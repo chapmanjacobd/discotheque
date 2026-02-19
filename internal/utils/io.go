@@ -14,6 +14,11 @@ func FileExists(path string) bool {
 	return err == nil
 }
 
+func DirExists(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && info.IsDir()
+}
+
 func GetDefaultBrowser() string {
 	switch runtime.GOOS {
 	case "linux":

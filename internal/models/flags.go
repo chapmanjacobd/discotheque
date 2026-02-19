@@ -17,6 +17,9 @@ type (
 	MergeTrait      interface{ IsMergeTrait() }
 	ActionTrait     interface{ IsActionTrait() }
 	FTSTrait        interface{ IsFTSTrait() }
+	HashingTrait    interface{ IsHashingTrait() }
+	DedupeTrait     interface{ IsDedupeTrait() }
+	HistoryTrait    interface{ IsHistoryTrait() }
 )
 
 // GlobalFlags are flags available to all commands
@@ -24,6 +27,20 @@ type GlobalFlags struct {
 	Query  string `short:"q" help:"Raw SQL query (overrides all query building)" group:"Query"`
 	Limit  int    `short:"L" default:"100" help:"Limit results per database" group:"Query"`
 	Offset int    `help:"Skip N results" group:"Query"`
+
+	// Dedupe profiles
+	Audio        bool `help:"Dedupe database by artist + album + title" group:"Dedupe"`
+	ExtractorID  bool `alias:"id" help:"Dedupe database by extractor_id" group:"Dedupe"`
+	TitleOnly    bool `help:"Dedupe database by title" group:"Dedupe"`
+	DurationOnly bool `help:"Dedupe database by duration" group:"Dedupe"`
+	Filesystem   bool `alias:"fs" help:"Dedupe filesystem database (hash)" group:"Dedupe"`
+
+	// Dedupe options
+	CompareDirs        bool    `help:"Compare directories" group:"Dedupe"`
+	Basename           bool    `help:"Match by basename similarity" group:"Dedupe"`
+	Dirname            bool    `help:"Match by dirname similarity" group:"Dedupe"`
+	MinSimilarityRatio float64 `default:"0.8" help:"Filter out matches with less than this ratio (0.7-0.9)" group:"Dedupe"`
+	DedupeCmd          string  `help:"Command to run for deduplication (rmlint-style: cmd duplicate keep)" group:"Dedupe"`
 
 	// Path filters
 	Include      []string `short:"s" help:"Include paths matching pattern" group:"Filter"`
@@ -136,22 +153,55 @@ type GlobalFlags struct {
 	PrintGroups bool `help:"Print clusters as JSON" group:"Similarity"`
 
 	// Playback
-	PlayInOrder    string  `short:"O" default:"natural_ps" help:"Play media in order" group:"Playback"`
-	NoPlayInOrder  bool    `help:"Don't play media in order" group:"Playback"`
-	Loop           bool    `help:"Loop playback" group:"Playback"`
-	Mute           bool    `short:"M" help:"Start playback muted" group:"Playback"`
-	OverridePlayer string  `help:"Override default player (e.g. --player 'vlc')" group:"Playback"`
-	Completed      bool    `help:"Show only completed items" group:"Playback"`
-	InProgress     bool    `help:"Show only items in progress" group:"Playback"`
-	Start          string  `help:"Start playback at specific time/percentage" group:"Playback"`
-	End            string  `help:"Stop playback at specific time/percentage" group:"Playback"`
-	Volume         int     `help:"Set initial volume (0-100)" group:"Playback"`
-	Fullscreen     bool    `help:"Start in fullscreen" group:"Playback"`
-	NoSubtitles    bool    `help:"Disable subtitles" group:"Playback"`
-	Speed          float64 `default:"1.0" help:"Playback speed" group:"Playback"`
-	SavePlayhead   bool    `default:"true" help:"Save playback position on quit" group:"Playback"`
-	MpvSocket      string  `help:"Mpv socket path" group:"Playback"`
-	WatchLaterDir  string  `help:"Mpv watch_later directory" group:"Playback"`
+	PlayInOrder           string  `short:"O" default:"natural_ps" help:"Play media in order" group:"Playback"`
+	NoPlayInOrder         bool    `help:"Don't play media in order" group:"Playback"`
+	ReRank                string  `short:"k" alias:"rerank" help:"Add key/value pairs re-rank sorting by multiple attributes (COLUMN=WEIGHT)" group:"Sort"`
+	Loop                  bool    `help:"Loop playback" group:"Playback"`
+	Mute                  bool    `short:"M" help:"Start playback muted" group:"Playback"`
+	OverridePlayer        string  `help:"Override default player (e.g. --player 'vlc')" group:"Playback"`
+	Completed             bool    `help:"Show only completed items" group:"Playback"`
+	InProgress            bool    `help:"Show only items in progress" group:"Playback"`
+	Start                 string  `help:"Start playback at specific time/percentage" group:"Playback"`
+	End                   string  `help:"Stop playback at specific time/percentage" group:"Playback"`
+	Volume                int     `help:"Set initial volume (0-100)" group:"Playback"`
+	Fullscreen            bool    `help:"Start in fullscreen" group:"Playback"`
+	NoSubtitles           bool    `help:"Disable subtitles" group:"Playback"`
+	SubtitleMix           float64 `default:"0.35" help:"Probability to play no-subtitle content" group:"Playback"`
+	InterdimensionalCable int     `short:"4" alias:"4dtv" help:"Duration to play (in seconds) while changing the channel" group:"Playback"`
+	Speed                 float64 `default:"1.0" help:"Playback speed" group:"Playback"`
+	SavePlayhead          bool    `default:"true" help:"Save playback position on quit" group:"Playback"`
+	MpvSocket             string  `help:"Mpv socket path" group:"Playback"`
+	WatchLaterDir         string  `help:"Mpv watch_later directory" group:"Playback"`
+
+	PlayerArgsSub   []string `help:"Player arguments for videos with subtitles" group:"Playback"`
+	PlayerArgsNoSub []string `help:"Player arguments for videos without subtitles" group:"Playback"`
+
+	Cmd0   string `help:"Command to run if mpv exits with code 0" group:"Action"`
+	Cmd1   string `help:"Command to run if mpv exits with code 1" group:"Action"`
+	Cmd2   string `help:"Command to run if mpv exits with code 2" group:"Action"`
+	Cmd3   string `help:"Command to run if mpv exits with code 3" group:"Action"`
+	Cmd4   string `help:"Command to run if mpv exits with code 4" group:"Action"`
+	Cmd5   string `help:"Command to run if mpv exits with code 5" group:"Action"`
+	Cmd6   string `help:"Command to run if mpv exits with code 6" group:"Action"`
+	Cmd7   string `help:"Command to run if mpv exits with code 7" group:"Action"`
+	Cmd8   string `help:"Command to run if mpv exits with code 8" group:"Action"`
+	Cmd9   string `help:"Command to run if mpv exits with code 9" group:"Action"`
+	Cmd10  string `help:"Command to run if mpv exits with code 10" group:"Action"`
+	Cmd11  string `help:"Command to run if mpv exits with code 11" group:"Action"`
+	Cmd12  string `help:"Command to run if mpv exits with code 12" group:"Action"`
+	Cmd13  string `help:"Command to run if mpv exits with code 13" group:"Action"`
+	Cmd14  string `help:"Command to run if mpv exits with code 14" group:"Action"`
+	Cmd15  string `help:"Command to run if mpv exits with code 15" group:"Action"`
+	Cmd20  string `help:"Command to run if mpv exits with code 20" group:"Action"`
+	Cmd127 string `help:"Command to run if mpv exits with code 127" group:"Action"`
+
+	Interactive bool `short:"I" help:"Interactive decision making after playback" group:"Action"`
+	Trash       bool `help:"Trash files after action" group:"Action"`
+
+	// Hashing
+	HashGap       float64 `default:"0.1" help:"Gap between segments (0.0-1.0 as percentage of file size, or absolute bytes if >1)" group:"Hashing"`
+	HashChunkSize int64   `help:"Size of each segment to hash" group:"Hashing"`
+	HashThreads   int     `default:"1" help:"Number of threads to use for hashing a single file" group:"Hashing"`
 
 	// Chromecast
 	Cast          bool   `help:"Cast to chromecast groups" group:"Playback"`

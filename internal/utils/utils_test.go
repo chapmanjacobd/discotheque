@@ -78,10 +78,10 @@ func TestParseSlice(t *testing.T) {
 		input    string
 		expected Slice
 	}{
-		{"1:5:2", Slice{Start: intPtr(1), Stop: intPtr(5), Step: intPtr(2)}},
-		{"3", Slice{Start: intPtr(3)}},
-		{"3:4", Slice{Start: intPtr(3), Stop: intPtr(4)}},
-		{":4", Slice{Stop: intPtr(4)}},
+		{"1:5:2", Slice{Start: new(1), Stop: new(5), Step: new(2)}},
+		{"3", Slice{Start: new(3)}},
+		{"3:4", Slice{Start: new(3), Stop: new(4)}},
+		{":4", Slice{Stop: new(4)}},
 	}
 
 	for _, tt := range tests {
@@ -94,10 +94,6 @@ func TestParseSlice(t *testing.T) {
 			t.Errorf("ParseSlice(%q) = %+v, want %+v", tt.input, got, tt.expected)
 		}
 	}
-}
-
-func intPtr(i int) *int {
-	return &i
 }
 
 func TestDictFilterBool(t *testing.T) {

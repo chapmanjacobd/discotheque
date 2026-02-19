@@ -60,6 +60,11 @@ func (m *Media) Parent() string {
 	return filepath.Dir(m.Path)
 }
 
+func (m *Media) Stem() string {
+	ext := filepath.Ext(m.Path)
+	return strings.TrimSuffix(filepath.Base(m.Path), ext)
+}
+
 func (m *Media) ParentAtDepth(depth int) string {
 	if depth <= 0 {
 		return "/"

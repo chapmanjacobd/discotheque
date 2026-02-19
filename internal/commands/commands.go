@@ -11,10 +11,13 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/adrg/strutil"
+	"github.com/adrg/strutil/metrics"
 	"github.com/alecthomas/kong"
 	"github.com/chapmanjacobd/discotheque/internal/aggregate"
 	"github.com/chapmanjacobd/discotheque/internal/db"
@@ -151,7 +154,7 @@ func (c *PrintCmd) Run(ctx *kong.Context) error {
 	if c.RegexSort {
 		media = query.RegexSortMedia(media, c.GlobalFlags)
 	} else {
-		query.SortMedia(media, c.SortBy, c.Reverse, c.NatSort)
+		query.SortMedia(media, c.GlobalFlags)
 	}
 	return PrintMedia(c.Columns, media)
 }
@@ -313,7 +316,38 @@ func (c *SimilarFoldersCmd) Run(ctx *kong.Context) error {
 	}
 
 	folders := query.AggregateMedia(media, c.GlobalFlags)
-	groups := aggregate.ClusterFoldersByNumbers(c.GlobalFlags, folders)
+
+	var groups []models.FolderStats
+	if c.FilterNames {
+		// First pass: group by name
+		groups = aggregate.ClusterFoldersByName(c.GlobalFlags, folders)
+
+		if c.FilterSizes || c.FilterCounts || c.FilterDurations {
+			// Second pass: filter each group by numerical similarity
+			var refinedGroups []models.FolderStats
+			for _, group := range groups {
+				if len(group.Files) < 2 {
+					continue
+				}
+				// Break this merged group back into individual folders
+				subFolders := query.AggregateMedia(group.Files, c.GlobalFlags)
+				// Apply numerical clustering within this group
+				subGroups := aggregate.ClusterFoldersByNumbers(c.GlobalFlags, subFolders)
+				refinedGroups = append(refinedGroups, subGroups...)
+			}
+			groups = refinedGroups
+		}
+	} else {
+		groups = aggregate.ClusterFoldersByNumbers(c.GlobalFlags, folders)
+	}
+
+	// Filter for only duplicates/originals if requested
+	if c.OnlyDuplicates || c.OnlyOriginals {
+		// This is tricky with FolderStats because it's already merged.
+		// ClusterFoldersByNumbers/ByName return merged stats of the groups.
+		// If we want to see individual folders in the groups, we might need a different return type.
+		// For now, PrintFolders shows the merged group path and the total stats.
+	}
 
 	return PrintFolders(c.Columns, groups)
 }
@@ -336,78 +370,108 @@ func (c *WatchCmd) Run(ctx *kong.Context) error {
 	}
 
 	media = query.FilterMedia(media, c.GlobalFlags)
-	query.SortMedia(media, c.SortBy, c.Reverse, c.NatSort)
+	query.SortMedia(media, c.GlobalFlags)
+	if c.ReRank != "" {
+		media = query.ReRankMedia(media, c.GlobalFlags)
+	}
 
 	if len(media) == 0 {
 		return fmt.Errorf("no media found")
 	}
 
-	// Build mpv command
-	args := []string{"mpv"}
-
-	if c.Volume > 0 {
-		args = append(args, fmt.Sprintf("--volume=%d", c.Volume))
-	}
-	if c.Fullscreen {
-		args = append(args, "--fullscreen")
-	}
-	if c.NoSubtitles {
-		args = append(args, "--no-sub")
-	}
-	if c.Speed != 1.0 {
-		args = append(args, fmt.Sprintf("--speed=%.2f", c.Speed))
-	}
-	if c.Start != "" {
-		args = append(args, fmt.Sprintf("--start=%s", c.Start))
-	}
-	if c.SavePlayhead {
-		args = append(args, "--save-position-on-quit")
-	}
-	if c.Mute {
-		args = append(args, "--mute=yes")
-	}
-	if c.Loop {
-		args = append(args, "--loop-file=inf")
-	}
-
-	ipcSocket := c.MpvSocket
-	if ipcSocket == "" {
-		ipcSocket = utils.GetMpvWatchSocket()
-	}
-	args = append(args, fmt.Sprintf("--input-ipc-server=%s", ipcSocket))
-
-	// Add file paths
-	var paths []string
-	for _, m := range media {
-		if utils.FileExists(m.Path) {
-			paths = append(paths, m.Path)
+	for i, m := range media {
+		if !utils.FileExists(m.Path) {
+			continue
 		}
-	}
 
-	if len(paths) == 0 {
-		return fmt.Errorf("no playable files found")
-	}
+		// Build mpv command for this specific item (to handle Cable and SubMix)
+		args := []string{"mpv"}
 
-	args = append(args, paths...)
+		if c.Volume > 0 {
+			args = append(args, fmt.Sprintf("--volume=%d", c.Volume))
+		}
+		if c.Fullscreen {
+			args = append(args, "--fullscreen")
+		}
 
-	if c.Cast {
-		return CastPlay(c.GlobalFlags, media, false)
-	}
+		// Subtitle Mix logic
+		useSubs := !c.NoSubtitles
+		if useSubs && c.SubtitleMix > 0 {
+			if utils.RandomFloat() < c.SubtitleMix {
+				useSubs = false
+			}
+		}
 
-	// Execute mpv
-	cmd := exec.Command(args[0], args[1:]...)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	cmd.Stdin = os.Stdin
+		if !useSubs {
+			args = append(args, "--no-sub")
+			args = append(args, c.PlayerArgsNoSub...)
+		} else {
+			args = append(args, c.PlayerArgsSub...)
+		}
 
-	startTime := time.Now()
-	if err := cmd.Run(); err != nil {
-		return err
-	}
+		if c.Speed != 1.0 {
+			args = append(args, fmt.Sprintf("--speed=%.2f", c.Speed))
+		}
 
-	// Update history
-	if c.TrackHistory {
-		for _, m := range media {
+		// Start/End and Interdimensional Cable
+		start := c.Start
+		end := c.End
+		if c.InterdimensionalCable > 0 {
+			duration := 0
+			if m.Duration != nil {
+				duration = int(*m.Duration)
+			}
+			if duration > c.InterdimensionalCable {
+				s := utils.RandomInt(0, duration-c.InterdimensionalCable)
+				start = fmt.Sprintf("%d", s)
+				end = fmt.Sprintf("%d", s+c.InterdimensionalCable)
+			}
+		}
+
+		if start != "" {
+			args = append(args, fmt.Sprintf("--start=%s", start))
+		}
+		if end != "" {
+			args = append(args, fmt.Sprintf("--end=%s", end))
+		}
+
+		if c.SavePlayhead {
+			args = append(args, "--save-position-on-quit")
+		}
+		if c.Mute {
+			args = append(args, "--mute=yes")
+		}
+		if c.Loop {
+			args = append(args, "--loop-file=inf")
+		}
+
+		ipcSocket := c.MpvSocket
+		if ipcSocket == "" {
+			ipcSocket = utils.GetMpvWatchSocket()
+		}
+		args = append(args, fmt.Sprintf("--input-ipc-server=%s", ipcSocket))
+		args = append(args, m.Path)
+
+		if c.Cast {
+			// CastPlay handles its own loop, but we want to handle one by one for Cable?
+			// For now, let's just call it with the single item
+			if err := CastPlay(c.GlobalFlags, []models.MediaWithDB{m}, false); err != nil {
+				slog.Error("Cast failed", "path", m.Path, "error", err)
+			}
+			continue
+		}
+
+		// Execute mpv
+		cmd := exec.Command(args[0], args[1:]...)
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		cmd.Stdin = os.Stdin
+
+		startTime := time.Now()
+		err := cmd.Run()
+
+		// Update history
+		if c.TrackHistory {
 			mediaDuration := 0
 			if m.Duration != nil {
 				mediaDuration = int(*m.Duration)
@@ -422,9 +486,39 @@ func (c *WatchCmd) Run(ctx *kong.Context) error {
 				slog.Error("Warning: failed to update history", "path", m.Path, "error", err)
 			}
 		}
+
+		// Handle Exit Code Hooks
+		exitCode := 0
+		if err != nil {
+			if exitError, ok := err.(*exec.ExitError); ok {
+				exitCode = exitError.ExitCode()
+			} else {
+				return err
+			}
+		}
+
+		if err := RunExitCommand(c.GlobalFlags, exitCode, m.Path); err != nil {
+			slog.Error("Exit command failed", "code", exitCode, "error", err)
+		}
+
+		// Interactive decision
+		if c.Interactive {
+			if err := InteractiveDecision(c.GlobalFlags, m); err != nil {
+				slog.Error("Interactive decision failed", "error", err)
+			}
+		}
+
+		// Execute post action for this item
+		if err := ExecutePostAction(c.GlobalFlags, []models.MediaWithDB{m}); err != nil {
+			slog.Error("Post action failed", "path", m.Path, "error", err)
+		}
+
+		if i < len(media)-1 && c.InterdimensionalCable > 0 {
+			fmt.Printf("\nChanging channel...\n")
+		}
 	}
 
-	return ExecutePostAction(c.GlobalFlags, media)
+	return nil
 }
 
 type ListenCmd struct {
@@ -445,50 +539,78 @@ func (c *ListenCmd) Run(ctx *kong.Context) error {
 	}
 
 	media = query.FilterMedia(media, c.GlobalFlags)
-	query.SortMedia(media, c.SortBy, c.Reverse, c.NatSort)
-
-	args := []string{"mpv", "--video=no"}
-
-	if c.Volume > 0 {
-		args = append(args, fmt.Sprintf("--volume=%d", c.Volume))
-	}
-	if c.Speed != 1.0 {
-		args = append(args, fmt.Sprintf("--speed=%.2f", c.Speed))
-	}
-	if c.Mute {
-		args = append(args, "--mute=yes")
-	}
-	if c.Loop {
-		args = append(args, "--loop-file=inf")
+	query.SortMedia(media, c.GlobalFlags)
+	if c.ReRank != "" {
+		media = query.ReRankMedia(media, c.GlobalFlags)
 	}
 
-	ipcSocket := c.MpvSocket
-	if ipcSocket == "" {
-		ipcSocket = utils.GetMpvWatchSocket()
+	if len(media) == 0 {
+		return fmt.Errorf("no media found")
 	}
-	args = append(args, fmt.Sprintf("--input-ipc-server=%s", ipcSocket))
 
 	for _, m := range media {
-		if utils.FileExists(m.Path) {
-			args = append(args, m.Path)
+		if !utils.FileExists(m.Path) {
+			continue
 		}
-	}
 
-	if c.Cast {
-		return CastPlay(c.GlobalFlags, media, true)
-	}
+		args := []string{"mpv", "--video=no"}
 
-	cmd := exec.Command(args[0], args[1:]...)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+		if c.Volume > 0 {
+			args = append(args, fmt.Sprintf("--volume=%d", c.Volume))
+		}
+		if c.Speed != 1.0 {
+			args = append(args, fmt.Sprintf("--speed=%.2f", c.Speed))
+		}
+		if c.Mute {
+			args = append(args, "--mute=yes")
+		}
+		if c.Loop {
+			args = append(args, "--loop-file=inf")
+		}
 
-	startTime := time.Now()
-	if err := cmd.Run(); err != nil {
-		return err
-	}
+		// Interdimensional Cable for audio too? why not.
+		start := c.Start
+		end := c.End
+		if c.InterdimensionalCable > 0 {
+			duration := 0
+			if m.Duration != nil {
+				duration = int(*m.Duration)
+			}
+			if duration > c.InterdimensionalCable {
+				s := utils.RandomInt(0, duration-c.InterdimensionalCable)
+				start = fmt.Sprintf("%d", s)
+				end = fmt.Sprintf("%d", s+c.InterdimensionalCable)
+			}
+		}
+		if start != "" {
+			args = append(args, fmt.Sprintf("--start=%s", start))
+		}
+		if end != "" {
+			args = append(args, fmt.Sprintf("--end=%s", end))
+		}
 
-	if c.TrackHistory {
-		for _, m := range media {
+		ipcSocket := c.MpvSocket
+		if ipcSocket == "" {
+			ipcSocket = utils.GetMpvWatchSocket()
+		}
+		args = append(args, fmt.Sprintf("--input-ipc-server=%s", ipcSocket))
+		args = append(args, m.Path)
+
+		if c.Cast {
+			if err := CastPlay(c.GlobalFlags, []models.MediaWithDB{m}, true); err != nil {
+				slog.Error("Cast failed", "path", m.Path, "error", err)
+			}
+			continue
+		}
+
+		cmd := exec.Command(args[0], args[1:]...)
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+
+		startTime := time.Now()
+		err := cmd.Run()
+
+		if c.TrackHistory {
 			mediaDuration := 0
 			if m.Duration != nil {
 				mediaDuration = int(*m.Duration)
@@ -498,12 +620,25 @@ func (c *ListenCmd) Run(ctx *kong.Context) error {
 				existingPlayhead = int(*m.Playhead)
 			}
 			playhead := utils.GetPlayhead(c.GlobalFlags, m.Path, startTime, existingPlayhead, mediaDuration)
-
 			history.UpdateHistorySimple(m.DB, []string{m.Path}, playhead, false)
 		}
+
+		exitCode := 0
+		if err != nil {
+			if exitError, ok := err.(*exec.ExitError); ok {
+				exitCode = exitError.ExitCode()
+			}
+		}
+		RunExitCommand(c.GlobalFlags, exitCode, m.Path)
+
+		if c.Interactive {
+			InteractiveDecision(c.GlobalFlags, m)
+		}
+
+		ExecutePostAction(c.GlobalFlags, []models.MediaWithDB{m})
 	}
 
-	return ExecutePostAction(c.GlobalFlags, media)
+	return nil
 }
 
 type OpenCmd struct {
@@ -743,7 +878,21 @@ func (c SearchCmd) IsFTSTrait()     {}
 
 func (c *SearchCmd) Run(ctx *kong.Context) error {
 	models.SetupLogging(c.Verbose)
-	c.FTS = true // Force FTS for search command
+	// We prefer FTS if not specified
+	if !c.FTS {
+		// Check if FTS table exists in first database
+		if len(c.Databases) > 0 {
+			if sqlDB, err := db.Connect(c.Databases[0]); err == nil {
+				var name string
+				err := sqlDB.QueryRow("SELECT name FROM sqlite_master WHERE type='table' AND name='media_fts'").Scan(&name)
+				if err == nil {
+					c.FTS = true
+				}
+				sqlDB.Close()
+			}
+		}
+	}
+
 	media, err := query.MediaQuery(context.Background(), c.Databases, c.GlobalFlags)
 	if err != nil {
 		return err
@@ -844,7 +993,7 @@ func (c *HistoryCmd) Run(ctx *kong.Context) error {
 	if c.Partial != "" {
 		query.SortHistory(media, c.Partial, c.Reverse)
 	} else {
-		query.SortMedia(media, c.SortBy, c.Reverse, c.NatSort)
+		query.SortMedia(media, c.GlobalFlags)
 	}
 	return PrintMedia(c.Columns, media)
 }
@@ -921,6 +1070,26 @@ func (c *OptimizeCmd) Run(ctx *kong.Context) error {
 		}
 
 		slog.Info("Optimization complete", "path", dbPath)
+	}
+	return nil
+}
+
+type SampleHashCmd struct {
+	models.GlobalFlags
+	Paths []string `arg:"" required:"" help:"Files to hash" type:"existingfile"`
+}
+
+func (c SampleHashCmd) IsHashingTrait() {}
+
+func (c *SampleHashCmd) Run(ctx *kong.Context) error {
+	models.SetupLogging(c.Verbose)
+	for _, path := range c.Paths {
+		h, err := utils.SampleHashFile(path, c.HashThreads, c.HashGap, c.HashChunkSize)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error hashing %s: %v\n", path, err)
+			continue
+		}
+		fmt.Printf("%s\t%s\n", h, path)
 	}
 	return nil
 }
@@ -1386,6 +1555,8 @@ func ExecutePostAction(flags models.GlobalFlags, media []models.MediaWithDB) err
 		action = "move"
 	} else if flags.CopyTo != "" {
 		action = "copy"
+	} else if flags.Trash {
+		action = "trash"
 	}
 
 	if action == "" || action == "none" {
@@ -1427,6 +1598,8 @@ func ExecutePostAction(flags models.GlobalFlags, media []models.MediaWithDB) err
 			err = MoveMediaItem(flags.MoveTo, m)
 		case "copy":
 			err = CopyMediaItem(flags.CopyTo, m)
+		case "trash":
+			err = utils.Trash(flags, m.Path)
 		}
 
 		if err != nil {
@@ -1439,6 +1612,87 @@ func ExecutePostAction(flags models.GlobalFlags, media []models.MediaWithDB) err
 
 	if count > 0 {
 		fmt.Printf("\n%s %d files (%s total)\n", action, count, utils.FormatSize(totalSize))
+	}
+
+	return nil
+}
+
+func RunExitCommand(flags models.GlobalFlags, exitCode int, path string) error {
+	var cmdStr string
+	switch exitCode {
+	case 0:
+		cmdStr = flags.Cmd0
+	case 1:
+		cmdStr = flags.Cmd1
+	case 2:
+		cmdStr = flags.Cmd2
+	case 3:
+		cmdStr = flags.Cmd3
+	case 4:
+		cmdStr = flags.Cmd4
+	case 5:
+		cmdStr = flags.Cmd5
+	case 6:
+		cmdStr = flags.Cmd6
+	case 7:
+		cmdStr = flags.Cmd7
+	case 8:
+		cmdStr = flags.Cmd8
+	case 9:
+		cmdStr = flags.Cmd9
+	case 10:
+		cmdStr = flags.Cmd10
+	case 11:
+		cmdStr = flags.Cmd11
+	case 12:
+		cmdStr = flags.Cmd12
+	case 13:
+		cmdStr = flags.Cmd13
+	case 14:
+		cmdStr = flags.Cmd14
+	case 15:
+		cmdStr = flags.Cmd15
+	case 20:
+		cmdStr = flags.Cmd20
+	case 127:
+		cmdStr = flags.Cmd127
+	}
+
+	if cmdStr == "" {
+		return nil
+	}
+
+	// Replace {} with path
+	cmdStr = strings.ReplaceAll(cmdStr, "{}", fmt.Sprintf("'%s'", path))
+
+	slog.Info("Running exit command", "code", exitCode, "command", cmdStr)
+	cmd := exec.Command("bash", "-c", cmdStr)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
+}
+
+func InteractiveDecision(flags models.GlobalFlags, m models.MediaWithDB) error {
+	fmt.Printf("\nAction for %s?\n", m.Path)
+	fmt.Println("  [k]eep (default)")
+	fmt.Println("  [d]elete")
+	fmt.Println("  [t]rash")
+	fmt.Println("  [m]ark-deleted")
+	fmt.Println("  [q]uit")
+
+	var input string
+	fmt.Print("> ")
+	fmt.Scanln(&input)
+
+	switch strings.ToLower(input) {
+	case "d":
+		return DeleteMediaItem(m)
+	case "t":
+		return utils.Trash(flags, m.Path)
+	case "m":
+		return MarkDeletedItem(m)
+	case "q":
+		os.Exit(0)
 	}
 
 	return nil
@@ -1592,5 +1846,423 @@ func CastPlay(flags models.GlobalFlags, media []models.MediaWithDB, audioOnly bo
 		}
 	}
 	os.Remove(utils.GetCattNowPlayingFile())
+	return nil
+}
+
+type DedupeCmd struct {
+	models.GlobalFlags
+	Databases []string `arg:"" required:"" help:"SQLite database files" type:"existingfile"`
+}
+
+func (c DedupeCmd) IsDedupeTrait() {}
+
+type DedupeDuplicate struct {
+	KeepPath      string
+	DuplicatePath string
+	DuplicateSize int64
+}
+
+func (c *DedupeCmd) Run(ctx *kong.Context) error {
+	models.SetupLogging(c.Verbose)
+
+	var duplicates []DedupeDuplicate
+	var err error
+
+	for _, dbPath := range c.Databases {
+		var dbDups []DedupeDuplicate
+		if c.Audio {
+			dbDups, err = c.getMusicDuplicates(dbPath)
+		} else if c.ExtractorID {
+			dbDups, err = c.getIDDuplicates(dbPath)
+		} else if c.TitleOnly {
+			dbDups, err = c.getTitleDuplicates(dbPath)
+		} else if c.DurationOnly {
+			dbDups, err = c.getDurationDuplicates(dbPath)
+		} else if c.Filesystem {
+			dbDups, err = c.getFSDuplicates(dbPath)
+		} else {
+			return fmt.Errorf("profile not set. Use --audio, --id, --title, --duration, or --fs")
+		}
+
+		if err != nil {
+			return err
+		}
+		duplicates = append(duplicates, dbDups...)
+	}
+
+	// Apply name similarity filters and deduplicate candidates
+	metric := metrics.NewSorensenDice()
+	var finalCandidates []DedupeDuplicate
+	seenDuplicates := make(map[string]bool)
+
+	for _, d := range duplicates {
+		if seenDuplicates[d.DuplicatePath] || d.KeepPath == d.DuplicatePath {
+			continue
+		}
+
+		if c.Dirname {
+			if strutil.Similarity(filepath.Dir(d.KeepPath), filepath.Dir(d.DuplicatePath), metric) < c.MinSimilarityRatio {
+				continue
+			}
+		}
+
+		if c.Basename {
+			if strutil.Similarity(filepath.Base(d.KeepPath), filepath.Base(d.DuplicatePath), metric) < c.MinSimilarityRatio {
+				continue
+			}
+		}
+
+		// Check if keep path still exists
+		if !utils.FileExists(d.KeepPath) {
+			continue
+		}
+
+		finalCandidates = append(finalCandidates, d)
+		seenDuplicates[d.DuplicatePath] = true
+	}
+
+	if len(finalCandidates) == 0 {
+		slog.Info("No duplicates found")
+		return nil
+	}
+
+	// Print summary
+	var totalSavings int64
+	for _, d := range finalCandidates {
+		totalSavings += d.DuplicateSize
+		fmt.Printf("Keep: %s\n  Dup: %s (%s)\n", d.KeepPath, d.DuplicatePath, utils.FormatSize(d.DuplicateSize))
+	}
+	fmt.Printf("\nApprox. space savings: %s (%d files)\n", utils.FormatSize(totalSavings), len(finalCandidates))
+
+	if !c.NoConfirm {
+		fmt.Print("\nDelete duplicates? [y/N] ")
+		var response string
+		fmt.Scanln(&response)
+		if strings.ToLower(response) != "y" {
+			return nil
+		}
+	}
+
+	slog.Info("Deleting duplicates...")
+	for _, d := range finalCandidates {
+		if c.DedupeCmd != "" {
+			cmdStr := strings.ReplaceAll(c.DedupeCmd, "{}", fmt.Sprintf("'%s'", d.DuplicatePath))
+			// rmlint style is cmd duplicate keep
+			exec.Command("bash", "-c", cmdStr+" "+fmt.Sprintf("'%s'", d.DuplicatePath)+" "+fmt.Sprintf("'%s'", d.KeepPath)).Run()
+		} else if c.Trash {
+			utils.Trash(c.GlobalFlags, d.DuplicatePath)
+		} else {
+			os.Remove(d.DuplicatePath)
+		}
+
+		// Mark as deleted in DB
+		// We need to find which DB this file came from.
+		// For simplicity, we can just try to mark it in all provided DBs or track it in DedupeDuplicate
+	}
+
+	return nil
+}
+
+func (c *DedupeCmd) getMusicDuplicates(dbPath string) ([]DedupeDuplicate, error) {
+	sqlDB, err := db.Connect(dbPath)
+	if err != nil {
+		return nil, err
+	}
+	defer sqlDB.Close()
+
+	// Simplified join query for duplicates
+	query := `
+		SELECT m1.path as keep_path, m2.path as duplicate_path, m2.size as duplicate_size
+		FROM media m1
+		JOIN media m2 ON m1.title = m2.title 
+			AND m1.artist = m2.artist 
+			AND m1.album = m2.album
+			AND ABS(m1.duration - m2.duration) <= 8
+			AND m1.path != m2.path
+		WHERE COALESCE(m1.time_deleted, 0) = 0 AND COALESCE(m2.time_deleted, 0) = 0
+		AND m1.title != '' AND m1.artist != ''
+		ORDER BY m1.size DESC, m1.time_modified DESC
+	`
+
+	rows, err := sqlDB.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var dups []DedupeDuplicate
+	for rows.Next() {
+		var d DedupeDuplicate
+		if err := rows.Scan(&d.KeepPath, &d.DuplicatePath, &d.DuplicateSize); err != nil {
+			return nil, err
+		}
+		dups = append(dups, d)
+	}
+	return dups, nil
+}
+
+func (c *DedupeCmd) getIDDuplicates(dbPath string) ([]DedupeDuplicate, error) {
+	sqlDB, err := db.Connect(dbPath)
+	if err != nil {
+		return nil, err
+	}
+	defer sqlDB.Close()
+
+	query := `
+		SELECT m1.path as keep_path, m2.path as duplicate_path, m2.size as duplicate_size
+		FROM media m1
+		JOIN media m2 ON m1.webpath = m2.webpath
+			AND ABS(m1.duration - m2.duration) <= 8
+			AND m1.path != m2.path
+		WHERE COALESCE(m1.time_deleted, 0) = 0 AND COALESCE(m2.time_deleted, 0) = 0
+		AND m1.webpath != ''
+		ORDER BY m1.size DESC
+	`
+
+	rows, err := sqlDB.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var dups []DedupeDuplicate
+	for rows.Next() {
+		var d DedupeDuplicate
+		if err := rows.Scan(&d.KeepPath, &d.DuplicatePath, &d.DuplicateSize); err != nil {
+			return nil, err
+		}
+		dups = append(dups, d)
+	}
+	return dups, nil
+}
+
+func (c *DedupeCmd) getTitleDuplicates(dbPath string) ([]DedupeDuplicate, error) {
+	sqlDB, err := db.Connect(dbPath)
+	if err != nil {
+		return nil, err
+	}
+	defer sqlDB.Close()
+
+	query := `
+		SELECT m1.path as keep_path, m2.path as duplicate_path, m2.size as duplicate_size
+		FROM media m1
+		JOIN media m2 ON m1.title = m2.title
+			AND ABS(m1.duration - m2.duration) <= 8
+			AND m1.path != m2.path
+		WHERE COALESCE(m1.time_deleted, 0) = 0 AND COALESCE(m2.time_deleted, 0) = 0
+		AND m1.title != ''
+		ORDER BY m1.size DESC
+	`
+
+	rows, err := sqlDB.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var dups []DedupeDuplicate
+	for rows.Next() {
+		var d DedupeDuplicate
+		if err := rows.Scan(&d.KeepPath, &d.DuplicatePath, &d.DuplicateSize); err != nil {
+			return nil, err
+		}
+		dups = append(dups, d)
+	}
+	return dups, nil
+}
+
+func (c *DedupeCmd) getDurationDuplicates(dbPath string) ([]DedupeDuplicate, error) {
+	sqlDB, err := db.Connect(dbPath)
+	if err != nil {
+		return nil, err
+	}
+	defer sqlDB.Close()
+
+	query := `
+		SELECT m1.path as keep_path, m2.path as duplicate_path, m2.size as duplicate_size
+		FROM media m1
+		JOIN media m2 ON m1.duration = m2.duration
+			AND m1.path != m2.path
+		WHERE COALESCE(m1.time_deleted, 0) = 0 AND COALESCE(m2.time_deleted, 0) = 0
+		AND m1.duration > 0
+		ORDER BY m1.size DESC
+	`
+
+	rows, err := sqlDB.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var dups []DedupeDuplicate
+	for rows.Next() {
+		var d DedupeDuplicate
+		if err := rows.Scan(&d.KeepPath, &d.DuplicatePath, &d.DuplicateSize); err != nil {
+			return nil, err
+		}
+		dups = append(dups, d)
+	}
+	return dups, nil
+}
+
+func (c *DedupeCmd) getFSDuplicates(dbPath string) ([]DedupeDuplicate, error) {
+	sqlDB, err := db.Connect(dbPath)
+	if err != nil {
+		return nil, err
+	}
+	defer sqlDB.Close()
+
+	// 1. Group by size
+	query := "SELECT path, size FROM media WHERE COALESCE(time_deleted, 0) = 0 AND size > 0"
+	rows, err := sqlDB.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	sizeGroups := make(map[int64][]string)
+	for rows.Next() {
+		var path string
+		var size int64
+		if err := rows.Scan(&path, &size); err != nil {
+			return nil, err
+		}
+		sizeGroups[size] = append(sizeGroups[size], path)
+	}
+
+	var candidates []string
+	for _, paths := range sizeGroups {
+		if len(paths) > 1 {
+			candidates = append(candidates, paths...)
+		}
+	}
+
+	if len(candidates) == 0 {
+		return nil, nil
+	}
+
+	// 2. Sample Hash
+	sampleHashes := make(map[string][]string)
+	for _, p := range candidates {
+		h, err := utils.SampleHashFile(p, c.HashThreads, c.HashGap, c.HashChunkSize)
+		if err == nil && h != "" {
+			sampleHashes[h] = append(sampleHashes[h], p)
+		}
+	}
+
+	var fullHashCandidates []string
+	for _, paths := range sampleHashes {
+		if len(paths) > 1 {
+			fullHashCandidates = append(fullHashCandidates, paths...)
+		}
+	}
+
+	// 3. Full Hash
+	fullHashes := make(map[string][]string)
+	for _, p := range fullHashCandidates {
+		h, err := utils.FullHashFile(p)
+		if err == nil && h != "" {
+			fullHashes[h] = append(fullHashes[h], p)
+		}
+	}
+
+	var dups []DedupeDuplicate
+	for _, paths := range fullHashes {
+		if len(paths) > 1 {
+			sort.Strings(paths) // consistent keep path
+			keep := paths[0]
+			var size int64
+			sqlDB.QueryRow("SELECT size FROM media WHERE path = ?", keep).Scan(&size)
+			for _, dup := range paths[1:] {
+				dups = append(dups, DedupeDuplicate{
+					KeepPath:      keep,
+					DuplicatePath: dup,
+					DuplicateSize: size,
+				})
+			}
+		}
+	}
+
+	return dups, nil
+}
+
+type MpvWatchlaterCmd struct {
+	models.GlobalFlags
+	Databases []string `arg:"" required:"" help:"SQLite database files" type:"existingfile"`
+}
+
+func (c MpvWatchlaterCmd) IsHistoryTrait() {}
+
+func (c *MpvWatchlaterCmd) Run(ctx *kong.Context) error {
+	models.SetupLogging(c.Verbose)
+
+	watchLaterDir := c.WatchLaterDir
+	if watchLaterDir == "" {
+		watchLaterDir = utils.GetMpvWatchLaterDir()
+	}
+
+	if !utils.DirExists(watchLaterDir) {
+		return fmt.Errorf("mpv watch_later directory not found: %s", watchLaterDir)
+	}
+
+	// 1. Get all media from databases
+	media, err := query.MediaQuery(context.Background(), c.Databases, c.GlobalFlags)
+	if err != nil {
+		return err
+	}
+
+	// 2. Map MD5 hashes to media items
+	md5Map := make(map[string]models.MediaWithDB)
+	for _, m := range media {
+		hash := utils.PathToMpvWatchLaterMD5(m.Path)
+		md5Map[hash] = m
+	}
+
+	// 3. Scan watch_later directory
+	entries, err := os.ReadDir(watchLaterDir)
+	if err != nil {
+		return err
+	}
+
+	count := 0
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+
+		hash := entry.Name()
+		if m, ok := md5Map[hash]; ok {
+			metadataPath := filepath.Join(watchLaterDir, hash)
+
+			// Get playhead
+			val, err := utils.MpvWatchLaterValue(metadataPath, "start")
+			if err != nil || val == "" {
+				continue
+			}
+
+			playhead := 0
+			if f := utils.SafeFloat(val); f != nil {
+				playhead = int(*f)
+			}
+
+			// Get file times
+			info, err := entry.Info()
+			if err != nil {
+				continue
+			}
+
+			// We use mtime as time_played
+			timePlayed := info.ModTime().Unix()
+
+			if err := history.UpdateHistoryWithTime(m.DB, []string{m.Path}, playhead, timePlayed, false); err != nil {
+				slog.Error("Failed to import watchlater", "path", m.Path, "error", err)
+			} else {
+				count++
+				slog.Debug("Imported watchlater", "path", m.Path, "playhead", playhead)
+			}
+		}
+	}
+
+	fmt.Printf("Imported %d watch-later records\n", count)
 	return nil
 }

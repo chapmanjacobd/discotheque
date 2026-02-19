@@ -3,6 +3,7 @@ package utils
 import (
 	"fmt"
 	"math"
+	"math/rand"
 	"regexp"
 	"sort"
 	"strconv"
@@ -11,6 +12,40 @@ import (
 
 type Number interface {
 	~int | ~int8 | ~int16 | ~int32 | ~int64 | ~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64 | ~uintptr | ~float32 | ~float64
+}
+
+func RandomFloat() float64 {
+	return rand.Float64()
+}
+
+func RandomInt(min, max int) int {
+	if min >= max {
+		return min
+	}
+	return rand.Intn(max-min) + min
+}
+
+func LinearInterpolation(x float64, dataPoints [][2]float64) float64 {
+	if len(dataPoints) == 0 {
+		return 0
+	}
+	// Assume dataPoints are sorted by x
+	n := len(dataPoints)
+	if x < dataPoints[0][0] {
+		return dataPoints[0][1]
+	}
+	if x > dataPoints[n-1][0] {
+		return dataPoints[n-1][1]
+	}
+
+	for i := 0; i < n-1; i++ {
+		if x >= dataPoints[i][0] && x <= dataPoints[i+1][0] {
+			x1, y1 := dataPoints[i][0], dataPoints[i][1]
+			x2, y2 := dataPoints[i+1][0], dataPoints[i+1][1]
+			return y1 + ((x-x1)/(x2-x1))*(y2-y1)
+		}
+	}
+	return dataPoints[n-1][1]
 }
 
 func SafeMean[T Number](slice []T) float64 {
@@ -261,6 +296,33 @@ func CalculateSegments(total float64, chunk float64, gap float64) []float64 {
 	g := gap
 	if g < 1 {
 		g = math.Ceil(total * gap)
+	}
+
+	for start+chunk < endSegmentStart {
+		segments = append(segments, start)
+		start += chunk + g
+	}
+
+	return append(segments, endSegmentStart)
+}
+
+func CalculateSegmentsInt(total int64, chunk int64, gap float64) []int64 {
+	if total <= 0 || chunk <= 0 {
+		return nil
+	}
+	if total <= chunk*3 {
+		return []int64{0}
+	}
+
+	var segments []int64
+	start := int64(0)
+	endSegmentStart := total - chunk
+
+	g := int64(0)
+	if gap < 1 {
+		g = int64(math.Ceil(float64(total) * gap))
+	} else {
+		g = int64(gap)
 	}
 
 	for start+chunk < endSegmentStart {

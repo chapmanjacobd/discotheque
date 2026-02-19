@@ -193,11 +193,8 @@ func (c *CategorizeCmd) mineCategories(media []models.MediaWithDB, compiled map[
 	})
 
 	fmt.Printf("Mined %d unmatched files. Top potential keywords:\n", unmatchedCount)
-	limit := 50
-	if len(freqs) < limit {
-		limit = len(freqs)
-	}
-	for i := 0; i < limit; i++ {
+	limit := min(len(freqs), 50)
+	for i := range limit {
 		fmt.Printf("%s: %d\n", freqs[i].word, freqs[i].count)
 	}
 

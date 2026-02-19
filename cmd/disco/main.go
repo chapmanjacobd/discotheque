@@ -22,6 +22,7 @@ type CLI struct {
 	MediaCheck     commands.MediaCheckCmd     `cmd:"" help:"Check media files for corruption" aliases:"mc"`
 	FilesInfo      commands.FilesInfoCmd      `cmd:"" help:"Show information about files" aliases:"fs"`
 	DiskUsage      commands.DiskUsageCmd      `cmd:"" help:"Show disk usage aggregation" aliases:"du"`
+	Dedupe         commands.DedupeCmd         `cmd:"" name:"dedupe" help:"Dedupe similar media" aliases:"dedupe-media"`
 	BigDirs        commands.BigDirsCmd        `cmd:"" help:"Show big directories aggregation" aliases:"bigdirs,bd"`
 	Categorize     commands.CategorizeCmd     `cmd:"" help:"Auto-group media into categories"`
 	SimilarFiles   commands.SimilarFilesCmd   `cmd:"" help:"Find similar files" aliases:"sf"`
@@ -31,11 +32,14 @@ type CLI struct {
 	Stats          commands.StatsCmd          `cmd:"" help:"Show library statistics"`
 	History        commands.HistoryCmd        `cmd:"" help:"Show playback history"`
 	HistoryAdd     commands.HistoryAddCmd     `cmd:"" help:"Add paths to playback history"`
+	MpvWatchlater  commands.MpvWatchlaterCmd  `cmd:"" name:"mpv-watchlater" help:"Import mpv watchlater files to history"`
+	Serve          commands.ServeCmd          `cmd:"" help:"Start Web UI server"`
 	Optimize       commands.OptimizeCmd       `cmd:"" help:"Optimize database (VACUUM, ANALYZE, FTS optimize)"`
 	Tui            commands.TuiCmd            `cmd:"" help:"Interactive TUI media picker"`
 	Readme         commands.ReadmeCmd         `cmd:"" help:"Generate README.md content"`
 	RegexSort      commands.RegexSortCmd      `cmd:"" help:"Sort by splitting lines and sorting words" aliases:"rs"`
 	ClusterSort    commands.ClusterSortCmd    `cmd:"" help:"Group items by similarity" aliases:"cs"`
+	SampleHash     commands.SampleHashCmd     `cmd:"" name:"sample-hash" help:"Calculate a hash based on small file segments" aliases:"hash"`
 	Open           commands.OpenCmd           `cmd:"" help:"Open files with default application"`
 	Browse         commands.BrowseCmd         `cmd:"" help:"Open URLs in browser"`
 	Now            commands.NowCmd            `cmd:"" help:"Show current mpv playback status"`
@@ -96,6 +100,12 @@ func main() {
 					_, keep = target.(models.ActionTrait)
 				case "FTS":
 					_, keep = target.(models.FTSTrait)
+				case "Hashing":
+					_, keep = target.(models.HashingTrait)
+				case "Dedupe":
+					_, keep = target.(models.DedupeTrait)
+				case "History":
+					_, keep = target.(models.HistoryTrait)
 				default:
 					keep = true
 				}

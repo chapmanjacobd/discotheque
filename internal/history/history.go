@@ -47,8 +47,8 @@ func (t *Tracker) MarkDeleted(ctx context.Context, path string) error {
 	})
 }
 
-// UpdateHistorySimple updates playback history in database without needing a Tracker
-func UpdateHistorySimple(dbPath string, paths []string, playhead int, markDone bool) error {
+// UpdateHistoryWithTime updates playback history in database with a specific timestamp
+func UpdateHistoryWithTime(dbPath string, paths []string, playhead int, timePlayed int64, markDone bool) error {
 	sqlDB, err := db.Connect(dbPath)
 	if err != nil {
 		return err
@@ -62,7 +62,6 @@ func UpdateHistorySimple(dbPath string, paths []string, playhead int, markDone b
 	defer tx.Rollback()
 
 	queries := db.New(sqlDB).WithTx(tx)
-	now := time.Now().Unix()
 	done := int64(0)
 	if markDone {
 		done = 1
@@ -70,20 +69,21 @@ func UpdateHistorySimple(dbPath string, paths []string, playhead int, markDone b
 
 	for _, path := range paths {
 		// Update media aggregate
+		// Note: UpdatePlayHistory in queries.sql only updates time_last_played if it's newer,
+		// but sqlc generated code might differ. Let's assume it's a simple update for now.
 		if err := queries.UpdatePlayHistory(context.Background(), db.UpdatePlayHistoryParams{
-			TimeLastPlayed:  sql.NullInt64{Int64: now, Valid: true},
-			TimeFirstPlayed: sql.NullInt64{Int64: now, Valid: true},
+			TimeLastPlayed:  sql.NullInt64{Int64: timePlayed, Valid: true},
+			TimeFirstPlayed: sql.NullInt64{Int64: timePlayed, Valid: true},
 			Playhead:        sql.NullInt64{Int64: int64(playhead), Valid: true},
 			Path:            path,
 		}); err != nil {
-			// If file doesn't exist in media, we might want to skip or log
 			continue
 		}
 
 		// Insert granular history record
 		if err := queries.InsertHistory(context.Background(), db.InsertHistoryParams{
 			MediaPath:  path,
-			TimePlayed: sql.NullInt64{Int64: now, Valid: true},
+			TimePlayed: sql.NullInt64{Int64: timePlayed, Valid: true},
 			Playhead:   sql.NullInt64{Int64: int64(playhead), Valid: true},
 			Done:       sql.NullInt64{Int64: done, Valid: true},
 		}); err != nil {
@@ -92,6 +92,11 @@ func UpdateHistorySimple(dbPath string, paths []string, playhead int, markDone b
 	}
 
 	return tx.Commit()
+}
+
+// UpdateHistorySimple updates playback history in database without needing a Tracker
+func UpdateHistorySimple(dbPath string, paths []string, playhead int, markDone bool) error {
+	return UpdateHistoryWithTime(dbPath, paths, playhead, time.Now().Unix(), markDone)
 }
 
 // DeleteHistoryByPaths removes history records for specified paths

@@ -1,16 +1,109 @@
 package utils
 
 import (
+	"crypto/sha256"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 
 	"github.com/chapmanjacobd/discotheque/internal/models"
 	"github.com/gabriel-vasile/mimetype"
 )
+
+// SampleHashFile calculates a hash based on small file segments
+func SampleHashFile(path string, threads int, gap float64, chunkSize int64) (string, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+
+	info, err := file.Stat()
+	if err != nil {
+		return "", err
+	}
+
+	size := info.Size()
+	if size == 0 {
+		return "", nil
+	}
+
+	if chunkSize <= 0 {
+		// Linear interpolation for chunk size based on file size
+		dataPoints := [][2]float64{
+			{26214400, 262144},      // 25MB -> 256KB
+			{52428800000, 10485760}, // 50GB -> 10MB
+		}
+		chunkSize = int64(LinearInterpolation(float64(size), dataPoints))
+	}
+
+	segments := CalculateSegmentsInt(size, chunkSize, gap)
+	if len(segments) == 0 {
+		return "", nil
+	}
+
+	hashes := make([][]byte, len(segments))
+	var wg sync.WaitGroup
+
+	if threads <= 0 {
+		threads = 1
+	}
+
+	sem := make(chan struct{}, threads)
+
+	for i, start := range segments {
+		wg.Add(1)
+		go func(idx int, offset int64) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+
+			buf := make([]byte, chunkSize)
+			n, err := file.ReadAt(buf, offset)
+			if err != nil && err != io.EOF {
+				slog.Error("Read error during hashing", "path", path, "offset", offset, "error", err)
+				return
+			}
+			data := buf[:n]
+			h := sha256.New()
+			h.Write(data)
+			hashes[idx] = h.Sum(nil)
+		}(i, start)
+	}
+
+	wg.Wait()
+
+	// Final hash of all segment hashes
+	finalHash := sha256.New()
+	for _, h := range hashes {
+		if h != nil {
+			finalHash.Write(h)
+		}
+	}
+
+	return fmt.Sprintf("%x", finalHash.Sum(nil)), nil
+}
+
+// FullHashFile calculates a full sha256 hash of a file
+func FullHashFile(path string) (string, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+
+	h := sha256.New()
+	if _, err := io.Copy(h, file); err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("%x", h.Sum(nil)), nil
+}
 
 // FilterDeleted returns only the paths that currently exist on the filesystem
 func FilterDeleted(paths []string) []string {

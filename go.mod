@@ -1,6 +1,6 @@
 module github.com/chapmanjacobd/discotheque
 
-go 1.25.1
+go 1.26.0
 
 require (
 	github.com/alecthomas/kong v1.13.0

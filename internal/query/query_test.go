@@ -134,12 +134,12 @@ func TestSortMedia(t *testing.T) {
 		{Media: models.Media{Path: "a.mp4", Size: &size100}},
 	}
 
-	SortMedia(media, "path", false, false)
+	SortMedia(media, models.GlobalFlags{SortBy: "path"})
 	if media[0].Path != "a.mp4" {
 		t.Errorf("SortMedia by path failed, got %s", media[0].Path)
 	}
 
-	SortMedia(media, "size", false, false)
+	SortMedia(media, models.GlobalFlags{SortBy: "size"})
 	if *media[0].Size != 100 {
 		t.Errorf("SortMedia by size failed, got %d", *media[0].Size)
 	}

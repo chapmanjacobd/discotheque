@@ -6,13 +6,11 @@ import (
 	"github.com/chapmanjacobd/discotheque/internal/models"
 )
 
-func int64Ptr(i int64) *int64 { return &i }
-
 func TestApply_BySize(t *testing.T) {
 	media := []models.Media{
-		{Path: "/c", Size: int64Ptr(3000)},
-		{Path: "/a", Size: int64Ptr(1000)},
-		{Path: "/b", Size: int64Ptr(2000)},
+		{Path: "/c", Size: new(int64(3000))},
+		{Path: "/a", Size: new(int64(1000))},
+		{Path: "/b", Size: new(int64(2000))},
 	}
 
 	Apply(media, BySize, false, false)
@@ -27,9 +25,9 @@ func TestApply_BySize(t *testing.T) {
 
 func TestApply_BySizeReverse(t *testing.T) {
 	media := []models.Media{
-		{Path: "/c", Size: int64Ptr(3000)},
-		{Path: "/a", Size: int64Ptr(1000)},
-		{Path: "/b", Size: int64Ptr(2000)},
+		{Path: "/c", Size: new(int64(3000))},
+		{Path: "/a", Size: new(int64(1000))},
+		{Path: "/b", Size: new(int64(2000))},
 	}
 
 	Apply(media, BySize, true, false)

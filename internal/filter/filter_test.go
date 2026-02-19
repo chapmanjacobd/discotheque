@@ -7,15 +7,11 @@ import (
 	"github.com/chapmanjacobd/discotheque/internal/models"
 )
 
-func int64Ptr(v int64) *int64 {
-	return &v
-}
-
 func TestApply_SizeFilter(t *testing.T) {
 	media := []models.Media{
-		{Path: "/test/small.mp4", Size: int64Ptr(1000)},
-		{Path: "/test/medium.mp4", Size: int64Ptr(5000)},
-		{Path: "/test/large.mp4", Size: int64Ptr(10000)},
+		{Path: "/test/small.mp4", Size: new(int64(1000))},
+		{Path: "/test/medium.mp4", Size: new(int64(5000))},
+		{Path: "/test/large.mp4", Size: new(int64(10000))},
 	}
 
 	criteria := Criteria{
@@ -35,9 +31,9 @@ func TestApply_SizeFilter(t *testing.T) {
 
 func TestApply_DurationFilter(t *testing.T) {
 	media := []models.Media{
-		{Path: "/test/short.mp4", Duration: int64Ptr(300)},
-		{Path: "/test/medium.mp4", Duration: int64Ptr(1800)},
-		{Path: "/test/long.mp4", Duration: int64Ptr(7200)},
+		{Path: "/test/short.mp4", Duration: new(int64(300))},
+		{Path: "/test/medium.mp4", Duration: new(int64(1800))},
+		{Path: "/test/long.mp4", Duration: new(int64(7200))},
 		{Path: "/test/info.txt", Duration: nil},
 	}
 

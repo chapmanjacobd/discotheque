@@ -3,6 +3,7 @@ package aggregate
 import (
 	"fmt"
 	"math"
+	"path/filepath"
 	"reflect"
 	"strings"
 
@@ -145,6 +146,10 @@ func ClusterFoldersByNumbers(flags models.GlobalFlags, folders []models.FolderSt
 		}
 	}
 
+	return groupToStats(flags, groups)
+}
+
+func groupToStats(flags models.GlobalFlags, groups [][]models.FolderStats) []models.FolderStats {
 	var result []models.FolderStats
 	for _, group := range groups {
 		if len(group) < 2 && (flags.OnlyDuplicates || flags.Similar) {
@@ -179,6 +184,38 @@ func ClusterFoldersByNumbers(flags models.GlobalFlags, folders []models.FolderSt
 	}
 
 	return result
+}
+
+// ClusterFoldersByName groups folder stats by name similarity
+func ClusterFoldersByName(flags models.GlobalFlags, folders []models.FolderStats) []models.FolderStats {
+	var groups [][]models.FolderStats
+	metric := metrics.NewSorensenDice()
+
+	for _, f := range folders {
+		found := false
+		name := filepath.Base(f.Path)
+		if flags.TotalSizes { // Re-using flag for name clustering mode for now, or we can use another one
+			name = f.Path
+		}
+
+		for i, group := range groups {
+			prevName := filepath.Base(group[0].Path)
+			if flags.TotalSizes {
+				prevName = group[0].Path
+			}
+
+			if strutil.Similarity(name, prevName, metric) > 0.8 {
+				groups[i] = append(groups[i], f)
+				found = true
+				break
+			}
+		}
+		if !found {
+			groups = append(groups, []models.FolderStats{f})
+		}
+	}
+
+	return groupToStats(flags, groups)
 }
 
 // FilterNearDuplicates breaks down existing groups further by string similarity

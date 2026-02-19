@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Discotheque</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header>
+        <div class="logo">Discotheque</div>
+        <div class="search-container">
+            <input type="text" id="search-input" placeholder="Search media...">
+            <button id="search-button">Search</button>
+        </div>
+        <div class="header-actions">
+            <span id="status-dot" class="dot"></span>
+            <span id="db-count">0 databases</span>
+        </div>
+    </header>
+
+    <main>
+        <aside class="sidebar">
+            <section>
+                <h3>Type</h3>
+                <label><input type="checkbox" class="filter-type" value="video"> Video</label>
+                <label><input type="checkbox" class="filter-type" value="audio"> Audio</label>
+                <label><input type="checkbox" class="filter-type" value="image"> Image</label>
+            </section>
+
+            <section>
+                <h3>Sort</h3>
+                <select id="sort-by">
+                    <option value="path">Path</option>
+                    <option value="size">Size</option>
+                    <option value="duration">Duration</option>
+                    <option value="time_last_played">Last Played</option>
+                    <option value="play_count">Play Count</option>
+                    <option value="random">Random</option>
+                </select>
+                <label><input type="checkbox" id="sort-reverse"> Reverse</label>
+            </section>
+
+            <section>
+                <h3>Limit</h3>
+                <input type="number" id="limit" value="100" min="1" max="1000">
+            </section>
+
+            <section id="db-list-container">
+                <h3>Databases</h3>
+                <div id="db-list"></div>
+            </section>
+        </aside>
+
+        <section class="content">
+            <div id="results-info">
+                <span id="results-count">0 files found</span>
+                <div class="view-toggle">
+                    <button id="view-grid" class="active">Grid</button>
+                    <button id="view-list">List</button>
+                </div>
+            </div>
+            <div id="results-container" class="grid">
+                <!-- Media items will be injected here -->
+            </div>
+        </section>
+    </main>
+
+    <div id="toast" class="hidden"></div>
+
+    <script src="app.js"></script>
+</body>
+</html>

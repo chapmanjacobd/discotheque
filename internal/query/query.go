@@ -690,7 +690,31 @@ func FilterMedia(media []models.MediaWithDB, flags models.GlobalFlags) []models.
 }
 
 // SortMedia sorts media using various methods
-func SortMedia(media []models.MediaWithDB, sortBy string, reverse bool, natSort bool) {
+func SortMedia(media []models.MediaWithDB, flags models.GlobalFlags) {
+	if flags.NoPlayInOrder {
+		sortMediaBasic(media, flags.SortBy, flags.Reverse, flags.NatSort)
+		return
+	}
+
+	// If Random is set, we typically want to respect the SQL random order
+	// unless the user EXPLICITLY requested a specific play-in-order.
+	// We check if PlayInOrder is different from the default "natural_ps"
+	isDefaultPlayInOrder := flags.PlayInOrder == "natural_ps" || flags.PlayInOrder == ""
+
+	if flags.Random && isDefaultPlayInOrder {
+		// Just keep the SQL order (which is random)
+		return
+	}
+
+	if flags.PlayInOrder != "" {
+		SortMediaAdvanced(media, flags.PlayInOrder)
+		return
+	}
+
+	sortMediaBasic(media, flags.SortBy, flags.Reverse, flags.NatSort)
+}
+
+func sortMediaBasic(media []models.MediaWithDB, sortBy string, reverse bool, natSort bool) {
 	less := func(i, j int) bool {
 		switch sortBy {
 		case "path":
@@ -721,6 +745,170 @@ func SortMedia(media []models.MediaWithDB, sortBy string, reverse bool, natSort 
 		sort.Slice(media, func(i, j int) bool { return !less(i, j) })
 	} else {
 		sort.Slice(media, less)
+	}
+}
+
+// SortMediaAdvanced implements the PlayInOrder logic from Python's natsort_media
+func SortMediaAdvanced(media []models.MediaWithDB, config string) {
+	reverse := false
+	if after, ok := strings.CutPrefix(config, "reverse_"); ok {
+		config = after
+		reverse = true
+	}
+
+	// For now, we simplify the algorithms to natural/python and focus on the keys
+	var alg, sortKey string
+	if strings.Contains(config, "_") {
+		parts := strings.SplitN(config, "_", 2)
+		alg, sortKey = parts[0], parts[1]
+	} else {
+		// If config matches an algorithm name, use default key "ps"
+		// Otherwise, use config as key and default algorithm "natural"
+		knownAlgs := map[string]bool{"natural": true, "path": true, "ignorecase": true, "lowercase": true, "human": true, "locale": true, "signed": true, "os": true, "python": true}
+		if knownAlgs[config] {
+			alg = config
+			sortKey = "ps"
+		} else {
+			alg = "natural"
+			sortKey = config
+		}
+	}
+
+	getSortValue := func(m models.MediaWithDB, key string) string {
+		switch key {
+		case "parent":
+			return m.Parent()
+		case "stem":
+			return m.Stem()
+		case "ps":
+			return m.Parent() + " " + m.Stem()
+		case "pts":
+			return m.Parent() + " " + utils.StringValue(m.Title) + " " + m.Stem()
+		case "path":
+			return m.Path
+		case "title":
+			return utils.StringValue(m.Title)
+		default:
+			return m.Path // fallback
+		}
+	}
+
+	less := func(i, j int) bool {
+		valI := getSortValue(media[i], sortKey)
+		valJ := getSortValue(media[j], sortKey)
+
+		var res bool
+		if alg == "python" {
+			res = valI < valJ
+		} else {
+			res = utils.NaturalLess(valI, valJ)
+		}
+
+		if reverse {
+			return !res
+		}
+		return res
+	}
+
+	sort.Slice(media, less)
+}
+
+// ReRankMedia implements MCDA-like re-ranking
+func ReRankMedia(media []models.MediaWithDB, flags models.GlobalFlags) []models.MediaWithDB {
+	if flags.ReRank == "" {
+		return media
+	}
+
+	// Parse re-rank flags (e.g., "size=3 duration=1 -play_count=2")
+	weights := make(map[string]float64)
+	parts := strings.FieldsSeq(flags.ReRank)
+	for p := range parts {
+		kv := strings.Split(p, "=")
+		weight := 1.0
+		if len(kv) == 2 {
+			if w, err := strconv.ParseFloat(kv[1], 64); err == nil {
+				weight = w
+			}
+		}
+		weights[kv[0]] = weight
+	}
+
+	if len(weights) == 0 {
+		return media
+	}
+
+	type rankedItem struct {
+		media models.MediaWithDB
+		score float64
+	}
+
+	n := len(media)
+	items := make([]rankedItem, n)
+	for i := range media {
+		items[i].media = media[i]
+	}
+
+	// For each weight, calculate rank and add to score
+	for col, weight := range weights {
+		direction := 1.0
+		cleanCol := col
+		if strings.HasPrefix(col, "-") {
+			direction = -1.0
+			cleanCol = col[1:]
+		}
+
+		// Sort by this column to get ranks
+		sort.SliceStable(items, func(i, j int) bool {
+			valI := getMediaValueFloat(items[i].media, cleanCol)
+			valJ := getMediaValueFloat(items[j].media, cleanCol)
+			if direction > 0 {
+				return valI < valJ
+			}
+			return valI > valJ
+		})
+
+		// Assign ranks (0 to n-1) and multiply by weight
+		for i := range n {
+			items[i].score += float64(i) * weight
+		}
+	}
+
+	// Final sort by score
+	sort.SliceStable(items, func(i, j int) bool {
+		return items[i].score < items[j].score
+	})
+
+	result := make([]models.MediaWithDB, n)
+	for i := range items {
+		result[i] = items[i].media
+	}
+	return result
+}
+
+func getMediaValueFloat(m models.MediaWithDB, col string) float64 {
+	switch col {
+	case "size":
+		return float64(utils.Int64Value(m.Size))
+	case "duration":
+		return float64(utils.Int64Value(m.Duration))
+	case "play_count":
+		return float64(utils.Int64Value(m.PlayCount))
+	case "time_last_played":
+		return float64(utils.Int64Value(m.TimeLastPlayed))
+	case "time_created":
+		return float64(utils.Int64Value(m.TimeCreated))
+	case "time_modified":
+		return float64(utils.Int64Value(m.TimeModified))
+	case "playhead":
+		return float64(utils.Int64Value(m.Playhead))
+	case "bitrate":
+		d := utils.Int64Value(m.Duration)
+		if d == 0 {
+			return 0
+		}
+		return float64(utils.Int64Value(m.Size)) / float64(d)
+	default:
+		return 0
 	}
 }
 
