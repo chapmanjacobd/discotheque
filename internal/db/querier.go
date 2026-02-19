@@ -32,6 +32,7 @@ type Querier interface {
 	MarkDeleted(ctx context.Context, arg MarkDeletedParams) error
 	SearchCaptions(ctx context.Context, query string) ([]SearchCaptionsRow, error)
 	SearchMediaFTS(ctx context.Context, arg SearchMediaFTSParams) ([]Media, error)
+	UpdateMediaCategories(ctx context.Context, arg UpdateMediaCategoriesParams) error
 	UpdatePath(ctx context.Context, arg UpdatePathParams) error
 	UpdatePlayHistory(ctx context.Context, arg UpdatePlayHistoryParams) error
 	UpsertMedia(ctx context.Context, arg UpsertMediaParams) error

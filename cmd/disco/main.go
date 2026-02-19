@@ -23,6 +23,7 @@ type CLI struct {
 	FilesInfo      commands.FilesInfoCmd      `cmd:"" help:"Show information about files" aliases:"fs"`
 	DiskUsage      commands.DiskUsageCmd      `cmd:"" help:"Show disk usage aggregation" aliases:"du"`
 	BigDirs        commands.BigDirsCmd        `cmd:"" help:"Show big directories aggregation" aliases:"bigdirs,bd"`
+	Categorize     commands.CategorizeCmd     `cmd:"" help:"Auto-group media into categories"`
 	SimilarFiles   commands.SimilarFilesCmd   `cmd:"" help:"Find similar files" aliases:"sf"`
 	SimilarFolders commands.SimilarFoldersCmd `cmd:"" help:"Find similar folders" aliases:"sh"`
 	Watch          commands.WatchCmd          `cmd:"" help:"Watch videos with mpv"`

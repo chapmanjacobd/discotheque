@@ -115,6 +115,11 @@ UPDATE media
 SET path = ?
 WHERE path = ?;
 
+-- name: UpdateMediaCategories :exec
+UPDATE media
+SET categories = ?
+WHERE path = ?;
+
 -- name: UpsertMedia :exec
 INSERT INTO media (
     path, title, duration, size, time_created, time_modified,

@@ -1316,6 +1316,22 @@ func (q *Queries) SearchMediaFTS(ctx context.Context, arg SearchMediaFTSParams) 
 	return items, nil
 }
 
+const updateMediaCategories = `-- name: UpdateMediaCategories :exec
+UPDATE media
+SET categories = ?
+WHERE path = ?
+`
+
+type UpdateMediaCategoriesParams struct {
+	Categories sql.NullString `json:"categories"`
+	Path       string         `json:"path"`
+}
+
+func (q *Queries) UpdateMediaCategories(ctx context.Context, arg UpdateMediaCategoriesParams) error {
+	_, err := q.db.ExecContext(ctx, updateMediaCategories, arg.Categories, arg.Path)
+	return err
+}
+
 const updatePath = `-- name: UpdatePath :exec
 UPDATE media
 SET path = ?
