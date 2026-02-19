@@ -1,12 +1,10 @@
 package sort
 
 import (
-	"regexp"
 	"sort"
-	"strconv"
-	"strings"
 
 	"github.com/chapmanjacobd/discotheque/internal/models"
+	"github.com/chapmanjacobd/discotheque/internal/utils"
 )
 
 type Method string
@@ -37,81 +35,33 @@ func makeLessFunc(media []models.Media, method Method, natural bool) func(i, j i
 	case ByPath:
 		if natural {
 			return func(i, j int) bool {
-				return naturalLess(media[i].Path, media[j].Path)
+				return utils.NaturalLess(media[i].Path, media[j].Path)
 			}
 		}
 		return func(i, j int) bool { return media[i].Path < media[j].Path }
 	case ByTitle:
-		return func(i, j int) bool { return stringValue(media[i].Title) < stringValue(media[j].Title) }
+		return func(i, j int) bool { return utils.StringValue(media[i].Title) < utils.StringValue(media[j].Title) }
 	case ByDuration:
-		return func(i, j int) bool { return int64Value(media[i].Duration) < int64Value(media[j].Duration) }
+		return func(i, j int) bool { return utils.Int64Value(media[i].Duration) < utils.Int64Value(media[j].Duration) }
 	case BySize:
-		return func(i, j int) bool { return int64Value(media[i].Size) < int64Value(media[j].Size) }
+		return func(i, j int) bool { return utils.Int64Value(media[i].Size) < utils.Int64Value(media[j].Size) }
 	case ByTimeCreated:
-		return func(i, j int) bool { return int64Value(media[i].TimeCreated) < int64Value(media[j].TimeCreated) }
+		return func(i, j int) bool {
+			return utils.Int64Value(media[i].TimeCreated) < utils.Int64Value(media[j].TimeCreated)
+		}
 	case ByTimeModified:
-		return func(i, j int) bool { return int64Value(media[i].TimeModified) < int64Value(media[j].TimeModified) }
+		return func(i, j int) bool {
+			return utils.Int64Value(media[i].TimeModified) < utils.Int64Value(media[j].TimeModified)
+		}
 	case ByTimePlayed:
-		return func(i, j int) bool { return int64Value(media[i].TimeLastPlayed) < int64Value(media[j].TimeLastPlayed) }
+		return func(i, j int) bool {
+			return utils.Int64Value(media[i].TimeLastPlayed) < utils.Int64Value(media[j].TimeLastPlayed)
+		}
 	case ByPlayCount:
-		return func(i, j int) bool { return int64Value(media[i].PlayCount) < int64Value(media[j].PlayCount) }
+		return func(i, j int) bool {
+			return utils.Int64Value(media[i].PlayCount) < utils.Int64Value(media[j].PlayCount)
+		}
 	default:
 		return func(i, j int) bool { return media[i].Path < media[j].Path }
 	}
-}
-
-func stringValue(s *string) string {
-	if s == nil {
-		return ""
-	}
-	return *s
-}
-
-func int64Value(i *int64) int64 {
-	if i == nil {
-		return 0
-	}
-	return *i
-}
-
-type chunk struct {
-	str   string
-	num   int
-	isNum bool
-}
-
-func naturalLess(s1, s2 string) bool {
-	n1, n2 := extractNumbers(s1), extractNumbers(s2)
-
-	idx1, idx2 := 0, 0
-	for idx1 < len(n1) && idx2 < len(n2) {
-		if n1[idx1].isNum && n2[idx2].isNum {
-			if n1[idx1].num != n2[idx2].num {
-				return n1[idx1].num < n2[idx2].num
-			}
-		} else {
-			if n1[idx1].str != n2[idx2].str {
-				return n1[idx1].str < n2[idx2].str
-			}
-		}
-		idx1++
-		idx2++
-	}
-
-	return len(n1) < len(n2)
-}
-
-func extractNumbers(s string) []chunk {
-	re := regexp.MustCompile(`\d+|\D+`)
-	matches := re.FindAllString(s, -1)
-
-	var chunks []chunk
-	for _, m := range matches {
-		if num, err := strconv.Atoi(m); err == nil {
-			chunks = append(chunks, chunk{num: num, isNum: true})
-		} else {
-			chunks = append(chunks, chunk{str: strings.ToLower(m), isNum: false})
-		}
-	}
-	return chunks
 }

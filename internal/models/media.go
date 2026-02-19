@@ -3,6 +3,7 @@ package models
 import (
 	"database/sql"
 	"path/filepath"
+	"strings"
 
 	"github.com/chapmanjacobd/discotheque/internal/db"
 )
@@ -32,12 +33,65 @@ type Media struct {
 	Album           *string  `json:"album,omitempty"`
 	Artist          *string  `json:"artist,omitempty"`
 	Genre           *string  `json:"genre,omitempty"`
+	Mood            *string  `json:"mood,omitempty"`
+	Bpm             *int64   `json:"bpm,omitempty"`
+	Key             *string  `json:"key,omitempty"`
+	Decade          *string  `json:"decade,omitempty"`
+	Categories      *string  `json:"categories,omitempty"`
+	City            *string  `json:"city,omitempty"`
+	Country         *string  `json:"country,omitempty"`
 	Description     *string  `json:"description,omitempty"`
 	Language        *string  `json:"language,omitempty"`
+
+	Webpath        *string  `json:"webpath,omitempty"`
+	Uploader       *string  `json:"uploader,omitempty"`
+	TimeUploaded   *int64   `json:"time_uploaded,omitempty"`
+	TimeDownloaded *int64   `json:"time_downloaded,omitempty"`
+	ViewCount      *int64   `json:"view_count,omitempty"`
+	NumComments    *int64   `json:"num_comments,omitempty"`
+	FavoriteCount  *int64   `json:"favorite_count,omitempty"`
+	Score          *float64 `json:"score,omitempty"`
+	UpvoteRatio    *float64 `json:"upvote_ratio,omitempty"`
+	Latitude       *float64 `json:"latitude,omitempty"`
+	Longitude      *float64 `json:"longitude,omitempty"`
 }
 
 func (m *Media) Parent() string {
 	return filepath.Dir(m.Path)
+}
+
+func (m *Media) ParentAtDepth(depth int) string {
+	if depth <= 0 {
+		return "/"
+	}
+	parts := strings.Split(filepath.Clean(m.Path), string(filepath.Separator))
+	if len(parts) <= depth {
+		return filepath.Dir(m.Path)
+	}
+	return strings.Join(parts[:depth+1], string(filepath.Separator))
+}
+
+// MediaWithDB wraps Media with the database path it came from
+type MediaWithDB struct {
+	Media
+	DB string `json:"db,omitempty"`
+}
+
+// FolderStats aggregates media by folder
+type FolderStats struct {
+	Path           string        `json:"path"`
+	Count          int           `json:"count"`
+	TotalSize      int64         `json:"total_size"`
+	TotalDuration  int64         `json:"total_duration"`
+	AvgSize        int64         `json:"avg_size"`
+	AvgDuration    int64         `json:"avg_duration"`
+	MedianSize     int64         `json:"median_size"`
+	MedianDuration int64         `json:"median_duration"`
+	DeletedCount   int           `json:"deleted_count"`
+	ExistsCount    int           `json:"exists_count"`
+	PlayedCount    int           `json:"played_count"`
+	FolderCount    int           `json:"folder_count"`
+	Files          []MediaWithDB `json:"files,omitempty"`
 }
 
 // Helper functions for mapping from sql.Null types
@@ -45,49 +99,67 @@ func (m *Media) Parent() string {
 func FromDB(m db.Media) Media {
 	return Media{
 		Path:            m.Path,
-		Title:           nullStringPtr(m.Title),
-		Duration:        nullInt64Ptr(m.Duration),
-		Size:            nullInt64Ptr(m.Size),
-		TimeCreated:     nullInt64Ptr(m.TimeCreated),
-		TimeModified:    nullInt64Ptr(m.TimeModified),
-		TimeDeleted:     nullInt64Ptr(m.TimeDeleted),
-		TimeFirstPlayed: nullInt64Ptr(m.TimeFirstPlayed),
-		TimeLastPlayed:  nullInt64Ptr(m.TimeLastPlayed),
-		PlayCount:       nullInt64Ptr(m.PlayCount),
-		Playhead:        nullInt64Ptr(m.Playhead),
-		Type:            nullStringPtr(m.Type),
-		Width:           nullInt64Ptr(m.Width),
-		Height:          nullInt64Ptr(m.Height),
-		Fps:             nullFloat64Ptr(m.Fps),
-		VideoCodecs:     nullStringPtr(m.VideoCodecs),
-		AudioCodecs:     nullStringPtr(m.AudioCodecs),
-		SubtitleCodecs:  nullStringPtr(m.SubtitleCodecs),
-		VideoCount:      nullInt64Ptr(m.VideoCount),
-		AudioCount:      nullInt64Ptr(m.AudioCount),
-		SubtitleCount:   nullInt64Ptr(m.SubtitleCount),
-		Album:           nullStringPtr(m.Album),
-		Artist:          nullStringPtr(m.Artist),
-		Genre:           nullStringPtr(m.Genre),
-		Description:     nullStringPtr(m.Description),
-		Language:        nullStringPtr(m.Language),
+		Title:           NullStringPtr(m.Title),
+		Duration:        NullInt64Ptr(m.Duration),
+		Size:            NullInt64Ptr(m.Size),
+		TimeCreated:     NullInt64Ptr(m.TimeCreated),
+		TimeModified:    NullInt64Ptr(m.TimeModified),
+		TimeDeleted:     NullInt64Ptr(m.TimeDeleted),
+		TimeFirstPlayed: NullInt64Ptr(m.TimeFirstPlayed),
+		TimeLastPlayed:  NullInt64Ptr(m.TimeLastPlayed),
+		PlayCount:       NullInt64Ptr(m.PlayCount),
+		Playhead:        NullInt64Ptr(m.Playhead),
+		Type:            NullStringPtr(m.Type),
+		Width:           NullInt64Ptr(m.Width),
+		Height:          NullInt64Ptr(m.Height),
+		Fps:             NullFloat64Ptr(m.Fps),
+		VideoCodecs:     NullStringPtr(m.VideoCodecs),
+		AudioCodecs:     NullStringPtr(m.AudioCodecs),
+		SubtitleCodecs:  NullStringPtr(m.SubtitleCodecs),
+		VideoCount:      NullInt64Ptr(m.VideoCount),
+		AudioCount:      NullInt64Ptr(m.AudioCount),
+		SubtitleCount:   NullInt64Ptr(m.SubtitleCount),
+		Album:           NullStringPtr(m.Album),
+		Artist:          NullStringPtr(m.Artist),
+		Genre:           NullStringPtr(m.Genre),
+		Mood:            NullStringPtr(m.Mood),
+		Bpm:             NullInt64Ptr(m.Bpm),
+		Key:             NullStringPtr(m.Key),
+		Decade:          NullStringPtr(m.Decade),
+		Categories:      NullStringPtr(m.Categories),
+		City:            NullStringPtr(m.City),
+		Country:         NullStringPtr(m.Country),
+		Description:     NullStringPtr(m.Description),
+		Language:        NullStringPtr(m.Language),
+		Webpath:         NullStringPtr(m.Webpath),
+		Uploader:        NullStringPtr(m.Uploader),
+		TimeUploaded:    NullInt64Ptr(m.TimeUploaded),
+		TimeDownloaded:  NullInt64Ptr(m.TimeDownloaded),
+		ViewCount:       NullInt64Ptr(m.ViewCount),
+		NumComments:     NullInt64Ptr(m.NumComments),
+		FavoriteCount:   NullInt64Ptr(m.FavoriteCount),
+		Score:           NullFloat64Ptr(m.Score),
+		UpvoteRatio:     NullFloat64Ptr(m.UpvoteRatio),
+		Latitude:        NullFloat64Ptr(m.Latitude),
+		Longitude:       NullFloat64Ptr(m.Longitude),
 	}
 }
 
-func nullStringPtr(ns sql.NullString) *string {
+func NullStringPtr(ns sql.NullString) *string {
 	if !ns.Valid {
 		return nil
 	}
 	return &ns.String
 }
 
-func nullInt64Ptr(ni sql.NullInt64) *int64 {
+func NullInt64Ptr(ni sql.NullInt64) *int64 {
 	if !ni.Valid {
 		return nil
 	}
 	return &ni.Int64
 }
 
-func nullFloat64Ptr(nf sql.NullFloat64) *float64 {
+func NullFloat64Ptr(nf sql.NullFloat64) *float64 {
 	if !nf.Valid {
 		return nil
 	}

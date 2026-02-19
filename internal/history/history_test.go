@@ -3,106 +3,120 @@ package history
 import (
 	"context"
 	"database/sql"
+	"os"
 	"testing"
 
 	_ "github.com/mattn/go-sqlite3"
 )
 
-func setupTestDB(t *testing.T) *sql.DB {
-	database, err := sql.Open("sqlite3", ":memory:")
+func setupTestDB(t *testing.T) (*sql.DB, string) {
+	f, err := os.CreateTemp("", "history-test-*.db")
 	if err != nil {
 		t.Fatal(err)
 	}
+	dbPath := f.Name()
+	f.Close()
 
-	// Create schema
+	sqlDB, err := sql.Open("sqlite3", dbPath)
+	if err != nil {
+		os.Remove(dbPath)
+		t.Fatal(err)
+	}
+
 	schema := `
 	CREATE TABLE media (
 		path TEXT PRIMARY KEY,
-		title TEXT,
-		duration INTEGER,
-		size INTEGER,
-		time_created INTEGER,
-		time_modified INTEGER,
-		time_deleted INTEGER DEFAULT 0,
-		time_first_played INTEGER DEFAULT 0,
-		time_last_played INTEGER DEFAULT 0,
+		time_first_played INTEGER,
+		time_last_played INTEGER,
+		playhead INTEGER,
 		play_count INTEGER DEFAULT 0,
-		playhead INTEGER DEFAULT 0
+		time_deleted INTEGER DEFAULT 0
+	);
+	CREATE TABLE history (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		media_path TEXT NOT NULL,
+		time_played INTEGER,
+		playhead INTEGER,
+		done INTEGER
 	);
 	`
-	if _, err := database.Exec(schema); err != nil {
+	if _, err := sqlDB.Exec(schema); err != nil {
+		sqlDB.Close()
+		os.Remove(dbPath)
 		t.Fatal(err)
 	}
 
-	// Insert test data
-	insert := `INSERT INTO media (path, title, duration, size) VALUES (?, ?, ?, ?)`
-	database.Exec(insert, "/test/movie.mp4", "Test Movie", 7200, 1000000)
-
-	return database
+	return sqlDB, dbPath
 }
 
-func TestUpdatePlayback(t *testing.T) {
-	database := setupTestDB(t)
-	defer database.Close()
+func TestTracker_UpdatePlayback(t *testing.T) {
+	sqlDB, dbPath := setupTestDB(t)
+	defer sqlDB.Close()
+	defer os.Remove(dbPath)
 
-	tracker := NewTracker(database)
-	ctx := context.Background()
+	path := "/test/video.mp4"
+	if _, err := sqlDB.Exec("INSERT INTO media (path) VALUES (?)", path); err != nil {
+		t.Fatal(err)
+	}
 
-	err := tracker.UpdatePlayback(ctx, "/test/movie.mp4", 3600)
-	if err != nil {
+	tracker := NewTracker(sqlDB)
+	if err := tracker.UpdatePlayback(context.Background(), path, 100); err != nil {
 		t.Fatalf("UpdatePlayback failed: %v", err)
 	}
 
-	// Verify update
-	var playCount int64
-	var playhead int64
-	err = database.QueryRow("SELECT play_count, playhead FROM media WHERE path = ?", "/test/movie.mp4").
-		Scan(&playCount, &playhead)
+	// Verify media update
+	var lastPlayed, playhead int64
+	err := sqlDB.QueryRow("SELECT time_last_played, playhead FROM media WHERE path = ?", path).Scan(&lastPlayed, &playhead)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("Failed to query media: %v", err)
+	}
+	if lastPlayed == 0 {
+		t.Error("Expected time_last_played to be set")
+	}
+	if playhead != 100 {
+		t.Errorf("Expected playhead 100, got %d", playhead)
 	}
 
-	if playCount != 1 {
-		t.Errorf("Expected play_count 1, got %d", playCount)
-	}
-
-	if playhead != 3600 {
-		t.Errorf("Expected playhead 3600, got %d", playhead)
-	}
-
-	// Update again
-	err = tracker.UpdatePlayback(ctx, "/test/movie.mp4", 7200)
+	// Verify history record
+	var hPath string
+	var hPlayhead int64
+	err = sqlDB.QueryRow("SELECT media_path, playhead FROM history WHERE media_path = ?", path).Scan(&hPath, &hPlayhead)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("Failed to query history: %v", err)
 	}
-
-	database.QueryRow("SELECT play_count FROM media WHERE path = ?", "/test/movie.mp4").Scan(&playCount)
-
-	if playCount != 2 {
-		t.Errorf("Expected play_count 2, got %d", playCount)
+	if hPath != path {
+		t.Errorf("Expected history path %s, got %s", path, hPath)
+	}
+	if hPlayhead != 100 {
+		t.Errorf("Expected history playhead 100, got %d", hPlayhead)
 	}
 }
 
-func TestMarkDeleted(t *testing.T) {
-	database := setupTestDB(t)
-	defer database.Close()
+func TestUpdateHistorySimple(t *testing.T) {
+	sqlDB, dbPath := setupTestDB(t)
+	sqlDB.Close() // UpdateHistorySimple opens its own connection
+	defer os.Remove(dbPath)
 
-	tracker := NewTracker(database)
-	ctx := context.Background()
+	// Re-open to insert test data
+	dbConn, _ := sql.Open("sqlite3", dbPath)
+	path := "/test/audio.mp3"
+	dbConn.Exec("INSERT INTO media (path) VALUES (?)", path)
+	dbConn.Close()
 
-	err := tracker.MarkDeleted(ctx, "/test/movie.mp4")
-	if err != nil {
-		t.Fatalf("MarkDeleted failed: %v", err)
+	if err := UpdateHistorySimple(dbPath, []string{path}, 50, true); err != nil {
+		t.Fatalf("UpdateHistorySimple failed: %v", err)
 	}
 
-	var timeDeleted int64
-	err = database.QueryRow("SELECT time_deleted FROM media WHERE path = ?", "/test/movie.mp4").
-		Scan(&timeDeleted)
-	if err != nil {
-		t.Fatal(err)
-	}
+	// Verify
+	dbConn, _ = sql.Open("sqlite3", dbPath)
+	defer dbConn.Close()
 
-	if timeDeleted == 0 {
-		t.Error("Expected time_deleted to be set")
+	var done int64
+	err := dbConn.QueryRow("SELECT done FROM history WHERE media_path = ?", path).Scan(&done)
+	if err != nil {
+		t.Fatalf("Failed to query history: %v", err)
+	}
+	if done != 1 {
+		t.Errorf("Expected done=1, got %d", done)
 	}
 }

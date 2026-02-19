@@ -65,11 +65,43 @@ func setupIntegrationTest(t *testing.T) *TestFixture {
 		album TEXT,
 		artist TEXT,
 		genre TEXT,
+		mood TEXT,
+		bpm INTEGER,
+		key TEXT,
+		decade TEXT,
+		categories TEXT,
+		city TEXT,
+		country TEXT,
 		description TEXT,
-		language TEXT
+		language TEXT,
+		webpath TEXT,
+		uploader TEXT,
+		time_uploaded INTEGER,
+		time_downloaded INTEGER,
+		view_count INTEGER,
+		num_comments INTEGER,
+		favorite_count INTEGER,
+		score REAL,
+		upvote_ratio REAL,
+		latitude REAL,
+		longitude REAL
 	);
 	CREATE INDEX idx_time_deleted ON media(time_deleted);
 	CREATE INDEX idx_time_last_played ON media(time_last_played);
+
+	CREATE TABLE history (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		media_path TEXT NOT NULL,
+		time_played INTEGER,
+		playhead INTEGER,
+		done INTEGER
+	);
+
+	CREATE TABLE captions (
+		media_path TEXT NOT NULL,
+		time REAL,
+		text TEXT
+	);
 	`
 	if _, err := database.Exec(schema); err != nil {
 		t.Fatal(err)

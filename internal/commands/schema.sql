@@ -39,9 +39,69 @@ CREATE TABLE IF NOT EXISTS media (
     album TEXT,
     artist TEXT,
     genre TEXT,
+    mood TEXT,
+    bpm INTEGER,
+    key TEXT,
+    decade TEXT,
+    categories TEXT,
+    city TEXT,
+    country TEXT,
     description TEXT,
-    language TEXT
+    language TEXT,
+
+    -- Online / Social metadata
+    webpath TEXT,
+    uploader TEXT,
+    time_uploaded INTEGER,
+    time_downloaded INTEGER,
+    view_count INTEGER,
+    num_comments INTEGER,
+    favorite_count INTEGER,
+    score REAL,
+    upvote_ratio REAL,
+
+    -- Location
+    latitude REAL,
+    longitude REAL
 );
+
+CREATE TABLE IF NOT EXISTS captions (
+    media_path TEXT NOT NULL,
+    time REAL,
+    text TEXT,
+    FOREIGN KEY (media_path) REFERENCES media(path) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_captions_path ON captions(media_path);
+
+-- FTS for captions
+CREATE VIRTUAL TABLE IF NOT EXISTS captions_fts USING fts5(
+    media_path UNINDEXED,
+    text,
+    content='captions'
+);
+
+-- Triggers for captions FTS
+CREATE TRIGGER IF NOT EXISTS captions_ai AFTER INSERT ON captions BEGIN
+    INSERT INTO captions_fts(rowid, media_path, text)
+    VALUES (new.rowid, new.media_path, new.text);
+END;
+
+CREATE TRIGGER IF NOT EXISTS captions_ad AFTER DELETE ON captions BEGIN
+    DELETE FROM captions_fts WHERE rowid = old.rowid;
+END;
+
+CREATE TABLE IF NOT EXISTS history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    media_path TEXT NOT NULL,
+    time_played INTEGER DEFAULT (strftime('%s', 'now')),
+    playhead INTEGER,
+    done INTEGER,
+    FOREIGN KEY (media_path) REFERENCES media(path) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_history_path ON history(media_path);
+CREATE INDEX IF NOT EXISTS idx_history_time ON history(time_played);
 
 CREATE INDEX IF NOT EXISTS idx_time_deleted ON media(time_deleted);
 CREATE INDEX IF NOT EXISTS idx_time_last_played ON media(time_last_played);

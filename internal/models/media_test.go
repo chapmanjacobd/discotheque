@@ -32,4 +32,18 @@ func TestFromDB(t *testing.T) {
 	if media.Duration != nil {
 		t.Errorf("Expected duration nil, got %v", media.Duration)
 	}
+
+	// Test nullFloat64Ptr
+	dbMedia.Fps = sql.NullFloat64{Float64: 24.0, Valid: true}
+	media = FromDB(dbMedia)
+	if media.Fps == nil || *media.Fps != 24.0 {
+		t.Errorf("Expected Fps 24.0, got %v", media.Fps)
+	}
+}
+
+func TestMedia_Parent(t *testing.T) {
+	m := Media{Path: "/dir/sub/file.mp4"}
+	if got := m.Parent(); got != "/dir/sub" {
+		t.Errorf("Parent() = %v, want /dir/sub", got)
+	}
 }

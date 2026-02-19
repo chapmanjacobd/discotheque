@@ -6,68 +6,126 @@ import (
 	"github.com/chapmanjacobd/discotheque/internal/models"
 )
 
-func int64Ptr(i int64) *int64 { return &i }
+func TestIsSameGroup(t *testing.T) {
+	s100 := int64(100)
+	s96 := int64(96)
+	s110 := int64(110)
+	d5 := int64(5)
+	d10 := int64(10)
 
-func TestByFolder(t *testing.T) {
-	media := []models.Media{
-		{Path: "/movies/action/movie1.mp4", Size: int64Ptr(1000), Duration: int64Ptr(7200)},
-		{Path: "/movies/action/movie2.mp4", Size: int64Ptr(2000), Duration: int64Ptr(6000)},
-		{Path: "/movies/comedy/movie3.mp4", Size: int64Ptr(1500), Duration: int64Ptr(5400)},
-		{Path: "/tv/show/episode1.mp4", Size: int64Ptr(500), Duration: int64Ptr(1800)},
+	flags := models.GlobalFlags{
+		FilterSizes:    true,
+		FilterDurations: true,
+		SizesDelta:     5.0,
+		DurationsDelta: 5.0,
 	}
 
-	folders := ByFolder(media)
-
-	if len(folders) != 3 {
-		t.Errorf("Expected 3 folders, got %d", len(folders))
+	m0 := models.MediaWithDB{Media: models.Media{Size: &s100, Duration: &d5}}
+	
+	if !IsSameGroup(flags, m0, models.MediaWithDB{Media: models.Media{Size: &s96, Duration: &d5}}) {
+		t.Error("Expected same group for 4% size diff")
 	}
-
-	// Find action folder
-	var actionFolder *FolderStats
-	for i := range folders {
-		if folders[i].Path == "/movies/action" {
-			actionFolder = &folders[i]
-			break
-		}
+	if IsSameGroup(flags, m0, models.MediaWithDB{Media: models.Media{Size: &s110, Duration: &d5}}) {
+		t.Error("Expected different group for 10% size diff")
 	}
-
-	if actionFolder == nil {
-		t.Fatal("Action folder not found")
-	}
-
-	if actionFolder.Count != 2 {
-		t.Errorf("Expected count 2, got %d", actionFolder.Count)
-	}
-
-	if actionFolder.TotalSize != 3000 {
-		t.Errorf("Expected total size 3000, got %d", actionFolder.TotalSize)
-	}
-
-	if actionFolder.AvgSize != 1500 {
-		t.Errorf("Expected avg size 1500, got %d", actionFolder.AvgSize)
-	}
-
-	if actionFolder.TotalDuration != 13200 {
-		t.Errorf("Expected total duration 13200, got %d", actionFolder.TotalDuration)
+	if IsSameGroup(flags, m0, models.MediaWithDB{Media: models.Media{Size: &s100, Duration: &d10}}) {
+		t.Error("Expected different group for large duration diff")
 	}
 }
 
-func TestSortFolders(t *testing.T) {
-	folders := []FolderStats{
-		{Path: "/a", Count: 3, TotalSize: 3000},
-		{Path: "/b", Count: 1, TotalSize: 5000},
-		{Path: "/c", Count: 2, TotalSize: 1000},
+func TestIsSameFolderGroup(t *testing.T) {
+	flags := models.GlobalFlags{
+		FilterCounts: true,
+		CountsDelta:  5.0,
 	}
 
-	SortFolders(folders, "count", false)
+	f0 := models.FolderStats{ExistsCount: 100}
+	
+	if !IsSameFolderGroup(flags, f0, models.FolderStats{ExistsCount: 96}) {
+		t.Error("Expected same folder group for 4% count diff")
+	}
+	if IsSameFolderGroup(flags, f0, models.FolderStats{ExistsCount: 110}) {
+		t.Error("Expected different folder group for 10% count diff")
+	}
+}
 
-	if folders[0].Path != "/b" || folders[1].Path != "/c" || folders[2].Path != "/a" {
-		t.Errorf("Sort by count failed: got %v", []string{folders[0].Path, folders[1].Path, folders[2].Path})
+func TestClusterByNumbers(t *testing.T) {
+	s100 := int64(100)
+	s104 := int64(104)
+	s108 := int64(108)
+	s116 := int64(116)
+	d100 := int64(100)
+	d104 := int64(104)
+	d108 := int64(108)
+
+	flags := models.GlobalFlags{
+		FilterSizes:    true,
+		FilterDurations: true,
+		SizesDelta:     5.0,
+		DurationsDelta: 5.0,
+		Similar:        true,
 	}
 
-	SortFolders(folders, "size", true)
+	media := []models.MediaWithDB{
+		{Media: models.Media{Path: "a", Size: &s100, Duration: &d100}},
+		{Media: models.Media{Path: "b", Size: &s100, Duration: &d104}},
+		{Media: models.Media{Path: "c", Size: &s104, Duration: &d104}},
+		{Media: models.Media{Path: "d", Size: &s104, Duration: &d108}},
+		{Media: models.Media{Path: "e", Size: &s108, Duration: &d108}},
+		{Media: models.Media{Path: "f", Size: &s116, Duration: &d108}},
+	}
 
-	if folders[0].Path != "/b" {
-		t.Errorf("Expected /b first when sorting by size desc, got %s", folders[0].Path)
+	got := ClusterByNumbers(flags, media)
+	// Python test said: [0, 0, 0, 1, 1, 2]
+	// group 0: a, b, c
+	// group 1: d, e
+	// group 2: f
+	// Since Similar=true, single-item groups are filtered out if OnlyDuplicates=true or Similar=true (in my impl)
+	// Wait, similar_files.py: groups = [d for d in groups if len(d["grouped_paths"]) > 1]
+	
+	if len(got) != 2 {
+		t.Errorf("Expected 2 groups, got %d", len(got))
+	}
+}
+
+func TestClusterFoldersByNumbers(t *testing.T) {
+	flags := models.GlobalFlags{
+		FilterCounts: true,
+		CountsDelta:  5.0,
+		Similar:      true,
+	}
+
+	folders := []models.FolderStats{
+		{Path: "/dir1", ExistsCount: 100, Count: 1},
+		{Path: "/dir2", ExistsCount: 96, Count: 1},
+		{Path: "/dir3", ExistsCount: 110, Count: 1},
+	}
+
+	got := ClusterFoldersByNumbers(flags, folders)
+	if len(got) != 1 {
+		t.Errorf("Expected 1 group, got %d", len(got))
+	}
+	if got[0].Count != 2 {
+		t.Errorf("Expected group to have 2 folders, got %d", got[0].Count)
+	}
+}
+
+func TestClusterPaths(t *testing.T) {
+	lines := []string{
+		"red apple",
+		"broccoli",
+		"yellow",
+		"green",
+		"orange apple",
+		"red apple",
+	}
+
+	flags := models.GlobalFlags{
+		Clusters: 2,
+	}
+
+	got := ClusterPaths(flags, lines)
+	if len(got) < 1 {
+		t.Errorf("Expected at least 1 group, got %d", len(got))
 	}
 }

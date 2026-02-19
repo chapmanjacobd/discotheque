@@ -65,3 +65,29 @@ func TestApply_NaturalSort(t *testing.T) {
 		}
 	}
 }
+
+func TestApply_ByOtherFields(t *testing.T) {
+	titleA := "A"
+	titleB := "B"
+	var dur100 int64 = 100
+	var dur200 int64 = 200
+	media := []models.Media{
+		{Path: "2", Title: &titleB, Duration: &dur200},
+		{Path: "1", Title: &titleA, Duration: &dur100},
+	}
+
+	Apply(media, ByTitle, false, false)
+	if *media[0].Title != "A" {
+		t.Errorf("Expected A first")
+	}
+
+	Apply(media, ByDuration, false, false)
+	if *media[0].Duration != 100 {
+		t.Errorf("Expected 100 first")
+	}
+
+	Apply(media, Method("invalid"), false, false)
+	if media[0].Path != "1" {
+		t.Errorf("Expected fallback to path")
+	}
+}

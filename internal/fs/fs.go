@@ -22,6 +22,13 @@ var MediaExtensions = map[string]bool{
 	".opus": true,
 	".ogg":  true,
 	".wav":  true,
+	".jpg":  true,
+	".jpeg": true,
+	".png":  true,
+	".gif":  true,
+	".webp": true,
+	".tiff": true,
+	".bmp":  true,
 }
 
 func FindMedia(root string) (map[string]os.FileInfo, error) {

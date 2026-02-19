@@ -1,3 +1,4 @@
+/coverage*
 /*.db-shm
 /*.db-wal
 /*.db

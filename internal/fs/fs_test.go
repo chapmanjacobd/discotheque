@@ -37,12 +37,12 @@ func TestFindMedia(t *testing.T) {
 		t.Fatalf("FindMedia failed: %v", err)
 	}
 
-	expectedCount := 3 // mp4, mp3, mkv
+	expectedCount := 4 // mp4, mp3, mkv, jpg
 	if len(found) != expectedCount {
 		t.Errorf("Expected %d media files, got %d: %v", expectedCount, len(found), found)
 	}
 
-	expectedFiles := []string{"movie.mp4", "song.mp3", "clip.mkv"}
+	expectedFiles := []string{"movie.mp4", "song.mp3", "clip.mkv", "image.jpg"}
 	for _, ef := range expectedFiles {
 		matched := false
 		for path := range found {

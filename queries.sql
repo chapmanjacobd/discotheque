@@ -42,6 +42,9 @@ SELECT * FROM media
 WHERE path = ?
 LIMIT 1;
 
+-- name: GetAllMediaMetadata :many
+SELECT path, size, time_modified, time_deleted FROM media;
+
 -- name: GetWatchedMedia :many
 SELECT * FROM media
 WHERE time_deleted = 0
@@ -118,13 +121,23 @@ INSERT INTO media (
     type, width, height, fps,
     video_codecs, audio_codecs, subtitle_codecs,
     video_count, audio_count, subtitle_count,
-    album, artist, genre, description, language
+    album, artist, genre, 
+    mood, bpm, key, decade, categories, city, country,
+    description, language,
+    webpath, uploader, time_uploaded, time_downloaded,
+    view_count, num_comments, favorite_count, score, upvote_ratio,
+    latitude, longitude
 ) VALUES (
     ?, ?, ?, ?, ?, ?,
     ?, ?, ?, ?,
     ?, ?, ?,
     ?, ?, ?,
-    ?, ?, ?, ?, ?
+    ?, ?, ?,
+    ?, ?, ?, ?, ?, ?, ?,
+    ?, ?,
+    ?, ?, ?, ?,
+    ?, ?, ?, ?, ?,
+    ?, ?
 )
 ON CONFLICT(path) DO UPDATE SET
     title = excluded.title,
@@ -144,8 +157,26 @@ ON CONFLICT(path) DO UPDATE SET
     album = excluded.album,
     artist = excluded.artist,
     genre = excluded.genre,
+    mood = excluded.mood,
+    bpm = excluded.bpm,
+    key = excluded.key,
+    decade = excluded.decade,
+    categories = excluded.categories,
+    city = excluded.city,
+    country = excluded.country,
     description = excluded.description,
-    language = excluded.language;
+    language = excluded.language,
+    webpath = excluded.webpath,
+    uploader = excluded.uploader,
+    time_uploaded = excluded.time_uploaded,
+    time_downloaded = excluded.time_downloaded,
+    view_count = excluded.view_count,
+    num_comments = excluded.num_comments,
+    favorite_count = excluded.favorite_count,
+    score = excluded.score,
+    upvote_ratio = excluded.upvote_ratio,
+    latitude = excluded.latitude,
+    longitude = excluded.longitude;
 
 -- name: InsertPlaylist :one
 INSERT INTO playlists (path, extractor_key, extractor_config)
@@ -154,6 +185,29 @@ ON CONFLICT(path) DO UPDATE SET
     extractor_key = excluded.extractor_key,
     extractor_config = excluded.extractor_config
 RETURNING id;
+
+-- name: GetPlaylists :many
+SELECT * FROM playlists WHERE time_deleted = 0;
+
+-- name: InsertCaption :exec
+INSERT INTO captions (media_path, time, text)
+VALUES (?, ?, ?);
+
+-- name: InsertHistory :exec
+INSERT INTO history (media_path, time_played, playhead, done)
+VALUES (?, ?, ?, ?);
+
+-- name: GetHistoryCount :one
+SELECT COUNT(*) FROM history WHERE media_path = ?;
+
+-- name: SearchCaptions :many
+SELECT c.media_path, c.time, c.text, m.title
+FROM captions c
+JOIN captions_fts f ON c.rowid = f.rowid
+JOIN media m ON c.media_path = m.path
+WHERE f.text MATCH sqlc.arg('query')
+  AND m.time_deleted = 0
+ORDER BY c.media_path, c.time;
 
 -- name: GetStats :one
 SELECT
