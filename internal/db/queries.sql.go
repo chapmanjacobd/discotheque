@@ -195,6 +195,46 @@ func (q *Queries) GetMediaByPath(ctx context.Context, arg GetMediaByPathParams) 
 	return items, nil
 }
 
+const getMediaByPathExact = `-- name: GetMediaByPathExact :one
+SELECT path, title, duration, size, time_created, time_modified, time_deleted, time_first_played, time_last_played, play_count, playhead, type, width, height, fps, video_codecs, audio_codecs, subtitle_codecs, video_count, audio_count, subtitle_count, album, artist, genre, description, language FROM media
+WHERE path = ?
+LIMIT 1
+`
+
+func (q *Queries) GetMediaByPathExact(ctx context.Context, path string) (Media, error) {
+	row := q.db.QueryRowContext(ctx, getMediaByPathExact, path)
+	var i Media
+	err := row.Scan(
+		&i.Path,
+		&i.Title,
+		&i.Duration,
+		&i.Size,
+		&i.TimeCreated,
+		&i.TimeModified,
+		&i.TimeDeleted,
+		&i.TimeFirstPlayed,
+		&i.TimeLastPlayed,
+		&i.PlayCount,
+		&i.Playhead,
+		&i.Type,
+		&i.Width,
+		&i.Height,
+		&i.Fps,
+		&i.VideoCodecs,
+		&i.AudioCodecs,
+		&i.SubtitleCodecs,
+		&i.VideoCount,
+		&i.AudioCount,
+		&i.SubtitleCount,
+		&i.Album,
+		&i.Artist,
+		&i.Genre,
+		&i.Description,
+		&i.Language,
+	)
+	return i, err
+}
+
 const getMediaByPlayCount = `-- name: GetMediaByPlayCount :many
 SELECT path, title, duration, size, time_created, time_modified, time_deleted, time_first_played, time_last_played, play_count, playhead, type, width, height, fps, video_codecs, audio_codecs, subtitle_codecs, video_count, audio_count, subtitle_count, album, artist, genre, description, language FROM media
 WHERE time_deleted = 0

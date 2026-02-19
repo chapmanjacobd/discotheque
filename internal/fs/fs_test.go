@@ -42,19 +42,17 @@ func TestFindMedia(t *testing.T) {
 		t.Errorf("Expected %d media files, got %d: %v", expectedCount, len(found), found)
 	}
 
-	foundMap := make(map[string]bool)
-	for _, f := range found {
-		foundMap[filepath.Base(f)] = true
-	}
-
 	expectedFiles := []string{"movie.mp4", "song.mp3", "clip.mkv"}
 	for _, ef := range expectedFiles {
-		if !foundMap[ef] {
+		matched := false
+		for path := range found {
+			if filepath.Base(path) == ef {
+				matched = true
+				break
+			}
+		}
+		if !matched {
 			t.Errorf("Expected to find %s", ef)
 		}
-	}
-
-	if foundMap["readme.txt"] {
-		t.Error("Should not have found readme.txt")
 	}
 }

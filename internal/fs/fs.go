@@ -24,8 +24,8 @@ var MediaExtensions = map[string]bool{
 	".wav":  true,
 }
 
-func FindMedia(root string) ([]string, error) {
-	var files []string
+func FindMedia(root string) (map[string]os.FileInfo, error) {
+	files := make(map[string]os.FileInfo)
 	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -36,7 +36,11 @@ func FindMedia(root string) ([]string, error) {
 
 		ext := strings.ToLower(filepath.Ext(path))
 		if MediaExtensions[ext] {
-			files = append(files, path)
+			info, err := d.Info()
+			if err != nil {
+				return nil // Skip files we can't access
+			}
+			files[path] = info
 		}
 		return nil
 	})

@@ -37,6 +37,11 @@ WHERE time_deleted = 0
 ORDER BY path
 LIMIT ?;
 
+-- name: GetMediaByPathExact :one
+SELECT * FROM media
+WHERE path = ?
+LIMIT 1;
+
 -- name: GetWatchedMedia :many
 SELECT * FROM media
 WHERE time_deleted = 0

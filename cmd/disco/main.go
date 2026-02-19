@@ -3,8 +3,10 @@ package main
 import (
 	"context"
 	"database/sql"
+	"embed"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -24,9 +26,13 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
+//go:embed schema.sql
+var schemaFS embed.FS
+
 // CLI defines the command-line interface
 type CLI struct {
 	Add     AddCmd     `cmd:"" help:"Add media to database"`
+	Check   CheckCmd   `cmd:"" help:"Check for missing files and mark as deleted"`
 	Print   PrintCmd   `cmd:"" help:"Print media information"`
 	Watch   WatchCmd   `cmd:"" help:"Watch videos with mpv"`
 	Listen  ListenCmd  `cmd:"" help:"Listen to audio with mpv"`
@@ -97,6 +103,7 @@ type GlobalFlags struct {
 	// FTS options
 	FTS      bool   `help:"Use full-text search if available"`
 	FTSTable string `default:"media_fts" help:"FTS table name"`
+	Verbose  bool   `short:"v" help:"Enable verbose logging"`
 }
 
 func (g *GlobalFlags) AfterApply() error {
@@ -146,7 +153,7 @@ type BrowseCmd struct {
 
 type AddCmd struct {
 	GlobalFlags
-	Args     []string `arg:"" name:"args" required:"" help:"Paths to scan followed by the database file"`
+	Args     []string `arg:"" name:"args" required:"" help:"Database file followed by paths to scan"`
 	Parallel int      `short:"p" default:"4" help:"Number of parallel extractors"`
 
 	ScanPaths []string `kong:"-"`
@@ -155,14 +162,32 @@ type AddCmd struct {
 
 func (c *AddCmd) AfterApply() error {
 	if len(c.Args) < 2 {
-		return fmt.Errorf("at least one path to scan and one database file are required")
+		return fmt.Errorf("at least one database file and one path to scan are required")
 	}
-	c.ScanPaths = c.Args[:len(c.Args)-1]
-	c.Database = c.Args[len(c.Args)-1]
+	c.Database = c.Args[0]
+	c.ScanPaths = c.Args[1:]
 	return nil
 }
 
+func initDB(sqlDB *sql.DB) error {
+	schema, err := schemaFS.ReadFile("schema.sql")
+	if err != nil {
+		return err
+	}
+	_, err = sqlDB.Exec(string(schema))
+	return err
+}
+
+func setupLogging(verbose bool) {
+	if verbose {
+		logLevel.Set(slog.LevelDebug)
+	} else {
+		logLevel.Set(slog.LevelInfo)
+	}
+}
+
 func (c *AddCmd) Run(ctx *kong.Context) error {
+	setupLogging(c.Verbose)
 	dbPath := c.Database
 
 	sqlDB, err := sql.Open("sqlite3", dbPath)
@@ -171,52 +196,90 @@ func (c *AddCmd) Run(ctx *kong.Context) error {
 	}
 	defer sqlDB.Close()
 
+	if err := initDB(sqlDB); err != nil {
+		return fmt.Errorf("failed to initialize database: %w", err)
+	}
+
 	queries := db.New(sqlDB)
 
 	for _, root := range c.ScanPaths {
-		fmt.Printf("Scanning %s...\n", root)
-		files, err := fs.FindMedia(root)
+		absRoot, err := filepath.Abs(root)
+		if err != nil {
+			slog.Error("Failed to get absolute path", "path", root, "error", err)
+			continue
+		}
+		slog.Info("Scanning", "path", absRoot)
+		foundFiles, err := fs.FindMedia(absRoot)
 		if err != nil {
 			return err
 		}
 
-		// Filter by Ext if specified
-		if len(c.Ext) > 0 {
-			var filtered []string
-			extMap := make(map[string]bool)
-			for _, e := range c.Ext {
-				extMap[strings.ToLower(e)] = true
-			}
-			for _, f := range files {
-				if extMap[strings.ToLower(filepath.Ext(f))] {
-					filtered = append(filtered, f)
+		slog.Info("Checking for updates", "count", len(foundFiles))
+
+		// Identify which files actually need probing
+		var toProbe []string
+		skipped := 0
+		for path, stat := range foundFiles {
+			// Filter by Ext if specified (though FindMedia already does basic extension filtering)
+			if len(c.Ext) > 0 {
+				matched := false
+				for _, e := range c.Ext {
+					if strings.EqualFold(filepath.Ext(path), e) {
+						matched = true
+						break
+					}
+				}
+				if !matched {
+					continue
 				}
 			}
-			files = filtered
+
+			existing, err := queries.GetMediaByPathExact(context.Background(), path)
+			if err == nil {
+				// Record exists, check if it's still valid
+				if existing.Size.Valid && existing.Size.Int64 == stat.Size() &&
+					existing.TimeModified.Valid && existing.TimeModified.Int64 == stat.ModTime().Unix() &&
+					existing.TimeDeleted.Int64 == 0 {
+					skipped++
+					slog.Debug("Skipping unchanged file", "path", path)
+					continue
+				}
+			}
+			toProbe = append(toProbe, path)
 		}
 
-		fmt.Printf("Found %d media files. Extracting metadata...\n", len(files))
+		if skipped > 0 {
+			slog.Info("Skipped unchanged files", "count", skipped)
+		}
+
+		if len(toProbe) == 0 {
+			continue
+		}
+
+		slog.Info("Extracting metadata", "count", len(toProbe))
 
 		// Parallel extraction
-		jobs := make(chan string, len(files))
-		results := make(chan *db.UpsertMediaParams, len(files))
+		jobs := make(chan string, len(toProbe))
+		results := make(chan *db.UpsertMediaParams, len(toProbe))
 		var wg sync.WaitGroup
 
 		for i := 0; i < c.Parallel; i++ {
-			wg.Go(func() {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
 				for path := range jobs {
 					params, err := metadata.Extract(context.Background(), path)
 					if err != nil {
-						fmt.Fprintf(os.Stderr, "Error extracting %s: %v\n", path, err)
+						slog.Error("Metadata extraction failed", "path", path, "error", err)
 						continue
 					}
 					results <- params
 				}
-			})
+			}()
 		}
 
 		go func() {
-			for _, f := range files {
+			for _, f := range toProbe {
 				jobs <- f
 			}
 			close(jobs)
@@ -230,11 +293,11 @@ func (c *AddCmd) Run(ctx *kong.Context) error {
 		count := 0
 		for params := range results {
 			if err := queries.UpsertMedia(context.Background(), *params); err != nil {
-				fmt.Fprintf(os.Stderr, "Error saving %s: %v\n", params.Path, err)
+				slog.Error("Database upsert failed", "path", params.Path, "error", err)
 			}
 			count++
-			if count%10 == 0 || count == len(files) {
-				fmt.Printf("\rProcessed %d/%d", count, len(files))
+			if count%10 == 0 || count == len(toProbe) {
+				fmt.Printf("\rProcessed %d/%d", count, len(toProbe))
 			}
 		}
 		fmt.Println()
@@ -255,17 +318,22 @@ type FolderStats struct {
 }
 
 type StatsCmd struct {
+	GlobalFlags
 	Databases []string `arg:"" required:"" help:"SQLite database files" type:"existingfile"`
-	JSON      bool     `short:"j" help:"Output as JSON"`
 }
 
 func (c *StatsCmd) Run(ctx *kong.Context) error {
+	setupLogging(c.Verbose)
 	for _, dbPath := range c.Databases {
 		sqlDB, err := sql.Open("sqlite3", dbPath)
 		if err != nil {
 			return err
 		}
 		defer sqlDB.Close()
+
+		if err := initDB(sqlDB); err != nil {
+			return fmt.Errorf("failed to initialize database %s: %w", dbPath, err)
+		}
 
 		queries := db.New(sqlDB)
 		stats, err := queries.GetStats(context.Background())
@@ -323,6 +391,7 @@ type HistoryCmd struct {
 }
 
 func (c *HistoryCmd) Run(ctx *kong.Context) error {
+	setupLogging(c.Verbose)
 	// Set default sort for history
 	if c.SortBy == "path" || c.SortBy == "" {
 		c.SortBy = "time_last_played"
@@ -350,6 +419,131 @@ func (c *HistoryCmd) Run(ctx *kong.Context) error {
 
 	SortMedia(media, c.SortBy, c.Reverse, c.NatSort)
 	return printMedia(c.Columns, media)
+}
+
+type CheckCmd struct {
+	GlobalFlags
+	Args   []string `arg:"" required:"" help:"Database file followed by optional paths to check"`
+	DryRun bool     `help:"Don't actually mark files as deleted"`
+
+	CheckPaths []string `kong:"-"`
+	Databases  []string `kong:"-"`
+}
+
+func (c *CheckCmd) AfterApply() error {
+	if len(c.Args) < 1 {
+		return fmt.Errorf("at least one database file is required")
+	}
+
+	c.Databases = []string{c.Args[0]}
+	if len(c.Args) > 1 {
+		c.CheckPaths = c.Args[1:]
+	}
+	return nil
+}
+
+func (c *CheckCmd) Run(ctx *kong.Context) error {
+	setupLogging(c.Verbose)
+
+	// If paths provided, build a presence set
+	var presenceSet map[string]bool
+	var absCheckPaths []string
+	if len(c.CheckPaths) > 0 {
+		presenceSet = make(map[string]bool)
+		for _, root := range c.CheckPaths {
+			absRoot, err := filepath.Abs(root)
+			if err != nil {
+				return err
+			}
+			absCheckPaths = append(absCheckPaths, absRoot)
+			slog.Info("Scanning filesystem for presence set", "path", absRoot)
+			err = filepath.WalkDir(absRoot, func(path string, d os.DirEntry, err error) error {
+				if err == nil && !d.IsDir() {
+					absPath, _ := filepath.Abs(path)
+					presenceSet[absPath] = true
+				}
+				return nil
+			})
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	for _, dbPath := range c.Databases {
+		sqlDB, err := sql.Open("sqlite3", dbPath)
+		if err != nil {
+			return err
+		}
+		defer sqlDB.Close()
+
+		if err := initDB(sqlDB); err != nil {
+			return fmt.Errorf("failed to initialize database %s: %w", dbPath, err)
+		}
+
+		queries := db.New(sqlDB)
+		allMedia, err := queries.GetMedia(context.Background(), 1000000)
+		if err != nil {
+			return err
+		}
+
+		slog.Info("Checking files", "count", len(allMedia), "database", dbPath)
+
+		missingCount := 0
+		now := time.Now().Unix()
+
+		for _, m := range allMedia {
+			isMissing := false
+
+			if presenceSet != nil {
+				// Only check files that are within the scanned roots
+				inScannedRoot := false
+				for _, root := range absCheckPaths {
+					if strings.HasPrefix(m.Path, root) {
+						inScannedRoot = true
+						break
+					}
+				}
+
+				if inScannedRoot {
+					if !presenceSet[m.Path] {
+						isMissing = true
+					}
+				} else {
+					// Outside scanned roots, skip or use Stat?
+					// For safety, if user provided roots, we only check files in those roots.
+					continue
+				}
+			} else {
+				// No presence set, fallback to individual Stats
+				if _, err := os.Stat(m.Path); os.IsNotExist(err) {
+					isMissing = true
+				}
+			}
+
+			if isMissing {
+				missingCount++
+				if !c.DryRun {
+					slog.Debug("Marking missing file as deleted", "path", m.Path)
+					if err := queries.MarkDeleted(context.Background(), db.MarkDeletedParams{
+						TimeDeleted: sql.NullInt64{Int64: now, Valid: true},
+						Path:        m.Path,
+					}); err != nil {
+						slog.Error("Failed to mark file as deleted", "path", m.Path, "error", err)
+					}
+				} else {
+					fmt.Printf("[Dry-run] Missing: %s\n", m.Path)
+				}
+			}
+		}
+
+		if c.DryRun {
+			slog.Info("Check complete (dry-run)", "missing", missingCount)
+		} else {
+			slog.Info("Check complete", "marked_deleted", missingCount)
+		}
+	}
+	return nil
 }
 
 type MediaWithDB struct {
@@ -904,6 +1098,7 @@ func UpdateHistory(dbPath string, paths []string, playhead int) error {
 // Commands implementation
 
 func (c *PrintCmd) Run(ctx *kong.Context) error {
+	setupLogging(c.Verbose)
 	media, err := MediaQuery(context.Background(), c.Databases, c.GlobalFlags)
 	if err != nil {
 		return err
@@ -935,6 +1130,7 @@ func (c *PrintCmd) Run(ctx *kong.Context) error {
 }
 
 func (c *WatchCmd) Run(ctx *kong.Context) error {
+	setupLogging(c.Verbose)
 	media, err := MediaQuery(context.Background(), c.Databases, c.GlobalFlags)
 	if err != nil {
 		return err
@@ -1006,6 +1202,7 @@ func (c *WatchCmd) Run(ctx *kong.Context) error {
 }
 
 func (c *ListenCmd) Run(ctx *kong.Context) error {
+	setupLogging(c.Verbose)
 	media, err := MediaQuery(context.Background(), c.Databases, c.GlobalFlags)
 	if err != nil {
 		return err
@@ -1047,6 +1244,7 @@ func (c *ListenCmd) Run(ctx *kong.Context) error {
 }
 
 func (c *OpenCmd) Run(ctx *kong.Context) error {
+	setupLogging(c.Verbose)
 	media, err := MediaQuery(context.Background(), c.Databases, c.GlobalFlags)
 	if err != nil {
 		return err
@@ -1078,6 +1276,7 @@ func (c *OpenCmd) Run(ctx *kong.Context) error {
 }
 
 func (c *BrowseCmd) Run(ctx *kong.Context) error {
+	setupLogging(c.Verbose)
 	media, err := MediaQuery(context.Background(), c.Databases, c.GlobalFlags)
 	if err != nil {
 		return err
@@ -1412,6 +1611,8 @@ func getDefaultBrowser() string {
 	}
 }
 
+var logLevel = &slog.LevelVar{}
+
 func main() {
 	cli := &CLI{}
 	ctx := kong.Parse(cli,
@@ -1419,6 +1620,14 @@ func main() {
 		kong.Description("Library media management tool"),
 		kong.UsageOnError(),
 	)
+
+	// Configure logger
+	opts := &slog.HandlerOptions{
+		Level: logLevel,
+	}
+	logger := slog.New(slog.NewTextHandler(os.Stderr, opts))
+	slog.SetDefault(logger)
+
 	err := ctx.Run(ctx)
 	ctx.FatalIfErrorf(err)
 }

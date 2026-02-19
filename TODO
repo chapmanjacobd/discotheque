@@ -1,3 +1,25 @@
+  3. Structured Logging (slog)
+  main.go currently uses a mix of fmt.Printf and fmt.Fprintf(os.Stderr, ...).
+   * Implementation: Switch to Go 1.21's log/slog. This allows for different verbosity levels (--verbose) and JSON-formatted logs for automated environments.
+
+
+  4. Logic Extraction & Modularization
+  main.go is growing large (~1400 lines).
+   * Implementation: Move command implementations (e.g., StatsCmd.Run, WatchCmd.Run) into internal/commands. Move the QueryBuilder and MediaQuery logic into internal/query.
+   * Benefit: Better testability and easier for other Go programs to use discotheque as a library.
+
+  5. Advanced Media Type Detection
+  Currently, we rely mostly on file extensions.
+   * Implementation: Use ffprobe's stream data or a mimetype library to more accurately distinguish between "Video", "Audio (music)", "Audiobook (long audio)", and "Image".
+
+
+  6. External Tool Integration (fzf)
+  The Python version supports selecting media via fzf.
+   * Implementation: Add a --picker or --fzf flag that pipes the filtered media list into fzf and plays only the selected items.
+
+
+  7. Database Optimization
+   * Implementation: Add an optimize command that runs VACUUM, ANALYZE, and ensures FTS indexes are fully populated.
 
 # Run all tests
 go test ./... -v
