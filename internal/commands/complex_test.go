@@ -1,0 +1,201 @@
+package commands
+
+import (
+	"database/sql"
+	"encoding/json"
+	"os"
+	"strings"
+	"testing"
+
+	"github.com/chapmanjacobd/discotheque/internal/models"
+	"github.com/chapmanjacobd/discotheque/internal/testutils"
+)
+
+func TestComplexFilteringAndAggregation(t *testing.T) {
+	fixture := testutils.Setup(t)
+	defer fixture.Cleanup()
+
+	// Create some files with different properties
+	// We'll manually insert them into the DB to have controlled metadata
+	dbPath := fixture.DBPath
+	sqlDB, _ := sql.Open("sqlite3", dbPath)
+	InitDB(sqlDB)
+
+	files := []struct {
+		path     string
+		size     int64
+		duration int64
+		ext      string
+	}{
+		{"/root/dir1/video1.mp4", 100 * 1024 * 1024, 600, ".mp4"},   // 100MB, 10min
+		{"/root/dir1/video2.mkv", 500 * 1024 * 1024, 1200, ".mkv"},  // 500MB, 20min
+		{"/root/dir2/audio1.mp3", 10 * 1024 * 1024, 300, ".mp3"},    // 10MB, 5min
+		{"/root/dir2/video3.mp4", 1000 * 1024 * 1024, 3600, ".mp4"}, // 1GB, 60min
+	}
+
+	for _, f := range files {
+		sqlDB.Exec("INSERT INTO media (path, size, duration, type) VALUES (?, ?, ?, ?)",
+			f.path, f.size, f.duration, strings.TrimPrefix(f.ext, "."))
+	}
+	sqlDB.Close()
+
+	t.Run("CombineFilters", func(t *testing.T) {
+		// Filter: Size > 50MB, Duration < 30min, Extension .mp4
+		cmd := &PrintCmd{
+			GlobalFlags: models.GlobalFlags{
+				Size:     []string{">50MB"},
+				Duration: []string{"<30min"},
+				Ext:      []string{".mp4"},
+				JSON:     true,
+			},
+			Args: []string{dbPath},
+		}
+		cmd.AfterApply()
+
+		// Capture stdout
+		oldStdout := os.Stdout
+		r, w, _ := os.Pipe()
+		os.Stdout = w
+
+		err := cmd.Run(nil)
+		w.Close()
+		os.Stdout = oldStdout
+
+		if err != nil {
+			t.Fatalf("PrintCmd failed: %v", err)
+		}
+
+		var results []models.MediaWithDB
+		json.NewDecoder(r).Decode(&results)
+
+		if len(results) != 1 {
+			t.Errorf("Expected 1 result, got %d", len(results))
+		} else if results[0].Path != "/root/dir1/video1.mp4" {
+			t.Errorf("Expected video1.mp4, got %s", results[0].Path)
+		}
+	})
+
+	t.Run("AggregationAndSorting", func(t *testing.T) {
+		// Aggregate by directory (BigDirs), sort by size reverse
+		cmd := &PrintCmd{
+			GlobalFlags: models.GlobalFlags{
+				BigDirs: true,
+				SortBy:  "size",
+				Reverse: true,
+				JSON:    true,
+			},
+			Args: []string{dbPath},
+		}
+		cmd.AfterApply()
+
+		oldStdout := os.Stdout
+		r, w, _ := os.Pipe()
+		os.Stdout = w
+
+		err := cmd.Run(nil)
+		w.Close()
+		os.Stdout = oldStdout
+
+		if err != nil {
+			t.Fatalf("PrintCmd failed: %v", err)
+		}
+
+		var folders []models.FolderStats
+		json.NewDecoder(r).Decode(&folders)
+
+		if len(folders) != 2 {
+			t.Errorf("Expected 2 folders, got %d", len(folders))
+		}
+		// dir2 should be first (1GB + 10MB > 100MB + 500MB)
+		if !strings.Contains(folders[0].Path, "dir2") {
+			t.Errorf("Expected dir2 to be first, got %s", folders[0].Path)
+		}
+	})
+}
+
+func TestClusterSort(t *testing.T) {
+	input := `/path/to/movie_part1.mp4
+/path/to/movie_part2.mp4
+/other/file.txt
+`
+	
+	t.Run("BasicClustering", func(t *testing.T) {
+		cmd := &ClusterSortCmd{
+			GlobalFlags: models.GlobalFlags{
+				PrintGroups: true,
+			},
+			InputPath: "-",
+		}
+		
+		// Mock stdin
+		oldStdin := os.Stdin
+		r, w, _ := os.Pipe()
+		os.Stdin = r
+		w.WriteString(input)
+		w.Close()
+		
+		// Capture stdout
+		oldStdout := os.Stdout
+		ro, wo, _ := os.Pipe()
+		os.Stdout = wo
+
+		err := cmd.Run(nil)
+		wo.Close()
+		os.Stdin = oldStdin
+		os.Stdout = oldStdout
+
+		if err != nil {
+			t.Fatalf("ClusterSortCmd failed: %v", err)
+		}
+
+		var groups []models.FolderStats
+		json.NewDecoder(ro).Decode(&groups)
+		
+		if len(groups) < 1 {
+			t.Errorf("Expected at least one group, got 0")
+		}
+	})
+}
+
+func TestStatsWithFrequency(t *testing.T) {
+	fixture := testutils.Setup(t)
+	defer fixture.Cleanup()
+
+	dbPath := fixture.DBPath
+	sqlDB, _ := sql.Open("sqlite3", dbPath)
+	InitDB(sqlDB)
+	
+	now := 1708358400 // 2024-02-19
+	sqlDB.Exec("INSERT INTO media (path, size, duration, time_last_played) VALUES (?, ?, ?, ?)",
+		"/path1", 100, 60, now)
+	sqlDB.Exec("INSERT INTO media (path, size, duration, time_last_played) VALUES (?, ?, ?, ?)",
+		"/path2", 200, 120, now - 86400) // yesterday
+	sqlDB.Close()
+
+	cmd := &StatsCmd{
+		Facet:     "watched",
+		Databases: []string{dbPath},
+		GlobalFlags: models.GlobalFlags{
+			Frequency: "daily",
+			JSON:      true,
+		},
+	}
+
+	oldStdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	err := cmd.Run(nil)
+	w.Close()
+	os.Stdout = oldStdout
+
+	if err != nil {
+		t.Fatalf("StatsCmd failed: %v", err)
+	}
+
+	var stats []any
+	json.NewDecoder(r).Decode(&stats)
+	if len(stats) == 0 {
+		t.Errorf("Expected stats, got none")
+	}
+}

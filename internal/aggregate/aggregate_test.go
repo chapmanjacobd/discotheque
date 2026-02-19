@@ -14,14 +14,14 @@ func TestIsSameGroup(t *testing.T) {
 	d10 := int64(10)
 
 	flags := models.GlobalFlags{
-		FilterSizes:    true,
+		FilterSizes:     true,
 		FilterDurations: true,
-		SizesDelta:     5.0,
-		DurationsDelta: 5.0,
+		SizesDelta:      5.0,
+		DurationsDelta:  5.0,
 	}
 
 	m0 := models.MediaWithDB{Media: models.Media{Size: &s100, Duration: &d5}}
-	
+
 	if !IsSameGroup(flags, m0, models.MediaWithDB{Media: models.Media{Size: &s96, Duration: &d5}}) {
 		t.Error("Expected same group for 4% size diff")
 	}
@@ -40,7 +40,7 @@ func TestIsSameFolderGroup(t *testing.T) {
 	}
 
 	f0 := models.FolderStats{ExistsCount: 100}
-	
+
 	if !IsSameFolderGroup(flags, f0, models.FolderStats{ExistsCount: 96}) {
 		t.Error("Expected same folder group for 4% count diff")
 	}
@@ -59,11 +59,11 @@ func TestClusterByNumbers(t *testing.T) {
 	d108 := int64(108)
 
 	flags := models.GlobalFlags{
-		FilterSizes:    true,
+		FilterSizes:     true,
 		FilterDurations: true,
-		SizesDelta:     5.0,
-		DurationsDelta: 5.0,
-		Similar:        true,
+		SizesDelta:      5.0,
+		DurationsDelta:  5.0,
+		Similar:         true,
 	}
 
 	media := []models.MediaWithDB{
@@ -82,7 +82,7 @@ func TestClusterByNumbers(t *testing.T) {
 	// group 2: f
 	// Since Similar=true, single-item groups are filtered out if OnlyDuplicates=true or Similar=true (in my impl)
 	// Wait, similar_files.py: groups = [d for d in groups if len(d["grouped_paths"]) > 1]
-	
+
 	if len(got) != 2 {
 		t.Errorf("Expected 2 groups, got %d", len(got))
 	}
@@ -110,22 +110,47 @@ func TestClusterFoldersByNumbers(t *testing.T) {
 	}
 }
 
-func TestClusterPaths(t *testing.T) {
-	lines := []string{
-		"red apple",
-		"broccoli",
-		"yellow",
-		"green",
-		"orange apple",
-		"red apple",
+func TestByFolder(t *testing.T) {
+	s100 := int64(100)
+	media := []models.Media{
+		{Path: "/dir1/file1.mp4", Size: &s100},
+		{Path: "/dir1/file2.mp4", Size: &s100},
+		{Path: "/dir2/file3.mp4", Size: &s100},
 	}
 
-	flags := models.GlobalFlags{
-		Clusters: 2,
+	got := ByFolder(media)
+	if len(got) != 2 {
+		t.Errorf("Expected 2 folders, got %d", len(got))
+	}
+}
+
+func TestSortFolders_Aggregate(t *testing.T) {
+	folders := []FolderStats{
+		{Path: "b", Count: 2},
+		{Path: "a", Count: 1},
 	}
 
-	got := ClusterPaths(flags, lines)
-	if len(got) < 1 {
-		t.Errorf("Expected at least 1 group, got %d", len(got))
+	SortFolders(folders, "path", false)
+	if folders[0].Path != "a" {
+		t.Errorf("SortFolders by path failed")
+	}
+}
+
+func TestFilterNearDuplicates(t *testing.T) {
+	groups := []models.FolderStats{
+		{
+			Path: "/common",
+			Files: []models.MediaWithDB{
+				{Media: models.Media{Path: "/common/movie_final.mp4"}},
+				{Media: models.Media{Path: "/common/movie_final_v2.mp4"}},
+				{Media: models.Media{Path: "/common/something_else.mp4"}},
+			},
+		},
+	}
+
+	got := FilterNearDuplicates(groups)
+	// movie_final and movie_final_v2 should be grouped together, something_else separate
+	if len(got) < 2 {
+		t.Errorf("Expected group to be split, got %d", len(got))
 	}
 }

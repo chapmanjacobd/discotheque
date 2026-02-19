@@ -4,6 +4,9 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"math"
+	"path/filepath"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -36,6 +39,9 @@ func (qb *QueryBuilder) Build() (string, []any) {
 	table := "media"
 	if qb.Flags.FTS {
 		table = qb.Flags.FTSTable
+		if table == "" {
+			table = "media_fts"
+		}
 	}
 
 	// Deleted status
@@ -63,18 +69,26 @@ func (qb *QueryBuilder) Build() (string, []any) {
 	allInclude = append(allInclude, qb.Flags.Include...)
 
 	if len(allInclude) > 0 {
+		joinOp := " AND "
+		if qb.Flags.FlexibleSearch {
+			joinOp = " OR "
+		}
+
 		if qb.Flags.FTS {
 			// FTS match syntax
-			searchTerm := strings.Join(allInclude, " ")
-			whereClauses = append(whereClauses, fmt.Sprintf("%s MATCH ?", table))
+			quoted := utils.FtsQuote(allInclude)
+			searchTerm := strings.Join(quoted, joinOp)
+			whereClauses = append(whereClauses, fmt.Sprintf("rowid IN (SELECT rowid FROM %s WHERE %s MATCH ?)", table, table))
 			args = append(args, searchTerm)
 		} else {
 			// Regular LIKE search
+			var searchParts []string
 			for _, term := range allInclude {
-				whereClauses = append(whereClauses, "(path LIKE ? OR title LIKE ?)")
-				pattern := "%" + term + "%"
+				searchParts = append(searchParts, "(path LIKE ? OR title LIKE ?)")
+				pattern := "%" + strings.ReplaceAll(term, " ", "%") + "%"
 				args = append(args, pattern, pattern)
 			}
+			whereClauses = append(whereClauses, "("+strings.Join(searchParts, joinOp)+")")
 		}
 	}
 
@@ -113,18 +127,6 @@ func (qb *QueryBuilder) Build() (string, []any) {
 			}
 		}
 	}
-	if qb.Flags.MinSize != "" {
-		if minBytes, err := utils.HumanToBytes(qb.Flags.MinSize); err == nil {
-			whereClauses = append(whereClauses, "size >= ?")
-			args = append(args, minBytes)
-		}
-	}
-	if qb.Flags.MaxSize != "" {
-		if maxBytes, err := utils.HumanToBytes(qb.Flags.MaxSize); err == nil {
-			whereClauses = append(whereClauses, "size <= ?")
-			args = append(args, maxBytes)
-		}
-	}
 
 	// Duration filters
 	for _, s := range qb.Flags.Duration {
@@ -142,14 +144,6 @@ func (qb *QueryBuilder) Build() (string, []any) {
 				args = append(args, *r.Max)
 			}
 		}
-	}
-	if qb.Flags.MinDuration > 0 {
-		whereClauses = append(whereClauses, "duration >= ?")
-		args = append(args, int64(qb.Flags.MinDuration))
-	}
-	if qb.Flags.MaxDuration > 0 {
-		whereClauses = append(whereClauses, "duration <= ?")
-		args = append(args, int64(qb.Flags.MaxDuration))
 	}
 
 	// Time filters
@@ -251,6 +245,16 @@ func (qb *QueryBuilder) Build() (string, []any) {
 	// Custom WHERE clauses
 	whereClauses = append(whereClauses, qb.Flags.Where...)
 
+	// Extension filters
+	if len(qb.Flags.Ext) > 0 {
+		var extClauses []string
+		for _, ext := range qb.Flags.Ext {
+			extClauses = append(extClauses, "path LIKE ?")
+			args = append(args, "%"+ext)
+		}
+		whereClauses = append(whereClauses, "("+strings.Join(extClauses, " OR ")+")")
+	}
+
 	if qb.Flags.DurationFromSize != "" {
 		if r, err := utils.ParseRange(qb.Flags.DurationFromSize, utils.HumanToBytes); err == nil {
 			var subWhere []string
@@ -276,7 +280,7 @@ func (qb *QueryBuilder) Build() (string, []any) {
 	}
 
 	// Build query
-	query := fmt.Sprintf("SELECT * FROM %s", table)
+	query := "SELECT * FROM media"
 
 	if len(whereClauses) > 0 {
 		query += " WHERE " + strings.Join(whereClauses, " AND ")
@@ -291,6 +295,23 @@ func (qb *QueryBuilder) Build() (string, []any) {
 		}
 		query += fmt.Sprintf(" ORDER BY %s %s", sortExpr, order)
 	} else if qb.Flags.Random {
+		// Optimization for large databases: select rowids randomly first
+		// Python: and m.rowid in (select rowid as id from media {where_not_deleted} order by random() limit {limit})
+		if !qb.Flags.FTS && len(allInclude) == 0 && qb.Flags.Limit > 0 {
+			whereNotDeleted := "WHERE COALESCE(time_deleted, 0) = 0"
+			if qb.Flags.OnlyDeleted {
+				whereNotDeleted = "WHERE COALESCE(time_deleted, 0) > 0"
+			}
+			// We use a larger pool for random selection then limit it in the outer query
+			randomLimit := qb.Flags.Limit * 16
+
+			randomSubquery := fmt.Sprintf("rowid IN (SELECT rowid FROM media %s ORDER BY RANDOM() LIMIT %d)", whereNotDeleted, randomLimit)
+			if strings.Contains(query, " WHERE ") {
+				query += " AND " + randomSubquery
+			} else {
+				query += " WHERE " + randomSubquery
+			}
+		}
 		query += " ORDER BY RANDOM()"
 	}
 
@@ -597,39 +618,53 @@ func FilterMedia(media []models.MediaWithDB, flags models.GlobalFlags) []models.
 		}
 
 		// Size filters
+		matchedSize := true
 		for _, s := range flags.Size {
 			if r, err := utils.ParseRange(s, utils.HumanToBytes); err == nil {
 				if m.Size == nil || !r.Matches(*m.Size) {
-					continue
+					matchedSize = false
+					break
 				}
 			}
 		}
-		if flags.MinSize != "" {
-			minBytes, _ := utils.HumanToBytes(flags.MinSize)
-			if m.Size == nil || *m.Size < minBytes {
-				continue
+		if !matchedSize {
+			continue
+		}
+
+		// Duration filters
+		matchedDuration := true
+		for _, s := range flags.Duration {
+			if r, err := utils.ParseRange(s, utils.HumanToSeconds); err == nil {
+				if m.Duration == nil || !r.Matches(*m.Duration) {
+					matchedDuration = false
+					break
+				}
 			}
 		}
-		if flags.MaxSize != "" {
-			maxBytes, _ := utils.HumanToBytes(flags.MaxSize)
-			if m.Size == nil || *m.Size > maxBytes {
+		if !matchedDuration {
+			continue
+		}
+
+		// Extension filters
+		if len(flags.Ext) > 0 {
+			matched := false
+			fileExt := strings.ToLower(filepath.Ext(m.Path))
+			for _, ext := range flags.Ext {
+				if fileExt == strings.ToLower(ext) {
+					matched = true
+					break
+				}
+			}
+			if !matched {
 				continue
 			}
 		}
 
-		// Duration filters
-		for _, s := range flags.Duration {
-			if r, err := utils.ParseRange(s, utils.HumanToSeconds); err == nil {
-				if m.Duration == nil || !r.Matches(*m.Duration) {
-					continue
-				}
+		// Regex filter
+		if flags.Regex != "" {
+			if matched, _ := regexp.MatchString(flags.Regex, m.Path); !matched {
+				continue
 			}
-		}
-		if flags.MinDuration > 0 && (m.Duration == nil || *m.Duration < int64(flags.MinDuration)) {
-			continue
-		}
-		if flags.MaxDuration > 0 && (m.Duration == nil || *m.Duration > int64(flags.MaxDuration)) {
-			continue
 		}
 
 		// Mimetype filters
@@ -656,7 +691,6 @@ func FilterMedia(media []models.MediaWithDB, flags models.GlobalFlags) []models.
 
 // SortMedia sorts media using various methods
 func SortMedia(media []models.MediaWithDB, sortBy string, reverse bool, natSort bool) {
-
 	less := func(i, j int) bool {
 		switch sortBy {
 		case "path":
@@ -690,6 +724,70 @@ func SortMedia(media []models.MediaWithDB, sortBy string, reverse bool, natSort 
 	}
 }
 
+// SortHistory applies specialized sorting for playback history (from filter_engine.history_sort)
+func SortHistory(media []models.MediaWithDB, partial string, reverse bool) {
+	if strings.Contains(partial, "s") {
+		// filter out seen items - should be done by builder but just in case
+		var filtered []models.MediaWithDB
+		for _, m := range media {
+			if m.TimeFirstPlayed == nil || *m.TimeFirstPlayed == 0 {
+				filtered = append(filtered, m)
+			}
+		}
+		media = filtered
+	}
+
+	mpvProgress := func(m models.MediaWithDB) float64 {
+		playhead := utils.Int64Value(m.Playhead)
+		duration := utils.Int64Value(m.Duration)
+		if playhead <= 0 || duration <= 0 {
+			return -math.MaxFloat64
+		}
+
+		if strings.Contains(partial, "p") && strings.Contains(partial, "t") {
+			// weighted remaining: (duration / playhead) * -(duration - playhead)
+			return (float64(duration) / float64(playhead)) * -float64(duration-playhead)
+		} else if strings.Contains(partial, "t") {
+			// time remaining: -(duration - playhead)
+			return -float64(duration - playhead)
+		} else {
+			// percent remaining: playhead / duration
+			return float64(playhead) / float64(duration)
+		}
+	}
+
+	less := func(i, j int) bool {
+		var valI, valJ float64
+
+		if strings.Contains(partial, "f") {
+			// first-viewed
+			valI = float64(utils.Int64Value(media[i].TimeFirstPlayed))
+			valJ = float64(utils.Int64Value(media[j].TimeFirstPlayed))
+		} else if strings.Contains(partial, "p") || strings.Contains(partial, "t") {
+			// sort by remaining duration
+			valI = mpvProgress(media[i])
+			valJ = mpvProgress(media[j])
+		} else {
+			// default: last played
+			valI = float64(utils.Int64Value(media[i].TimeLastPlayed))
+			if valI == 0 {
+				valI = float64(utils.Int64Value(media[i].TimeFirstPlayed))
+			}
+			valJ = float64(utils.Int64Value(media[j].TimeLastPlayed))
+			if valJ == 0 {
+				valJ = float64(utils.Int64Value(media[j].TimeFirstPlayed))
+			}
+		}
+
+		if reverse {
+			return valI > valJ
+		}
+		return valI < valJ
+	}
+
+	sort.Slice(media, less)
+}
+
 // RegexSortMedia sorts media using the text processor (regex splitting and word sorting)
 func RegexSortMedia(media []models.MediaWithDB, flags models.GlobalFlags) []models.MediaWithDB {
 	if len(media) == 0 {
@@ -711,7 +809,7 @@ func RegexSortMedia(media []models.MediaWithDB, flags models.GlobalFlags) []mode
 	}
 
 	sortedSentences := utils.TextProcessor(flags, sentenceStrings)
-	
+
 	// Reconstruct media list in sorted order
 	result := make([]models.MediaWithDB, 0, len(media))
 	seenCount := make(map[string]int)
@@ -812,8 +910,16 @@ func HistoricalUsage(ctx context.Context, dbPath string, freq string, timeColumn
 		freqSql = fmt.Sprintf("strftime('%%Y-%%W', datetime(%s, 'unixepoch'))", timeColumn)
 	case "monthly":
 		freqSql = fmt.Sprintf("strftime('%%Y-%%m', datetime(%s, 'unixepoch'))", timeColumn)
+	case "quarterly":
+		freqSql = fmt.Sprintf("strftime('%%Y', datetime(%s, 'unixepoch', '-3 months')) || '-Q' || ((strftime('%%m', datetime(%s, 'unixepoch', '-3 months')) - 1) / 3 + 1)", timeColumn, timeColumn)
 	case "yearly":
 		freqSql = fmt.Sprintf("strftime('%%Y', datetime(%s, 'unixepoch'))", timeColumn)
+	case "decadally":
+		freqSql = fmt.Sprintf("(CAST(strftime('%%Y', datetime(%s, 'unixepoch')) AS INTEGER) / 10) * 10", timeColumn)
+	case "hourly":
+		freqSql = fmt.Sprintf("strftime('%%Y-%%m-%%d %%Hh', datetime(%s, 'unixepoch'))", timeColumn)
+	case "minutely":
+		freqSql = fmt.Sprintf("strftime('%%Y-%%m-%%d %%H:%%M', datetime(%s, 'unixepoch'))", timeColumn)
 	default:
 		return nil, fmt.Errorf("invalid frequency: %s", freq)
 	}

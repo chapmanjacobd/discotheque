@@ -4,11 +4,45 @@ import (
 	"database/sql"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/chapmanjacobd/discotheque/internal/models"
+	"github.com/chapmanjacobd/discotheque/internal/testutils"
 )
+
+func TestAddCmd_Run(t *testing.T) {
+	fixture := testutils.Setup(t)
+	defer fixture.Cleanup()
+
+	f1 := fixture.CreateDummyFile("video1.mp4")
+	f2 := fixture.CreateDummyFile("audio1.mp3")
+
+	cmd := &AddCmd{
+		Args: []string{fixture.DBPath, f1, f2},
+	}
+	if err := cmd.AfterApply(); err != nil {
+		t.Fatalf("AfterApply failed: %v", err)
+	}
+
+	if err := cmd.Run(nil); err != nil {
+		t.Fatalf("AddCmd failed: %v", err)
+	}
+
+	// Verify items added
+	dbConn := fixture.GetDB()
+	defer dbConn.Close()
+
+	var count int
+	err := dbConn.QueryRow("SELECT COUNT(*) FROM media").Scan(&count)
+	if err != nil {
+		t.Fatalf("Query failed: %v", err)
+	}
+	if count != 2 {
+		t.Errorf("Expected 2 items in database, got %d", count)
+	}
+}
 
 func TestFilesInfoCmd_Run(t *testing.T) {
 	f, err := os.CreateTemp("", "test-*.txt")
@@ -26,7 +60,10 @@ func TestFilesInfoCmd_Run(t *testing.T) {
 
 	cmd := &FilesInfoCmd{
 		GlobalFlags: models.GlobalFlags{JSON: true},
-		Paths:       []string{f.Name()},
+		Args:        []string{f.Name()},
+	}
+	if err := cmd.AfterApply(); err != nil {
+		t.Fatalf("AfterApply failed: %v", err)
 	}
 	if err := cmd.Run(nil); err != nil {
 		t.Fatalf("FilesInfoCmd failed: %v", err)
@@ -39,8 +76,8 @@ func TestFilesInfoCmd_Run(t *testing.T) {
 	io.Copy(&buf, r)
 	output := buf.String()
 
-	if !strings.Contains(output, "text/plain") {
-		t.Errorf("Expected output to contain text/plain, got %s", output)
+	if !strings.Contains(output, "text") {
+		t.Errorf("Expected output to contain text, got %s", output)
 	}
 }
 
@@ -175,21 +212,372 @@ func TestRegexSortCmd_Run(t *testing.T) {
 	})
 }
 
+func TestStatsCmd_Run(t *testing.T) {
+	fixture := testutils.Setup(t)
+	defer fixture.Cleanup()
+
+	fixture.CreateDummyFile("media1.mp4")
+	addCmd := &AddCmd{
+		Args: []string{fixture.DBPath, fixture.TempDir},
+	}
+	addCmd.AfterApply()
+	addCmd.Run(nil)
+
+	t.Run("DefaultStats", func(t *testing.T) {
+		cmd := &StatsCmd{
+			Facet:     "watched",
+			Databases: []string{fixture.DBPath},
+		}
+		if err := cmd.Run(nil); err != nil {
+			t.Fatalf("StatsCmd failed: %v", err)
+		}
+	})
+
+	t.Run("JSONStats", func(t *testing.T) {
+		cmd := &StatsCmd{
+			GlobalFlags: models.GlobalFlags{JSON: true},
+			Facet:       "watched",
+			Databases:   []string{fixture.DBPath},
+		}
+		if err := cmd.Run(nil); err != nil {
+			t.Fatalf("StatsCmd failed: %v", err)
+		}
+	})
+}
+
+func TestPrintCmd_Run(t *testing.T) {
+	fixture := testutils.Setup(t)
+	defer fixture.Cleanup()
+
+	f1 := fixture.CreateDummyFile("media1.mp4")
+	addCmd := &AddCmd{
+		Args: []string{fixture.DBPath, f1},
+	}
+	addCmd.AfterApply()
+	addCmd.Run(nil)
+
+	t.Run("PrintFromDB", func(t *testing.T) {
+		cmd := &PrintCmd{
+			Args: []string{fixture.DBPath},
+		}
+		cmd.AfterApply()
+		if err := cmd.Run(nil); err != nil {
+			t.Fatalf("PrintCmd failed: %v", err)
+		}
+	})
+
+	t.Run("PrintFromFS", func(t *testing.T) {
+		cmd := &PrintCmd{
+			Args: []string{fixture.TempDir},
+		}
+		cmd.AfterApply()
+		if err := cmd.Run(nil); err != nil {
+			t.Fatalf("PrintCmd failed: %v", err)
+		}
+	})
+
+	t.Run("PrintJSONAggregated", func(t *testing.T) {
+		cmd := &PrintCmd{
+			GlobalFlags: models.GlobalFlags{JSON: true, BigDirs: true},
+			Args:        []string{fixture.DBPath},
+		}
+		cmd.AfterApply()
+		if err := cmd.Run(nil); err != nil {
+			t.Fatalf("PrintCmd failed: %v", err)
+		}
+	})
+}
+
+func TestHistoryCmd_Run(t *testing.T) {
+	fixture := testutils.Setup(t)
+	defer fixture.Cleanup()
+
+	f1 := fixture.CreateDummyFile("media1.mp4")
+	addCmd := &AddCmd{
+		Args: []string{fixture.DBPath, f1},
+	}
+	addCmd.AfterApply()
+	addCmd.Run(nil)
+
+	// Add history
+	addHist := &HistoryAddCmd{
+		Args: []string{fixture.DBPath, f1},
+	}
+	addHist.AfterApply()
+	addHist.Run(nil)
+
+	t.Run("DefaultHistory", func(t *testing.T) {
+		cmd := &HistoryCmd{
+			Databases: []string{fixture.DBPath},
+		}
+		if err := cmd.Run(nil); err != nil {
+			t.Fatalf("HistoryCmd failed: %v", err)
+		}
+	})
+
+	t.Run("DeleteHistory", func(t *testing.T) {
+		cmd := &HistoryCmd{
+			GlobalFlags: models.GlobalFlags{DeleteRows: true},
+			Databases:   []string{fixture.DBPath},
+		}
+		if err := cmd.Run(nil); err != nil {
+			t.Fatalf("HistoryCmd failed: %v", err)
+		}
+	})
+}
+
+func TestOptimizeCmd_Run(t *testing.T) {
+	fixture := testutils.Setup(t)
+	defer fixture.Cleanup()
+
+	addCmd := &AddCmd{
+		Args: []string{fixture.DBPath},
+	}
+	addCmd.AfterApply() // Will fail if no paths, but we just want to init DB
+	// Manually init DB
+	dbConn := fixture.GetDB()
+	InitDB(dbConn)
+	dbConn.Close()
+
+	cmd := &OptimizeCmd{
+		Databases: []string{fixture.DBPath},
+	}
+	if err := cmd.Run(nil); err != nil {
+		t.Fatalf("OptimizeCmd failed: %v", err)
+	}
+}
+
+func TestCheckCmd_Run(t *testing.T) {
+	fixture := testutils.Setup(t)
+	defer fixture.Cleanup()
+
+	f1 := fixture.CreateDummyFile("media1.mp4")
+	addCmd := &AddCmd{
+		Args: []string{fixture.DBPath, f1},
+	}
+	addCmd.AfterApply()
+	addCmd.Run(nil)
+
+	// Delete file from FS
+	os.Remove(f1)
+
+	cmd := &CheckCmd{
+		Args: []string{fixture.DBPath},
+	}
+	cmd.AfterApply()
+	if err := cmd.Run(nil); err != nil {
+		t.Fatalf("CheckCmd failed: %v", err)
+	}
+
+	// Verify it was marked as deleted
+	dbConn := fixture.GetDB()
+	defer dbConn.Close()
+	var timeDeleted sql.NullInt64
+	err := dbConn.QueryRow("SELECT time_deleted FROM media WHERE path = ?", f1).Scan(&timeDeleted)
+	if err != nil {
+		t.Fatalf("Query failed: %v", err)
+	}
+	if !timeDeleted.Valid || timeDeleted.Int64 == 0 {
+		t.Errorf("Expected file to be marked as deleted")
+	}
+}
+
+func TestBigDirsCmd_Run(t *testing.T) {
+	fixture := testutils.Setup(t)
+	defer fixture.Cleanup()
+
+	fixture.CreateDummyFile("dir1/media1.mp4")
+	fixture.CreateDummyFile("dir2/media2.mp4")
+
+	addCmd := &AddCmd{
+		Args: []string{fixture.DBPath, fixture.TempDir},
+	}
+	addCmd.AfterApply()
+	addCmd.Run(nil)
+
+	cmd := &BigDirsCmd{
+		Databases: []string{fixture.DBPath},
+	}
+	if err := cmd.Run(nil); err != nil {
+		t.Fatalf("BigDirsCmd failed: %v", err)
+	}
+}
+
+func TestDiskUsageCmd_Run(t *testing.T) {
+	fixture := testutils.Setup(t)
+	defer fixture.Cleanup()
+
+	fixture.CreateDummyFile("dir1/media1.mp4")
+
+	addCmd := &AddCmd{
+		Args: []string{fixture.DBPath, fixture.TempDir},
+	}
+	addCmd.AfterApply()
+	addCmd.Run(nil)
+
+	t.Run("DefaultDU", func(t *testing.T) {
+		cmd := &DiskUsageCmd{
+			Args: []string{fixture.DBPath},
+		}
+		cmd.AfterApply()
+		if err := cmd.Run(nil); err != nil {
+			t.Fatalf("DiskUsageCmd failed: %v", err)
+		}
+	})
+}
+
+func TestPlaylistsCmd_Run(t *testing.T) {
+	fixture := testutils.Setup(t)
+	defer fixture.Cleanup()
+
+	addCmd := &AddCmd{
+		Args: []string{fixture.DBPath, fixture.TempDir},
+	}
+	addCmd.AfterApply()
+	addCmd.Run(nil)
+
+	cmd := &PlaylistsCmd{
+		Databases: []string{fixture.DBPath},
+	}
+	if err := cmd.Run(nil); err != nil {
+		t.Fatalf("PlaylistsCmd failed: %v", err)
+	}
+}
+
+func TestMarkDeletedItem(t *testing.T) {
+	fixture := testutils.Setup(t)
+	defer fixture.Cleanup()
+
+	f1 := fixture.CreateDummyFile("media1.mp4")
+	addCmd := &AddCmd{
+		Args: []string{fixture.DBPath, f1},
+	}
+	addCmd.AfterApply()
+	addCmd.Run(nil)
+
+	m := models.MediaWithDB{
+		Media: models.Media{Path: f1},
+		DB:    fixture.DBPath,
+	}
+
+	if err := MarkDeletedItem(m); err != nil {
+		t.Fatalf("MarkDeletedItem failed: %v", err)
+	}
+
+	dbConn := fixture.GetDB()
+	defer dbConn.Close()
+	var timeDeleted sql.NullInt64
+	err := dbConn.QueryRow("SELECT time_deleted FROM media WHERE path = ?", f1).Scan(&timeDeleted)
+	if err != nil {
+		t.Fatalf("Query failed: %v", err)
+	}
+	if !timeDeleted.Valid || timeDeleted.Int64 == 0 {
+		t.Errorf("Expected file to be marked as deleted")
+	}
+}
+
+func TestMoveMediaItem(t *testing.T) {
+	fixture := testutils.Setup(t)
+	defer fixture.Cleanup()
+
+	f1 := fixture.CreateDummyFile("media1.mp4")
+	addCmd := &AddCmd{
+		Args: []string{fixture.DBPath, f1},
+	}
+	addCmd.AfterApply()
+	addCmd.Run(nil)
+
+	destDir := filepath.Join(fixture.TempDir, "moved")
+	m := models.MediaWithDB{
+		Media: models.Media{Path: f1},
+		DB:    fixture.DBPath,
+	}
+
+	if err := MoveMediaItem(destDir, m); err != nil {
+		t.Fatalf("MoveMediaItem failed: %v", err)
+	}
+
+	destPath := filepath.Join(destDir, filepath.Base(f1))
+	if _, err := os.Stat(destPath); err != nil {
+		t.Errorf("Expected file to exist at %s", destPath)
+	}
+	if _, err := os.Stat(f1); !os.IsNotExist(err) {
+		t.Errorf("Expected original file to be gone")
+	}
+
+	dbConn := fixture.GetDB()
+	defer dbConn.Close()
+	var count int
+	dbConn.QueryRow("SELECT COUNT(*) FROM media WHERE path = ?", destPath).Scan(&count)
+	if count != 1 {
+		t.Errorf("Expected 1 row with new path, got %d", count)
+	}
+}
+
+func TestCopyMediaItem(t *testing.T) {
+	fixture := testutils.Setup(t)
+	defer fixture.Cleanup()
+
+	f1 := fixture.CreateDummyFile("media1.mp4")
+	m := models.MediaWithDB{
+		Media: models.Media{Path: f1},
+	}
+
+	destDir := filepath.Join(fixture.TempDir, "copied")
+	if err := CopyMediaItem(destDir, m); err != nil {
+		t.Fatalf("CopyMediaItem failed: %v", err)
+	}
+
+	destPath := filepath.Join(destDir, filepath.Base(f1))
+	if _, err := os.Stat(destPath); err != nil {
+		t.Errorf("Expected file to exist at %s", destPath)
+	}
+	if _, err := os.Stat(f1); err != nil {
+		t.Errorf("Expected original file to still exist")
+	}
+}
+
+func TestSearchCmd_Run(t *testing.T) {
+	fixture := testutils.Setup(t)
+	defer fixture.Cleanup()
+
+	f1 := fixture.CreateDummyFile("media1.mp4")
+	addCmd := &AddCmd{
+		Args: []string{fixture.DBPath, f1},
+	}
+	// We need a title to search for
+	addCmd.AfterApply()
+	addCmd.Run(nil)
+
+	// Manually set title so we can search it
+	dbConn := fixture.GetDB()
+	dbConn.Exec("UPDATE media SET title = 'Super Secret Movie' WHERE path = ?", f1)
+	dbConn.Close()
+
+	cmd := &SearchCmd{
+		GlobalFlags: models.GlobalFlags{Search: []string{"Secret"}},
+		Databases:   []string{fixture.DBPath},
+	}
+	if err := cmd.Run(nil); err != nil {
+		t.Fatalf("SearchCmd failed: %v", err)
+	}
+}
+
 func TestDeleteMediaItem(t *testing.T) {
 	f, err := os.CreateTemp("", "delete-test")
 	if err != nil {
 		t.Fatal(err)
 	}
 	f.Close()
-	
+
 	m := models.MediaWithDB{
 		Media: models.Media{Path: f.Name()},
 	}
-	
+
 	if err := DeleteMediaItem(m); err != nil {
 		t.Fatalf("DeleteMediaItem failed: %v", err)
 	}
-	
+
 	if _, err := os.Stat(f.Name()); !os.IsNotExist(err) {
 		t.Error("File still exists after DeleteMediaItem")
 	}

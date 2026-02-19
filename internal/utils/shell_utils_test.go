@@ -11,7 +11,7 @@ func TestResolveAbsolutePath(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	f := filepath.Join(tmpDir, "testfile")
-	os.WriteFile(f, []byte("test"), 0644)
+	os.WriteFile(f, []byte("test"), 0o644)
 
 	abs, _ := filepath.Abs(f)
 	if got := ResolveAbsolutePath(f); got != abs {
@@ -29,9 +29,9 @@ func TestFlattenWrapperFolder(t *testing.T) {
 
 	// struct: tmpDir/wrapper/file.txt
 	wrapper := filepath.Join(tmpDir, "wrapper")
-	os.Mkdir(wrapper, 0755)
+	os.Mkdir(wrapper, 0o755)
 	file := filepath.Join(wrapper, "file.txt")
-	os.WriteFile(file, []byte("data"), 0644)
+	os.WriteFile(file, []byte("data"), 0o644)
 
 	if err := FlattenWrapperFolder(tmpDir); err != nil {
 		t.Fatalf("FlattenWrapperFolder failed: %v", err)
@@ -51,9 +51,9 @@ func TestFlattenWrapperFolderConflict(t *testing.T) {
 
 	// struct: tmpDir/wrapper/wrapper (file)
 	wrapper := filepath.Join(tmpDir, "wrapper")
-	os.Mkdir(wrapper, 0755)
+	os.Mkdir(wrapper, 0o755)
 	file := filepath.Join(wrapper, "wrapper")
-	os.WriteFile(file, []byte("conflict data"), 0644)
+	os.WriteFile(file, []byte("conflict data"), 0o644)
 
 	if err := FlattenWrapperFolder(tmpDir); err != nil {
 		t.Fatalf("FlattenWrapperFolder failed: %v", err)
@@ -63,7 +63,7 @@ func TestFlattenWrapperFolderConflict(t *testing.T) {
 	if !FileExists(dstFile) {
 		t.Error("conflict file should be in the root folder")
 	}
-	
+
 	info, err := os.Stat(dstFile)
 	if err != nil {
 		t.Fatal(err)

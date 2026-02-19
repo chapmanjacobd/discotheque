@@ -5,15 +5,12 @@ import (
 	"database/sql"
 	"os"
 	"path/filepath"
-	"regexp"
 	"testing"
 
-	"github.com/chapmanjacobd/discotheque/internal/aggregate"
 	"github.com/chapmanjacobd/discotheque/internal/db"
-	"github.com/chapmanjacobd/discotheque/internal/filter"
 	"github.com/chapmanjacobd/discotheque/internal/history"
 	"github.com/chapmanjacobd/discotheque/internal/models"
-	"github.com/chapmanjacobd/discotheque/internal/sort"
+	"github.com/chapmanjacobd/discotheque/internal/query"
 	_ "github.com/mattn/go-sqlite3"
 )
 
@@ -180,24 +177,24 @@ func TestIntegration_FilterSortAggregate(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var allMedia []models.Media
+	var allMedia []models.MediaWithDB
 	for _, m := range dbMedia {
-		allMedia = append(allMedia, models.FromDB(m))
+		allMedia = append(allMedia, models.FromDBWithDB(m, "test.db"))
 	}
 
 	// Filter: Large video files (> 450MB) that are not samples
-	criteria := filter.Criteria{
-		MinSize: 450_000_000,
+	flags := models.GlobalFlags{
+		Size:    []string{">450MB"},
 		Exclude: []string{"*sample*"},
 	}
-	filtered := filter.Apply(allMedia, criteria)
+	filtered := query.FilterMedia(allMedia, flags)
 
 	if len(filtered) != 9 { // Should exclude small files and sample
 		t.Errorf("Expected 9 filtered results, got %d", len(filtered))
 	}
 
 	// Sort by natural order (important for TV shows)
-	sort.Apply(filtered, sort.ByPath, false, true)
+	query.SortMedia(filtered, "path", false, true)
 
 	// Verify S01E01 comes before S01E10
 	var s01e01Idx, s01e10Idx int = -1, -1
@@ -214,10 +211,10 @@ func TestIntegration_FilterSortAggregate(t *testing.T) {
 	}
 
 	// Aggregate by folder
-	folders := aggregate.ByFolder(filtered)
+	folders := query.AggregateMedia(filtered, models.GlobalFlags{BigDirs: true})
 
 	// Find TV show folder
-	var tvFolder *aggregate.FolderStats
+	var tvFolder *models.FolderStats
 	for i := range folders {
 		if filepath.Base(folders[i].Path) == "Show" {
 			tvFolder = &folders[i]
@@ -234,7 +231,7 @@ func TestIntegration_FilterSortAggregate(t *testing.T) {
 	}
 
 	// Sort folders by size
-	aggregate.SortFolders(folders, "size", true)
+	query.SortFolders(folders, "size", true)
 
 	// Largest folder should be action movies
 	if filepath.Base(folders[0].Path) != "action" {
@@ -317,17 +314,17 @@ func TestIntegration_UnwatchedHDContent(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var unwatched []models.Media
+	var unwatched []models.MediaWithDB
 	for _, m := range dbUnwatched {
-		unwatched = append(unwatched, models.FromDB(m))
+		unwatched = append(unwatched, models.FromDBWithDB(m, "test.db"))
 	}
 
 	// Filter for unwatched files > 500MB and longer than 1 hour
-	criteria := filter.Criteria{
-		MinSize:     500_000_000,
-		MinDuration: 3600,
+	flags := models.GlobalFlags{
+		Size:     []string{">500MB"},
+		Duration: []string{">1hour"},
 	}
-	hdUnwatched := filter.Apply(unwatched, criteria)
+	hdUnwatched := query.FilterMedia(unwatched, flags)
 
 	// Should find S01E10 and possibly others
 	if len(hdUnwatched) == 0 {
@@ -357,24 +354,24 @@ func TestIntegration_RegexNaturalSortSize(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var allMedia []models.Media
+	var allMedia []models.MediaWithDB
 	for _, m := range allMediaRaw {
-		allMedia = append(allMedia, models.FromDB(m))
+		allMedia = append(allMedia, models.FromDBWithDB(m, "test.db"))
 	}
 
 	// Find all Season 1 episodes using regex
-	criteria := filter.Criteria{
-		Regex:   regexp.MustCompile(`S01E\d+`),
-		MinSize: 400_000_000, // Exclude samples
+	flags := models.GlobalFlags{
+		Regex: `S01E\d+`,
+		Size:  []string{">400MB"}, // Exclude samples
 	}
-	season1 := filter.Apply(allMedia, criteria)
+	season1 := query.FilterMedia(allMedia, flags)
 
 	if len(season1) != 3 {
 		t.Errorf("Expected 3 Season 1 episodes, got %d", len(season1))
 	}
 
 	// Natural sort to get correct episode order
-	sort.Apply(season1, sort.ByPath, false, true)
+	query.SortMedia(season1, "path", false, true)
 
 	// Verify episode order
 	expectedOrder := []string{"S01E01.mp4", "S01E02.mp4", "S01E10.mp4"}
@@ -426,19 +423,19 @@ func TestIntegration_MultiDatabaseScenario(t *testing.T) {
 	}
 
 	// Combine results
-	var allMedia []models.Media
+	var allMedia []models.MediaWithDB
 	for _, m := range dbMedia1 {
-		allMedia = append(allMedia, models.FromDB(m))
+		allMedia = append(allMedia, models.FromDBWithDB(m, "db1.db"))
 	}
 	for _, m := range dbMedia2 {
-		allMedia = append(allMedia, models.FromDB(m))
+		allMedia = append(allMedia, models.FromDBWithDB(m, "db2.db"))
 	}
 
 	// Filter for videos only (exclude audiobooks)
-	criteria := filter.Criteria{
+	flags := models.GlobalFlags{
 		Exclude: []string{"*.m4a", "*.mp3", "*.flac"},
 	}
-	videos := filter.Apply(allMedia, criteria)
+	videos := query.FilterMedia(allMedia, flags)
 
 	// Should have twice the video content (minus audiobooks)
 	if len(videos) < 20 { // Each fixture has 11 video files
@@ -446,10 +443,10 @@ func TestIntegration_MultiDatabaseScenario(t *testing.T) {
 	}
 
 	// Aggregate by folder across both databases
-	folders := aggregate.ByFolder(videos)
+	folders := query.AggregateMedia(videos, models.GlobalFlags{BigDirs: true})
 
 	// Sort by total size
-	aggregate.SortFolders(folders, "size", true)
+	query.SortFolders(folders, "size", true)
 
 	// Verify we have folders from both databases
 	uniqueFolders := make(map[string]bool)
@@ -475,26 +472,26 @@ func TestIntegration_CompleteWatchWorkflow(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var unwatched []models.Media
+	var unwatched []models.MediaWithDB
 	for _, m := range dbUnwatched {
-		unwatched = append(unwatched, models.FromDB(m))
+		unwatched = append(unwatched, models.FromDBWithDB(m, "test.db"))
 	}
 
 	initialUnwatchedCount := len(unwatched)
 
 	// Step 2: Filter for short content (easier to "watch" in test)
-	criteria := filter.Criteria{
-		MaxDuration: 3600, // 1 hour or less
-		MinSize:     100_000_000,
+	flags := models.GlobalFlags{
+		Duration: []string{"<1hour"},
+		Size:     []string{">100MB"},
 	}
-	toWatch := filter.Apply(unwatched, criteria)
+	toWatch := query.FilterMedia(unwatched, flags)
 
 	if len(toWatch) == 0 {
 		t.Fatal("No content to watch")
 	}
 
 	// Step 3: Natural sort (watch in order)
-	sort.Apply(toWatch, sort.ByPath, false, true)
+	query.SortMedia(toWatch, "path", false, true)
 
 	// Step 4: "Watch" first item
 	firstItem := toWatch[0]
@@ -559,16 +556,16 @@ func TestIntegration_FolderStatsAccuracy(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var allMedia []models.Media
+	var allMedia []models.MediaWithDB
 	for _, m := range dbMedia {
-		allMedia = append(allMedia, models.FromDB(m))
+		allMedia = append(allMedia, models.FromDBWithDB(m, "test.db"))
 	}
 
 	// Aggregate by folder
-	folders := aggregate.ByFolder(allMedia)
+	folders := query.AggregateMedia(allMedia, models.GlobalFlags{BigDirs: true})
 
 	// Find action movies folder
-	var actionFolder *aggregate.FolderStats
+	var actionFolder *models.FolderStats
 	for i := range folders {
 		if filepath.Base(folders[i].Path) == "action" {
 			actionFolder = &folders[i]
@@ -615,20 +612,20 @@ func BenchmarkIntegration_FilterSort(b *testing.B) {
 
 	ctx := context.Background()
 	dbMedia, _ := fixture.Queries.GetMedia(ctx, 100)
-	var allMedia []models.Media
+	var allMedia []models.MediaWithDB
 	for _, m := range dbMedia {
-		allMedia = append(allMedia, models.FromDB(m))
+		allMedia = append(allMedia, models.FromDBWithDB(m, "test.db"))
 	}
 
-	criteria := filter.Criteria{
-		MinSize: 400_000_000,
+	flags := models.GlobalFlags{
+		Size:    []string{">400MB"},
 		Exclude: []string{"*sample*"},
 	}
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		filtered := filter.Apply(allMedia, criteria)
-		sort.Apply(filtered, sort.ByPath, false, true)
+		filtered := query.FilterMedia(allMedia, flags)
+		query.SortMedia(filtered, "path", false, true)
 	}
 }
 

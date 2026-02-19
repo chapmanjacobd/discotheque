@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log/slog"
+	"slices"
 	"strings"
 
 	"github.com/alecthomas/kong"
@@ -87,13 +88,7 @@ func (c *MergeDBsCmd) getTables(conn *sql.DB) ([]string, error) {
 
 func (c *MergeDBsCmd) shouldProcessTable(table string) bool {
 	if len(c.OnlyTables) > 0 {
-		found := false
-		for _, t := range c.OnlyTables {
-			if t == table {
-				found = true
-				break
-			}
-		}
+		found := slices.Contains(c.OnlyTables, table)
 		if !found {
 			return false
 		}
@@ -110,7 +105,7 @@ func (c *MergeDBsCmd) mergeTable(srcConn, targetConn *sql.DB, table string) erro
 	targetCols, err := c.getTableColumns(targetConn, table)
 	if err != nil {
 		// Table might not exist in target. If not OnlyTargetColumns, we might want to create it?
-		// Python sqlite-utils insert_all(alter=True) handles this. 
+		// Python sqlite-utils insert_all(alter=True) handles this.
 		// For now, let's assume it should exist or we only care about existing target columns if requested.
 		if c.OnlyTargetColumns {
 			return fmt.Errorf("table %s does not exist in target", table)
@@ -189,7 +184,7 @@ func (c *MergeDBsCmd) mergeTable(srcConn, targetConn *sql.DB, table string) erro
 		placeholders[i] = "?"
 	}
 
-	insertQuery := fmt.Sprintf("%s INTO %s (%s) VALUES (%s)", 
+	insertQuery := fmt.Sprintf("%s INTO %s (%s) VALUES (%s)",
 		insertVerb, table, strings.Join(selectedCols, ", "), strings.Join(placeholders, ", "))
 
 	if c.Upsert && len(pks) > 0 {
@@ -209,13 +204,7 @@ func (c *MergeDBsCmd) mergeTable(srcConn, targetConn *sql.DB, table string) erro
 		if allIn {
 			updateParts := []string{}
 			for _, col := range selectedCols {
-				isPk := false
-				for _, pk := range pks {
-					if pk == col {
-						isPk = true
-						break
-					}
-				}
+				isPk := slices.Contains(pks, col)
 				if !isPk {
 					updateParts = append(updateParts, fmt.Sprintf("%s=excluded.%s", col, col))
 				}

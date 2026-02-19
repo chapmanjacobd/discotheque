@@ -133,10 +133,7 @@ func Chunks[T any](slice []T, chunkSize int) [][]T {
 	}
 	var res [][]T
 	for i := 0; i < len(slice); i += chunkSize {
-		end := i + chunkSize
-		if end > len(slice) {
-			end = len(slice)
-		}
+		end := min(i+chunkSize, len(slice))
 		res = append(res, slice[i:end])
 	}
 	return res
@@ -218,6 +215,3 @@ func DivideSequence[T Number](slice []T) float64 {
 	}
 	return res
 }
-
-
-

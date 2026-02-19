@@ -240,10 +240,7 @@ func ClusterPaths(flags models.GlobalFlags, lines []string) []models.FolderStats
 
 	k := flags.Clusters
 	if k <= 0 {
-		k = int(math.Sqrt(float64(len(lines))))
-		if k < 2 {
-			k = 2
-		}
+		k = max(int(math.Sqrt(float64(len(lines)))), 2)
 	}
 
 	// Simple TF-IDF Vectorization

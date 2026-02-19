@@ -22,12 +22,12 @@ func RenameMoveFile(flags models.GlobalFlags, src, dst string) error {
 		// If dst parent doesn't exist
 		if os.IsNotExist(err) {
 			parent := filepath.Dir(dst)
-			if err := os.MkdirAll(parent, 0755); err != nil {
+			if err := os.MkdirAll(parent, 0o755); err != nil {
 				return err
 			}
 			return os.Rename(src, dst)
 		}
-		
+
 		// Cross-device move fallback
 		if strings.Contains(err.Error(), "invalid cross-device link") {
 			// Basic copy and delete
@@ -35,7 +35,7 @@ func RenameMoveFile(flags models.GlobalFlags, src, dst string) error {
 			if err != nil {
 				return err
 			}
-			err = os.WriteFile(dst, input, 0644)
+			err = os.WriteFile(dst, input, 0o644)
 			if err != nil {
 				return err
 			}
@@ -147,7 +147,7 @@ func ResolveAbsolutePath(s string) string {
 		home, _ := os.UserHomeDir()
 		s = filepath.Join(home, s[1:])
 	}
-	
+
 	abs, err := filepath.Abs(s)
 	if err == nil {
 		if _, err := os.Stat(abs); err == nil {

@@ -148,4 +148,3 @@ func SizeTimeout(timeoutSize string, totalSize int64) bool {
 	}
 	return totalSize >= limit
 }
-

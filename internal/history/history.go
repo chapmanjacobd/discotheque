@@ -112,7 +112,7 @@ func DeleteHistoryByPaths(dbPath string, paths []string) error {
 		if _, err := tx.Exec("DELETE FROM history WHERE media_path = ?", path); err != nil {
 			return err
 		}
-		// Also reset playhead/play_count in media table? 
+		// Also reset playhead/play_count in media table?
 		// Python remove logic does that too.
 		if _, err := tx.Exec("UPDATE media SET playhead=0, play_count=0, time_last_played=0, time_first_played=0 WHERE path = ?", path); err != nil {
 			return err

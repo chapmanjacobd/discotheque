@@ -19,37 +19,33 @@ type GlobalFlags struct {
 	PathContains []string `help:"Path must contain all these strings"`
 
 	// Size/Duration filters
-	Size        []string `short:"S" help:"Size range (e.g., >100MB, 1GB%10)"`
-	Duration    []string `short:"d" help:"Duration range (e.g., >1hour, 30min%10)"`
-	MinSize     string   `help:"(Deprecated) Minimum file size"`
-	MaxSize     string   `help:"(Deprecated) Maximum file size"`
-	MinDuration int      `help:"(Deprecated) Minimum duration in seconds"`
-	MaxDuration int      `help:"(Deprecated) Maximum duration in seconds"`
-	DurationFromSize string `help:"Constrain media to duration of videos which match any size constraints"`
-	Ext         []string `short:"e" help:"Filter by extensions (e.g., .mp4,.mkv)"`
+	Size             []string `short:"S" help:"Size range (e.g., >100MB, 1GB%10)"`
+	Duration         []string `short:"d" help:"Duration range (e.g., >1hour, 30min%10)"`
+	DurationFromSize string   `help:"Constrain media to duration of videos which match any size constraints"`
+	Ext              []string `short:"e" help:"Filter by extensions (e.g., .mp4,.mkv)"`
 
 	// Time filters
-	CreatedAfter  string `help:"Created after date (YYYY-MM-DD)"`
-	CreatedBefore string `help:"Created before date (YYYY-MM-DD)"`
-	ModifiedAfter string `help:"Modified after date (YYYY-MM-DD)"`
+	CreatedAfter   string `help:"Created after date (YYYY-MM-DD)"`
+	CreatedBefore  string `help:"Created before date (YYYY-MM-DD)"`
+	ModifiedAfter  string `help:"Modified after date (YYYY-MM-DD)"`
 	ModifiedBefore string `help:"Modified before date (YYYY-MM-DD)"`
-	DeletedAfter  string `help:"Deleted after date (YYYY-MM-DD)"`
-	DeletedBefore string `help:"Deleted before date (YYYY-MM-DD)"`
-	PlayedAfter   string `help:"Last played after date (YYYY-MM-DD)"`
-	PlayedBefore  string `help:"Last played before date (YYYY-MM-DD)"`
+	DeletedAfter   string `help:"Deleted after date (YYYY-MM-DD)"`
+	DeletedBefore  string `help:"Deleted before date (YYYY-MM-DD)"`
+	PlayedAfter    string `help:"Last played after date (YYYY-MM-DD)"`
+	PlayedBefore   string `help:"Last played before date (YYYY-MM-DD)"`
 
 	// Playback state filters
-	Watched      *bool `help:"Filter by watched status (true/false)"`
-	Unfinished   bool  `help:"Has playhead but not finished"`
+	Watched      *bool  `help:"Filter by watched status (true/false)"`
+	Unfinished   bool   `help:"Has playhead but not finished"`
 	Partial      string `short:"P" help:"Filter by partial playback status"`
-	PlayCountMin int   `help:"Minimum play count"`
-	PlayCountMax int   `help:"Maximum play count"`
+	PlayCountMin int    `help:"Minimum play count"`
+	PlayCountMax int    `help:"Maximum play count"`
 
 	// Content type filters
-	VideoOnly bool `help:"Only video files"`
-	AudioOnly bool `help:"Only audio files"`
-	ImageOnly bool `help:"Only image files"`
-	Portrait  bool `help:"Only portrait orientation files"`
+	VideoOnly       bool `help:"Only video files"`
+	AudioOnly       bool `help:"Only audio files"`
+	ImageOnly       bool `help:"Only image files"`
+	Portrait        bool `help:"Only portrait orientation files"`
 	ScanSubtitles   bool `help:"Scan for external subtitles during import"`
 	OnlineMediaOnly bool `help:"Exclude local media"`
 	LocalMediaOnly  bool `help:"Exclude online media"`
@@ -78,11 +74,10 @@ type GlobalFlags struct {
 	// Display
 	Columns   []string `short:"c" help:"Columns to display"`
 	BigDirs   bool     `short:"B" help:"Aggregate by parent directory"`
-		JSON      bool     `short:"j" help:"Output results as JSON"`
-		Summarize bool     `help:"Print aggregate statistics"`
-		Frequency string   `short:"f" help:"Group statistics by time frequency (daily, weekly, monthly, yearly)"`
-		TUI       bool     `help:"Interactive TUI mode"`
-	
+	JSON      bool     `short:"j" help:"Output results as JSON"`
+	Summarize bool     `help:"Print aggregate statistics"`
+	Frequency string   `short:"f" help:"Group statistics by time frequency (daily, weekly, monthly, yearly)"`
+	TUI       bool     `help:"Interactive TUI mode"`
 
 	// Grouping
 	FileCounts        string   `help:"Filter by number of files in directory (e.g., >5, 10%1)"`
@@ -121,16 +116,16 @@ type GlobalFlags struct {
 	TotalSizes      bool    `help:"Compare total sizes (folders only)"`
 	TotalDurations  bool    `help:"Compare total durations (folders only)"`
 	OnlyDuplicates  bool    `help:"Only show duplicate items"`
-		OnlyOriginals   bool    `help:"Only show original items"`
-	
-		// Clustering
-		ClusterSort     bool    `short:"C" help:"Group items by similarity"`
-		Clusters        int     `help:"Number of clusters"`
-		TFIDF           bool    `help:"Use TF-IDF for clustering"`
-		MoveGroups      bool    `help:"Move grouped files into separate directories"`
-		PrintGroups     bool    `help:"Print clusters as JSON"`
-	
-		// Database merging and filtering
+	OnlyOriginals   bool    `help:"Only show original items"`
+
+	// Clustering
+	ClusterSort bool `short:"C" help:"Group items by similarity"`
+	Clusters    int  `help:"Number of clusters"`
+	TFIDF       bool `help:"Use TF-IDF for clustering"`
+	MoveGroups  bool `help:"Move grouped files into separate directories"`
+	PrintGroups bool `help:"Print clusters as JSON"`
+
+	// Database merging and filtering
 	OnlyTables        []string `short:"t" help:"Comma separated specific table(s)"`
 	PrimaryKeys       []string `help:"Comma separated primary keys"`
 	BusinessKeys      []string `help:"Comma separated business keys"`
@@ -169,13 +164,13 @@ type GlobalFlags struct {
 	Timeout        string  `short:"T" help:"Quit after N minutes/seconds"`
 	Threads        int     `help:"Use N threads for parallel processing"`
 	Loop           bool    `help:"Loop playback"`
-		Mute         bool    `short:"M" help:"Start playback muted"`
-		OverridePlayer string  `help:"Override default player (e.g. --player 'vlc')"`
-		IgnoreErrors   bool    `short:"i" help:"Ignore errors and continue to next file"`
-		Completed      bool    `help:"Show only completed items"`
-		InProgress     bool    `help:"Show only items in progress"`
-		Start          string  `help:"Start playback at specific time/percentage"`
-		End            string  `help:"Stop playback at specific time/percentage"`
+	Mute           bool    `short:"M" help:"Start playback muted"`
+	OverridePlayer string  `help:"Override default player (e.g. --player 'vlc')"`
+	IgnoreErrors   bool    `short:"i" help:"Ignore errors and continue to next file"`
+	Completed      bool    `help:"Show only completed items"`
+	InProgress     bool    `help:"Show only items in progress"`
+	Start          string  `help:"Start playback at specific time/percentage"`
+	End            string  `help:"Stop playback at specific time/percentage"`
 	Volume         int     `help:"Set initial volume (0-100)"`
 	Fullscreen     bool    `help:"Start in fullscreen"`
 	NoSubtitles    bool    `help:"Disable subtitles"`

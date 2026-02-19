@@ -16,8 +16,8 @@ func InitDB(sqlDB *sql.DB) error {
 
 	// Filter out FTS5 specific commands
 	var filteredSchema strings.Builder
-	lines := strings.Split(schema, ";")
-	for _, line := range lines {
+	lines := strings.SplitSeq(schema, ";")
+	for line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if trimmed == "" {
 			continue

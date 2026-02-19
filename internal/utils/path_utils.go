@@ -26,92 +26,63 @@ func RandomFilename(path string) string {
 	return fmt.Sprintf("%s.%s%s", base, RandomString(6), ext)
 }
 
-// TrimPathSegments reduces the length of path segments to fit within desiredLength
+// TrimPathSegments reduces the length of path segments to fit within desiredLength.
+// It uses a fish-shell style where parent/grandparent segments are reduced to their first letter.
 func TrimPathSegments(path string, desiredLength int) string {
+	if len(path) <= desiredLength {
+		return path
+	}
+
 	ext := filepath.Ext(path)
-	stem := strings.TrimSuffix(filepath.Base(path), ext)
+	base := filepath.Base(path)
 	dir := filepath.Dir(path)
 
-	// Split directory into segments
+	if dir == "." || dir == "/" || dir == "" {
+		if len(path) > desiredLength {
+			return ShortenMiddle(path, desiredLength)
+		}
+		return path
+	}
+
 	sep := string(filepath.Separator)
-	var segments []string
+	pre := ""
 	if filepath.IsAbs(path) {
-		segments = append(segments, sep)
+		pre = sep
 		dir = strings.TrimPrefix(dir, sep)
 	}
-	
-	if dir != "" && dir != "." {
-		segments = append(segments, strings.Split(dir, sep)...)
-	}
-	
-	// Add stem as the last segment
-	segments = append(segments, stem)
 
-	targetLength := desiredLength - len(ext)
+	segments := strings.Split(dir, sep)
 
-	currentLength := 0
-	for _, s := range segments {
-		currentLength += len(s)
-	}
-
-	for currentLength > targetLength {
-		// Find the longest segment, skipping the separator if it's there
-		longestIdx := -1
-		for i := 0; i < len(segments); i++ {
-			if segments[i] == sep {
-				continue
-			}
-			if longestIdx == -1 || len(segments[i]) > len(segments[longestIdx]) {
-				longestIdx = i
-			}
+	// Try shortening segments from left to right (grandparents first)
+	for i := range segments {
+		if len(pre+filepath.Join(append(segments, base)...)) <= desiredLength {
+			break
 		}
-
-		if longestIdx == -1 || len(segments[longestIdx]) <= 1 {
-			break // Cannot shorten anymore
-		}
-
-		segments[longestIdx] = segments[longestIdx][:len(segments[longestIdx])-1]
-		currentLength--
-
-		allEven := true
-		for _, s := range segments {
-			if s == sep {
-				continue
-			}
-			if len(s)%2 != 0 {
-				allEven = false
-				break
-			}
-		}
-		if allEven {
-			for i := range segments {
-				if segments[i] == sep {
-					continue
-				}
-				if len(segments[i]) > 0 {
-					segments[i] = segments[i][:len(segments[i])-1]
-					currentLength--
-				}
-			}
+		if len(segments[i]) > 1 {
+			segments[i] = string([]rune(segments[i])[0])
 		}
 	}
 
-	// Reconstruct path
-	var res string
-	if len(segments) > 0 && segments[0] == sep {
-		res = sep + filepath.Join(segments[1:]...)
-	} else {
-		res = filepath.Join(segments...)
+	res := pre + filepath.Join(append(segments, base)...)
+	if len(res) > desiredLength {
+		// If still too long, shorten the base name
+		available := desiredLength - len(pre+filepath.Join(segments...)+sep)
+		if available > 3 {
+			stem := strings.TrimSuffix(base, ext)
+			res = pre + filepath.Join(append(segments, ShortenMiddle(stem, available-len(ext))+ext)...)
+		} else {
+			res = ShortenMiddle(res, desiredLength)
+		}
 	}
-	
-	return res + ext
+
+	return res
 }
 
 // SafeJoin joins a base path with a user-provided path, preventing directory traversal
 func SafeJoin(base string, userPath string) string {
 	// Clean the user path to remove .. and other traversal elements
 	userPath = filepath.Clean(userPath)
-	
+
 	// Split and filter out traversal elements just in case Clean didn't handle everything as expected for "safe" join
 	parts := strings.Split(userPath, string(filepath.Separator))
 	var safeParts []string
@@ -121,7 +92,7 @@ func SafeJoin(base string, userPath string) string {
 		}
 		safeParts = append(safeParts, p)
 	}
-	
+
 	return filepath.Join(append([]string{base}, safeParts...)...)
 }
 
@@ -131,10 +102,10 @@ func Relativize(path string) string {
 	if len(path) >= 2 && path[1] == ':' {
 		path = path[2:]
 	}
-	
+
 	// Remove leading slashes
 	path = strings.TrimLeft(path, `/\`)
-	
+
 	return path
 }
 
@@ -192,14 +163,14 @@ func PathTupleFromURL(rawURL string) (string, string) {
 
 	path := u.Path
 	host := strings.ReplaceAll(u.Host, ":", ".")
-	
+
 	if path == "" || path == "/" {
 		return host, ""
 	}
 
 	filename := filepath.Base(path)
 	parent := SafeJoin(host, filepath.Dir(path))
-	
+
 	return StripMountSyntax(parent), filename
 }
 
@@ -235,7 +206,7 @@ func CleanPath(path string, opts CleanPathOptions) string {
 	if dir != "." && dir != "" {
 		parts = strings.Split(dir, sep)
 	}
-	
+
 	var cleanParts []string
 	for _, p := range parts {
 		if p == "." || p == "" || p == sep {
@@ -247,7 +218,7 @@ func CleanPath(path string, opts CleanPathOptions) string {
 		if cp == "" {
 			cp = "_"
 		}
-		
+
 		if opts.LowercaseFolders {
 			cp = strings.ToLower(cp)
 		} else if opts.CaseInsensitive {

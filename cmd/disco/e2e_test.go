@@ -26,9 +26,9 @@ func TestE2E_AddAndCheck(t *testing.T) {
 
 	addCmd := &commands.AddCmd{
 		GlobalFlags: models.GlobalFlags{ScanSubtitles: false},
-		Database:  fixture.DBPath,
-		ScanPaths: []string{dummyPath},
-		Parallel:  1,
+		Database:    fixture.DBPath,
+		ScanPaths:   []string{dummyPath},
+		Parallel:    1,
 	}
 
 	if err := addCmd.Run(nil); err != nil {
@@ -89,9 +89,9 @@ func TestE2E_HistoryAdd(t *testing.T) {
 	// 1. Add to media
 	addCmd := &commands.AddCmd{
 		GlobalFlags: models.GlobalFlags{ScanSubtitles: false},
-		Database:  fixture.DBPath,
-		ScanPaths: []string{dummyPath},
-		Parallel:  1,
+		Database:    fixture.DBPath,
+		ScanPaths:   []string{dummyPath},
+		Parallel:    1,
 	}
 	addCmd.Run(nil)
 
@@ -128,7 +128,7 @@ func TestE2E_PathConsolidation(t *testing.T) {
 
 	parentDir := filepath.Join(fixture.TempDir, "parent")
 	subDir := filepath.Join(parentDir, "sub")
-	os.MkdirAll(subDir, 0755)
+	os.MkdirAll(subDir, 0o755)
 	fixture.CreateDummyFile("parent/video1.mp4")
 	fixture.CreateDummyFile("parent/sub/video2.mp4")
 
@@ -173,9 +173,9 @@ func TestE2E_Stats(t *testing.T) {
 	// 1. Add to media
 	addCmd := &commands.AddCmd{
 		GlobalFlags: models.GlobalFlags{ScanSubtitles: false},
-		Database:  fixture.DBPath,
-		ScanPaths: []string{dummyPath},
-		Parallel:  1,
+		Database:    fixture.DBPath,
+		ScanPaths:   []string{dummyPath},
+		Parallel:    1,
 	}
 	addCmd.Run(nil)
 

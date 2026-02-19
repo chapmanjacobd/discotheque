@@ -34,8 +34,8 @@ func TestTrimPathSegments(t *testing.T) {
 		desiredLength int
 		expected      string
 	}{
-		{"/aaaaaaaaaa/fans/001.jpg", 16, "/aaaa/fans/001.jpg"},
-		{"/ao/bo/co/do/eo/fo/go/ho", 9, "/a/b/c/d/e/f/g/h"},
+		{"/aaaaaaaaaa/fans/001.jpg", 16, "/a/fans/001.jpg"},
+		{"/ao/bo/co/do/eo/fo/go/ho", 13, "/a/b/.../g/ho"},
 		{"/a/b/c", 10, "/a/b/c"},
 	}
 
@@ -74,7 +74,7 @@ func TestSafeJoin(t *testing.T) {
 
 func TestPathTupleFromURL(t *testing.T) {
 	tests := []struct {
-		url      string
+		url              string
 		expectedParent   string
 		expectedFilename string
 	}{

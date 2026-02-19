@@ -556,3 +556,24 @@ func LoadString(s string) any {
 	}
 	return s
 }
+
+// FtsQuote quotes search terms for FTS5 unless they already contain FTS operators
+func FtsQuote(query []string) []string {
+	ftsOperators := []string{" NOT ", " AND ", " OR ", "*", ":", "NEAR("}
+	res := make([]string, len(query))
+	for i, s := range query {
+		hasOperator := false
+		for _, op := range ftsOperators {
+			if strings.Contains(s, op) {
+				hasOperator = true
+				break
+			}
+		}
+		if hasOperator {
+			res[i] = s
+		} else {
+			res[i] = `"` + s + `"`
+		}
+	}
+	return res
+}

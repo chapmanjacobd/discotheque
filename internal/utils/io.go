@@ -79,4 +79,3 @@ func Prompt(message string) string {
 	fmt.Scanln(&response)
 	return strings.TrimSpace(response)
 }
-

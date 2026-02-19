@@ -6,22 +6,50 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/alecthomas/kong"
 	"github.com/chapmanjacobd/discotheque/internal/metadata"
 	"github.com/chapmanjacobd/discotheque/internal/models"
+	"github.com/chapmanjacobd/discotheque/internal/query"
+	"github.com/chapmanjacobd/discotheque/internal/utils"
 )
 
 type FilesInfoCmd struct {
 	models.GlobalFlags
-	Paths []string `arg:"" required:"" help:"Files or directories to scan"`
+	Args []string `arg:"" required:"" help:"Database file(s) or files/directories to scan"`
+
+	Databases []string `kong:"-"`
+	ScanPaths []string `kong:"-"`
+}
+
+func (c *FilesInfoCmd) AfterApply() error {
+	for _, arg := range c.Args {
+		if strings.HasSuffix(arg, ".db") && utils.IsSQLite(arg) {
+			c.Databases = append(c.Databases, arg)
+		} else {
+			c.ScanPaths = append(c.ScanPaths, arg)
+		}
+	}
+	return nil
 }
 
 func (c *FilesInfoCmd) Run(ctx *kong.Context) error {
 	models.SetupLogging(c.Verbose)
 
-	var allMeta []*metadata.MediaMetadata
-	for _, root := range c.Paths {
+	var allMedia []models.MediaWithDB
+
+	// Handle databases
+	if len(c.Databases) > 0 {
+		media, err := query.MediaQuery(context.Background(), c.Databases, c.GlobalFlags)
+		if err != nil {
+			return err
+		}
+		allMedia = append(allMedia, media...)
+	}
+
+	// Handle paths
+	for _, root := range c.ScanPaths {
 		err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
 			if err != nil {
 				return err
@@ -32,10 +60,17 @@ func (c *FilesInfoCmd) Run(ctx *kong.Context) error {
 
 			meta, err := metadata.Extract(context.Background(), path, c.ScanSubtitles)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "Error extracting metadata for %s: %v\n", path, err)
 				return nil
 			}
-			allMeta = append(allMeta, meta)
+			allMedia = append(allMedia, models.MediaWithDB{
+				Media: models.Media{
+					Path:     meta.Media.Path,
+					Title:    models.NullStringPtr(meta.Media.Title),
+					Type:     models.NullStringPtr(meta.Media.Type),
+					Size:     models.NullInt64Ptr(meta.Media.Size),
+					Duration: models.NullInt64Ptr(meta.Media.Duration),
+				},
+			})
 			return nil
 		})
 		if err != nil {
@@ -46,24 +81,23 @@ func (c *FilesInfoCmd) Run(ctx *kong.Context) error {
 	if c.JSON {
 		encoder := json.NewEncoder(os.Stdout)
 		encoder.SetIndent("", "  ")
-		return encoder.Encode(allMeta)
+		return encoder.Encode(allMedia)
 	}
 
-
 	// Basic print if not JSON
-	for _, m := range allMeta {
-		fmt.Printf("Path: %s\n", m.Media.Path)
-		if m.Media.Title.Valid {
-			fmt.Printf("  Title: %s\n", m.Media.Title.String)
+	for _, m := range allMedia {
+		fmt.Printf("Path: %s\n", m.Path)
+		if m.Title != nil {
+			fmt.Printf("  Title: %s\n", *m.Title)
 		}
-		if m.Media.Type.Valid {
-			fmt.Printf("  Type: %s\n", m.Media.Type.String)
+		if m.Type != nil {
+			fmt.Printf("  Type: %s\n", *m.Type)
 		}
-		if m.Media.Size.Valid {
-			fmt.Printf("  Size: %d\n", m.Media.Size.Int64)
+		if m.Size != nil {
+			fmt.Printf("  Size: %d\n", *m.Size)
 		}
-		if m.Media.Duration.Valid {
-			fmt.Printf("  Duration: %d\n", m.Media.Duration.Int64)
+		if m.Duration != nil {
+			fmt.Printf("  Duration: %d\n", *m.Duration)
 		}
 		fmt.Println()
 	}

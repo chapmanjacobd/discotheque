@@ -61,6 +61,18 @@ func Extract(ctx context.Context, path string, scanSubtitles bool) (*MediaMetada
 	// Detect mimetype first
 	mimeStr := utils.DetectMimeType(path)
 
+	// Advanced Type Detection
+	mediaType := ""
+	if strings.HasPrefix(mimeStr, "image/") {
+		mediaType = "image"
+	} else if strings.HasPrefix(mimeStr, "text/") || mimeStr == "application/pdf" || mimeStr == "application/epub+zip" {
+		mediaType = "text"
+	} else if mimeStr != "" {
+		// Fallback to coarse mimetype category
+		parts := strings.Split(mimeStr, "/")
+		mediaType = parts[0]
+	}
+
 	cmd := exec.CommandContext(ctx, "ffprobe",
 		"-hide_banner",
 		"-show_format",
@@ -73,16 +85,12 @@ func Extract(ctx context.Context, path string, scanSubtitles bool) (*MediaMetada
 	output, err := cmd.Output()
 	if err != nil {
 		// If ffprobe fails, we still return basic file info with detected mimetype
-		p := basicInfo(path, stat)
-		p.Media.Type = utils.ToNullString(mimeStr)
-		return p, nil
+		return basicInfo(path, stat, mediaType), nil
 	}
 
 	var data FFProbeOutput
 	if err := json.Unmarshal(output, &data); err != nil {
-		p := basicInfo(path, stat)
-		p.Media.Type = utils.ToNullString(mimeStr)
-		return p, nil
+		return basicInfo(path, stat, mediaType), nil
 	}
 
 	params := db.UpsertMediaParams{
@@ -189,11 +197,8 @@ func Extract(ctx context.Context, path string, scanSubtitles bool) (*MediaMetada
 	params.AudioCount = utils.ToNullInt64(aCount)
 	params.SubtitleCount = utils.ToNullInt64(sCount)
 
-	// Advanced Type Detection
-	mediaType := ""
-	if strings.HasPrefix(mimeStr, "image/") {
-		mediaType = "image"
-	} else if vCount > 0 {
+	// Refine Type Detection with stream info
+	if vCount > 0 {
 		mediaType = "video"
 	} else if aCount > 0 {
 		mediaType = "audio"
@@ -202,13 +207,23 @@ func Extract(ctx context.Context, path string, scanSubtitles bool) (*MediaMetada
 		if duration > 3600 || strings.Contains(lowerPath, "audiobook") {
 			mediaType = "audiobook"
 		}
-	} else if mimeStr != "" {
-		// Fallback to coarse mimetype category
-		parts := strings.Split(mimeStr, "/")
-		mediaType = parts[0]
 	}
 
 	params.Type = utils.ToNullString(mediaType)
+
+	if mediaType == "text" && params.Duration.Int64 == 0 {
+		// Python: cast(length(tags) / 4.2 / 220 * 60 as INT) + 10 duration
+		allTags := ""
+		if data.Format.Tags != nil {
+			for _, v := range data.Format.Tags {
+				allTags += v
+			}
+		}
+		if allTags != "" {
+			d := int64(float64(len(allTags))/4.2/220*60) + 10
+			params.Duration = utils.ToNullInt64(d)
+		}
+	}
 
 	metadata := &MediaMetadata{
 		Media: params,
@@ -231,13 +246,14 @@ func Extract(ctx context.Context, path string, scanSubtitles bool) (*MediaMetada
 	return metadata, nil
 }
 
-func basicInfo(path string, stat os.FileInfo) *MediaMetadata {
+func basicInfo(path string, stat os.FileInfo, mimeStr string) *MediaMetadata {
 	return &MediaMetadata{
 		Media: db.UpsertMediaParams{
 			Path:         path,
 			Size:         utils.ToNullInt64(stat.Size()),
 			TimeCreated:  utils.ToNullInt64(stat.ModTime().Unix()),
 			TimeModified: utils.ToNullInt64(stat.ModTime().Unix()),
+			Type:         utils.ToNullString(mimeStr),
 		},
 	}
 }

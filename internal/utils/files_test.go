@@ -15,7 +15,7 @@ func TestFilterDeleted(t *testing.T) {
 	defer os.RemoveAll(tempDir)
 
 	f1 := filepath.Join(tempDir, "f1.txt")
-	if err := os.WriteFile(f1, []byte("hello"), 0644); err != nil {
+	if err := os.WriteFile(f1, []byte("hello"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -127,4 +127,3 @@ func TestCommonPathFull(t *testing.T) {
 		t.Errorf("CommonPathFull failed to find common words, got %q", got)
 	}
 }
-

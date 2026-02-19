@@ -37,7 +37,7 @@ func TestQueryBuilder_Build(t *testing.T) {
 		{
 			"Search Query",
 			models.GlobalFlags{Search: []string{"term"}, SortBy: "path", Limit: 100, HideDeleted: true},
-			"SELECT * FROM media WHERE COALESCE(time_deleted, 0) = 0 AND (path LIKE ? OR title LIKE ?) ORDER BY path ASC LIMIT 100",
+			"SELECT * FROM media WHERE COALESCE(time_deleted, 0) = 0 AND ((path LIKE ? OR title LIKE ?)) ORDER BY path ASC LIMIT 100",
 		},
 		{
 			"Video Only",
@@ -52,12 +52,12 @@ func TestQueryBuilder_Build(t *testing.T) {
 		{
 			"Random Sort",
 			models.GlobalFlags{Random: true, Limit: 10, HideDeleted: true},
-			"SELECT * FROM media WHERE COALESCE(time_deleted, 0) = 0 ORDER BY RANDOM() LIMIT 10",
+			"SELECT * FROM media WHERE COALESCE(time_deleted, 0) = 0 AND rowid IN (SELECT rowid FROM media WHERE COALESCE(time_deleted, 0) = 0 ORDER BY RANDOM() LIMIT 160) ORDER BY RANDOM() LIMIT 10",
 		},
 		{
 			"FTS Search",
 			models.GlobalFlags{FTS: true, Search: []string{"term"}, FTSTable: "media_fts", Limit: 10, HideDeleted: true},
-			"SELECT * FROM media_fts WHERE COALESCE(time_deleted, 0) = 0 AND media_fts MATCH ? LIMIT 10",
+			"SELECT * FROM media WHERE COALESCE(time_deleted, 0) = 0 AND rowid IN (SELECT rowid FROM media_fts WHERE media_fts MATCH ?) LIMIT 10",
 		},
 		{
 			"Only Deleted",
@@ -113,7 +113,7 @@ func TestFilterMedia(t *testing.T) {
 		{"No filters", models.GlobalFlags{}, 2},
 		{"Include filter", models.GlobalFlags{Include: []string{"%.mp4"}}, 1},
 		{"Exclude filter", models.GlobalFlags{Exclude: []string{"%.mp4"}}, 1},
-		{"MinSize filter", models.GlobalFlags{MinSize: "150B"}, 1},
+		{"Size filter", models.GlobalFlags{Size: []string{">150B"}}, 1},
 	}
 
 	for _, tt := range tests {

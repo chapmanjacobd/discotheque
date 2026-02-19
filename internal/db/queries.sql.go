@@ -1235,11 +1235,11 @@ func (q *Queries) SearchCaptions(ctx context.Context, query string) ([]SearchCap
 }
 
 const searchMediaFTS = `-- name: SearchMediaFTS :many
-SELECT m.path, m.title, m.duration, m.size, m.time_created, m.time_modified, m.time_deleted, m.time_first_played, m.time_last_played, m.play_count, m.playhead, m.type, m.width, m.height, m.fps, m.video_codecs, m.audio_codecs, m.subtitle_codecs, m.video_count, m.audio_count, m.subtitle_count, m.album, m.artist, m.genre, m.mood, m.bpm, m."key", m.decade, m.categories, m.city, m.country, m.description, m.language, m.webpath, m.uploader, m.time_uploaded, m.time_downloaded, m.view_count, m.num_comments, m.favorite_count, m.score, m.upvote_ratio, m.latitude, m.longitude FROM media m
-JOIN media_fts f ON m.rowid = f.rowid
-WHERE f.path MATCH ?1
-  AND m.time_deleted = 0
-ORDER BY f.rank
+SELECT path, title, duration, size, time_created, time_modified, time_deleted, time_first_played, time_last_played, play_count, playhead, type, width, height, fps, video_codecs, audio_codecs, subtitle_codecs, video_count, audio_count, subtitle_count, album, artist, genre, mood, bpm, "key", decade, categories, city, country, description, language, webpath, uploader, time_uploaded, time_downloaded, view_count, num_comments, favorite_count, score, upvote_ratio, latitude, longitude FROM media
+WHERE rowid IN (
+    SELECT rowid FROM media_fts f WHERE f.title MATCH ?1
+)
+AND time_deleted = 0
 LIMIT ?2
 `
 

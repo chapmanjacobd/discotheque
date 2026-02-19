@@ -54,7 +54,7 @@ func (f *TestFixture) createTree(parent string, tree map[string]any) {
 	for name, content := range tree {
 		path := filepath.Join(parent, name)
 		if subTree, ok := content.(map[string]any); ok {
-			if err := os.MkdirAll(path, 0755); err != nil {
+			if err := os.MkdirAll(path, 0o755); err != nil {
 				f.T.Fatal(err)
 			}
 			f.createTree(path, subTree)
@@ -67,10 +67,10 @@ func (f *TestFixture) createTree(parent string, tree map[string]any) {
 }
 
 func (f *TestFixture) writeFile(path string, data []byte) {
-	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		f.T.Fatal(err)
 	}
-	if err := os.WriteFile(path, data, 0644); err != nil {
+	if err := os.WriteFile(path, data, 0o644); err != nil {
 		f.T.Fatal(err)
 	}
 }

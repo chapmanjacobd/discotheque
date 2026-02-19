@@ -33,17 +33,71 @@ var schemaFS embed.FS
 
 type PrintCmd struct {
 	models.GlobalFlags
-	Databases []string `arg:"" required:"" help:"SQLite database files" type:"existingfile"`
+	Args []string `arg:"" required:"" help:"Database file(s) or files/directories to scan"`
+
+	Databases []string `kong:"-"`
+	ScanPaths []string `kong:"-"`
+}
+
+func (c *PrintCmd) AfterApply() error {
+	for _, arg := range c.Args {
+		if strings.HasSuffix(arg, ".db") && utils.IsSQLite(arg) {
+			c.Databases = append(c.Databases, arg)
+		} else {
+			c.ScanPaths = append(c.ScanPaths, arg)
+		}
+	}
+	return nil
 }
 
 func (c *PrintCmd) Run(ctx *kong.Context) error {
 	models.SetupLogging(c.Verbose)
-	media, err := query.MediaQuery(context.Background(), c.Databases, c.GlobalFlags)
-	if err != nil {
-		return err
+
+	var allMedia []models.MediaWithDB
+
+	// Handle databases
+	if len(c.Databases) > 0 {
+		dbMedia, err := query.MediaQuery(context.Background(), c.Databases, c.GlobalFlags)
+		if err != nil {
+			return err
+		}
+		allMedia = append(allMedia, dbMedia...)
 	}
 
-	media = query.FilterMedia(media, c.GlobalFlags)
+	// Handle paths
+	for _, root := range c.ScanPaths {
+		err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			if d.IsDir() {
+				return nil
+			}
+
+			meta, err := metadata.Extract(context.Background(), path, c.ScanSubtitles)
+			if err != nil {
+				return nil
+			}
+			allMedia = append(allMedia, models.MediaWithDB{
+				Media: models.Media{
+					Path:         meta.Media.Path,
+					Title:        models.NullStringPtr(meta.Media.Title),
+					Type:         models.NullStringPtr(meta.Media.Type),
+					Size:         models.NullInt64Ptr(meta.Media.Size),
+					Duration:     models.NullInt64Ptr(meta.Media.Duration),
+					TimeCreated:  models.NullInt64Ptr(meta.Media.TimeCreated),
+					TimeModified: models.NullInt64Ptr(meta.Media.TimeModified),
+				},
+			})
+			return nil
+		})
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error walking %s: %v\n", root, err)
+		}
+	}
+
+	var media []models.MediaWithDB
+	media = query.FilterMedia(allMedia, c.GlobalFlags)
 	HideRedundantFirstPlayed(media)
 
 	isAggregated := c.BigDirs || c.GroupByExtensions || c.GroupByMimeTypes || c.GroupBySize || c.Depth > 0 || c.Parents
@@ -94,24 +148,77 @@ func (c *PrintCmd) Run(ctx *kong.Context) error {
 
 type DiskUsageCmd struct {
 	models.GlobalFlags
-	Databases []string `arg:"" required:"" help:"SQLite database files" type:"existingfile"`
+	Args []string `arg:"" required:"" help:"Database file(s) or files/directories to scan"`
+
+	Databases []string `kong:"-"`
+	ScanPaths []string `kong:"-"`
+}
+
+func (c *DiskUsageCmd) AfterApply() error {
+	for _, arg := range c.Args {
+		if strings.HasSuffix(arg, ".db") && utils.IsSQLite(arg) {
+			c.Databases = append(c.Databases, arg)
+		} else {
+			c.ScanPaths = append(c.ScanPaths, arg)
+		}
+	}
+	return nil
 }
 
 func (c *DiskUsageCmd) Run(ctx *kong.Context) error {
 	models.SetupLogging(c.Verbose)
 
-	if c.TUI {
-		media, err := query.MediaQuery(context.Background(), c.Databases, c.GlobalFlags)
+	var allMedia []models.MediaWithDB
+
+	// Handle databases
+	if len(c.Databases) > 0 {
+		dbMedia, err := query.MediaQuery(context.Background(), c.Databases, c.GlobalFlags)
 		if err != nil {
 			return err
 		}
-		if len(media) == 0 {
+		allMedia = append(allMedia, dbMedia...)
+	}
+
+	// Handle paths
+	for _, root := range c.ScanPaths {
+		err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			if d.IsDir() {
+				return nil
+			}
+
+			meta, err := metadata.Extract(context.Background(), path, c.ScanSubtitles)
+			if err != nil {
+				return nil
+			}
+			allMedia = append(allMedia, models.MediaWithDB{
+				Media: models.Media{
+					Path:         meta.Media.Path,
+					Title:        models.NullStringPtr(meta.Media.Title),
+					Type:         models.NullStringPtr(meta.Media.Type),
+					Size:         models.NullInt64Ptr(meta.Media.Size),
+					Duration:     models.NullInt64Ptr(meta.Media.Duration),
+					TimeCreated:  models.NullInt64Ptr(meta.Media.TimeCreated),
+					TimeModified: models.NullInt64Ptr(meta.Media.TimeModified),
+				},
+			})
+			return nil
+		})
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error walking %s: %v\n", root, err)
+		}
+	}
+
+	if c.TUI {
+		if len(allMedia) == 0 {
 			return fmt.Errorf("no media found")
 		}
 
-		m := tui.NewDUModel(media, c.GlobalFlags)
+		m := tui.NewDUModel(allMedia, c.GlobalFlags)
 		p := tea.NewProgram(m, tea.WithAltScreen())
-		_, err = p.Run()
+		_, err := p.Run()
 		return err
 	}
 
@@ -119,7 +226,7 @@ func (c *DiskUsageCmd) Run(ctx *kong.Context) error {
 	if !c.BigDirs && !c.GroupByExtensions && !c.GroupByMimeTypes && !c.GroupBySize && c.Depth == 0 && !c.Parents {
 		c.BigDirs = true
 	}
-	printCmd := PrintCmd{GlobalFlags: c.GlobalFlags, Databases: c.Databases}
+	printCmd := PrintCmd{GlobalFlags: c.GlobalFlags, Databases: c.Databases, ScanPaths: c.ScanPaths}
 	return printCmd.Run(ctx)
 }
 
@@ -233,7 +340,7 @@ func (c *WatchCmd) Run(ctx *kong.Context) error {
 
 	ipcSocket := c.MpvSocket
 	if ipcSocket == "" {
-		ipcSocket = utils.DefaultMpvSocket
+		ipcSocket = utils.GetMpvWatchSocket()
 	}
 	args = append(args, fmt.Sprintf("--input-ipc-server=%s", ipcSocket))
 
@@ -316,7 +423,7 @@ func (c *ListenCmd) Run(ctx *kong.Context) error {
 
 	ipcSocket := c.MpvSocket
 	if ipcSocket == "" {
-		ipcSocket = utils.DefaultMpvSocket
+		ipcSocket = utils.GetMpvWatchSocket()
 	}
 	args = append(args, fmt.Sprintf("--input-ipc-server=%s", ipcSocket))
 
@@ -353,7 +460,6 @@ func (c *ListenCmd) Run(ctx *kong.Context) error {
 
 	return ExecutePostAction(c.GlobalFlags, media)
 }
-
 
 type OpenCmd struct {
 	models.GlobalFlags
@@ -669,7 +775,11 @@ func (c *HistoryCmd) Run(ctx *kong.Context) error {
 		return nil
 	}
 
-	query.SortMedia(media, c.SortBy, c.Reverse, c.NatSort)
+	if c.Partial != "" {
+		query.SortHistory(media, c.Partial, c.Reverse)
+	} else {
+		query.SortMedia(media, c.SortBy, c.Reverse, c.NatSort)
+	}
 	return PrintMedia(c.Columns, media)
 }
 
@@ -760,14 +870,13 @@ func (c *AddCmd) AfterApply() error {
 		return fmt.Errorf("at least one database file and one path to scan are required")
 	}
 
-	// Smart DB detection: check if first arg is actually a SQLite file
-	if utils.IsSQLite(c.Args[0]) || strings.HasSuffix(c.Args[0], ".db") {
+	// Smart DB detection: first arg MUST be a database for 'add'
+	isDB := strings.HasSuffix(c.Args[0], ".db") && (utils.IsSQLite(c.Args[0]) || !utils.FileExists(c.Args[0]))
+	if isDB {
 		c.Database = c.Args[0]
 		c.ScanPaths = c.Args[1:]
 	} else {
-		// Fallback or error? For now, keep it consistent with user request: first arg is DB
-		c.Database = c.Args[0]
-		c.ScanPaths = c.Args[1:]
+		return fmt.Errorf("first argument must be a database file (e.g. .db): %s", c.Args[0])
 	}
 
 	if c.Parallel <= 0 {
@@ -1267,7 +1376,7 @@ func DeleteMediaItem(m models.MediaWithDB) error {
 }
 
 func MarkDeletedItem(m models.MediaWithDB) error {
-	sqlDB, err := sql.Open("sqlite3", m.DB)
+	sqlDB, err := db.Connect(m.DB)
 	if err != nil {
 		return err
 	}
@@ -1296,7 +1405,7 @@ func MoveMediaItem(destDir string, m models.MediaWithDB) error {
 	}
 
 	// Update database
-	sqlDB, err := sql.Open("sqlite3", m.DB)
+	sqlDB, err := db.Connect(m.DB)
 	if err != nil {
 		return err
 	}

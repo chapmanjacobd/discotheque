@@ -145,6 +145,13 @@ func FromDB(m db.Media) Media {
 	}
 }
 
+func FromDBWithDB(m db.Media, dbPath string) MediaWithDB {
+	return MediaWithDB{
+		Media: FromDB(m),
+		DB:    dbPath,
+	}
+}
+
 func NullStringPtr(ns sql.NullString) *string {
 	if !ns.Valid {
 		return nil

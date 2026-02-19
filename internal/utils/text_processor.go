@@ -52,8 +52,8 @@ func WordSorter(flags models.GlobalFlags, corpusStats map[string]int, lineWords 
 		w1, w2 := lineWords[i], lineWords[j]
 		for _, s := range flags.WordSorts {
 			reverse := false
-			if strings.HasPrefix(s, "-") {
-				s = strings.TrimPrefix(s, "-")
+			if after, ok := strings.CutPrefix(s, "-"); ok {
+				s = after
 				reverse = true
 			}
 
@@ -123,8 +123,8 @@ func LineSorter(flags models.GlobalFlags, corpusStats map[string]int, originalLi
 		l1, l2 := infos[i], infos[j]
 		for _, s := range flags.LineSorts {
 			reverse := false
-			if strings.HasPrefix(s, "-") {
-				s = strings.TrimPrefix(s, "-")
+			if after, ok := strings.CutPrefix(s, "-"); ok {
+				s = after
 				reverse = true
 			}
 
@@ -316,7 +316,6 @@ func filterCorpus(corpusStats map[string]int, words []string, unique *bool, dups
 
 	return true
 }
-
 
 // Comparison helpers
 

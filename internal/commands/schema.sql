@@ -127,6 +127,6 @@ CREATE TRIGGER IF NOT EXISTS media_ad AFTER DELETE ON media BEGIN
 END;
 
 CREATE TRIGGER IF NOT EXISTS media_au AFTER UPDATE ON media BEGIN
-    UPDATE media_fts SET path = new.path, title = new.title
-    WHERE rowid = new.rowid;
+    INSERT INTO media_fts(media_fts, rowid, path, title) VALUES('delete', old.rowid, old.path, old.title);
+    INSERT INTO media_fts(rowid, path, title) VALUES (new.rowid, new.path, new.title);
 END;

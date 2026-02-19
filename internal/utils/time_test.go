@@ -46,12 +46,12 @@ func TestSpecificDate(t *testing.T) {
 	d2 := "2019-05-20" // earlier and specific
 	d3 := "2025-01-01" // future (assuming now > 2025) - wait, today is 2026!
 	// Feb 18, 2026 is today.
-	
+
 	got := SpecificDate(d1, d2, d3)
 	if got == nil {
 		t.Fatal("SpecificDate returned nil")
 	}
-	
+
 	t2 := SuperParser(d2).Unix()
 	if *got != t2 {
 		t.Errorf("SpecificDate expected %v, got %v", t2, *got)
@@ -67,7 +67,7 @@ func TestTubeDate(t *testing.T) {
 	if got == nil {
 		t.Fatal("TubeDate returned nil")
 	}
-	
+
 	if _, ok := v["upload_date"]; ok {
 		t.Error("TubeDate should have removed upload_date from map")
 	}

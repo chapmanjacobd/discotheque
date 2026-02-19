@@ -244,7 +244,7 @@ func TestLoadString(t *testing.T) {
 	if !reflect.DeepEqual(got, expected) {
 		t.Errorf("LoadString() = %v, want %v", got, expected)
 	}
-	
+
 	if got := LoadString("just string"); got != "just string" {
 		t.Errorf("LoadString() = %v, want just string", got)
 	}

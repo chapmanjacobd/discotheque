@@ -175,10 +175,7 @@ func AggregateByDepth(media []models.MediaWithDB, flags models.GlobalFlags) []mo
 
 		// 2. Add folders
 		if flags.Parents {
-			start := flags.MinDepth
-			if start < 1 {
-				start = 1
-			}
+			start := max(flags.MinDepth, 1)
 			for d := start; d < len(parts); d++ {
 				if flags.MaxDepth > 0 && d > flags.MaxDepth {
 					break

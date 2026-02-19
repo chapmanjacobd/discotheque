@@ -22,7 +22,7 @@ func TestTextProcessor(t *testing.T) {
 	// All lines have 3 words, so count sorting won't change order if stable.
 	// But let's check word sorting within each line if we were to expose it.
 	// TextProcessor returns original lines sorted.
-	
+
 	got := TextProcessor(flags, lines)
 	if !reflect.DeepEqual(got, lines) {
 		t.Errorf("TextProcessor failed, got %v, want %v", got, lines)

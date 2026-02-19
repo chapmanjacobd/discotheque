@@ -90,11 +90,11 @@ ORDER BY path
 LIMIT ?;
 
 -- name: SearchMediaFTS :many
-SELECT m.* FROM media m
-JOIN media_fts f ON m.rowid = f.rowid
-WHERE f.path MATCH sqlc.arg('query')
-  AND m.time_deleted = 0
-ORDER BY f.rank
+SELECT * FROM media
+WHERE rowid IN (
+    SELECT rowid FROM media_fts f WHERE f.title MATCH sqlc.arg('query')
+)
+AND time_deleted = 0
 LIMIT sqlc.arg('limit');
 
 -- name: UpdatePlayHistory :exec

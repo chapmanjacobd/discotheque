@@ -245,16 +245,16 @@ func CommonPathFull(paths []string) string {
 func GetExternalSubtitles(path string) []string {
 	ext := filepath.Ext(path)
 	base := strings.TrimSuffix(path, ext)
-	
+
 	var subs []string
 	subExts := []string{".srt", ".vtt", ".ass", ".ssa"}
-	
+
 	for _, sExt := range subExts {
 		subPath := base + sExt
 		if FileExists(subPath) {
 			subs = append(subs, subPath)
 		}
-		
+
 		// Check for language-specific suffixes like .en.srt
 		// This is a simplified version of Python's glob logic
 		matches, _ := filepath.Glob(base + ".*" + sExt)
@@ -264,7 +264,6 @@ func GetExternalSubtitles(path string) []string {
 			}
 		}
 	}
-	
+
 	return Unique(subs)
 }
-

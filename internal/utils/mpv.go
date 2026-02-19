@@ -16,9 +16,9 @@ import (
 )
 
 type MpvResponse struct {
-	Data   any    `json:"data"`
-	Error  string `json:"error"`
-	ID     int    `json:"request_id"`
+	Data  any    `json:"data"`
+	Error string `json:"error"`
+	ID    int    `json:"request_id"`
 }
 
 type MpvCommand struct {
@@ -78,8 +78,8 @@ func MpvWatchLaterValue(path, key string) (string, error) {
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		line := scanner.Text()
-		if strings.HasPrefix(line, key+"=") {
-			return strings.TrimPrefix(line, key+"="), nil
+		if after, ok := strings.CutPrefix(line, key+"="); ok {
+			return after, nil
 		}
 	}
 
@@ -135,7 +135,7 @@ func GetPlayhead(flags models.GlobalFlags, path string, startTime time.Time, exi
 func MpvArgsToMap(argStrings []string) map[string]string {
 	argMap := make(map[string]string)
 	for _, s := range argStrings {
-		for _, arg := range strings.Split(s, ",") {
+		for arg := range strings.SplitSeq(s, ",") {
 			parts := strings.SplitN(strings.TrimLeft(arg, "-"), "=", 2)
 			if len(parts) == 2 {
 				argMap[parts[0]] = parts[1]

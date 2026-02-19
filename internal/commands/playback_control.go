@@ -21,7 +21,7 @@ type NowCmd struct {
 func (c *NowCmd) Run(ctx *kong.Context) error {
 	socketPath := c.MpvSocket
 	if socketPath == "" {
-		socketPath = utils.DefaultMpvSocket
+		socketPath = utils.GetMpvWatchSocket()
 	}
 
 	pathResp, err := utils.MpvCall(socketPath, "get_property", "path")
@@ -62,7 +62,7 @@ type StopCmd struct {
 func (c *StopCmd) Run(ctx *kong.Context) error {
 	socketPath := c.MpvSocket
 	if socketPath == "" {
-		socketPath = utils.DefaultMpvSocket
+		socketPath = utils.GetMpvWatchSocket()
 	}
 
 	// Making mpv exit with code 3 like Python version (loadfile /dev/null)
@@ -82,7 +82,7 @@ type PauseCmd struct {
 func (c *PauseCmd) Run(ctx *kong.Context) error {
 	socketPath := c.MpvSocket
 	if socketPath == "" {
-		socketPath = utils.DefaultMpvSocket
+		socketPath = utils.GetMpvWatchSocket()
 	}
 	_, err := utils.MpvCall(socketPath, "cycle", "pause")
 	return err
@@ -95,7 +95,7 @@ type NextCmd struct {
 func (c *NextCmd) Run(ctx *kong.Context) error {
 	socketPath := c.MpvSocket
 	if socketPath == "" {
-		socketPath = utils.DefaultMpvSocket
+		socketPath = utils.GetMpvWatchSocket()
 	}
 	_, err := utils.MpvCall(socketPath, "playlist_next", "force")
 	return err
@@ -109,7 +109,7 @@ type SeekCmd struct {
 func (c *SeekCmd) Run(ctx *kong.Context) error {
 	socketPath := c.MpvSocket
 	if socketPath == "" {
-		socketPath = utils.DefaultMpvSocket
+		socketPath = utils.GetMpvWatchSocket()
 	}
 
 	s := c.Time
