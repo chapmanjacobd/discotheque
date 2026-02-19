@@ -23,6 +23,8 @@ type FilesInfoCmd struct {
 	ScanPaths []string `kong:"-"`
 }
 
+func (c FilesInfoCmd) IsFilterTrait() {}
+
 func (c *FilesInfoCmd) AfterApply() error {
 	for _, arg := range c.Args {
 		if strings.HasSuffix(arg, ".db") && utils.IsSQLite(arg) {

@@ -42,7 +42,7 @@ type CLI struct {
 	Stop           commands.StopCmd           `cmd:"" help:"Stop mpv playback"`
 	Pause          commands.PauseCmd          `cmd:"" help:"Toggle mpv pause state" aliases:"play"`
 	Seek           commands.SeekCmd           `cmd:"" help:"Seek mpv playback" aliases:"ffwd,rewind"`
-	MergeDBs       commands.MergeDBsCmd       `cmd:"merge-dbs" help:"Merge multiple SQLite databases" aliases:"mergedbs"`
+	MergeDBs       commands.MergeDBsCmd       `cmd:"" name:"merge-dbs" help:"Merge multiple SQLite databases" aliases:"mergedbs"`
 
 	ExitCalled bool `kong:"-"`
 }
@@ -53,11 +53,67 @@ func (c *CLI) Terminate(code int) {
 
 func main() {
 	cli := &CLI{}
-	ctx := kong.Parse(cli,
+	parser, err := kong.New(cli,
 		kong.Name("disco"),
 		kong.Description("discotheque management tool"),
 		kong.UsageOnError(),
 	)
+	if err != nil {
+		panic(err)
+	}
+
+	// Dynamic help filtering: Hide flag groups not implemented by the subcommand
+	var filterFlags func(*kong.Node)
+	filterFlags = func(n *kong.Node) {
+		if n.Type == kong.CommandNode {
+			// For each flag in the command
+			for _, flag := range n.Flags {
+				if flag.Group == nil {
+					continue
+				}
+
+				keep := false
+				target := n.Target.Interface()
+				switch flag.Group.Title {
+				case "Query":
+					_, keep = target.(models.QueryTrait)
+				case "Filter":
+					_, keep = target.(models.FilterTrait)
+				case "Sort":
+					_, keep = target.(models.SortTrait)
+				case "Display":
+					_, keep = target.(models.DisplayTrait)
+				case "Playback":
+					_, keep = target.(models.PlaybackTrait)
+				case "Text":
+					_, keep = target.(models.TextTrait)
+				case "Similarity":
+					_, keep = target.(models.SimilarityTrait)
+				case "Merge":
+					_, keep = target.(models.MergeTrait)
+				case "Action":
+					_, keep = target.(models.ActionTrait)
+				case "FTS":
+					_, keep = target.(models.FTSTrait)
+				default:
+					keep = true
+				}
+
+				if !keep {
+					flag.Hidden = true
+				}
+			}
+		}
+		for _, child := range n.Children {
+			filterFlags(child)
+		}
+	}
+	filterFlags(parser.Model.Node)
+
+	ctx, err := parser.Parse(os.Args[1:])
+	if err != nil {
+		parser.FatalIfErrorf(err)
+	}
 
 	// Configure logger
 	opts := &slog.HandlerOptions{
@@ -66,6 +122,6 @@ func main() {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, opts))
 	slog.SetDefault(logger)
 
-	err := ctx.Run(ctx)
+	err = ctx.Run(ctx)
 	ctx.FatalIfErrorf(err)
 }

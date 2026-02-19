@@ -10,6 +10,10 @@ type BigDirsCmd struct {
 	Databases []string `arg:"" required:"" help:"SQLite database files" type:"existingfile"`
 }
 
+func (c BigDirsCmd) IsFilterTrait()  {}
+func (c BigDirsCmd) IsSortTrait()    {}
+func (c BigDirsCmd) IsDisplayTrait() {}
+
 func (c *BigDirsCmd) Run(ctx *kong.Context) error {
 	// Bigdirs is Essentially Print with BigDirs enabled by default
 	c.BigDirs = true

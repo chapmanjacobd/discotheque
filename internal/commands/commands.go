@@ -39,7 +39,17 @@ type PrintCmd struct {
 	ScanPaths []string `kong:"-"`
 }
 
+func (c PrintCmd) IsFilterTrait()  {}
+func (c PrintCmd) IsSortTrait()    {}
+func (c PrintCmd) IsDisplayTrait() {}
+func (c PrintCmd) IsActionTrait()  {}
+func (c PrintCmd) IsFTSTrait()     {}
+func (c PrintCmd) IsTextTrait()    {}
+
 func (c *PrintCmd) AfterApply() error {
+	if err := c.GlobalFlags.AfterApply(); err != nil {
+		return err
+	}
 	for _, arg := range c.Args {
 		if strings.HasSuffix(arg, ".db") && utils.IsSQLite(arg) {
 			c.Databases = append(c.Databases, arg)
@@ -154,7 +164,14 @@ type DiskUsageCmd struct {
 	ScanPaths []string `kong:"-"`
 }
 
+func (c DiskUsageCmd) IsFilterTrait()  {}
+func (c DiskUsageCmd) IsSortTrait()    {}
+func (c DiskUsageCmd) IsDisplayTrait() {}
+
 func (c *DiskUsageCmd) AfterApply() error {
+	if err := c.GlobalFlags.AfterApply(); err != nil {
+		return err
+	}
 	for _, arg := range c.Args {
 		if strings.HasSuffix(arg, ".db") && utils.IsSQLite(arg) {
 			c.Databases = append(c.Databases, arg)
@@ -235,6 +252,11 @@ type SimilarFilesCmd struct {
 	Databases []string `arg:"" required:"" help:"SQLite database files" type:"existingfile"`
 }
 
+func (c SimilarFilesCmd) IsFilterTrait()     {}
+func (c SimilarFilesCmd) IsSortTrait()       {}
+func (c SimilarFilesCmd) IsDisplayTrait()    {}
+func (c SimilarFilesCmd) IsSimilarityTrait() {}
+
 func (c *SimilarFilesCmd) Run(ctx *kong.Context) error {
 	models.SetupLogging(c.Verbose)
 	media, err := query.MediaQuery(context.Background(), c.Databases, c.GlobalFlags)
@@ -270,6 +292,11 @@ type SimilarFoldersCmd struct {
 	Databases []string `arg:"" required:"" help:"SQLite database files" type:"existingfile"`
 }
 
+func (c SimilarFoldersCmd) IsFilterTrait()     {}
+func (c SimilarFoldersCmd) IsSortTrait()       {}
+func (c SimilarFoldersCmd) IsDisplayTrait()    {}
+func (c SimilarFoldersCmd) IsSimilarityTrait() {}
+
 func (c *SimilarFoldersCmd) Run(ctx *kong.Context) error {
 	models.SetupLogging(c.Verbose)
 	media, err := query.MediaQuery(context.Background(), c.Databases, c.GlobalFlags)
@@ -295,6 +322,11 @@ type WatchCmd struct {
 	models.GlobalFlags
 	Databases []string `arg:"" required:"" help:"SQLite database files" type:"existingfile"`
 }
+
+func (c WatchCmd) IsFilterTrait()   {}
+func (c WatchCmd) IsSortTrait()     {}
+func (c WatchCmd) IsPlaybackTrait() {}
+func (c WatchCmd) IsActionTrait()   {}
 
 func (c *WatchCmd) Run(ctx *kong.Context) error {
 	models.SetupLogging(c.Verbose)
@@ -396,6 +428,11 @@ type ListenCmd struct {
 	Databases []string `arg:"" required:"" help:"SQLite database files" type:"existingfile"`
 }
 
+func (c ListenCmd) IsFilterTrait()   {}
+func (c ListenCmd) IsSortTrait()     {}
+func (c ListenCmd) IsPlaybackTrait() {}
+func (c ListenCmd) IsActionTrait()   {}
+
 func (c *ListenCmd) Run(ctx *kong.Context) error {
 	models.SetupLogging(c.Verbose)
 	media, err := query.MediaQuery(context.Background(), c.Databases, c.GlobalFlags)
@@ -466,6 +503,10 @@ type OpenCmd struct {
 	Databases []string `arg:"" required:"" help:"SQLite database files" type:"existingfile"`
 }
 
+func (c OpenCmd) IsFilterTrait() {}
+func (c OpenCmd) IsSortTrait()   {}
+func (c OpenCmd) IsActionTrait() {}
+
 func (c *OpenCmd) Run(ctx *kong.Context) error {
 	models.SetupLogging(c.Verbose)
 	media, err := query.MediaQuery(context.Background(), c.Databases, c.GlobalFlags)
@@ -504,6 +545,8 @@ type BrowseCmd struct {
 	Browser   string   `help:"Browser to use"`
 }
 
+func (c BrowseCmd) IsFilterTrait() {}
+
 func (c *BrowseCmd) Run(ctx *kong.Context) error {
 	models.SetupLogging(c.Verbose)
 	media, err := query.MediaQuery(context.Background(), c.Databases, c.GlobalFlags)
@@ -539,6 +582,9 @@ type StatsCmd struct {
 	Facet     string   `arg:"" required:"" help:"One of: watched, deleted, created, modified"`
 	Databases []string `arg:"" required:"" help:"SQLite database files" type:"existingfile"`
 }
+
+func (c StatsCmd) IsFilterTrait()  {}
+func (c StatsCmd) IsDisplayTrait() {}
 
 func (c *StatsCmd) Run(ctx *kong.Context) error {
 	models.SetupLogging(c.Verbose)
@@ -642,6 +688,8 @@ type PlaylistsCmd struct {
 	Databases []string `arg:"" required:"" help:"SQLite database files" type:"existingfile"`
 }
 
+func (c PlaylistsCmd) IsDisplayTrait() {}
+
 func (c *PlaylistsCmd) Run(ctx *kong.Context) error {
 	models.SetupLogging(c.Verbose)
 	for _, dbPath := range c.Databases {
@@ -680,6 +728,11 @@ type SearchCmd struct {
 	Databases []string `arg:"" required:"" help:"SQLite database files" type:"existingfile"`
 }
 
+func (c SearchCmd) IsFilterTrait()  {}
+func (c SearchCmd) IsSortTrait()    {}
+func (c SearchCmd) IsDisplayTrait() {}
+func (c SearchCmd) IsFTSTrait()     {}
+
 func (c *SearchCmd) Run(ctx *kong.Context) error {
 	models.SetupLogging(c.Verbose)
 	c.FTS = true // Force FTS for search command
@@ -712,6 +765,11 @@ type HistoryCmd struct {
 	models.GlobalFlags
 	Databases []string `arg:"" required:"" help:"SQLite database files" type:"existingfile"`
 }
+
+func (c HistoryCmd) IsFilterTrait()  {}
+func (c HistoryCmd) IsSortTrait()    {}
+func (c HistoryCmd) IsDisplayTrait() {}
+func (c HistoryCmd) IsActionTrait()  {}
 
 func HideRedundantFirstPlayed(media []models.MediaWithDB) {
 	for i := range media {
@@ -792,6 +850,9 @@ type HistoryAddCmd struct {
 }
 
 func (c *HistoryAddCmd) AfterApply() error {
+	if err := c.GlobalFlags.AfterApply(); err != nil {
+		return err
+	}
 	if len(c.Args) < 2 {
 		return fmt.Errorf("at least one database file and one path are required")
 	}
@@ -865,7 +926,12 @@ type AddCmd struct {
 	Database  string   `kong:"-"`
 }
 
+func (c AddCmd) IsFilterTrait() {}
+
 func (c *AddCmd) AfterApply() error {
+	if err := c.GlobalFlags.AfterApply(); err != nil {
+		return err
+	}
 	if len(c.Args) < 2 {
 		return fmt.Errorf("at least one database file and one path to scan are required")
 	}
@@ -1089,7 +1155,12 @@ type CheckCmd struct {
 	Databases  []string `kong:"-"`
 }
 
+func (c CheckCmd) IsFilterTrait() {}
+
 func (c *CheckCmd) AfterApply() error {
+	if err := c.GlobalFlags.AfterApply(); err != nil {
+		return err
+	}
 	if len(c.Args) < 1 {
 		return fmt.Errorf("at least one database file is required")
 	}

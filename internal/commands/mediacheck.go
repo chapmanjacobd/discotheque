@@ -27,6 +27,8 @@ type MediaCheckCmd struct {
 	AudioScan         bool    `help:"Count errors in audio track only"`
 }
 
+func (c MediaCheckCmd) IsFilterTrait() {}
+
 func (c *MediaCheckCmd) Run(ctx *kong.Context) error {
 	models.SetupLogging(c.Verbose)
 

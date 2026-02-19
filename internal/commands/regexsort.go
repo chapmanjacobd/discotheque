@@ -22,6 +22,8 @@ type RegexSortCmd struct {
 	Writer io.Writer `kong:"-"`
 }
 
+func (c RegexSortCmd) IsTextTrait() {}
+
 func (c *RegexSortCmd) Run(ctx *kong.Context) error {
 	models.SetupLogging(c.Verbose)
 

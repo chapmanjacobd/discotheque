@@ -118,7 +118,7 @@ func TestClusterSort(t *testing.T) {
 /path/to/movie_part2.mp4
 /other/file.txt
 `
-	
+
 	t.Run("BasicClustering", func(t *testing.T) {
 		cmd := &ClusterSortCmd{
 			GlobalFlags: models.GlobalFlags{
@@ -126,14 +126,14 @@ func TestClusterSort(t *testing.T) {
 			},
 			InputPath: "-",
 		}
-		
+
 		// Mock stdin
 		oldStdin := os.Stdin
 		r, w, _ := os.Pipe()
 		os.Stdin = r
 		w.WriteString(input)
 		w.Close()
-		
+
 		// Capture stdout
 		oldStdout := os.Stdout
 		ro, wo, _ := os.Pipe()
@@ -150,7 +150,7 @@ func TestClusterSort(t *testing.T) {
 
 		var groups []models.FolderStats
 		json.NewDecoder(ro).Decode(&groups)
-		
+
 		if len(groups) < 1 {
 			t.Errorf("Expected at least one group, got 0")
 		}
@@ -164,12 +164,12 @@ func TestStatsWithFrequency(t *testing.T) {
 	dbPath := fixture.DBPath
 	sqlDB, _ := sql.Open("sqlite3", dbPath)
 	InitDB(sqlDB)
-	
+
 	now := 1708358400 // 2024-02-19
 	sqlDB.Exec("INSERT INTO media (path, size, duration, time_last_played) VALUES (?, ?, ?, ?)",
 		"/path1", 100, 60, now)
 	sqlDB.Exec("INSERT INTO media (path, size, duration, time_last_played) VALUES (?, ?, ?, ?)",
-		"/path2", 200, 120, now - 86400) // yesterday
+		"/path2", 200, 120, now-86400) // yesterday
 	sqlDB.Close()
 
 	cmd := &StatsCmd{

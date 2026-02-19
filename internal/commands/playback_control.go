@@ -14,6 +14,8 @@ type MpvControlBase struct {
 	models.GlobalFlags
 }
 
+func (c MpvControlBase) IsPlaybackTrait() {}
+
 type NowCmd struct {
 	MpvControlBase
 }

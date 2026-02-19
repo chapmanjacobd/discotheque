@@ -18,6 +18,8 @@ type MergeDBsCmd struct {
 	SourceDBs []string `arg:"" required:"" help:"Source SQLite database files" type:"existingfile"`
 }
 
+func (c MergeDBsCmd) IsMergeTrait() {}
+
 func (c *MergeDBsCmd) Run(ctx *kong.Context) error {
 	models.SetupLogging(c.Verbose)
 

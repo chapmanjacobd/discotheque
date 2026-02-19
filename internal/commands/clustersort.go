@@ -18,6 +18,9 @@ type ClusterSortCmd struct {
 	OutputPath string `help:"Output file path (default stdout)"`
 }
 
+func (c ClusterSortCmd) IsSimilarityTrait() {}
+func (c ClusterSortCmd) IsTextTrait()       {}
+
 func (c *ClusterSortCmd) Run(ctx *kong.Context) error {
 	models.SetupLogging(c.Verbose)
 

@@ -18,6 +18,9 @@ type TuiCmd struct {
 	Databases []string `arg:"" required:"" help:"SQLite database files" type:"existingfile"`
 }
 
+func (c TuiCmd) IsFilterTrait() {}
+func (c TuiCmd) IsSortTrait()   {}
+
 func (c *TuiCmd) Run(ctx *kong.Context) error {
 	models.SetupLogging(c.Verbose)
 

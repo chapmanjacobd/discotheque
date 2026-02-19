@@ -23,6 +23,8 @@ type SearchCaptionsCmd struct {
 	Overlap int  `help:"Overlap in seconds for merging captions" default:"8"`
 }
 
+func (c SearchCaptionsCmd) IsPlaybackTrait() {}
+
 type MergedCaption struct {
 	Path  string
 	Time  float64
