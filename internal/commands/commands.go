@@ -390,6 +390,10 @@ func (c *WatchCmd) Run(ctx *kong.Context) error {
 
 	args = append(args, paths...)
 
+	if c.Cast {
+		return CastPlay(c.GlobalFlags, media, false)
+	}
+
 	// Execute mpv
 	cmd := exec.Command(args[0], args[1:]...)
 	cmd.Stdout = os.Stdout
@@ -468,6 +472,10 @@ func (c *ListenCmd) Run(ctx *kong.Context) error {
 		if utils.FileExists(m.Path) {
 			args = append(args, m.Path)
 		}
+	}
+
+	if c.Cast {
+		return CastPlay(c.GlobalFlags, media, true)
 	}
 
 	cmd := exec.Command(args[0], args[1:]...)
@@ -1507,5 +1515,82 @@ func CopyMediaItem(destDir string, m models.MediaWithDB) error {
 	}
 
 	fmt.Printf("Copied: %s -> %s\n", m.Path, dest)
+	return nil
+}
+
+func CastPlay(flags models.GlobalFlags, media []models.MediaWithDB, audioOnly bool) error {
+	for _, m := range media {
+		if !utils.FileExists(m.Path) {
+			continue
+		}
+
+		slog.Info("Casting", "path", m.Path)
+		os.WriteFile(utils.GetCattNowPlayingFile(), []byte(m.Path), 0o644)
+
+		args := []string{"catt"}
+		if flags.CastDevice != "" {
+			args = append(args, "-d", flags.CastDevice)
+		}
+		args = append(args, "cast")
+		if audioOnly || flags.NoSubtitles {
+			args = append(args, "--no-subs")
+		}
+		if flags.Start != "" {
+			// Convert start time to seconds if needed
+			seconds := flags.Start
+			if strings.Contains(flags.Start, ":") {
+				seconds = fmt.Sprintf("%d", int64(utils.FromTimestampSeconds(flags.Start)))
+			}
+			args = append(args, "--seek-to", seconds)
+		}
+		args = append(args, m.Path)
+		startTime := time.Now()
+
+		if flags.CastWithLocal {
+			// Start catt in background
+			cattCmd := exec.Command(args[0], args[1:]...)
+			cattCmd.Start()
+
+			// Wait a bit for sync (lazy sync as in Python version)
+			time.Sleep(974 * time.Millisecond)
+
+			// Start local mpv
+			localArgs := []string{"mpv"}
+			if audioOnly {
+				localArgs = append(localArgs, "--video=no")
+			}
+			localArgs = append(localArgs, m.Path)
+			localCmd := exec.Command(localArgs[0], localArgs[1:]...)
+			localCmd.Stdout = os.Stdout
+			localCmd.Stderr = os.Stderr
+			localCmd.Stdin = os.Stdin
+			localCmd.Run()
+
+			// Wait for catt to finish if it hasn't
+			cattCmd.Wait()
+		} else {
+			cmd := exec.Command(args[0], args[1:]...)
+			cmd.Stdout = os.Stdout
+			cmd.Stderr = os.Stderr
+
+			if err := cmd.Run(); err != nil {
+				slog.Error("catt failed", "error", err)
+			}
+		}
+
+		if flags.TrackHistory {
+			mediaDuration := 0
+			if m.Duration != nil {
+				mediaDuration = int(*m.Duration)
+			}
+			existingPlayhead := 0
+			if m.Playhead != nil {
+				existingPlayhead = int(*m.Playhead)
+			}
+			playhead := utils.GetPlayhead(flags, m.Path, startTime, existingPlayhead, mediaDuration)
+			history.UpdateHistorySimple(m.DB, []string{m.Path}, playhead, false)
+		}
+	}
+	os.Remove(utils.GetCattNowPlayingFile())
 	return nil
 }

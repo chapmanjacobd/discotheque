@@ -3,6 +3,7 @@ package commands
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"strings"
 
 	"github.com/alecthomas/kong"
@@ -21,6 +22,14 @@ type NowCmd struct {
 }
 
 func (c *NowCmd) Run(ctx *kong.Context) error {
+	cattFile := utils.GetCattNowPlayingFile()
+	if utils.FileExists(cattFile) {
+		data, err := os.ReadFile(cattFile)
+		if err == nil {
+			fmt.Printf("Now Playing (Chromecast): %s\n", string(data))
+		}
+	}
+
 	socketPath := c.MpvSocket
 	if socketPath == "" {
 		socketPath = utils.GetMpvWatchSocket()
@@ -28,7 +37,10 @@ func (c *NowCmd) Run(ctx *kong.Context) error {
 
 	pathResp, err := utils.MpvCall(socketPath, "get_property", "path")
 	if err != nil {
-		return fmt.Errorf("mpv not running or socket not found: %w", err)
+		if !utils.FileExists(cattFile) {
+			return fmt.Errorf("no playback detected (mpv or chromecast)")
+		}
+		return nil
 	}
 
 	path := utils.GetString(pathResp.Data)
@@ -62,16 +74,28 @@ type StopCmd struct {
 }
 
 func (c *StopCmd) Run(ctx *kong.Context) error {
+	cattFile := utils.GetCattNowPlayingFile()
+	if utils.FileExists(cattFile) {
+		args := []string{"catt"}
+		if c.CastDevice != "" {
+			args = append(args, "-d", c.CastDevice)
+		}
+		args = append(args, "stop")
+		exec.Command(args[0], args[1:]...).Run()
+		os.Remove(cattFile)
+	}
+
 	socketPath := c.MpvSocket
 	if socketPath == "" {
 		socketPath = utils.GetMpvWatchSocket()
 	}
 
-	// Making mpv exit with code 3 like Python version (loadfile /dev/null)
-	_, err := utils.MpvCall(socketPath, "loadfile", "/dev/null")
-	if err != nil {
-		return err
+	if !utils.FileExists(socketPath) {
+		return nil
 	}
+
+	// Making mpv exit with code 3 like Python version (loadfile /dev/null)
+	utils.MpvCall(socketPath, "loadfile", "/dev/null")
 	// Also delete the socket file as Python version does
 	os.Remove(socketPath)
 	return nil
@@ -82,12 +106,24 @@ type PauseCmd struct {
 }
 
 func (c *PauseCmd) Run(ctx *kong.Context) error {
+	cattFile := utils.GetCattNowPlayingFile()
+	if utils.FileExists(cattFile) {
+		args := []string{"catt"}
+		if c.CastDevice != "" {
+			args = append(args, "-d", c.CastDevice)
+		}
+		args = append(args, "play_toggle")
+		exec.Command(args[0], args[1:]...).Run()
+	}
+
 	socketPath := c.MpvSocket
 	if socketPath == "" {
 		socketPath = utils.GetMpvWatchSocket()
 	}
-	_, err := utils.MpvCall(socketPath, "cycle", "pause")
-	return err
+	if utils.FileExists(socketPath) {
+		utils.MpvCall(socketPath, "cycle", "pause")
+	}
+	return nil
 }
 
 type NextCmd struct {
@@ -95,12 +131,25 @@ type NextCmd struct {
 }
 
 func (c *NextCmd) Run(ctx *kong.Context) error {
+	cattFile := utils.GetCattNowPlayingFile()
+	if utils.FileExists(cattFile) {
+		args := []string{"catt"}
+		if c.CastDevice != "" {
+			args = append(args, "-d", c.CastDevice)
+		}
+		args = append(args, "stop")
+		exec.Command(args[0], args[1:]...).Run()
+		// We don't remove cattFile here because CastPlay loop will handle it or update it
+	}
+
 	socketPath := c.MpvSocket
 	if socketPath == "" {
 		socketPath = utils.GetMpvWatchSocket()
 	}
-	_, err := utils.MpvCall(socketPath, "playlist_next", "force")
-	return err
+	if utils.FileExists(socketPath) {
+		utils.MpvCall(socketPath, "playlist_next", "force")
+	}
+	return nil
 }
 
 type SeekCmd struct {
@@ -142,6 +191,23 @@ func (c *SeekCmd) Run(ctx *kong.Context) error {
 		seconds = -seconds
 	}
 
+	cattFile := utils.GetCattNowPlayingFile()
+	if utils.FileExists(cattFile) {
+		args := []string{"catt"}
+		if c.CastDevice != "" {
+			args = append(args, "-d", c.CastDevice)
+		}
+
+		if isRelative && isNegative {
+			args = append(args, "rewind", fmt.Sprintf("%d", int64(-seconds)))
+		} else if isRelative {
+			args = append(args, "ffwd", fmt.Sprintf("%d", int64(seconds)))
+		} else {
+			args = append(args, "seek", fmt.Sprintf("%d", int64(seconds)))
+		}
+		exec.Command(args[0], args[1:]...).Run()
+	}
+
 	mode := "absolute"
 	if isRelative {
 		mode = "relative"
@@ -151,6 +217,11 @@ func (c *SeekCmd) Run(ctx *kong.Context) error {
 		mode = "relative"
 	}
 
-	_, err := utils.MpvCall(socketPath, "seek", seconds, mode)
-	return err
+	if socketPath == "" {
+		socketPath = utils.GetMpvWatchSocket()
+	}
+	if utils.FileExists(socketPath) {
+		utils.MpvCall(socketPath, "seek", seconds, mode)
+	}
+	return nil
 }

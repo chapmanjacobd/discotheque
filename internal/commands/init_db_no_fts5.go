@@ -17,12 +17,21 @@ func InitDB(sqlDB *sql.DB) error {
 	// Filter out FTS5 specific commands
 	var filteredSchema strings.Builder
 	lines := strings.SplitSeq(schema, ";")
+	skipNextEnd := false
 	for line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if trimmed == "" {
 			continue
 		}
-		if strings.Contains(strings.ToUpper(trimmed), "FTS5") || strings.Contains(strings.ToUpper(trimmed), "_FTS") {
+		upper := strings.ToUpper(trimmed)
+		if strings.Contains(upper, "FTS5") || strings.Contains(upper, "_FTS") {
+			if strings.Contains(upper, "BEGIN") && !strings.Contains(upper, "END") {
+				skipNextEnd = true
+			}
+			continue
+		}
+		if skipNextEnd && upper == "END" {
+			skipNextEnd = false
 			continue
 		}
 		filteredSchema.WriteString(trimmed)

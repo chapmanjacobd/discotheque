@@ -153,6 +153,11 @@ type GlobalFlags struct {
 	MpvSocket      string  `help:"Mpv socket path" group:"Playback"`
 	WatchLaterDir  string  `help:"Mpv watch_later directory" group:"Playback"`
 
+	// Chromecast
+	Cast          bool   `help:"Cast to chromecast groups" group:"Playback"`
+	CastDevice    string `alias:"cast-to" help:"Chromecast device name" group:"Playback"`
+	CastWithLocal bool   `help:"Play music locally at the same time as chromecast" group:"Playback"`
+
 	// Database merging and filtering
 	OnlyTables        []string `short:"t" help:"Comma separated specific table(s)" group:"Merge"`
 	PrimaryKeys       []string `help:"Comma separated primary keys" group:"Merge"`

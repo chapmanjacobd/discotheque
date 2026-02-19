@@ -80,6 +80,10 @@ func GetTempDir() string {
 	return os.TempDir()
 }
 
+func GetCattNowPlayingFile() string {
+	return filepath.Join(os.TempDir(), "catt_playing")
+}
+
 func GetConfigDir() string {
 	home, _ := os.UserHomeDir()
 	if IsWindows {
