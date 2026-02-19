@@ -1,18 +1,21 @@
 package filter
 
 import (
-	"database/sql"
 	"regexp"
 	"testing"
 
-	"github.com/chapmanjacobd/discotheque/internal/db"
+	"github.com/chapmanjacobd/discotheque/internal/models"
 )
 
+func int64Ptr(v int64) *int64 {
+	return &v
+}
+
 func TestApply_SizeFilter(t *testing.T) {
-	media := []db.Media{
-		{Path: "/test/small.mp4", Size: sqlInt(1000)},
-		{Path: "/test/medium.mp4", Size: sqlInt(5000)},
-		{Path: "/test/large.mp4", Size: sqlInt(10000)},
+	media := []models.Media{
+		{Path: "/test/small.mp4", Size: int64Ptr(1000)},
+		{Path: "/test/medium.mp4", Size: int64Ptr(5000)},
+		{Path: "/test/large.mp4", Size: int64Ptr(10000)},
 	}
 
 	criteria := Criteria{
@@ -30,16 +33,12 @@ func TestApply_SizeFilter(t *testing.T) {
 	}
 }
 
-func sqlInt(v int64) sql.NullInt64 {
-	return sql.NullInt64{Int64: v, Valid: true}
-}
-
 func TestApply_DurationFilter(t *testing.T) {
-	media := []db.Media{
-		{Path: "/test/short.mp4", Duration: sqlInt(300)},
-		{Path: "/test/medium.mp4", Duration: sqlInt(1800)},
-		{Path: "/test/long.mp4", Duration: sqlInt(7200)},
-		{Path: "/test/info.txt", Duration: sql.NullInt64{Valid: false}},
+	media := []models.Media{
+		{Path: "/test/short.mp4", Duration: int64Ptr(300)},
+		{Path: "/test/medium.mp4", Duration: int64Ptr(1800)},
+		{Path: "/test/long.mp4", Duration: int64Ptr(7200)},
+		{Path: "/test/info.txt", Duration: nil},
 	}
 
 	criteria := Criteria{
@@ -52,13 +51,13 @@ func TestApply_DurationFilter(t *testing.T) {
 	if len(result) != 1 {
 		t.Fatalf("Expected 1 result, got %d", len(result))
 	}
-	if result[0].Duration != sqlInt(1800) {
-		t.Fatalf("Expected duration 1800, got %d", result[0].Duration.Int64)
+	if *result[0].Duration != 1800 {
+		t.Fatalf("Expected duration 1800, got %d", *result[0].Duration)
 	}
 }
 
 func TestApply_PathContains(t *testing.T) {
-	media := []db.Media{
+	media := []models.Media{
 		{Path: "/movies/2024/1080p/movie.mp4"},
 		{Path: "/movies/2023/720p/movie.mp4"},
 		{Path: "/tv/2024/1080p/show.mp4"},
@@ -76,7 +75,7 @@ func TestApply_PathContains(t *testing.T) {
 }
 
 func TestApply_Regex(t *testing.T) {
-	media := []db.Media{
+	media := []models.Media{
 		{Path: "/tv/Show.S01E01.mp4"},
 		{Path: "/tv/Show.S01E02.mp4"},
 		{Path: "/tv/Show.S02E01.mp4"},
@@ -94,7 +93,7 @@ func TestApply_Regex(t *testing.T) {
 }
 
 func TestApply_IncludeExclude(t *testing.T) {
-	media := []db.Media{
+	media := []models.Media{
 		{Path: "/test/movie.mp4"},
 		{Path: "/test/movie.sample.mp4"},
 		{Path: "/test/show.mkv"},
@@ -116,7 +115,7 @@ func TestApply_IncludeExclude(t *testing.T) {
 }
 
 func TestApply_EmptyCriteria(t *testing.T) {
-	media := []db.Media{
+	media := []models.Media{
 		{Path: "/test/file1.mp4"},
 		{Path: "/test/file2.mp4"},
 	}

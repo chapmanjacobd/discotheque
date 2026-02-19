@@ -54,8 +54,8 @@ func TestUpdatePlayback(t *testing.T) {
 	}
 
 	// Verify update
-	var playCount int32
-	var playhead int32
+	var playCount int64
+	var playhead int64
 	err = database.QueryRow("SELECT play_count, playhead FROM media WHERE path = ?", "/test/movie.mp4").
 		Scan(&playCount, &playhead)
 	if err != nil {

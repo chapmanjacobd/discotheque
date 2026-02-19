@@ -40,14 +40,14 @@ LIMIT ?;
 -- name: GetWatchedMedia :many
 SELECT * FROM media
 WHERE time_deleted = 0
-  AND time_last_played > 0
+  AND COALESCE(time_last_played, 0) > 0
 ORDER BY time_last_played DESC
 LIMIT ?;
 
 -- name: GetUnwatchedMedia :many
 SELECT * FROM media
 WHERE time_deleted = 0
-  AND time_last_played = 0
+  AND COALESCE(time_last_played, 0) = 0
 ORDER BY path
 LIMIT ?;
 
@@ -106,3 +106,66 @@ WHERE path = ?;
 UPDATE media
 SET path = ?
 WHERE path = ?;
+
+-- name: UpsertMedia :exec
+INSERT INTO media (
+    path, title, duration, size, time_created, time_modified,
+    type, width, height, fps,
+    video_codecs, audio_codecs, subtitle_codecs,
+    video_count, audio_count, subtitle_count,
+    album, artist, genre, description, language
+) VALUES (
+    ?, ?, ?, ?, ?, ?,
+    ?, ?, ?, ?,
+    ?, ?, ?,
+    ?, ?, ?,
+    ?, ?, ?, ?, ?
+)
+ON CONFLICT(path) DO UPDATE SET
+    title = excluded.title,
+    duration = excluded.duration,
+    size = excluded.size,
+    time_modified = excluded.time_modified,
+    type = excluded.type,
+    width = excluded.width,
+    height = excluded.height,
+    fps = excluded.fps,
+    video_codecs = excluded.video_codecs,
+    audio_codecs = excluded.audio_codecs,
+    subtitle_codecs = excluded.subtitle_codecs,
+    video_count = excluded.video_count,
+    audio_count = excluded.audio_count,
+    subtitle_count = excluded.subtitle_count,
+    album = excluded.album,
+    artist = excluded.artist,
+    genre = excluded.genre,
+    description = excluded.description,
+    language = excluded.language;
+
+-- name: InsertPlaylist :one
+INSERT INTO playlists (path, extractor_key, extractor_config)
+VALUES (?, ?, ?)
+ON CONFLICT(path) DO UPDATE SET
+    extractor_key = excluded.extractor_key,
+    extractor_config = excluded.extractor_config
+RETURNING id;
+
+-- name: GetStats :one
+SELECT
+    COUNT(*) as total_count,
+    SUM(size) as total_size,
+    SUM(duration) as total_duration,
+    COUNT(CASE WHEN COALESCE(time_last_played, 0) > 0 THEN 1 END) as watched_count,
+    COUNT(CASE WHEN COALESCE(time_last_played, 0) = 0 THEN 1 END) as unwatched_count
+FROM media
+WHERE time_deleted = 0;
+
+-- name: GetStatsByType :many
+SELECT
+    type,
+    COUNT(*) as count,
+    SUM(size) as total_size,
+    SUM(duration) as total_duration
+FROM media
+WHERE time_deleted = 0
+GROUP BY type;

@@ -1,11 +1,12 @@
 package filter
 
 import (
+	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
 
-	"github.com/chapmanjacobd/discotheque/internal/db"
+	"github.com/chapmanjacobd/discotheque/internal/models"
 )
 
 type Criteria struct {
@@ -20,8 +21,8 @@ type Criteria struct {
 	Exists       bool
 }
 
-func Apply(media []db.Media, criteria Criteria) []db.Media {
-	var filtered []db.Media
+func Apply(media []models.Media, criteria Criteria) []models.Media {
+	var filtered []models.Media
 
 	for _, m := range media {
 		if !matches(m, criteria) {
@@ -33,7 +34,7 @@ func Apply(media []db.Media, criteria Criteria) []db.Media {
 	return filtered
 }
 
-func matches(m db.Media, c Criteria) bool {
+func matches(m models.Media, c Criteria) bool {
 	// Existence check
 	if c.Exists && !fileExists(m.Path) {
 		return false
@@ -58,26 +59,26 @@ func matches(m db.Media, c Criteria) bool {
 
 	// Size filters
 	if c.MinSize > 0 {
-		if !m.Size.Valid || m.Size.Int64 < c.MinSize {
+		if m.Size == nil || *m.Size < c.MinSize {
 			return false
 		}
 	}
 
 	if c.MaxSize > 0 {
-		if !m.Size.Valid || m.Size.Int64 > c.MaxSize {
+		if m.Size == nil || *m.Size > c.MaxSize {
 			return false
 		}
 	}
 
 	// Duration filters
 	if c.MinDuration > 0 {
-		if !m.Duration.Valid || m.Duration.Int64 < c.MinDuration {
+		if m.Duration == nil || *m.Duration < c.MinDuration {
 			return false
 		}
 	}
 
 	if c.MaxDuration > 0 {
-		if !m.Duration.Valid || m.Duration.Int64 > c.MaxDuration {
+		if m.Duration == nil || *m.Duration > c.MaxDuration {
 			return false
 		}
 	}
@@ -103,6 +104,6 @@ func matchesAny(path string, patterns []string) bool {
 }
 
 func fileExists(path string) bool {
-	// Implementation from previous version
-	return true // placeholder
+	_, err := os.Stat(path)
+	return err == nil
 }

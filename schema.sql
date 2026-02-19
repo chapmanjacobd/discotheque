@@ -1,4 +1,13 @@
 -- SQLite schema for media library
+
+CREATE TABLE IF NOT EXISTS playlists (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    path TEXT UNIQUE,
+    extractor_key TEXT,
+    extractor_config TEXT,
+    time_deleted INTEGER DEFAULT 0
+);
+
 CREATE TABLE IF NOT EXISTS media (
     path TEXT PRIMARY KEY,
     title TEXT,
@@ -24,7 +33,14 @@ CREATE TABLE IF NOT EXISTS media (
     subtitle_codecs TEXT,
     video_count INTEGER DEFAULT 0,
     audio_count INTEGER DEFAULT 0,
-    subtitle_count INTEGER DEFAULT 0
+    subtitle_count INTEGER DEFAULT 0,
+
+    -- Extra metadata
+    album TEXT,
+    artist TEXT,
+    genre TEXT,
+    description TEXT,
+    language TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_time_deleted ON media(time_deleted);
@@ -42,8 +58,8 @@ CREATE VIRTUAL TABLE IF NOT EXISTS media_fts USING fts5(
 
 -- Trigger to keep FTS in sync
 CREATE TRIGGER IF NOT EXISTS media_ai AFTER INSERT ON media BEGIN
-    INSERT INTO media_fts(rowid, path, title, captions)
-    VALUES (new.rowid, new.path, new.title, new.captions);
+    INSERT INTO media_fts(rowid, path, title)
+    VALUES (new.rowid, new.path, new.title);
 END;
 
 CREATE TRIGGER IF NOT EXISTS media_ad AFTER DELETE ON media BEGIN
@@ -51,6 +67,6 @@ CREATE TRIGGER IF NOT EXISTS media_ad AFTER DELETE ON media BEGIN
 END;
 
 CREATE TRIGGER IF NOT EXISTS media_au AFTER UPDATE ON media BEGIN
-    UPDATE media_fts SET path = new.path, title = new.title, captions = new.captions
+    UPDATE media_fts SET path = new.path, title = new.title
     WHERE rowid = new.rowid;
 END;

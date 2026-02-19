@@ -4,20 +4,22 @@ import (
 	"path/filepath"
 	"sort"
 
-	"github.com/chapmanjacobd/discotheque/internal/db"
+	"github.com/chapmanjacobd/discotheque/internal/models"
 )
 
+// FolderStats aggregates media by folder
 type FolderStats struct {
-	Path          string
-	Count         int
-	TotalSize     int64
-	TotalDuration int32
-	AvgSize       int64
-	AvgDuration   int32
-	Files         []db.Media
+	Path          string         `json:"path"`
+	Count         int            `json:"count"`
+	TotalSize     int64          `json:"total_size"`
+	TotalDuration int64          `json:"total_duration"`
+	AvgSize       int64          `json:"avg_size"`
+	AvgDuration   int64          `json:"avg_duration"`
+	Files         []models.Media `json:"files,omitempty"`
 }
 
-func ByFolder(media []db.Media) []FolderStats {
+// ByFolder groups media by parent directory
+func ByFolder(media []models.Media) []FolderStats {
 	folders := make(map[string]*FolderStats)
 
 	for _, m := range media {
@@ -25,14 +27,18 @@ func ByFolder(media []db.Media) []FolderStats {
 		if _, exists := folders[parent]; !exists {
 			folders[parent] = &FolderStats{
 				Path:  parent,
-				Files: []db.Media{},
+				Files: []models.Media{},
 			}
 		}
 
 		f := folders[parent]
 		f.Count++
-		f.TotalSize += m.Size
-		f.TotalDuration += m.Duration
+		if m.Size != nil {
+			f.TotalSize += *m.Size
+		}
+		if m.Duration != nil {
+			f.TotalDuration += *m.Duration
+		}
 		f.Files = append(f.Files, m)
 	}
 
@@ -40,7 +46,7 @@ func ByFolder(media []db.Media) []FolderStats {
 	for _, f := range folders {
 		if f.Count > 0 {
 			f.AvgSize = f.TotalSize / int64(f.Count)
-			f.AvgDuration = f.TotalDuration / int32(f.Count)
+			f.AvgDuration = f.TotalDuration / int64(f.Count)
 		}
 		result = append(result, *f)
 	}
@@ -48,9 +54,10 @@ func ByFolder(media []db.Media) []FolderStats {
 	return result
 }
 
-func SortFolders(folders []FolderStats, by string, reverse bool) {
+// SortFolders sorts folder stats
+func SortFolders(folders []FolderStats, sortBy string, reverse bool) {
 	less := func(i, j int) bool {
-		switch by {
+		switch sortBy {
 		case "count":
 			return folders[i].Count < folders[j].Count
 		case "size":

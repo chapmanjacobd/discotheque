@@ -17,13 +17,17 @@ type Querier interface {
 	GetMediaByType(ctx context.Context, arg GetMediaByTypeParams) ([]Media, error)
 	GetRandomMedia(ctx context.Context, limit int64) ([]Media, error)
 	GetSiblingMedia(ctx context.Context, arg GetSiblingMediaParams) ([]Media, error)
+	GetStats(ctx context.Context) (GetStatsRow, error)
+	GetStatsByType(ctx context.Context) ([]GetStatsByTypeRow, error)
 	GetUnfinishedMedia(ctx context.Context, limit int64) ([]Media, error)
 	GetUnwatchedMedia(ctx context.Context, limit int64) ([]Media, error)
 	GetWatchedMedia(ctx context.Context, limit int64) ([]Media, error)
+	InsertPlaylist(ctx context.Context, arg InsertPlaylistParams) (int64, error)
 	MarkDeleted(ctx context.Context, arg MarkDeletedParams) error
 	SearchMediaFTS(ctx context.Context, arg SearchMediaFTSParams) ([]Media, error)
 	UpdatePath(ctx context.Context, arg UpdatePathParams) error
 	UpdatePlayHistory(ctx context.Context, arg UpdatePlayHistoryParams) error
+	UpsertMedia(ctx context.Context, arg UpsertMediaParams) error
 }
 
 var _ Querier = (*Queries)(nil)

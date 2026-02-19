@@ -21,9 +21,9 @@ func NewTracker(database *sql.DB) *Tracker {
 func (t *Tracker) UpdatePlayback(ctx context.Context, path string, playhead int32) error {
 	now := time.Now().Unix()
 	return t.queries.UpdatePlayHistory(ctx, db.UpdatePlayHistoryParams{
-		TimeLastPlayed:  now,
-		TimeFirstPlayed: now,
-		Playhead:        playhead,
+		TimeLastPlayed:  sql.NullInt64{Int64: now, Valid: true},
+		TimeFirstPlayed: sql.NullInt64{Int64: now, Valid: true},
+		Playhead:        sql.NullInt64{Int64: int64(playhead), Valid: true},
 		Path:            path,
 	})
 }
@@ -31,7 +31,7 @@ func (t *Tracker) UpdatePlayback(ctx context.Context, path string, playhead int3
 func (t *Tracker) MarkDeleted(ctx context.Context, path string) error {
 	now := time.Now().Unix()
 	return t.queries.MarkDeleted(ctx, db.MarkDeletedParams{
-		TimeDeleted: now,
+		TimeDeleted: sql.NullInt64{Int64: now, Valid: true},
 		Path:        path,
 	})
 }

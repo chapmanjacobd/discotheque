@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -16,24 +17,30 @@ import (
 	"time"
 
 	"github.com/alecthomas/kong"
+	"github.com/chapmanjacobd/discotheque/internal/db"
+	"github.com/chapmanjacobd/discotheque/internal/fs"
+	"github.com/chapmanjacobd/discotheque/internal/metadata"
+	"github.com/chapmanjacobd/discotheque/internal/models"
 	_ "github.com/mattn/go-sqlite3"
 )
 
 // CLI defines the command-line interface
 type CLI struct {
-	Print  PrintCmd  `cmd:"" help:"Print media information"`
-	Watch  WatchCmd  `cmd:"" help:"Watch videos with mpv"`
-	Listen ListenCmd `cmd:"" help:"Listen to audio with mpv"`
-	Open   OpenCmd   `cmd:"" help:"Open files with default application"`
-	Browse BrowseCmd `cmd:"" help:"Open URLs in browser"`
+	Add     AddCmd     `cmd:"" help:"Add media to database"`
+	Print   PrintCmd   `cmd:"" help:"Print media information"`
+	Watch   WatchCmd   `cmd:"" help:"Watch videos with mpv"`
+	Listen  ListenCmd  `cmd:"" help:"Listen to audio with mpv"`
+	Stats   StatsCmd   `cmd:"" help:"Show library statistics"`
+	History HistoryCmd `cmd:"" help:"Show playback history"`
+	Open    OpenCmd    `cmd:"" help:"Open files with default application"`
+	Browse  BrowseCmd  `cmd:"" help:"Open URLs in browser"`
 }
 
 // GlobalFlags are flags available to all commands
 type GlobalFlags struct {
-	Databases []string `arg:"" required:"" help:"SQLite database files" type:"existingfile"`
-	Query     string   `short:"q" help:"Raw SQL query (overrides all query building)"`
-	Limit     int      `short:"L" default:"100" help:"Limit results per database"`
-	Offset    int      `help:"Skip N results"`
+	Query  string `short:"q" help:"Raw SQL query (overrides all query building)"`
+	Limit  int    `short:"L" default:"100" help:"Limit results per database"`
+	Offset int    `help:"Skip N results"`
 
 	// Path filters
 	Include      []string `short:"i" help:"Include paths matching pattern"`
@@ -43,10 +50,11 @@ type GlobalFlags struct {
 	PathContains []string `help:"Path must contain all these strings"`
 
 	// Size/Duration filters
-	MinSize     string `help:"Minimum file size (e.g., 100MB)"`
-	MaxSize     string `help:"Maximum file size"`
-	MinDuration int    `help:"Minimum duration in seconds"`
-	MaxDuration int    `help:"Maximum duration in seconds"`
+	MinSize     string   `help:"Minimum file size (e.g., 100MB)"`
+	MaxSize     string   `help:"Maximum file size"`
+	MinDuration int      `help:"Minimum duration in seconds"`
+	MaxDuration int      `help:"Maximum duration in seconds"`
+	Ext         []string `help:"Filter by extensions (e.g., .mp4,.mkv)"`
 
 	// Time filters
 	CreatedAfter  string `help:"Created after date (YYYY-MM-DD)"`
@@ -75,6 +83,7 @@ type GlobalFlags struct {
 	// Display
 	Columns []string `short:"c" help:"Columns to display"`
 	BigDirs bool     `help:"Aggregate by parent directory"`
+	JSON    bool     `short:"j" help:"Output results as JSON"`
 
 	// Actions
 	PostAction   string `help:"Post-action: none, delete, mark-deleted, move, copy"`
@@ -90,50 +99,148 @@ type GlobalFlags struct {
 	FTSTable string `default:"media_fts" help:"FTS table name"`
 }
 
+func (g *GlobalFlags) AfterApply() error {
+	if g.Ext != nil {
+		for i, ext := range g.Ext {
+			if !strings.HasPrefix(ext, ".") {
+				g.Ext[i] = "." + ext
+			}
+		}
+	}
+	return nil
+}
+
 type PrintCmd struct {
 	GlobalFlags
+	Databases []string `arg:"" required:"" help:"SQLite database files" type:"existingfile"`
 }
 
 type WatchCmd struct {
 	GlobalFlags
-	Volume       int     `help:"Set volume (0-100)"`
-	Fullscreen   bool    `short:"f" help:"Start in fullscreen"`
-	NoSubtitles  bool    `help:"Disable subtitles"`
-	Speed        float64 `default:"1.0" help:"Playback speed"`
-	Start        string  `help:"Start time (e.g., 5:30 or 30%)"`
-	SavePlayhead bool    `default:"true" help:"Save playback position"`
+	Databases    []string `arg:"" required:"" help:"SQLite database files" type:"existingfile"`
+	Volume       int      `help:"Set volume (0-100)"`
+	Fullscreen   bool     `short:"f" help:"Start in fullscreen"`
+	NoSubtitles  bool     `help:"Disable subtitles"`
+	Speed        float64  `default:"1.0" help:"Playback speed"`
+	Start        string   `help:"Start time (e.g., 5:30 or 30%)"`
+	SavePlayhead bool     `default:"true" help:"Save playback position"`
 }
 
 type ListenCmd struct {
 	GlobalFlags
-	Volume int     `help:"Set volume (0-100)"`
-	Speed  float64 `default:"1.0" help:"Playback speed"`
+	Databases []string `arg:"" required:"" help:"SQLite database files" type:"existingfile"`
+	Volume    int      `help:"Set volume (0-100)"`
+	Speed     float64  `default:"1.0" help:"Playback speed"`
 }
 
 type OpenCmd struct {
 	GlobalFlags
+	Databases []string `arg:"" required:"" help:"SQLite database files" type:"existingfile"`
 }
 
 type BrowseCmd struct {
 	GlobalFlags
-	Browser string `help:"Browser to use"`
+	Databases []string `arg:"" required:"" help:"SQLite database files" type:"existingfile"`
+	Browser   string   `help:"Browser to use"`
 }
 
-// Media represents a media file record
-type Media struct {
-	Path            string
-	Title           string
-	Duration        int
-	Size            int64
-	TimeCreated     int64
-	TimeModified    int64
-	TimeDeleted     int64
-	TimeFirstPlayed int64
-	TimeLastPlayed  int64
-	PlayCount       int
-	Playhead        int
-	DB              string
-	Parent          string
+type AddCmd struct {
+	GlobalFlags
+	Args     []string `arg:"" name:"args" required:"" help:"Paths to scan followed by the database file"`
+	Parallel int      `short:"p" default:"4" help:"Number of parallel extractors"`
+
+	ScanPaths []string `kong:"-"`
+	Database  string   `kong:"-"`
+}
+
+func (c *AddCmd) AfterApply() error {
+	if len(c.Args) < 2 {
+		return fmt.Errorf("at least one path to scan and one database file are required")
+	}
+	c.ScanPaths = c.Args[:len(c.Args)-1]
+	c.Database = c.Args[len(c.Args)-1]
+	return nil
+}
+
+func (c *AddCmd) Run(ctx *kong.Context) error {
+	dbPath := c.Database
+
+	sqlDB, err := sql.Open("sqlite3", dbPath)
+	if err != nil {
+		return err
+	}
+	defer sqlDB.Close()
+
+	queries := db.New(sqlDB)
+
+	for _, root := range c.ScanPaths {
+		fmt.Printf("Scanning %s...\n", root)
+		files, err := fs.FindMedia(root)
+		if err != nil {
+			return err
+		}
+
+		// Filter by Ext if specified
+		if len(c.Ext) > 0 {
+			var filtered []string
+			extMap := make(map[string]bool)
+			for _, e := range c.Ext {
+				extMap[strings.ToLower(e)] = true
+			}
+			for _, f := range files {
+				if extMap[strings.ToLower(filepath.Ext(f))] {
+					filtered = append(filtered, f)
+				}
+			}
+			files = filtered
+		}
+
+		fmt.Printf("Found %d media files. Extracting metadata...\n", len(files))
+
+		// Parallel extraction
+		jobs := make(chan string, len(files))
+		results := make(chan *db.UpsertMediaParams, len(files))
+		var wg sync.WaitGroup
+
+		for i := 0; i < c.Parallel; i++ {
+			wg.Go(func() {
+				for path := range jobs {
+					params, err := metadata.Extract(context.Background(), path)
+					if err != nil {
+						fmt.Fprintf(os.Stderr, "Error extracting %s: %v\n", path, err)
+						continue
+					}
+					results <- params
+				}
+			})
+		}
+
+		go func() {
+			for _, f := range files {
+				jobs <- f
+			}
+			close(jobs)
+		}()
+
+		go func() {
+			wg.Wait()
+			close(results)
+		}()
+
+		count := 0
+		for params := range results {
+			if err := queries.UpsertMedia(context.Background(), *params); err != nil {
+				fmt.Fprintf(os.Stderr, "Error saving %s: %v\n", params.Path, err)
+			}
+			count++
+			if count%10 == 0 || count == len(files) {
+				fmt.Printf("\rProcessed %d/%d", count, len(files))
+			}
+		}
+		fmt.Println()
+	}
+
+	return nil
 }
 
 // FolderStats aggregates media by folder
@@ -144,7 +251,110 @@ type FolderStats struct {
 	TotalDuration int
 	AvgSize       int64
 	AvgDuration   int
-	Files         []Media
+	Files         []MediaWithDB
+}
+
+type StatsCmd struct {
+	Databases []string `arg:"" required:"" help:"SQLite database files" type:"existingfile"`
+	JSON      bool     `short:"j" help:"Output as JSON"`
+}
+
+func (c *StatsCmd) Run(ctx *kong.Context) error {
+	for _, dbPath := range c.Databases {
+		sqlDB, err := sql.Open("sqlite3", dbPath)
+		if err != nil {
+			return err
+		}
+		defer sqlDB.Close()
+
+		queries := db.New(sqlDB)
+		stats, err := queries.GetStats(context.Background())
+		if err != nil {
+			return err
+		}
+
+		typeStats, err := queries.GetStatsByType(context.Background())
+		if err != nil {
+			return err
+		}
+
+		if c.JSON {
+			result := map[string]any{
+				"database":  dbPath,
+				"summary":   stats,
+				"breakdown": typeStats,
+			}
+			encoder := json.NewEncoder(os.Stdout)
+			encoder.SetIndent("", "  ")
+			if err := encoder.Encode(result); err != nil {
+				return err
+			}
+			continue
+		}
+
+		fmt.Printf("Statistics for %s:\n", dbPath)
+		fmt.Printf("  Total Files:      %d\n", stats.TotalCount)
+		fmt.Printf("  Total Size:       %s\n", formatSize(getInt64(stats.TotalSize)))
+		fmt.Printf("  Total Duration:   %s\n", formatDuration(int(getInt64(stats.TotalDuration))))
+		fmt.Printf("  Watched Files:    %d\n", stats.WatchedCount)
+		fmt.Printf("  Unwatched Files:  %d\n", stats.UnwatchedCount)
+
+		if len(typeStats) > 0 {
+			fmt.Println("\n  Breakdown by Type:")
+			for _, ts := range typeStats {
+				t := "unknown"
+				if ts.Type.Valid {
+					t = ts.Type.String
+				}
+				fmt.Printf("    %-10s: %d files, %s, %s\n",
+					t, ts.Count,
+					formatSize(getInt64(ts.TotalSize)),
+					formatDuration(int(getInt64(ts.TotalDuration))))
+			}
+		}
+		fmt.Println()
+	}
+	return nil
+}
+
+type HistoryCmd struct {
+	GlobalFlags
+	Databases []string `arg:"" required:"" help:"SQLite database files" type:"existingfile"`
+}
+
+func (c *HistoryCmd) Run(ctx *kong.Context) error {
+	// Set default sort for history
+	if c.SortBy == "path" || c.SortBy == "" {
+		c.SortBy = "time_last_played"
+		c.Reverse = true
+	}
+
+	media, err := MediaQuery(context.Background(), c.Databases, c.GlobalFlags)
+	if err != nil {
+		return err
+	}
+
+	// Filter for only watched items if not otherwise specified
+	if c.Watched == nil {
+		watched := true
+		c.Watched = &watched
+	}
+
+	media = FilterMedia(media, c.GlobalFlags)
+
+	if c.JSON {
+		encoder := json.NewEncoder(os.Stdout)
+		encoder.SetIndent("", "  ")
+		return encoder.Encode(media)
+	}
+
+	SortMedia(media, c.SortBy, c.Reverse, c.NatSort)
+	return printMedia(c.Columns, media)
+}
+
+type MediaWithDB struct {
+	models.Media
+	DB string
 }
 
 // QueryBuilder constructs SQL queries from flags
@@ -156,14 +366,14 @@ func NewQueryBuilder(flags GlobalFlags) *QueryBuilder {
 	return &QueryBuilder{Flags: flags}
 }
 
-func (qb *QueryBuilder) Build() (string, []interface{}) {
+func (qb *QueryBuilder) Build() (string, []any) {
 	// If raw query provided, use it
 	if qb.Flags.Query != "" {
 		return qb.Flags.Query, nil
 	}
 
 	var whereClauses []string
-	var args []interface{}
+	var args []any
 
 	// Base table
 	table := "media"
@@ -324,12 +534,12 @@ func (qb *QueryBuilder) Build() (string, []interface{}) {
 }
 
 // MediaQuery executes a query against multiple databases concurrently
-func MediaQuery(ctx context.Context, dbs []string, flags GlobalFlags) ([]Media, error) {
+func MediaQuery(ctx context.Context, dbs []string, flags GlobalFlags) ([]MediaWithDB, error) {
 	qb := NewQueryBuilder(flags)
 	query, args := qb.Build()
 
 	var wg sync.WaitGroup
-	results := make(chan []Media, len(dbs))
+	results := make(chan []MediaWithDB, len(dbs))
 	errors := make(chan error, len(dbs))
 
 	for _, dbPath := range dbs {
@@ -351,7 +561,7 @@ func MediaQuery(ctx context.Context, dbs []string, flags GlobalFlags) ([]Media, 
 		close(errors)
 	}()
 
-	var allMedia []Media
+	var allMedia []MediaWithDB
 	for media := range results {
 		allMedia = append(allMedia, media...)
 	}
@@ -367,25 +577,25 @@ func MediaQuery(ctx context.Context, dbs []string, flags GlobalFlags) ([]Media, 
 	return allMedia, nil
 }
 
-func queryDatabase(ctx context.Context, dbPath, query string, args []interface{}) ([]Media, error) {
-	db, err := sql.Open("sqlite3", dbPath)
+func queryDatabase(ctx context.Context, dbPath, query string, args []any) ([]MediaWithDB, error) {
+	sqlDB, err := sql.Open("sqlite3", dbPath)
 	if err != nil {
 		return nil, err
 	}
-	defer db.Close()
+	defer sqlDB.Close()
 
-	rows, err := db.QueryContext(ctx, query, args...)
+	rows, err := sqlDB.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
 	cols, _ := rows.Columns()
-	var media []Media
+	var allMedia []MediaWithDB
 
 	for rows.Next() {
-		values := make([]interface{}, len(cols))
-		valuePtrs := make([]interface{}, len(cols))
+		values := make([]any, len(cols))
+		valuePtrs := make([]any, len(cols))
 		for i := range cols {
 			valuePtrs[i] = &values[i]
 		}
@@ -394,7 +604,7 @@ func queryDatabase(ctx context.Context, dbPath, query string, args []interface{}
 			return nil, err
 		}
 
-		m := Media{DB: dbPath}
+		m := db.Media{}
 		for i, col := range cols {
 			if values[i] == nil {
 				continue
@@ -404,33 +614,35 @@ func queryDatabase(ctx context.Context, dbPath, query string, args []interface{}
 			case "path":
 				m.Path = getString(values[i])
 			case "title":
-				m.Title = getString(values[i])
+				m.Title = sql.NullString{String: getString(values[i]), Valid: true}
 			case "duration":
-				m.Duration = getInt(values[i])
+				m.Duration = sql.NullInt64{Int64: getInt64(values[i]), Valid: true}
 			case "size":
-				m.Size = getInt64(values[i])
+				m.Size = sql.NullInt64{Int64: getInt64(values[i]), Valid: true}
 			case "time_created":
-				m.TimeCreated = getInt64(values[i])
+				m.TimeCreated = sql.NullInt64{Int64: getInt64(values[i]), Valid: true}
 			case "time_modified":
-				m.TimeModified = getInt64(values[i])
+				m.TimeModified = sql.NullInt64{Int64: getInt64(values[i]), Valid: true}
 			case "time_deleted":
-				m.TimeDeleted = getInt64(values[i])
+				m.TimeDeleted = sql.NullInt64{Int64: getInt64(values[i]), Valid: true}
 			case "time_first_played":
-				m.TimeFirstPlayed = getInt64(values[i])
+				m.TimeFirstPlayed = sql.NullInt64{Int64: getInt64(values[i]), Valid: true}
 			case "time_last_played":
-				m.TimeLastPlayed = getInt64(values[i])
+				m.TimeLastPlayed = sql.NullInt64{Int64: getInt64(values[i]), Valid: true}
 			case "play_count":
-				m.PlayCount = getInt(values[i])
+				m.PlayCount = sql.NullInt64{Int64: getInt64(values[i]), Valid: true}
 			case "playhead":
-				m.Playhead = getInt(values[i])
+				m.Playhead = sql.NullInt64{Int64: getInt64(values[i]), Valid: true}
 			}
 		}
 
-		m.Parent = filepath.Dir(m.Path)
-		media = append(media, m)
+		allMedia = append(allMedia, MediaWithDB{
+			Media: models.FromDB(m),
+			DB:    dbPath,
+		})
 	}
 
-	return media, rows.Err()
+	return allMedia, rows.Err()
 }
 
 func parseDate(dateStr string) int64 {
@@ -450,8 +662,8 @@ func parseDate(dateStr string) int64 {
 }
 
 // FilterMedia applies all filters to media list
-func FilterMedia(media []Media, flags GlobalFlags) []Media {
-	var filtered []Media
+func FilterMedia(media []MediaWithDB, flags GlobalFlags) []MediaWithDB {
+	var filtered []MediaWithDB
 
 	for _, m := range media {
 		// Check existence
@@ -470,22 +682,22 @@ func FilterMedia(media []Media, flags GlobalFlags) []Media {
 		// Size filters
 		if flags.MinSize != "" {
 			minBytes, _ := humanToBytes(flags.MinSize)
-			if m.Size < minBytes {
+			if m.Size == nil || *m.Size < minBytes {
 				continue
 			}
 		}
 		if flags.MaxSize != "" {
 			maxBytes, _ := humanToBytes(flags.MaxSize)
-			if m.Size > maxBytes {
+			if m.Size == nil || *m.Size > maxBytes {
 				continue
 			}
 		}
 
 		// Duration filters
-		if flags.MinDuration > 0 && m.Duration < flags.MinDuration {
+		if flags.MinDuration > 0 && (m.Duration == nil || *m.Duration < int64(flags.MinDuration)) {
 			continue
 		}
-		if flags.MaxDuration > 0 && m.Duration > flags.MaxDuration {
+		if flags.MaxDuration > 0 && (m.Duration == nil || *m.Duration > int64(flags.MaxDuration)) {
 			continue
 		}
 
@@ -496,22 +708,26 @@ func FilterMedia(media []Media, flags GlobalFlags) []Media {
 }
 
 // AggregateFolders groups media by parent directory
-func AggregateFolders(media []Media) []FolderStats {
+func AggregateFolders(media []MediaWithDB) []FolderStats {
 	folders := make(map[string]*FolderStats)
 
 	for _, m := range media {
-		parent := m.Parent
+		parent := filepath.Dir(m.Path)
 		if _, exists := folders[parent]; !exists {
 			folders[parent] = &FolderStats{
 				Path:  parent,
-				Files: []Media{},
+				Files: []MediaWithDB{},
 			}
 		}
 
 		f := folders[parent]
 		f.Count++
-		f.TotalSize += m.Size
-		f.TotalDuration += m.Duration
+		if m.Size != nil {
+			f.TotalSize += *m.Size
+		}
+		if m.Duration != nil {
+			f.TotalDuration += int(*m.Duration)
+		}
 		f.Files = append(f.Files, m)
 	}
 
@@ -528,7 +744,7 @@ func AggregateFolders(media []Media) []FolderStats {
 }
 
 // SortMedia sorts media using various methods
-func SortMedia(media []Media, sortBy string, reverse bool, natSort bool) {
+func SortMedia(media []MediaWithDB, sortBy string, reverse bool, natSort bool) {
 	less := func(i, j int) bool {
 		switch sortBy {
 		case "path":
@@ -537,19 +753,19 @@ func SortMedia(media []Media, sortBy string, reverse bool, natSort bool) {
 			}
 			return media[i].Path < media[j].Path
 		case "title":
-			return media[i].Title < media[j].Title
+			return stringValue(media[i].Title) < stringValue(media[j].Title)
 		case "duration":
-			return media[i].Duration < media[j].Duration
+			return int64Value(media[i].Duration) < int64Value(media[j].Duration)
 		case "size":
-			return media[i].Size < media[j].Size
+			return int64Value(media[i].Size) < int64Value(media[j].Size)
 		case "time_created":
-			return media[i].TimeCreated < media[j].TimeCreated
+			return int64Value(media[i].TimeCreated) < int64Value(media[j].TimeCreated)
 		case "time_modified":
-			return media[i].TimeModified < media[j].TimeModified
+			return int64Value(media[i].TimeModified) < int64Value(media[j].TimeModified)
 		case "time_last_played":
-			return media[i].TimeLastPlayed < media[j].TimeLastPlayed
+			return int64Value(media[i].TimeLastPlayed) < int64Value(media[j].TimeLastPlayed)
 		case "play_count":
-			return media[i].PlayCount < media[j].PlayCount
+			return int64Value(media[i].PlayCount) < int64Value(media[j].PlayCount)
 		default:
 			return media[i].Path < media[j].Path
 		}
@@ -560,6 +776,20 @@ func SortMedia(media []Media, sortBy string, reverse bool, natSort bool) {
 	} else {
 		sort.Slice(media, less)
 	}
+}
+
+func stringValue(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
+}
+
+func int64Value(i *int64) int64 {
+	if i == nil {
+		return 0
+	}
+	return *i
 }
 
 // SortFolders sorts folder stats
@@ -674,12 +904,25 @@ func UpdateHistory(dbPath string, paths []string, playhead int) error {
 // Commands implementation
 
 func (c *PrintCmd) Run(ctx *kong.Context) error {
-	media, err := MediaQuery(context.Background(), c.Databases, c.Query, c.Limit)
+	media, err := MediaQuery(context.Background(), c.Databases, c.GlobalFlags)
 	if err != nil {
 		return err
 	}
 
 	media = FilterMedia(media, c.GlobalFlags)
+
+	if c.JSON {
+		if c.BigDirs {
+			folders := AggregateFolders(media)
+			SortFolders(folders, c.SortBy, c.Reverse)
+			encoder := json.NewEncoder(os.Stdout)
+			encoder.SetIndent("", "  ")
+			return encoder.Encode(folders)
+		}
+		encoder := json.NewEncoder(os.Stdout)
+		encoder.SetIndent("", "  ")
+		return encoder.Encode(media)
+	}
 
 	if c.BigDirs {
 		folders := AggregateFolders(media)
@@ -692,7 +935,7 @@ func (c *PrintCmd) Run(ctx *kong.Context) error {
 }
 
 func (c *WatchCmd) Run(ctx *kong.Context) error {
-	media, err := MediaQuery(context.Background(), c.Databases, c.Query, c.Limit)
+	media, err := MediaQuery(context.Background(), c.Databases, c.GlobalFlags)
 	if err != nil {
 		return err
 	}
@@ -763,7 +1006,7 @@ func (c *WatchCmd) Run(ctx *kong.Context) error {
 }
 
 func (c *ListenCmd) Run(ctx *kong.Context) error {
-	media, err := MediaQuery(context.Background(), c.Databases, c.Query, c.Limit)
+	media, err := MediaQuery(context.Background(), c.Databases, c.GlobalFlags)
 	if err != nil {
 		return err
 	}
@@ -804,7 +1047,7 @@ func (c *ListenCmd) Run(ctx *kong.Context) error {
 }
 
 func (c *OpenCmd) Run(ctx *kong.Context) error {
-	media, err := MediaQuery(context.Background(), c.Databases, c.Query, c.Limit)
+	media, err := MediaQuery(context.Background(), c.Databases, c.GlobalFlags)
 	if err != nil {
 		return err
 	}
@@ -835,7 +1078,7 @@ func (c *OpenCmd) Run(ctx *kong.Context) error {
 }
 
 func (c *BrowseCmd) Run(ctx *kong.Context) error {
-	media, err := MediaQuery(context.Background(), c.Databases, c.Query, c.Limit)
+	media, err := MediaQuery(context.Background(), c.Databases, c.GlobalFlags)
 	if err != nil {
 		return err
 	}
@@ -865,7 +1108,7 @@ func (c *BrowseCmd) Run(ctx *kong.Context) error {
 
 // Print functions
 
-func printMedia(columns []string, media []Media) error {
+func printMedia(columns []string, media []MediaWithDB) error {
 	if len(columns) == 0 {
 		columns = []string{"path", "duration", "size"}
 	}
@@ -880,17 +1123,17 @@ func printMedia(columns []string, media []Media) error {
 			case "path":
 				row = append(row, m.Path)
 			case "title":
-				row = append(row, m.Title)
+				row = append(row, stringValue(m.Title))
 			case "duration":
-				row = append(row, formatDuration(m.Duration))
+				row = append(row, formatDuration(int(int64Value(m.Duration))))
 			case "size":
-				row = append(row, formatSize(m.Size))
+				row = append(row, formatSize(int64Value(m.Size)))
 			case "play_count":
-				row = append(row, fmt.Sprintf("%d", m.PlayCount))
+				row = append(row, fmt.Sprintf("%d", int64Value(m.PlayCount)))
 			case "playhead":
-				row = append(row, formatDuration(m.Playhead))
+				row = append(row, formatDuration(int(int64Value(m.Playhead))))
 			case "time_last_played":
-				row = append(row, formatTime(m.TimeLastPlayed))
+				row = append(row, formatTime(int64Value(m.TimeLastPlayed)))
 			case "db":
 				row = append(row, filepath.Base(m.DB))
 			}
@@ -936,7 +1179,7 @@ func printFolders(columns []string, folders []FolderStats) error {
 
 // Post-action execution
 
-func executePostAction(flags GlobalFlags, media []Media) error {
+func executePostAction(flags GlobalFlags, media []MediaWithDB) error {
 	action := flags.PostAction
 
 	if flags.DeleteFiles {
@@ -963,7 +1206,7 @@ func executePostAction(flags GlobalFlags, media []Media) error {
 	return nil
 }
 
-func deleteMedia(media []Media) error {
+func deleteMedia(media []MediaWithDB) error {
 	for _, m := range media {
 		if fileExists(m.Path) {
 			if err := os.Remove(m.Path); err != nil {
@@ -975,19 +1218,19 @@ func deleteMedia(media []Media) error {
 	return nil
 }
 
-func markDeleted(media []Media) error {
+func markDeleted(media []MediaWithDB) error {
 	byDB := make(map[string][]string)
 	for _, m := range media {
 		byDB[m.DB] = append(byDB[m.DB], m.Path)
 	}
 
 	for dbPath, paths := range byDB {
-		db, err := sql.Open("sqlite3", dbPath)
+		sqlDB, err := sql.Open("sqlite3", dbPath)
 		if err != nil {
 			return err
 		}
 
-		tx, _ := db.Begin()
+		tx, _ := sqlDB.Begin()
 		now := time.Now().Unix()
 
 		for _, path := range paths {
@@ -995,14 +1238,14 @@ func markDeleted(media []Media) error {
 		}
 
 		tx.Commit()
-		db.Close()
+		sqlDB.Close()
 
 		fmt.Printf("Marked %d files as deleted in %s\n", len(paths), filepath.Base(dbPath))
 	}
 	return nil
 }
 
-func moveMedia(destDir string, media []Media) error {
+func moveMedia(destDir string, media []MediaWithDB) error {
 	if err := os.MkdirAll(destDir, 0o755); err != nil {
 		return err
 	}
@@ -1018,16 +1261,16 @@ func moveMedia(destDir string, media []Media) error {
 		}
 
 		// Update database
-		db, _ := sql.Open("sqlite3", m.DB)
-		db.Exec("UPDATE media SET path = ? WHERE path = ?", dest, m.Path)
-		db.Close()
+		sqlDB, _ := sql.Open("sqlite3", m.DB)
+		sqlDB.Exec("UPDATE media SET path = ? WHERE path = ?", dest, m.Path)
+		sqlDB.Close()
 
 		fmt.Printf("Moved: %s -> %s\n", m.Path, dest)
 	}
 	return nil
 }
 
-func copyMedia(destDir string, media []Media) error {
+func copyMedia(destDir string, media []MediaWithDB) error {
 	if err := os.MkdirAll(destDir, 0o755); err != nil {
 		return err
 	}
@@ -1048,21 +1291,21 @@ func copyMedia(destDir string, media []Media) error {
 
 // Helper functions
 
-func getString(v interface{}) string {
+func getString(v any) string {
 	if s, ok := v.(string); ok {
 		return s
 	}
 	return ""
 }
 
-func getInt(v interface{}) int {
+func getInt(v any) int {
 	if i, ok := v.(int64); ok {
 		return int(i)
 	}
 	return 0
 }
 
-func getInt64(v interface{}) int64 {
+func getInt64(v any) int64 {
 	if i, ok := v.(int64); ok {
 		return i
 	}
@@ -1084,26 +1327,29 @@ func matchesAny(path string, patterns []string) bool {
 func humanToBytes(s string) (int64, error) {
 	s = strings.ToUpper(strings.TrimSpace(s))
 
-	multipliers := map[string]int64{
-		"B":  1,
-		"K":  1024,
-		"KB": 1024,
-		"M":  1024 * 1024,
-		"MB": 1024 * 1024,
-		"G":  1024 * 1024 * 1024,
-		"GB": 1024 * 1024 * 1024,
-		"T":  1024 * 1024 * 1024 * 1024,
-		"TB": 1024 * 1024 * 1024 * 1024,
+	suffixes := []struct {
+		suffix string
+		mult   int64
+	}{
+		{"KB", 1024},
+		{"MB", 1024 * 1024},
+		{"GB", 1024 * 1024 * 1024},
+		{"TB", 1024 * 1024 * 1024 * 1024},
+		{"K", 1024},
+		{"M", 1024 * 1024},
+		{"G", 1024 * 1024 * 1024},
+		{"T", 1024 * 1024 * 1024 * 1024},
+		{"B", 1},
 	}
 
-	for suffix, mult := range multipliers {
-		if strings.HasSuffix(s, suffix) {
-			numStr := strings.TrimSuffix(s, suffix)
+	for _, entry := range suffixes {
+		if before, ok := strings.CutSuffix(s, entry.suffix); ok {
+			numStr := strings.TrimSpace(before)
 			num, err := strconv.ParseFloat(numStr, 64)
 			if err != nil {
 				return 0, err
 			}
-			return int64(num * float64(mult)), nil
+			return int64(num * float64(entry.mult)), nil
 		}
 	}
 

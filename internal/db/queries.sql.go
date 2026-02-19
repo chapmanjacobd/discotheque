@@ -11,7 +11,7 @@ import (
 )
 
 const getMedia = `-- name: GetMedia :many
-SELECT path, title, duration, size, time_created, time_modified, time_deleted, time_first_played, time_last_played, play_count, playhead, type, width, height, fps, video_codecs, audio_codecs, subtitle_codecs, video_count, audio_count, subtitle_count FROM media
+SELECT path, title, duration, size, time_created, time_modified, time_deleted, time_first_played, time_last_played, play_count, playhead, type, width, height, fps, video_codecs, audio_codecs, subtitle_codecs, video_count, audio_count, subtitle_count, album, artist, genre, description, language FROM media
 WHERE time_deleted = 0
 ORDER BY path
 LIMIT ?
@@ -48,6 +48,11 @@ func (q *Queries) GetMedia(ctx context.Context, limit int64) ([]Media, error) {
 			&i.VideoCount,
 			&i.AudioCount,
 			&i.SubtitleCount,
+			&i.Album,
+			&i.Artist,
+			&i.Genre,
+			&i.Description,
+			&i.Language,
 		); err != nil {
 			return nil, err
 		}
@@ -63,7 +68,7 @@ func (q *Queries) GetMedia(ctx context.Context, limit int64) ([]Media, error) {
 }
 
 const getMediaByDuration = `-- name: GetMediaByDuration :many
-SELECT path, title, duration, size, time_created, time_modified, time_deleted, time_first_played, time_last_played, play_count, playhead, type, width, height, fps, video_codecs, audio_codecs, subtitle_codecs, video_count, audio_count, subtitle_count FROM media
+SELECT path, title, duration, size, time_created, time_modified, time_deleted, time_first_played, time_last_played, play_count, playhead, type, width, height, fps, video_codecs, audio_codecs, subtitle_codecs, video_count, audio_count, subtitle_count, album, artist, genre, description, language FROM media
 WHERE time_deleted = 0
   AND duration >= ?
   AND duration <= ?
@@ -108,6 +113,11 @@ func (q *Queries) GetMediaByDuration(ctx context.Context, arg GetMediaByDuration
 			&i.VideoCount,
 			&i.AudioCount,
 			&i.SubtitleCount,
+			&i.Album,
+			&i.Artist,
+			&i.Genre,
+			&i.Description,
+			&i.Language,
 		); err != nil {
 			return nil, err
 		}
@@ -123,7 +133,7 @@ func (q *Queries) GetMediaByDuration(ctx context.Context, arg GetMediaByDuration
 }
 
 const getMediaByPath = `-- name: GetMediaByPath :many
-SELECT path, title, duration, size, time_created, time_modified, time_deleted, time_first_played, time_last_played, play_count, playhead, type, width, height, fps, video_codecs, audio_codecs, subtitle_codecs, video_count, audio_count, subtitle_count FROM media
+SELECT path, title, duration, size, time_created, time_modified, time_deleted, time_first_played, time_last_played, play_count, playhead, type, width, height, fps, video_codecs, audio_codecs, subtitle_codecs, video_count, audio_count, subtitle_count, album, artist, genre, description, language FROM media
 WHERE time_deleted = 0
   AND path LIKE ?
 ORDER BY path
@@ -166,6 +176,11 @@ func (q *Queries) GetMediaByPath(ctx context.Context, arg GetMediaByPathParams) 
 			&i.VideoCount,
 			&i.AudioCount,
 			&i.SubtitleCount,
+			&i.Album,
+			&i.Artist,
+			&i.Genre,
+			&i.Description,
+			&i.Language,
 		); err != nil {
 			return nil, err
 		}
@@ -181,7 +196,7 @@ func (q *Queries) GetMediaByPath(ctx context.Context, arg GetMediaByPathParams) 
 }
 
 const getMediaByPlayCount = `-- name: GetMediaByPlayCount :many
-SELECT path, title, duration, size, time_created, time_modified, time_deleted, time_first_played, time_last_played, play_count, playhead, type, width, height, fps, video_codecs, audio_codecs, subtitle_codecs, video_count, audio_count, subtitle_count FROM media
+SELECT path, title, duration, size, time_created, time_modified, time_deleted, time_first_played, time_last_played, play_count, playhead, type, width, height, fps, video_codecs, audio_codecs, subtitle_codecs, video_count, audio_count, subtitle_count, album, artist, genre, description, language FROM media
 WHERE time_deleted = 0
   AND play_count >= ?
   AND play_count <= ?
@@ -226,6 +241,11 @@ func (q *Queries) GetMediaByPlayCount(ctx context.Context, arg GetMediaByPlayCou
 			&i.VideoCount,
 			&i.AudioCount,
 			&i.SubtitleCount,
+			&i.Album,
+			&i.Artist,
+			&i.Genre,
+			&i.Description,
+			&i.Language,
 		); err != nil {
 			return nil, err
 		}
@@ -241,7 +261,7 @@ func (q *Queries) GetMediaByPlayCount(ctx context.Context, arg GetMediaByPlayCou
 }
 
 const getMediaBySize = `-- name: GetMediaBySize :many
-SELECT path, title, duration, size, time_created, time_modified, time_deleted, time_first_played, time_last_played, play_count, playhead, type, width, height, fps, video_codecs, audio_codecs, subtitle_codecs, video_count, audio_count, subtitle_count FROM media
+SELECT path, title, duration, size, time_created, time_modified, time_deleted, time_first_played, time_last_played, play_count, playhead, type, width, height, fps, video_codecs, audio_codecs, subtitle_codecs, video_count, audio_count, subtitle_count, album, artist, genre, description, language FROM media
 WHERE time_deleted = 0
   AND size >= ?
   AND size <= ?
@@ -286,6 +306,11 @@ func (q *Queries) GetMediaBySize(ctx context.Context, arg GetMediaBySizeParams) 
 			&i.VideoCount,
 			&i.AudioCount,
 			&i.SubtitleCount,
+			&i.Album,
+			&i.Artist,
+			&i.Genre,
+			&i.Description,
+			&i.Language,
 		); err != nil {
 			return nil, err
 		}
@@ -301,7 +326,7 @@ func (q *Queries) GetMediaBySize(ctx context.Context, arg GetMediaBySizeParams) 
 }
 
 const getMediaByType = `-- name: GetMediaByType :many
-SELECT path, title, duration, size, time_created, time_modified, time_deleted, time_first_played, time_last_played, play_count, playhead, type, width, height, fps, video_codecs, audio_codecs, subtitle_codecs, video_count, audio_count, subtitle_count FROM media
+SELECT path, title, duration, size, time_created, time_modified, time_deleted, time_first_played, time_last_played, play_count, playhead, type, width, height, fps, video_codecs, audio_codecs, subtitle_codecs, video_count, audio_count, subtitle_count, album, artist, genre, description, language FROM media
 WHERE time_deleted = 0
   AND (
     (? AND type LIKE 'video/%')
@@ -355,6 +380,11 @@ func (q *Queries) GetMediaByType(ctx context.Context, arg GetMediaByTypeParams) 
 			&i.VideoCount,
 			&i.AudioCount,
 			&i.SubtitleCount,
+			&i.Album,
+			&i.Artist,
+			&i.Genre,
+			&i.Description,
+			&i.Language,
 		); err != nil {
 			return nil, err
 		}
@@ -370,7 +400,7 @@ func (q *Queries) GetMediaByType(ctx context.Context, arg GetMediaByTypeParams) 
 }
 
 const getRandomMedia = `-- name: GetRandomMedia :many
-SELECT path, title, duration, size, time_created, time_modified, time_deleted, time_first_played, time_last_played, play_count, playhead, type, width, height, fps, video_codecs, audio_codecs, subtitle_codecs, video_count, audio_count, subtitle_count FROM media
+SELECT path, title, duration, size, time_created, time_modified, time_deleted, time_first_played, time_last_played, play_count, playhead, type, width, height, fps, video_codecs, audio_codecs, subtitle_codecs, video_count, audio_count, subtitle_count, album, artist, genre, description, language FROM media
 WHERE time_deleted = 0
 ORDER BY RANDOM()
 LIMIT ?
@@ -407,6 +437,11 @@ func (q *Queries) GetRandomMedia(ctx context.Context, limit int64) ([]Media, err
 			&i.VideoCount,
 			&i.AudioCount,
 			&i.SubtitleCount,
+			&i.Album,
+			&i.Artist,
+			&i.Genre,
+			&i.Description,
+			&i.Language,
 		); err != nil {
 			return nil, err
 		}
@@ -422,7 +457,7 @@ func (q *Queries) GetRandomMedia(ctx context.Context, limit int64) ([]Media, err
 }
 
 const getSiblingMedia = `-- name: GetSiblingMedia :many
-SELECT path, title, duration, size, time_created, time_modified, time_deleted, time_first_played, time_last_played, play_count, playhead, type, width, height, fps, video_codecs, audio_codecs, subtitle_codecs, video_count, audio_count, subtitle_count FROM media
+SELECT path, title, duration, size, time_created, time_modified, time_deleted, time_first_played, time_last_played, play_count, playhead, type, width, height, fps, video_codecs, audio_codecs, subtitle_codecs, video_count, audio_count, subtitle_count, album, artist, genre, description, language FROM media
 WHERE time_deleted = 0
   AND path LIKE ?
   AND path != ?
@@ -467,6 +502,89 @@ func (q *Queries) GetSiblingMedia(ctx context.Context, arg GetSiblingMediaParams
 			&i.VideoCount,
 			&i.AudioCount,
 			&i.SubtitleCount,
+			&i.Album,
+			&i.Artist,
+			&i.Genre,
+			&i.Description,
+			&i.Language,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getStats = `-- name: GetStats :one
+SELECT
+    COUNT(*) as total_count,
+    SUM(size) as total_size,
+    SUM(duration) as total_duration,
+    COUNT(CASE WHEN COALESCE(time_last_played, 0) > 0 THEN 1 END) as watched_count,
+    COUNT(CASE WHEN COALESCE(time_last_played, 0) = 0 THEN 1 END) as unwatched_count
+FROM media
+WHERE time_deleted = 0
+`
+
+type GetStatsRow struct {
+	TotalCount     int64           `json:"total_count"`
+	TotalSize      sql.NullFloat64 `json:"total_size"`
+	TotalDuration  sql.NullFloat64 `json:"total_duration"`
+	WatchedCount   int64           `json:"watched_count"`
+	UnwatchedCount int64           `json:"unwatched_count"`
+}
+
+func (q *Queries) GetStats(ctx context.Context) (GetStatsRow, error) {
+	row := q.db.QueryRowContext(ctx, getStats)
+	var i GetStatsRow
+	err := row.Scan(
+		&i.TotalCount,
+		&i.TotalSize,
+		&i.TotalDuration,
+		&i.WatchedCount,
+		&i.UnwatchedCount,
+	)
+	return i, err
+}
+
+const getStatsByType = `-- name: GetStatsByType :many
+SELECT
+    type,
+    COUNT(*) as count,
+    SUM(size) as total_size,
+    SUM(duration) as total_duration
+FROM media
+WHERE time_deleted = 0
+GROUP BY type
+`
+
+type GetStatsByTypeRow struct {
+	Type          sql.NullString  `json:"type"`
+	Count         int64           `json:"count"`
+	TotalSize     sql.NullFloat64 `json:"total_size"`
+	TotalDuration sql.NullFloat64 `json:"total_duration"`
+}
+
+func (q *Queries) GetStatsByType(ctx context.Context) ([]GetStatsByTypeRow, error) {
+	rows, err := q.db.QueryContext(ctx, getStatsByType)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetStatsByTypeRow{}
+	for rows.Next() {
+		var i GetStatsByTypeRow
+		if err := rows.Scan(
+			&i.Type,
+			&i.Count,
+			&i.TotalSize,
+			&i.TotalDuration,
 		); err != nil {
 			return nil, err
 		}
@@ -482,7 +600,7 @@ func (q *Queries) GetSiblingMedia(ctx context.Context, arg GetSiblingMediaParams
 }
 
 const getUnfinishedMedia = `-- name: GetUnfinishedMedia :many
-SELECT path, title, duration, size, time_created, time_modified, time_deleted, time_first_played, time_last_played, play_count, playhead, type, width, height, fps, video_codecs, audio_codecs, subtitle_codecs, video_count, audio_count, subtitle_count FROM media
+SELECT path, title, duration, size, time_created, time_modified, time_deleted, time_first_played, time_last_played, play_count, playhead, type, width, height, fps, video_codecs, audio_codecs, subtitle_codecs, video_count, audio_count, subtitle_count, album, artist, genre, description, language FROM media
 WHERE time_deleted = 0
   AND playhead > 0
   AND playhead < duration * 0.95
@@ -521,6 +639,11 @@ func (q *Queries) GetUnfinishedMedia(ctx context.Context, limit int64) ([]Media,
 			&i.VideoCount,
 			&i.AudioCount,
 			&i.SubtitleCount,
+			&i.Album,
+			&i.Artist,
+			&i.Genre,
+			&i.Description,
+			&i.Language,
 		); err != nil {
 			return nil, err
 		}
@@ -536,9 +659,9 @@ func (q *Queries) GetUnfinishedMedia(ctx context.Context, limit int64) ([]Media,
 }
 
 const getUnwatchedMedia = `-- name: GetUnwatchedMedia :many
-SELECT path, title, duration, size, time_created, time_modified, time_deleted, time_first_played, time_last_played, play_count, playhead, type, width, height, fps, video_codecs, audio_codecs, subtitle_codecs, video_count, audio_count, subtitle_count FROM media
+SELECT path, title, duration, size, time_created, time_modified, time_deleted, time_first_played, time_last_played, play_count, playhead, type, width, height, fps, video_codecs, audio_codecs, subtitle_codecs, video_count, audio_count, subtitle_count, album, artist, genre, description, language FROM media
 WHERE time_deleted = 0
-  AND time_last_played = 0
+  AND COALESCE(time_last_played, 0) = 0
 ORDER BY path
 LIMIT ?
 `
@@ -574,6 +697,11 @@ func (q *Queries) GetUnwatchedMedia(ctx context.Context, limit int64) ([]Media, 
 			&i.VideoCount,
 			&i.AudioCount,
 			&i.SubtitleCount,
+			&i.Album,
+			&i.Artist,
+			&i.Genre,
+			&i.Description,
+			&i.Language,
 		); err != nil {
 			return nil, err
 		}
@@ -589,9 +717,9 @@ func (q *Queries) GetUnwatchedMedia(ctx context.Context, limit int64) ([]Media, 
 }
 
 const getWatchedMedia = `-- name: GetWatchedMedia :many
-SELECT path, title, duration, size, time_created, time_modified, time_deleted, time_first_played, time_last_played, play_count, playhead, type, width, height, fps, video_codecs, audio_codecs, subtitle_codecs, video_count, audio_count, subtitle_count FROM media
+SELECT path, title, duration, size, time_created, time_modified, time_deleted, time_first_played, time_last_played, play_count, playhead, type, width, height, fps, video_codecs, audio_codecs, subtitle_codecs, video_count, audio_count, subtitle_count, album, artist, genre, description, language FROM media
 WHERE time_deleted = 0
-  AND time_last_played > 0
+  AND COALESCE(time_last_played, 0) > 0
 ORDER BY time_last_played DESC
 LIMIT ?
 `
@@ -627,6 +755,11 @@ func (q *Queries) GetWatchedMedia(ctx context.Context, limit int64) ([]Media, er
 			&i.VideoCount,
 			&i.AudioCount,
 			&i.SubtitleCount,
+			&i.Album,
+			&i.Artist,
+			&i.Genre,
+			&i.Description,
+			&i.Language,
 		); err != nil {
 			return nil, err
 		}
@@ -639,6 +772,28 @@ func (q *Queries) GetWatchedMedia(ctx context.Context, limit int64) ([]Media, er
 		return nil, err
 	}
 	return items, nil
+}
+
+const insertPlaylist = `-- name: InsertPlaylist :one
+INSERT INTO playlists (path, extractor_key, extractor_config)
+VALUES (?, ?, ?)
+ON CONFLICT(path) DO UPDATE SET
+    extractor_key = excluded.extractor_key,
+    extractor_config = excluded.extractor_config
+RETURNING id
+`
+
+type InsertPlaylistParams struct {
+	Path            sql.NullString `json:"path"`
+	ExtractorKey    sql.NullString `json:"extractor_key"`
+	ExtractorConfig sql.NullString `json:"extractor_config"`
+}
+
+func (q *Queries) InsertPlaylist(ctx context.Context, arg InsertPlaylistParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, insertPlaylist, arg.Path, arg.ExtractorKey, arg.ExtractorConfig)
+	var id int64
+	err := row.Scan(&id)
+	return id, err
 }
 
 const markDeleted = `-- name: MarkDeleted :exec
@@ -658,7 +813,7 @@ func (q *Queries) MarkDeleted(ctx context.Context, arg MarkDeletedParams) error 
 }
 
 const searchMediaFTS = `-- name: SearchMediaFTS :many
-SELECT m.path, m.title, m.duration, m.size, m.time_created, m.time_modified, m.time_deleted, m.time_first_played, m.time_last_played, m.play_count, m.playhead, m.type, m.width, m.height, m.fps, m.video_codecs, m.audio_codecs, m.subtitle_codecs, m.video_count, m.audio_count, m.subtitle_count FROM media m
+SELECT m.path, m.title, m.duration, m.size, m.time_created, m.time_modified, m.time_deleted, m.time_first_played, m.time_last_played, m.play_count, m.playhead, m.type, m.width, m.height, m.fps, m.video_codecs, m.audio_codecs, m.subtitle_codecs, m.video_count, m.audio_count, m.subtitle_count, m.album, m.artist, m.genre, m.description, m.language FROM media m
 JOIN media_fts f ON m.rowid = f.rowid
 WHERE f.path MATCH ?1
   AND m.time_deleted = 0
@@ -702,6 +857,11 @@ func (q *Queries) SearchMediaFTS(ctx context.Context, arg SearchMediaFTSParams) 
 			&i.VideoCount,
 			&i.AudioCount,
 			&i.SubtitleCount,
+			&i.Album,
+			&i.Artist,
+			&i.Genre,
+			&i.Description,
+			&i.Language,
 		); err != nil {
 			return nil, err
 		}
@@ -754,6 +914,93 @@ func (q *Queries) UpdatePlayHistory(ctx context.Context, arg UpdatePlayHistoryPa
 		arg.TimeFirstPlayed,
 		arg.Playhead,
 		arg.Path,
+	)
+	return err
+}
+
+const upsertMedia = `-- name: UpsertMedia :exec
+INSERT INTO media (
+    path, title, duration, size, time_created, time_modified,
+    type, width, height, fps,
+    video_codecs, audio_codecs, subtitle_codecs,
+    video_count, audio_count, subtitle_count,
+    album, artist, genre, description, language
+) VALUES (
+    ?, ?, ?, ?, ?, ?,
+    ?, ?, ?, ?,
+    ?, ?, ?,
+    ?, ?, ?,
+    ?, ?, ?, ?, ?
+)
+ON CONFLICT(path) DO UPDATE SET
+    title = excluded.title,
+    duration = excluded.duration,
+    size = excluded.size,
+    time_modified = excluded.time_modified,
+    type = excluded.type,
+    width = excluded.width,
+    height = excluded.height,
+    fps = excluded.fps,
+    video_codecs = excluded.video_codecs,
+    audio_codecs = excluded.audio_codecs,
+    subtitle_codecs = excluded.subtitle_codecs,
+    video_count = excluded.video_count,
+    audio_count = excluded.audio_count,
+    subtitle_count = excluded.subtitle_count,
+    album = excluded.album,
+    artist = excluded.artist,
+    genre = excluded.genre,
+    description = excluded.description,
+    language = excluded.language
+`
+
+type UpsertMediaParams struct {
+	Path           string          `json:"path"`
+	Title          sql.NullString  `json:"title"`
+	Duration       sql.NullInt64   `json:"duration"`
+	Size           sql.NullInt64   `json:"size"`
+	TimeCreated    sql.NullInt64   `json:"time_created"`
+	TimeModified   sql.NullInt64   `json:"time_modified"`
+	Type           sql.NullString  `json:"type"`
+	Width          sql.NullInt64   `json:"width"`
+	Height         sql.NullInt64   `json:"height"`
+	Fps            sql.NullFloat64 `json:"fps"`
+	VideoCodecs    sql.NullString  `json:"video_codecs"`
+	AudioCodecs    sql.NullString  `json:"audio_codecs"`
+	SubtitleCodecs sql.NullString  `json:"subtitle_codecs"`
+	VideoCount     sql.NullInt64   `json:"video_count"`
+	AudioCount     sql.NullInt64   `json:"audio_count"`
+	SubtitleCount  sql.NullInt64   `json:"subtitle_count"`
+	Album          sql.NullString  `json:"album"`
+	Artist         sql.NullString  `json:"artist"`
+	Genre          sql.NullString  `json:"genre"`
+	Description    sql.NullString  `json:"description"`
+	Language       sql.NullString  `json:"language"`
+}
+
+func (q *Queries) UpsertMedia(ctx context.Context, arg UpsertMediaParams) error {
+	_, err := q.db.ExecContext(ctx, upsertMedia,
+		arg.Path,
+		arg.Title,
+		arg.Duration,
+		arg.Size,
+		arg.TimeCreated,
+		arg.TimeModified,
+		arg.Type,
+		arg.Width,
+		arg.Height,
+		arg.Fps,
+		arg.VideoCodecs,
+		arg.AudioCodecs,
+		arg.SubtitleCodecs,
+		arg.VideoCount,
+		arg.AudioCount,
+		arg.SubtitleCount,
+		arg.Album,
+		arg.Artist,
+		arg.Genre,
+		arg.Description,
+		arg.Language,
 	)
 	return err
 }

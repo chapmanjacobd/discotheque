@@ -3,15 +3,17 @@ package aggregate
 import (
 	"testing"
 
-	"github.com/chapmanjacobd/discotheque/internal/db"
+	"github.com/chapmanjacobd/discotheque/internal/models"
 )
 
+func int64Ptr(i int64) *int64 { return &i }
+
 func TestByFolder(t *testing.T) {
-	media := []db.Media{
-		{Path: "/movies/action/movie1.mp4", Size: 1000, Duration: 7200},
-		{Path: "/movies/action/movie2.mp4", Size: 2000, Duration: 6000},
-		{Path: "/movies/comedy/movie3.mp4", Size: 1500, Duration: 5400},
-		{Path: "/tv/show/episode1.mp4", Size: 500, Duration: 1800},
+	media := []models.Media{
+		{Path: "/movies/action/movie1.mp4", Size: int64Ptr(1000), Duration: int64Ptr(7200)},
+		{Path: "/movies/action/movie2.mp4", Size: int64Ptr(2000), Duration: int64Ptr(6000)},
+		{Path: "/movies/comedy/movie3.mp4", Size: int64Ptr(1500), Duration: int64Ptr(5400)},
+		{Path: "/tv/show/episode1.mp4", Size: int64Ptr(500), Duration: int64Ptr(1800)},
 	}
 
 	folders := ByFolder(media)

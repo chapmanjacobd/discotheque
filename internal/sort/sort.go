@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/chapmanjacobd/discotheque/internal/db"
+	"github.com/chapmanjacobd/discotheque/internal/models"
 )
 
 type Method string
@@ -22,7 +22,7 @@ const (
 	ByPlayCount    Method = "play_count"
 )
 
-func Apply(media []db.Media, method Method, reverse bool, natural bool) {
+func Apply(media []models.Media, method Method, reverse bool, natural bool) {
 	less := makeLessFunc(media, method, natural)
 
 	if reverse {
@@ -32,7 +32,7 @@ func Apply(media []db.Media, method Method, reverse bool, natural bool) {
 	}
 }
 
-func makeLessFunc(media []db.Media, method Method, natural bool) func(i, j int) bool {
+func makeLessFunc(media []models.Media, method Method, natural bool) func(i, j int) bool {
 	switch method {
 	case ByPath:
 		if natural {
@@ -42,22 +42,36 @@ func makeLessFunc(media []db.Media, method Method, natural bool) func(i, j int) 
 		}
 		return func(i, j int) bool { return media[i].Path < media[j].Path }
 	case ByTitle:
-		return func(i, j int) bool { return media[i].Title < media[j].Title }
+		return func(i, j int) bool { return stringValue(media[i].Title) < stringValue(media[j].Title) }
 	case ByDuration:
-		return func(i, j int) bool { return media[i].Duration < media[j].Duration }
+		return func(i, j int) bool { return int64Value(media[i].Duration) < int64Value(media[j].Duration) }
 	case BySize:
-		return func(i, j int) bool { return media[i].Size < media[j].Size }
+		return func(i, j int) bool { return int64Value(media[i].Size) < int64Value(media[j].Size) }
 	case ByTimeCreated:
-		return func(i, j int) bool { return media[i].TimeCreated < media[j].TimeCreated }
+		return func(i, j int) bool { return int64Value(media[i].TimeCreated) < int64Value(media[j].TimeCreated) }
 	case ByTimeModified:
-		return func(i, j int) bool { return media[i].TimeModified < media[j].TimeModified }
+		return func(i, j int) bool { return int64Value(media[i].TimeModified) < int64Value(media[j].TimeModified) }
 	case ByTimePlayed:
-		return func(i, j int) bool { return media[i].TimeLastPlayed < media[j].TimeLastPlayed }
+		return func(i, j int) bool { return int64Value(media[i].TimeLastPlayed) < int64Value(media[j].TimeLastPlayed) }
 	case ByPlayCount:
-		return func(i, j int) bool { return media[i].PlayCount < media[j].PlayCount }
+		return func(i, j int) bool { return int64Value(media[i].PlayCount) < int64Value(media[j].PlayCount) }
 	default:
 		return func(i, j int) bool { return media[i].Path < media[j].Path }
 	}
+}
+
+func stringValue(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
+}
+
+func int64Value(i *int64) int64 {
+	if i == nil {
+		return 0
+	}
+	return *i
 }
 
 type chunk struct {

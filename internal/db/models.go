@@ -30,9 +30,22 @@ type Media struct {
 	VideoCount      sql.NullInt64   `json:"video_count"`
 	AudioCount      sql.NullInt64   `json:"audio_count"`
 	SubtitleCount   sql.NullInt64   `json:"subtitle_count"`
+	Album           sql.NullString  `json:"album"`
+	Artist          sql.NullString  `json:"artist"`
+	Genre           sql.NullString  `json:"genre"`
+	Description     sql.NullString  `json:"description"`
+	Language        sql.NullString  `json:"language"`
 }
 
 type MediaFts struct {
 	Path  string `json:"path"`
 	Title string `json:"title"`
+}
+
+type Playlists struct {
+	ID              int64          `json:"id"`
+	Path            sql.NullString `json:"path"`
+	ExtractorKey    sql.NullString `json:"extractor_key"`
+	ExtractorConfig sql.NullString `json:"extractor_config"`
+	TimeDeleted     sql.NullInt64  `json:"time_deleted"`
 }
