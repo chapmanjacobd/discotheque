@@ -2,6 +2,7 @@ package commands
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -9,10 +10,13 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/alecthomas/kong"
+	database "github.com/chapmanjacobd/discotheque/internal/db"
 	"github.com/chapmanjacobd/discotheque/internal/models"
 	"github.com/chapmanjacobd/discotheque/internal/query"
+	"github.com/chapmanjacobd/discotheque/internal/utils"
 	"github.com/chapmanjacobd/discotheque/web"
 )
 
@@ -21,6 +25,7 @@ type ServeCmd struct {
 	Databases []string `arg:"" required:"" help:"SQLite database files" type:"existingfile"`
 	Port      int      `short:"p" default:"5555" help:"Port to listen on"`
 	PublicDir string   `help:"Override embedded web assets with local directory"`
+	Dev       bool     `help:"Enable development mode (auto-reload)"`
 }
 
 func (c ServeCmd) IsQueryTrait()    {}
@@ -34,6 +39,7 @@ func (c *ServeCmd) Run(ctx *kong.Context) error {
 	http.HandleFunc("/api/databases", c.handleDatabases)
 	http.HandleFunc("/api/query", c.handleQuery)
 	http.HandleFunc("/api/play", c.handlePlay)
+	http.HandleFunc("/api/events", c.handleEvents)
 
 	// Serve static files
 	var handler http.Handler
@@ -110,6 +116,30 @@ func (c *ServeCmd) handlePlay(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !strings.HasPrefix(req.Path, "http") && !utils.FileExists(req.Path) {
+		slog.Warn("File not found, marking as deleted in databases", "path", req.Path)
+		now := time.Now().Unix()
+		for _, dbPath := range c.Databases {
+			sqlDB, err := database.Connect(dbPath)
+			if err != nil {
+				slog.Error("Failed to connect to database", "db", dbPath, "error", err)
+				continue
+			}
+			queries := database.New(sqlDB)
+			err = queries.MarkDeleted(r.Context(), database.MarkDeletedParams{
+				Path:        req.Path,
+				TimeDeleted: sql.NullInt64{Int64: now, Valid: true},
+			})
+			sqlDB.Close()
+			if err != nil {
+				slog.Error("Failed to mark file as deleted", "db", dbPath, "path", req.Path, "error", err)
+			}
+		}
+
+		http.Error(w, "file not found", http.StatusNotFound)
+		return
+	}
+
 	// Trigger local playback
 	slog.Info("Playing", "path", req.Path)
 	cmd := exec.Command("mpv", req.Path)
@@ -120,4 +150,27 @@ func (c *ServeCmd) handlePlay(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
+}
+
+func (c *ServeCmd) handleEvents(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "Streaming unsupported", http.StatusInternalServerError)
+		return
+	}
+
+	fmt.Fprintf(w, "data: ready\n\n")
+	flusher.Flush()
+
+	if c.Dev {
+		fmt.Fprintf(w, "data: reload\n\n")
+		flusher.Flush()
+	}
+
+	// Keep connection open until client disconnects
+	<-r.Context().Done()
 }

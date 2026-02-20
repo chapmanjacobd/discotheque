@@ -74,11 +74,19 @@ document.addEventListener('DOMContentLoaded', () => {
     async function playMedia(path) {
         showToast(`Playing: ${path.split('/').pop()}`);
         try {
-            await fetch('/api/play', {
+            const resp = await fetch('/api/play', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ path })
             });
+
+            if (!resp.ok) {
+                if (resp.status === 404) {
+                    showToast('file not found');
+                } else {
+                    showToast('Playback failed');
+                }
+            }
         } catch (err) {
             console.error('Playback failed', err);
             showToast('Playback failed');
@@ -168,6 +176,22 @@ document.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => toast.classList.add('hidden'), 3000);
     }
 
+    // --- Dev Mode Auto-Reload ---
+    function setupAutoReload() {
+        const events = new EventSource('/api/events');
+        events.onmessage = (event) => {
+            if (event.data === 'reload') {
+                console.log('Server restarted, reloading...');
+                location.reload();
+            }
+        };
+        events.onerror = () => {
+            events.close();
+            // Retry connection after a delay
+            setTimeout(setupAutoReload, 2000);
+        };
+    }
+
     // --- Event Listeners ---
     searchButton.onclick = performSearch;
     searchInput.onkeypress = (e) => { if (e.key === 'Enter') performSearch(); };
@@ -189,4 +213,5 @@ document.addEventListener('DOMContentLoaded', () => {
     // Initial load
     fetchDatabases();
     performSearch();
+    setupAutoReload();
 });
