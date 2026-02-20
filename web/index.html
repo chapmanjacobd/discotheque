@@ -15,52 +15,49 @@
         </div>
         <div class="header-actions">
             <button id="settings-button" title="Settings">⚙️</button>
-            <span id="status-dot" class="dot"></span>
-            <span id="db-count">0 databases</span>
         </div>
     </header>
 
     <main>
         <aside class="sidebar">
             <section>
-                <h3>Type</h3>
-                <label><input type="checkbox" class="filter-type" value="video"> Video</label>
-                <label><input type="checkbox" class="filter-type" value="audio"> Audio</label>
-                <label><input type="checkbox" class="filter-type" value="image"> Image</label>
-            </section>
-
-            <section>
-                <h3>Sort</h3>
-                <select id="sort-by">
-                    <option value="path">Path</option>
-                    <option value="size">Size</option>
-                    <option value="duration">Duration</option>
-                    <option value="time_last_played">Last Played</option>
-                    <option value="play_count">Play Count</option>
-                    <option value="random">Random</option>
-                </select>
-                <label><input type="checkbox" id="sort-reverse"> Reverse</label>
-            </section>
-
-            <section>
-                <h3>Limit</h3>
-                <input type="number" id="limit" value="100" min="1" max="1000">
-            </section>
-
-            <section id="db-list-container">
-                <h3>Databases</h3>
-                <div id="db-list"></div>
+                <h3>Categories</h3>
+                <div id="category-list">
+                    <!-- Categories will be injected here -->
+                </div>
             </section>
         </aside>
 
         <section class="content">
-            <div id="results-info">
-                <span id="results-count">0 files found</span>
+            <div id="toolbar">
+                <div class="filter-group">
+                    <button class="type-btn active" data-type="video">Video</button>
+                    <button class="type-btn active" data-type="audio">Audio</button>
+                    <button class="type-btn" data-type="image">Image</button>
+                </div>
+
+                <div class="sort-group">
+                    <select id="sort-by">
+                        <option value="path">Path</option>
+                        <option value="size">Size</option>
+                        <option value="duration">Duration</option>
+                        <option value="time_last_played">Last Played</option>
+                        <option value="play_count">Play Count</option>
+                        <option value="random">Random</option>
+                    </select>
+                    <button id="sort-reverse-btn" title="Reverse Sort">⇅</button>
+                </div>
+
                 <div class="view-toggle">
                     <button id="view-grid" class="active">Grid</button>
                     <button id="view-list">List</button>
                 </div>
             </div>
+
+            <div id="results-info">
+                <span id="results-count"></span>
+            </div>
+
             <div id="results-container" class="grid">
                 <!-- Media items will be injected here -->
             </div>
@@ -77,28 +74,61 @@
             <div class="modal-body">
                 <section>
                     <h3>Playback</h3>
-                    <label>
-                        Default Player:
+                    <div class="setting-item">
+                        <label for="setting-player">Default Player:</label>
                         <select id="setting-player">
                             <option value="browser">Browser (Internal)</option>
                             <option value="system">System (mpv)</option>
                         </select>
-                    </label>
+                    </div>
+                    <div class="setting-item">
+                        <label for="setting-language">Preferred Language:</label>
+                        <input type="text" id="setting-language" placeholder="e.g. eng, spa, jp" value="">
+                    </div>
+                    <div class="setting-item">
+                        <label for="setting-theme">Theme:</label>
+                        <select id="setting-theme">
+                            <option value="auto">Auto (Browser)</option>
+                            <option value="light">Light</option>
+                            <option value="dark">Dark</option>
+                        </select>
+                    </div>
+                </section>
+
+                <section>
+                    <h3>Search</h3>
+                    <div class="setting-item">
+                        <label for="limit">Result Limit:</label>
+                        <div style="display: flex; gap: 10px; align-items: center;">
+                            <input type="number" id="limit" value="100" min="1">
+                            <label style="font-size: 0.8rem; display: flex; align-items: center; gap: 4px; white-space: nowrap; cursor: pointer;">
+                                <input type="checkbox" id="limit-all"> All
+                            </label>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="db-settings">
+                    <h3>Databases</h3>
+                    <div id="db-checkbox-list">
+                        <!-- Database checkboxes will be injected here -->
+                    </div>
                 </section>
             </div>
         </div>
     </div>
 
-    <!-- Media Player Modal -->
-    <div id="media-modal" class="modal hidden">
-        <div class="modal-content media-content">
-            <div class="modal-header">
-                <span id="media-title"></span>
-                <button class="close-modal">&times;</button>
+    <!-- Media Player (PiP Style) -->
+    <div id="pip-player" class="pip-container hidden">
+        <div class="pip-header">
+            <span id="media-title"></span>
+            <div class="pip-controls">
+                <button id="pip-minimize" title="Minimize">_</button>
+                <button class="close-pip" title="Close">&times;</button>
             </div>
-            <div id="media-viewer">
-                <!-- Media tag (img, video, audio) will be injected here -->
-            </div>
+        </div>
+        <div id="media-viewer">
+            <!-- Media tag (img, video, audio) will be injected here -->
         </div>
     </div>
 

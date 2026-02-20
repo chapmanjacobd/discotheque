@@ -64,6 +64,12 @@ func (qb *QueryBuilder) Build() (string, []any) {
 		}
 	}
 
+	// Category filter
+	if qb.Flags.Category != "" {
+		whereClauses = append(whereClauses, "categories LIKE '%' || ? || '%'")
+		args = append(args, ";"+qb.Flags.Category+";")
+	}
+
 	// Search terms (FTS or LIKE)
 	allInclude := append([]string{}, qb.Flags.Search...)
 	allInclude = append(allInclude, qb.Flags.Include...)
@@ -221,14 +227,18 @@ func (qb *QueryBuilder) Build() (string, []any) {
 	}
 
 	// Content type filters
+	var typeClauses []string
 	if qb.Flags.VideoOnly {
-		whereClauses = append(whereClauses, "(path LIKE '%.mp4' OR path LIKE '%.mkv' OR path LIKE '%.avi' OR path LIKE '%.mov' OR path LIKE '%.webm')")
+		typeClauses = append(typeClauses, utils.ExtensionsToLike(utils.VideoExtensions))
 	}
 	if qb.Flags.AudioOnly {
-		whereClauses = append(whereClauses, "(path LIKE '%.mp3' OR path LIKE '%.flac' OR path LIKE '%.m4a' OR path LIKE '%.opus' OR path LIKE '%.ogg')")
+		typeClauses = append(typeClauses, utils.ExtensionsToLike(utils.AudioExtensions))
 	}
 	if qb.Flags.ImageOnly {
-		whereClauses = append(whereClauses, "(path LIKE '%.jpg' OR path LIKE '%.png' OR path LIKE '%.gif' OR path LIKE '%.webp')")
+		typeClauses = append(typeClauses, utils.ExtensionsToLike(utils.ImageExtensions))
+	}
+	if len(typeClauses) > 0 {
+		whereClauses = append(whereClauses, "("+strings.Join(typeClauses, " OR ")+")")
 	}
 
 	if qb.Flags.Portrait {
@@ -297,7 +307,7 @@ func (qb *QueryBuilder) Build() (string, []any) {
 	} else if qb.Flags.Random {
 		// Optimization for large databases: select rowids randomly first
 		// Python: and m.rowid in (select rowid as id from media {where_not_deleted} order by random() limit {limit})
-		if !qb.Flags.FTS && len(allInclude) == 0 && qb.Flags.Limit > 0 {
+		if !qb.Flags.All && !qb.Flags.FTS && len(allInclude) == 0 && qb.Flags.Limit > 0 {
 			whereNotDeleted := "WHERE COALESCE(time_deleted, 0) = 0"
 			if qb.Flags.OnlyDeleted {
 				whereNotDeleted = "WHERE COALESCE(time_deleted, 0) > 0"
@@ -316,7 +326,7 @@ func (qb *QueryBuilder) Build() (string, []any) {
 	}
 
 	// Limit and offset
-	if qb.Flags.Limit > 0 {
+	if !qb.Flags.All && qb.Flags.Limit > 0 {
 		query += fmt.Sprintf(" LIMIT %d", qb.Flags.Limit)
 	}
 	if qb.Flags.Offset > 0 {
@@ -375,7 +385,7 @@ func MediaQuery(ctx context.Context, dbs []string, flags models.GlobalFlags) ([]
 		close(errors)
 	}()
 
-	var allMedia []models.MediaWithDB
+	allMedia := []models.MediaWithDB{}
 	for media := range results {
 		allMedia = append(allMedia, media...)
 	}
@@ -497,7 +507,7 @@ func FilterEpisodic(media []models.MediaWithDB, criteria string) []models.MediaW
 		counts[parent]++
 	}
 
-	var filtered []models.MediaWithDB
+	filtered := []models.MediaWithDB{}
 	for _, m := range media {
 		count := counts[m.Parent()]
 		if r.Matches(count) {
@@ -521,7 +531,7 @@ func QueryDatabase(ctx context.Context, dbPath, query string, args []any) ([]mod
 	defer rows.Close()
 
 	cols, _ := rows.Columns()
-	var allMedia []models.MediaWithDB
+	allMedia := []models.MediaWithDB{}
 
 	for rows.Next() {
 		values := make([]any, len(cols))
@@ -601,7 +611,7 @@ func QueryDatabase(ctx context.Context, dbPath, query string, args []any) ([]mod
 
 // FilterMedia applies all filters to media list
 func FilterMedia(media []models.MediaWithDB, flags models.GlobalFlags) []models.MediaWithDB {
-	var filtered []models.MediaWithDB
+	filtered := []models.MediaWithDB{}
 
 	for _, m := range media {
 		// Check existence
@@ -696,6 +706,13 @@ func SortMedia(media []models.MediaWithDB, flags models.GlobalFlags) {
 		return
 	}
 
+	// If the user explicitly requested a specific sort field other than "path",
+	// we should respect it and skip the default play-in-order.
+	if flags.SortBy != "" && flags.SortBy != "path" {
+		sortMediaBasic(media, flags.SortBy, flags.Reverse, flags.NatSort)
+		return
+	}
+
 	// If Random is set, we typically want to respect the SQL random order
 	// unless the user EXPLICITLY requested a specific play-in-order.
 	// We check if PlayInOrder is different from the default "natural_ps"
@@ -728,9 +745,29 @@ func sortMediaBasic(media []models.MediaWithDB, sortBy string, reverse bool, nat
 			return utils.Int64Value(media[i].Duration) < utils.Int64Value(media[j].Duration)
 		case "size":
 			return utils.Int64Value(media[i].Size) < utils.Int64Value(media[j].Size)
-		case "time_created":
+		case "bitrate":
+			d1 := utils.Int64Value(media[i].Duration)
+			d2 := utils.Int64Value(media[j].Duration)
+			if d1 == 0 || d2 == 0 {
+				return false
+			}
+			return float64(utils.Int64Value(media[i].Size))/float64(d1) < float64(utils.Int64Value(media[j].Size))/float64(d2)
+		case "priority":
+			d1 := utils.Int64Value(media[i].Duration)
+			d2 := utils.Int64Value(media[j].Duration)
+			if d1 == 0 || d2 == 0 {
+				return false
+			}
+			return float64(utils.Int64Value(media[i].Size))/float64(d1) < float64(utils.Int64Value(media[j].Size))/float64(d2)
+		case "priorityfast":
+			// Simplified version of ntile(1000) over (order by size) desc, duration
+			if utils.Int64Value(media[i].Size) != utils.Int64Value(media[j].Size) {
+				return utils.Int64Value(media[i].Size) > utils.Int64Value(media[j].Size)
+			}
+			return utils.Int64Value(media[i].Duration) < utils.Int64Value(media[j].Duration)
+		case "time_created", "date_created", "month_created":
 			return utils.Int64Value(media[i].TimeCreated) < utils.Int64Value(media[j].TimeCreated)
-		case "time_modified":
+		case "time_modified", "date_modified", "month_modified":
 			return utils.Int64Value(media[i].TimeModified) < utils.Int64Value(media[j].TimeModified)
 		case "time_last_played":
 			return utils.Int64Value(media[i].TimeLastPlayed) < utils.Int64Value(media[j].TimeLastPlayed)

@@ -214,7 +214,7 @@ func (c *SearchDBCmd) printRows(sqlDB *sql.DB, table string, where []string, arg
 	if len(where) > 0 {
 		query += " WHERE " + strings.Join(where, " AND ")
 	}
-	if c.Limit > 0 {
+	if !c.All && c.Limit > 0 {
 		query += fmt.Sprintf(" LIMIT %d", c.Limit)
 	}
 

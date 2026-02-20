@@ -26,6 +26,7 @@ type (
 type GlobalFlags struct {
 	Query  string `short:"q" help:"Raw SQL query (overrides all query building)" group:"Query"`
 	Limit  int    `short:"L" default:"100" help:"Limit results per database" group:"Query"`
+	All    bool   `short:"a" help:"Return all results (no limit)" group:"Query"`
 	Offset int    `help:"Skip N results" group:"Query"`
 
 	// Dedupe profiles
@@ -46,6 +47,7 @@ type GlobalFlags struct {
 	Include      []string `short:"s" help:"Include paths matching pattern" group:"Filter"`
 	Exclude      []string `short:"E" help:"Exclude paths matching pattern" group:"Filter"`
 	Search       []string `help:"Search terms (space-separated for AND, | for OR)" group:"Filter"`
+	Category     string   `help:"Filter by category" group:"Filter"`
 	Regex        string   `help:"Filter paths by regex pattern" group:"Filter"`
 	PathContains []string `help:"Path must contain all these strings" group:"Filter"`
 

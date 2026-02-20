@@ -91,23 +91,24 @@ func (c *CategorizeCmd) applyCategories(media []models.MediaWithDB, compiled map
 		}
 
 		if len(foundCategories) > 0 {
-			newCategories := strings.Join(foundCategories, ";")
+			merged := make(map[string]bool)
 			if m.Categories != nil && *m.Categories != "" {
-				existing := strings.Split(*m.Categories, ";")
-				merged := make(map[string]bool)
-				for _, e := range existing {
-					merged[strings.TrimSpace(e)] = true
+				existing := strings.SplitSeq(strings.Trim(*m.Categories, ";"), ";")
+				for e := range existing {
+					if e != "" {
+						merged[strings.TrimSpace(e)] = true
+					}
 				}
-				for _, f := range foundCategories {
-					merged[f] = true
-				}
-				combined := []string{}
-				for k := range merged {
-					combined = append(combined, k)
-				}
-				sort.Strings(combined)
-				newCategories = strings.Join(combined, ";")
 			}
+			for _, f := range foundCategories {
+				merged[f] = true
+			}
+			combined := []string{}
+			for k := range merged {
+				combined = append(combined, k)
+			}
+			sort.Strings(combined)
+			newCategories := ";" + strings.Join(combined, ";") + ";"
 
 			if !c.Simulate {
 				sqlDB, err := db.Connect(m.DB)

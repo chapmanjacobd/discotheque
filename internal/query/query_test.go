@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/chapmanjacobd/discotheque/internal/models"
+	"github.com/chapmanjacobd/discotheque/internal/utils"
 	_ "github.com/mattn/go-sqlite3"
 )
 
@@ -42,7 +43,7 @@ func TestQueryBuilder_Build(t *testing.T) {
 		{
 			"Video Only",
 			models.GlobalFlags{VideoOnly: true, SortBy: "path", Limit: 100, HideDeleted: true},
-			"SELECT * FROM media WHERE COALESCE(time_deleted, 0) = 0 AND (path LIKE '%.mp4' OR path LIKE '%.mkv' OR path LIKE '%.avi' OR path LIKE '%.mov' OR path LIKE '%.webm') ORDER BY path ASC LIMIT 100",
+			"SELECT * FROM media WHERE COALESCE(time_deleted, 0) = 0 AND (" + utils.ExtensionsToLike(utils.VideoExtensions) + ") ORDER BY path ASC LIMIT 100",
 		},
 		{
 			"Reverse Sort",
@@ -142,6 +143,16 @@ func TestSortMedia(t *testing.T) {
 	SortMedia(media, models.GlobalFlags{SortBy: "size"})
 	if *media[0].Size != 100 {
 		t.Errorf("SortMedia by size failed, got %d", *media[0].Size)
+	}
+
+	// Test that SortBy is respected even when PlayInOrder is set to default
+	media = []models.MediaWithDB{
+		{Media: models.Media{Path: "a.mp4", Size: &size200}},
+		{Media: models.Media{Path: "b.mp4", Size: &size100}},
+	}
+	SortMedia(media, models.GlobalFlags{SortBy: "size", PlayInOrder: "natural_ps"})
+	if *media[0].Size != 100 {
+		t.Errorf("SortMedia by size with natural_ps failed, got %d", *media[0].Size)
 	}
 }
 

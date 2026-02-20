@@ -84,6 +84,7 @@ func (m *DUModel) updateList() {
 	tempFlags.Parents = false
 
 	stats := query.AggregateMedia(currentMedia, tempFlags)
+	query.SortFolders(stats, m.flags.SortBy, m.flags.Reverse)
 
 	items := make([]list.Item, len(stats))
 	maxSize := int64(0)

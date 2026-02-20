@@ -497,6 +497,10 @@ func (c *WatchCmd) Run(ctx *kong.Context) error {
 			}
 		}
 
+		if exitCode == 4 {
+			return nil
+		}
+
 		if err := RunExitCommand(c.GlobalFlags, exitCode, m.Path); err != nil {
 			slog.Error("Exit command failed", "code", exitCode, "error", err)
 		}
@@ -629,6 +633,11 @@ func (c *ListenCmd) Run(ctx *kong.Context) error {
 				exitCode = exitError.ExitCode()
 			}
 		}
+
+		if exitCode == 4 {
+			return nil
+		}
+
 		RunExitCommand(c.GlobalFlags, exitCode, m.Path)
 
 		if c.Interactive {
@@ -899,6 +908,7 @@ func (c *SearchCmd) Run(ctx *kong.Context) error {
 	}
 
 	media = query.FilterMedia(media, c.GlobalFlags)
+	query.SortMedia(media, c.GlobalFlags)
 
 	if c.JSON {
 		encoder := json.NewEncoder(os.Stdout)
