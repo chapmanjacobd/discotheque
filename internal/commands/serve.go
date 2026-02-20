@@ -26,6 +26,7 @@ type ServeCmd struct {
 	Port      int      `short:"p" default:"5555" help:"Port to listen on"`
 	PublicDir string   `help:"Override embedded web assets with local directory"`
 	Dev       bool     `help:"Enable development mode (auto-reload)"`
+	ApplicationStartTime int64    `kong:"-"`
 }
 
 func (c ServeCmd) IsQueryTrait()    {}
@@ -35,11 +36,13 @@ func (c ServeCmd) IsPlaybackTrait() {}
 
 func (c *ServeCmd) Run(ctx *kong.Context) error {
 	models.SetupLogging(c.Verbose)
+	c.ApplicationStartTime = time.Now().UnixNano()
 
 	http.HandleFunc("/api/databases", c.handleDatabases)
 	http.HandleFunc("/api/query", c.handleQuery)
 	http.HandleFunc("/api/play", c.handlePlay)
 	http.HandleFunc("/api/events", c.handleEvents)
+	http.HandleFunc("/api/raw", c.handleRaw)
 
 	// Serve static files
 	var handler http.Handler
@@ -163,14 +166,27 @@ func (c *ServeCmd) handleEvents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Fprintf(w, "data: ready\n\n")
-	flusher.Flush()
-
 	if c.Dev {
-		fmt.Fprintf(w, "data: reload\n\n")
+		fmt.Fprintf(w, "data: %d\n\n", c.ApplicationStartTime)
 		flusher.Flush()
 	}
 
 	// Keep connection open until client disconnects
 	<-r.Context().Done()
+}
+
+func (c *ServeCmd) handleRaw(w http.ResponseWriter, r *http.Request) {
+	path := r.URL.Query().Get("path")
+	if path == "" {
+		http.Error(w, "Path required", http.StatusBadRequest)
+		return
+	}
+
+	if !utils.FileExists(path) {
+		http.Error(w, "File not found", http.StatusNotFound)
+		return
+	}
+
+	// Range requests are handled by ServeFile
+	http.ServeFile(w, r, path)
 }
