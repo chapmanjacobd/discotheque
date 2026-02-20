@@ -597,6 +597,18 @@ func QueryDatabase(ctx context.Context, dbPath, query string, args []any) ([]mod
 				m.Description = sql.NullString{String: utils.GetString(values[i]), Valid: true}
 			case "language":
 				m.Language = sql.NullString{String: utils.GetString(values[i]), Valid: true}
+			case "video_codecs":
+				m.VideoCodecs = sql.NullString{String: utils.GetString(values[i]), Valid: true}
+			case "audio_codecs":
+				m.AudioCodecs = sql.NullString{String: utils.GetString(values[i]), Valid: true}
+			case "subtitle_codecs":
+				m.SubtitleCodecs = sql.NullString{String: utils.GetString(values[i]), Valid: true}
+			case "width":
+				m.Width = sql.NullInt64{Int64: utils.GetInt64(values[i]), Valid: true}
+			case "height":
+				m.Height = sql.NullInt64{Int64: utils.GetInt64(values[i]), Valid: true}
+			case "type":
+				m.Type = sql.NullString{String: utils.GetString(values[i]), Valid: true}
 			}
 		}
 

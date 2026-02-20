@@ -14,6 +14,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const pipPlayer = document.getElementById('pip-player');
     const pipViewer = document.getElementById('media-viewer');
     const pipTitle = document.getElementById('media-title');
+    const lyricsDisplay = document.getElementById('lyrics-display');
 
     let currentMedia = [];
     let allDatabases = [];
@@ -27,6 +28,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- State Management ---
     const state = {
         view: 'grid',
+        page: 'search', // 'search' or 'trash'
         filters: {
             types: ['video', 'audio'], // Default selection
             search: '',
@@ -40,13 +42,16 @@ document.addEventListener('DOMContentLoaded', () => {
         applicationStartTime: null,
         player: localStorage.getItem('disco-player') || 'browser',
         language: localStorage.getItem('disco-language') || '',
-        theme: localStorage.getItem('disco-theme') || 'auto'
+        theme: localStorage.getItem('disco-theme') || 'auto',
+        postPlaybackAction: localStorage.getItem('disco-post-playback') || 'nothing',
+        trashcan: false
     };
 
     // Initialize UI from state
     document.getElementById('setting-player').value = state.player;
     document.getElementById('setting-language').value = state.language;
     document.getElementById('setting-theme').value = state.theme;
+    document.getElementById('setting-post-playback').value = state.postPlaybackAction;
     if (limitInput) limitInput.value = state.filters.limit;
     if (limitAll) limitAll.checked = state.filters.all;
 
@@ -64,14 +69,21 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const resp = await fetch('/api/databases');
             if (!resp.ok) throw new Error('Offline');
-            allDatabases = await resp.json();
+            const data = await resp.json();
+            allDatabases = data.databases;
+            state.trashcan = data.trashcan;
+            
             renderDbSettingsList(allDatabases);
+            if (state.trashcan) {
+                document.getElementById('trash-section').classList.remove('hidden');
+            }
         } catch (err) {
             console.error('Failed to fetch databases', err);
         }
     }
 
     async function performSearch() {
+        state.page = 'search';
         if (searchAbortController) {
             searchAbortController.abort();
         }
@@ -128,6 +140,88 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    async function fetchTrash() {
+        state.page = 'trash';
+        try {
+            const resp = await fetch('/api/trash');
+            if (!resp.ok) throw new Error('Failed to fetch trash');
+            currentMedia = await resp.json();
+            renderResults();
+        } catch (err) {
+            console.error('Trash fetch failed:', err);
+            showToast('Failed to load trash');
+        }
+    }
+
+    async function emptyBin() {
+        if (!confirm('Are you sure you want to permanently delete all files in the trash?')) return;
+        
+        try {
+            const resp = await fetch('/api/empty-bin', { method: 'POST' });
+            if (!resp.ok) throw new Error('Failed to empty bin');
+            const msg = await resp.text();
+            showToast(msg);
+            fetchTrash();
+        } catch (err) {
+            console.error('Empty bin failed:', err);
+            showToast('Failed to empty bin');
+        }
+    }
+
+    async function deleteMedia(path, restore = false) {
+        const card = document.querySelector(`.media-card[data-path="${CSS.escape(path)}"]`);
+        const content = document.querySelector('.content');
+        const main = document.querySelector('main');
+        
+        if (card && !restore) {
+            // Randomize zip direction
+            const angle = Math.random() * Math.PI * 2;
+            const dist = 2000;
+            const x = Math.cos(angle) * dist;
+            const y = Math.sin(angle) * dist;
+            const rotate = (Math.random() * 180) - 90; // -90 to 90
+            const tilt = (Math.random() * 10) - 5; // -5 to 5 for anticipation
+
+            card.style.setProperty('--zip-x', `${x}px`);
+            card.style.setProperty('--zip-y', `${y}px`);
+            card.style.setProperty('--zip-rotate', `${rotate}deg`);
+            card.style.setProperty('--zip-tilt', `${tilt}deg`);
+            
+            // Disable overflow clipping so it can fly over sidebar/header
+            if (content) content.style.overflow = 'visible';
+            if (main) main.style.overflow = 'visible';
+            card.classList.add('poof');
+
+            // Wait for animation (matched to 0.2s in CSS)
+            await new Promise(r => setTimeout(r, 200));
+        }
+
+        try {
+            const resp = await fetch('/api/delete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ path, restore })
+            });
+
+            if (!resp.ok) throw new Error('Action failed');
+            
+            showToast(restore ? 'Item restored' : 'Item moved to trash');
+            
+            if (state.page === 'trash') {
+                fetchTrash();
+            } else {
+                performSearch();
+            }
+        } catch (err) {
+            console.error('Delete/Restore failed:', err);
+            showToast('Action failed');
+            if (card) card.classList.remove('poof');
+        } finally {
+            if (content) content.style.overflow = '';
+            if (main) main.style.overflow = '';
+        }
+    }
+
     async function playMedia(item) {
         if (state.player === 'browser') {
             openInPiP(item);
@@ -161,6 +255,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const type = item.type || "";
         pipTitle.textContent = path.split('/').pop();
         pipViewer.innerHTML = '';
+        lyricsDisplay.classList.add('hidden');
+        lyricsDisplay.textContent = '';
+        
         pipPlayer.classList.remove('hidden');
         pipPlayer.classList.remove('minimized');
 
@@ -173,24 +270,83 @@ document.addEventListener('DOMContentLoaded', () => {
             el.autoplay = true;
             el.src = url;
 
-            // Add subtitle tracks
+            el.onended = () => handlePostPlayback(item);
+
+            const addTrack = (trackUrl, label, index) => {
+                const track = document.createElement('track');
+                track.kind = 'subtitles';
+                track.label = label;
+                track.srclang = state.language || 'en';
+                track.src = trackUrl;
+                
+                track.onload = () => {
+                    // Try to auto-enable
+                    if (el.textTracks.length <= 1) {
+                        track.track.mode = 'showing';
+                    } else {
+                        // If we have a language preference and this matches, switch to it
+                        if (state.language && label.toLowerCase().includes(state.language.toLowerCase())) {
+                            for (let i = 0; i < el.textTracks.length; i++) {
+                                el.textTracks[i].mode = 'disabled';
+                            }
+                            track.track.mode = 'showing';
+                        }
+                    }
+                };
+
+                el.appendChild(track);
+                // Hint to browser to load it
+                if (el.textTracks.length <= 1) track.default = true;
+                
+                return track;
+            };
+
+            // 1. Add embedded tracks from metadata
             if (item.subtitle_codecs) {
                 const codecs = item.subtitle_codecs.split(';');
                 codecs.forEach((codec, index) => {
-                    const track = document.createElement('track');
-                    track.kind = 'subtitles';
-                    track.label = codec || `Track ${index + 1}`;
-                    track.srclang = state.language || 'en';
-                    track.src = `/api/subtitles?path=${encodeURIComponent(path)}&index=${index}`;
-                    if (index === 0) track.default = true;
-                    el.appendChild(track);
+                    const isExt = codec.startsWith('.');
+                    const label = isExt ? `External (${codec})` : (codec || `Embedded #${index + 1}`);
+                    const trackUrl = isExt ? 
+                        `/api/subtitles?path=${encodeURIComponent(item.path.substring(0, item.path.lastIndexOf('.')) + codec)}` :
+                        `/api/subtitles?path=${encodeURIComponent(path)}&index=${index}`;
+                    
+                    addTrack(trackUrl, label, index);
                 });
             }
+
+            // 2. Always check for external subtitle file (sibling with same name)
+            addTrack(`/api/subtitles?path=${encodeURIComponent(path)}`, 'External/Auto', 'auto');
+
         } else if (type.includes('audio')) {
             el = document.createElement('audio');
             el.controls = true;
             el.autoplay = true;
             el.src = url;
+
+            el.onended = () => handlePostPlayback(item);
+
+            // Try to fetch lyrics (server will look for siblings)
+            const track = document.createElement('track');
+            track.kind = 'subtitles';
+            track.src = `/api/subtitles?path=${encodeURIComponent(path)}`;
+            track.srclang = state.language || 'en';
+            el.appendChild(track);
+            
+            track.onload = () => {
+                const textTrack = el.textTracks[0];
+                if (textTrack.cues && textTrack.cues.length > 0) {
+                    lyricsDisplay.classList.remove('hidden');
+                    textTrack.mode = 'hidden';
+                    
+                    el.ontimeupdate = () => {
+                        const cue = Array.from(textTrack.activeCues || []).pop();
+                        if (cue) {
+                            lyricsDisplay.textContent = cue.text;
+                        }
+                    };
+                }
+            };
         } else if (type.includes('image')) {
             el = document.createElement('img');
             el.src = url;
@@ -228,15 +384,22 @@ document.addEventListener('DOMContentLoaded', () => {
             media.src = "";
         }
         pipViewer.innerHTML = '';
+        lyricsDisplay.classList.add('hidden');
+        lyricsDisplay.textContent = '';
         pipPlayer.classList.add('hidden');
     }
 
     // --- Rendering ---
     function renderResults() {
-        if (state.filters.all || currentMedia.length < state.filters.limit) {
-            resultsCount.textContent = `${currentMedia.length} files found`;
+        if (state.page === 'trash') {
+            resultsCount.innerHTML = `<span>${currentMedia.length} files in trash</span> <button id="empty-bin-btn" class="category-btn" style="margin-left: 1rem; background: #e74c3c; color: white;">Empty Bin</button>`;
+            document.getElementById('empty-bin-btn').onclick = emptyBin;
         } else {
-            resultsCount.textContent = '';
+            if (state.filters.all || currentMedia.length < state.filters.limit) {
+                resultsCount.textContent = `${currentMedia.length} files found`;
+            } else {
+                resultsCount.textContent = '';
+            }
         }
 
         resultsContainer.innerHTML = '';
@@ -249,18 +412,25 @@ document.addEventListener('DOMContentLoaded', () => {
         currentMedia.forEach(item => {
             const card = document.createElement('div');
             card.className = 'media-card';
+            card.dataset.path = item.path;
             card.onclick = () => playMedia(item);
 
             const title = item.title || item.path.split('/').pop();
             const size = formatSize(item.size);
             const duration = formatDuration(item.duration);
             const thumbUrl = `/api/thumbnail?path=${encodeURIComponent(item.path)}`;
+            
+            const isTrash = state.page === 'trash';
+            const actionBtn = isTrash ? 
+                `<button class="media-action-btn restore" title="Restore">↺</button>` :
+                `<button class="media-action-btn delete" title="Move to Trash">🗑️</button>`;
 
             card.innerHTML = `
                 <div class="media-thumb">
                     <img src="${thumbUrl}" loading="lazy" onload="this.classList.add('loaded')" onerror="this.style.display='none'; this.nextElementSibling.style.display='block'">
                     <i style="display: none">${getIcon(item.type)}</i>
                     ${duration ? `<span class="media-duration">${duration}</span>` : ''}
+                    ${actionBtn}
                 </div>
                 <div class="media-info">
                     <div class="media-title" title="${item.path}">${title}</div>
@@ -270,6 +440,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
                 </div>
             `;
+
+            const btn = card.querySelector('.media-action-btn');
+            btn.onclick = (e) => {
+                e.stopPropagation();
+                deleteMedia(item.path, isTrash);
+            };
+
             resultsContainer.appendChild(card);
         });
     }
@@ -314,6 +491,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 state.filters.category = cat;
                 
                 categoryList.querySelectorAll('.category-btn').forEach(b => b.classList.remove('active'));
+                if (trashBtn) trashBtn.classList.remove('active');
                 e.target.classList.add('active');
                 
                 performSearch();
@@ -389,6 +567,21 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
+    function handlePostPlayback(item) {
+        if (state.postPlaybackAction === 'delete') {
+            deleteMedia(item.path);
+        } else if (state.postPlaybackAction === 'ask') {
+            openModal('confirm-modal');
+            document.getElementById('confirm-yes').onclick = () => {
+                closeModal('confirm-modal');
+                deleteMedia(item.path);
+            };
+            document.getElementById('confirm-no').onclick = () => {
+                closeModal('confirm-modal');
+            };
+        }
+    }
+
     function applyTheme() {
         if (state.theme === 'auto') {
             document.documentElement.removeAttribute('data-theme');
@@ -435,6 +628,14 @@ document.addEventListener('DOMContentLoaded', () => {
     if (settingLanguage) settingLanguage.oninput = (e) => {
         state.language = e.target.value;
         localStorage.setItem('disco-language', state.language);
+        
+        // Update current tracks
+        const media = pipViewer.querySelector('video, audio');
+        if (media) {
+            for (let i = 0; i < media.textTracks.length; i++) {
+                media.textTracks[i].srclang = state.language;
+            }
+        }
     };
 
     const settingTheme = document.getElementById('setting-theme');
@@ -442,6 +643,12 @@ document.addEventListener('DOMContentLoaded', () => {
         state.theme = e.target.value;
         localStorage.setItem('disco-theme', state.theme);
         applyTheme();
+    };
+
+    const settingPostPlayback = document.getElementById('setting-post-playback');
+    if (settingPostPlayback) settingPostPlayback.onchange = (e) => {
+        state.postPlaybackAction = e.target.value;
+        localStorage.setItem('disco-post-playback', state.postPlaybackAction);
     };
 
     // Close modal on outside click
@@ -454,6 +661,16 @@ document.addEventListener('DOMContentLoaded', () => {
     if (searchInput) {
         searchInput.oninput = debouncedSearch;
         searchInput.onkeypress = (e) => { if (e.key === 'Enter') performSearch(); };
+    }
+
+    const trashBtn = document.getElementById('trash-btn');
+    if (trashBtn) {
+        trashBtn.onclick = () => {
+            // Remove active from other categories
+            categoryList.querySelectorAll('.category-btn').forEach(b => b.classList.remove('active'));
+            trashBtn.classList.add('active');
+            fetchTrash();
+        };
     }
 
     // Toolbar logic

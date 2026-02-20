@@ -340,7 +340,7 @@ func GetExternalSubtitles(path string) []string {
 	base := strings.TrimSuffix(path, ext)
 
 	var subs []string
-	subExts := []string{".srt", ".vtt", ".ass", ".ssa"}
+	subExts := []string{".srt", ".vtt", ".ass", ".ssa", ".lrc", ".idx", ".sub"}
 
 	for _, sExt := range subExts {
 		subPath := base + sExt

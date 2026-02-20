@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
@@ -28,6 +29,7 @@ type ServeCmd struct {
 	Port                 int      `short:"p" default:"5555" help:"Port to listen on"`
 	PublicDir            string   `help:"Override embedded web assets with local directory"`
 	Dev                  bool     `help:"Enable development mode (auto-reload)"`
+	Trashcan             bool     `help:"Enable trash/recycle page and empty bin functionality"`
 	ApplicationStartTime int64    `kong:"-"`
 	thumbnailCache       sync.Map `kong:"-"`
 }
@@ -48,10 +50,16 @@ func (c *ServeCmd) Run(ctx *kong.Context) error {
 	http.HandleFunc("/api/databases", c.handleDatabases)
 	http.HandleFunc("/api/query", c.handleQuery)
 	http.HandleFunc("/api/play", c.handlePlay)
+	http.HandleFunc("/api/delete", c.handleDelete)
 	http.HandleFunc("/api/events", c.handleEvents)
 	http.HandleFunc("/api/raw", c.handleRaw)
 	http.HandleFunc("/api/subtitles", c.handleSubtitles)
 	http.HandleFunc("/api/thumbnail", c.handleThumbnail)
+
+	if c.Trashcan {
+		http.HandleFunc("/api/trash", c.handleTrash)
+		http.HandleFunc("/api/empty-bin", c.handleEmptyBin)
+	}
 
 	// Serve static files
 	var handler http.Handler
@@ -70,7 +78,14 @@ func (c *ServeCmd) Run(ctx *kong.Context) error {
 
 func (c *ServeCmd) handleDatabases(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(c.Databases)
+	resp := struct {
+		Databases []string `json:"databases"`
+		Trashcan  bool     `json:"trashcan"`
+	}{
+		Databases: c.Databases,
+		Trashcan:  c.Trashcan,
+	}
+	json.NewEncoder(w).Encode(resp)
 }
 
 func (c *ServeCmd) handleQuery(w http.ResponseWriter, r *http.Request) {
@@ -171,6 +186,45 @@ func (c *ServeCmd) handlePlay(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+func (c *ServeCmd) handleDelete(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		Path    string `json:"path"`
+		Restore bool   `json:"restore"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	var deleteTime int64 = 0
+	if !req.Restore {
+		deleteTime = time.Now().Unix()
+	}
+
+	for _, dbPath := range c.Databases {
+		sqlDB, err := database.Connect(dbPath)
+		if err != nil {
+			continue
+		}
+		queries := database.New(sqlDB)
+		err = queries.MarkDeleted(r.Context(), database.MarkDeletedParams{
+			Path:        req.Path,
+			TimeDeleted: sql.NullInt64{Int64: deleteTime, Valid: !req.Restore},
+		})
+		sqlDB.Close()
+		if err == nil {
+			break
+		}
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
 func (c *ServeCmd) handleEvents(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
@@ -198,6 +252,8 @@ func (c *ServeCmd) handleRaw(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	slog.Debug("handleRaw request", "path", path)
+
 	var m models.Media
 	found := false
 	for _, dbPath := range c.Databases {
@@ -216,24 +272,31 @@ func (c *ServeCmd) handleRaw(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !found {
+		slog.Warn("Access denied: file not in database", "path", path)
 		http.Error(w, "Access denied: file not in database", http.StatusForbidden)
 		return
 	}
 
 	if !utils.FileExists(path) {
+		slog.Warn("File not found on disk", "path", path)
 		http.Error(w, "File not found", http.StatusNotFound)
 		return
 	}
 
 	strategy := c.getTranscodeStrategy(m)
+	slog.Info("Transcode strategy determined", "path", path, "needsTranscode", strategy.needsTranscode, "videoCopy", strategy.videoCopy, "audioCopy", strategy.audioCopy, "targetMime", strategy.targetMime)
+
 	if strategy.needsTranscode {
 		if _, err := exec.LookPath("ffmpeg"); err == nil {
-			c.handleTranscode(w, r, path, strategy)
+			c.handleTranscode(w, r, path, m, strategy)
 			return
+		} else {
+			slog.Error("ffmpeg not found in PATH, skipping transcoding", "path", path)
 		}
 	}
 
 	// Range requests are handled by ServeFile
+	slog.Debug("Serving raw file (no transcode)", "path", path)
 	http.ServeFile(w, r, path)
 }
 
@@ -258,9 +321,26 @@ func (c *ServeCmd) getTranscodeStrategy(m models.Media) transcodeStrategy {
 	}
 
 	isSupportedAudioCodec := func(codec string) bool {
+		if codec == "" {
+			return false
+		}
 		codec = strings.ToLower(codec)
-		// flac and wav are supported by most modern browsers
-		return strings.Contains(codec, "aac") || strings.Contains(codec, "mp3") || strings.Contains(codec, "opus") || strings.Contains(codec, "vorbis") || strings.Contains(codec, "flac") || strings.Contains(codec, "pcm")
+		// If it contains any incompatible codec, return false
+		incompatible := []string{"eac3", "ac3", "dts", "truehd", "mlp"}
+		for _, inc := range incompatible {
+			if strings.Contains(codec, inc) {
+				return false
+			}
+		}
+
+		// It must contain at least one supported codec
+		supported := []string{"aac", "mp3", "opus", "vorbis", "flac", "pcm", "wav"}
+		for _, sup := range supported {
+			if strings.Contains(codec, sup) {
+				return true
+			}
+		}
+		return false
 	}
 
 	vCodecs := ""
@@ -271,32 +351,62 @@ func (c *ServeCmd) getTranscodeStrategy(m models.Media) transcodeStrategy {
 	if m.AudioCodecs != nil {
 		aCodecs = *m.AudioCodecs
 	}
-
-	mime := ""
-	if m.Type != nil {
-		mime = *m.Type
+	sCodecs := ""
+	if m.SubtitleCodecs != nil {
+		sCodecs = *m.SubtitleCodecs
 	}
 
-	if strings.HasPrefix(mime, "image/") {
+	mime := ""
+	if m.Type != nil && *m.Type != "" {
+		mime = *m.Type
+	} else {
+		mime = utils.DetectMimeType(m.Path)
+	}
+
+	slog.Debug("Analyzing codecs for transcode", "path", m.Path, "vCodecs", vCodecs, "aCodecs", aCodecs, "sCodecs", sCodecs, "mime", mime, "ext", ext)
+
+	if strings.HasPrefix(mime, "image") {
 		return transcodeStrategy{needsTranscode: false}
 	}
 
-	if strings.HasPrefix(mime, "video/") {
+	if strings.HasPrefix(mime, "video") {
 		vNeeds := !isSupportedVideoCodec(vCodecs)
 		aNeeds := !isSupportedAudioCodec(aCodecs)
-		// Even if codecs are supported, some containers (like MKV) might need remuxing to MP4 for browser compatibility
-		needsRemux := ext != ".mp4" && ext != ".webm" && ext != ".m4v"
 
-		if vNeeds || aNeeds || needsRemux {
+		// Prefer WebM for VP9/VP8/AV1/Opus/Vorbis
+		preferWebm := strings.Contains(strings.ToLower(vCodecs), "vp9") || strings.Contains(strings.ToLower(vCodecs), "vp8") || strings.Contains(strings.ToLower(vCodecs), "av1") ||
+			strings.Contains(strings.ToLower(aCodecs), "opus") || strings.Contains(strings.ToLower(aCodecs), "vorbis")
+
+		targetMime := "video/mp4"
+		if preferWebm {
+			targetMime = "video/webm"
+		}
+
+		// Check if container already matches the target mime type
+		containerMatches := false
+		if targetMime == "video/mp4" {
+			// Most browsers support H264/AAC in MKV or MOV as well, but we'll be slightly conservative
+			if ext == ".mp4" || ext == ".m4v" || ext == ".mov" || ext == ".mkv" {
+				containerMatches = true
+			}
+		} else if targetMime == "video/webm" {
+			if ext == ".webm" || ext == ".mkv" {
+				containerMatches = true
+			}
+		}
+
+		slog.Debug("Transcode decision details", "vNeeds", vNeeds, "aNeeds", aNeeds, "preferWebm", preferWebm, "containerMatches", containerMatches, "targetMime", targetMime)
+
+		if vNeeds || aNeeds || !containerMatches {
 			return transcodeStrategy{
 				needsTranscode: true,
 				videoCopy:      !vNeeds,
 				audioCopy:      !aNeeds,
-				targetMime:     "video/mp4",
+				targetMime:     targetMime,
 			}
 		}
-	} else if strings.HasPrefix(mime, "audio/") {
-		if !isSupportedAudioCodec(aCodecs) || (ext != ".mp3" && ext != ".m4a" && ext != ".ogg" && ext != ".flac" && ext != ".wav") {
+	} else if strings.HasPrefix(mime, "audio") {
+		if !isSupportedAudioCodec(aCodecs) || (ext != ".mp3" && ext != ".m4a" && ext != ".ogg" && ext != ".flac" && ext != ".wav" && ext != ".opus") {
 			return transcodeStrategy{
 				needsTranscode: true,
 				audioCopy:      isSupportedAudioCodec(aCodecs),
@@ -308,39 +418,57 @@ func (c *ServeCmd) getTranscodeStrategy(m models.Media) transcodeStrategy {
 	return transcodeStrategy{needsTranscode: false}
 }
 
-func (c *ServeCmd) handleTranscode(w http.ResponseWriter, r *http.Request, path string, strategy transcodeStrategy) {
+func (c *ServeCmd) handleTranscode(w http.ResponseWriter, r *http.Request, path string, m models.Media, strategy transcodeStrategy) {
 	w.Header().Set("Content-Type", strategy.targetMime)
+	w.Header().Set("Accept-Ranges", "bytes")
 
+	// Add flags to help with piped streaming duration and timestamp issues
 	var args []string
-	if strings.HasPrefix(strategy.targetMime, "video/") {
-		args = []string{"-i", path}
 
-		if strategy.videoCopy {
-			args = append(args, "-c:v", "copy")
-		} else {
-			args = append(args, "-c:v", "libx264", "-preset", "ultrafast", "-tune", "zerolatency", "-crf", "28")
-		}
+	args = append(args, "-fflags", "+genpts", "-i", path)
 
-		if strategy.audioCopy {
-			args = append(args, "-c:a", "copy")
-		} else {
-			args = append(args, "-c:a", "aac", "-b:a", "128k")
-		}
+	// If we have duration in metadata, tell ffmpeg so it can write it to headers
+	if m.Duration != nil && *m.Duration > 0 {
+		args = append(args, "-t", fmt.Sprintf("%d", *m.Duration))
+	}
 
-		args = append(args, "-f", "mp4", "-movflags", "frag_keyframe+empty_moov", "pipe:1")
+	if strategy.videoCopy {
+		args = append(args, "-c:v", "copy")
 	} else {
-		// Audio only
-		args = []string{"-i", path}
-		if strategy.audioCopy {
-			args = append(args, "-c:a", "copy")
+		if strategy.targetMime == "video/mp4" {
+			args = append(args, "-c:v", "libx264", "-preset", "ultrafast", "-tune", "zerolatency", "-crf", "28")
 		} else {
-			args = append(args, "-c:a", "libmp3lame", "-q:a", "2")
+			// WebM
+			args = append(args, "-c:v", "libvpx-vp9", "-deadline", "realtime", "-cpu-used", "8", "-crf", "30", "-b:v", "0")
 		}
-		args = append(args, "-f", "mp3", "pipe:1")
+	}
+
+	if strategy.audioCopy {
+		args = append(args, "-c:a", "copy")
+	} else {
+		if strategy.targetMime == "video/mp4" {
+			args = append(args, "-c:a", "aac", "-b:a", "128k", "-ac", "2")
+		} else {
+			// WebM supports Opus
+			args = append(args, "-c:a", "libopus", "-b:a", "128k", "-ac", "2")
+		}
+	}
+
+	args = append(args, "-avoid_negative_ts", "make_zero", "-map_metadata", "-1", "-sn")
+
+	if strategy.targetMime == "video/mp4" {
+		// frag_keyframe+empty_moov+default_base_moof+global_sidx is the standard for fragmented streaming
+		args = append(args, "-f", "mp4", "-movflags", "frag_keyframe+empty_moov+default_base_moof+global_sidx", "pipe:1")
+	} else {
+		// Matroska with index space reserved and cluster limits can help browsers determine duration
+		args = append(args, "-f", "matroska", "-live", "1", "-reserve_index_space", "1024k", "-cluster_size_limit", "2M", "-cluster_time_limit", "5100", "pipe:1")
 	}
 
 	slog.Info("Streaming with transcode/remux", "path", path, "strategy", strategy)
-	cmd := exec.CommandContext(r.Context(), "ffmpeg", append([]string{"-hide_banner", "-loglevel", "error"}, args...)...)
+	ffmpegArgs := append([]string{"-hide_banner", "-loglevel", "error"}, args...)
+	slog.Debug("ffmpeg command", "args", strings.Join(ffmpegArgs, " "))
+
+	cmd := exec.CommandContext(r.Context(), "ffmpeg", ffmpegArgs...)
 	cmd.Stdout = w
 
 	if err := cmd.Start(); err != nil {
@@ -365,8 +493,9 @@ func (c *ServeCmd) handleSubtitles(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// For subtitles, the path could be the media file (for embedded subs) or a separate srt/vtt file
-	// Verification logic...
+	slog.Debug("handleSubtitles request", "path", path, "index", r.URL.Query().Get("index"))
+
+	// Verify path or siblings
 	found := false
 	for _, dbPath := range c.Databases {
 		sqlDB, err := database.Connect(dbPath)
@@ -374,21 +503,32 @@ func (c *ServeCmd) handleSubtitles(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		queries := database.New(sqlDB)
-		// If it's a direct srt/vtt file, its parent media should be in DB
-		// This is a bit simplified; ideally we check if it's a known sibling
 		_, err = queries.GetMediaByPathExact(r.Context(), path)
 		if err == nil {
 			found = true
 			sqlDB.Close()
 			break
 		}
-		// Check if it's a sibling of any media
+
+		// If path doesn't exist, it might be an external subtitle file next to a media file
+		// We'll check if any media in the database shares the same directory and base name
 		dir := filepath.Dir(path)
-		mediaInDir, _ := queries.GetMedia(r.Context(), 1000) // just a sample
+		filename := filepath.Base(path)
+		base := strings.TrimSuffix(filename, filepath.Ext(filename))
+		// Handle cases like movie.en.srt by stripping one more extension if it exists
+		if secondExt := filepath.Ext(base); secondExt != "" {
+			base = strings.TrimSuffix(base, secondExt)
+		}
+
+		// Simple check: does this directory contain ANY media we know with the same base name?
+		mediaInDir, _ := queries.GetMedia(r.Context(), 1000)
 		for _, m := range mediaInDir {
 			if filepath.Dir(m.Path) == dir {
-				found = true
-				break
+				mBase := strings.TrimSuffix(filepath.Base(m.Path), filepath.Ext(m.Path))
+				if mBase == base {
+					found = true
+					break
+				}
 			}
 		}
 		sqlDB.Close()
@@ -403,6 +543,23 @@ func (c *ServeCmd) handleSubtitles(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ext := strings.ToLower(filepath.Ext(path))
+	streamIndex := r.URL.Query().Get("index")
+
+	// If it's a media container but no index is specified, we should try to find an external sidecar
+	if streamIndex == "" && (ext == ".mkv" || ext == ".mp4" || ext == ".m4v" || ext == ".mov" || ext == ".webm") {
+		// Try to find a sibling subtitle file
+		sidecars := utils.GetExternalSubtitles(path)
+		if len(sidecars) > 0 {
+			// Serve the first found sidecar
+			path = sidecars[0]
+			ext = strings.ToLower(filepath.Ext(path))
+			slog.Debug("Found sidecar for media file", "media", r.URL.Query().Get("path"), "sidecar", path)
+		} else {
+			http.Error(w, "No index specified and no sidecar found", http.StatusNotFound)
+			return
+		}
+	}
+
 	if ext == ".vtt" {
 		w.Header().Set("Content-Type", "text/vtt")
 		http.ServeFile(w, r, path)
@@ -411,20 +568,27 @@ func (c *ServeCmd) handleSubtitles(w http.ResponseWriter, r *http.Request) {
 
 	// Convert to VTT using ffmpeg
 	w.Header().Set("Content-Type", "text/vtt")
-	
-	streamIndex := r.URL.Query().Get("index")
+
 	var args []string
 	if streamIndex != "" {
 		// Use -map to select the specific subtitle stream from the media file
 		args = []string{"-i", path, "-map", "0:s:" + streamIndex, "-f", "webvtt", "pipe:1"}
 	} else {
+		// Standalone file (srt, lrc, ass, idx, etc.)
 		args = []string{"-i", path, "-f", "webvtt", "pipe:1"}
 	}
-	
-	cmd := exec.CommandContext(r.Context(), "ffmpeg", append([]string{"-hide_banner", "-loglevel", "error"}, args...)...)
+
+	ffmpegArgs := append([]string{"-hide_banner", "-loglevel", "error"}, args...)
+	slog.Debug("subtitle ffmpeg command", "args", strings.Join(ffmpegArgs, " "))
+
+	cmd := exec.CommandContext(r.Context(), "ffmpeg", ffmpegArgs...)
 	cmd.Stdout = w
 	if err := cmd.Run(); err != nil {
-		slog.Error("Failed to convert subtitles", "path", path, "error", err)
+		if r.Context().Err() == nil {
+			slog.Error("Failed to convert subtitles", "path", path, "error", err)
+		} else {
+			slog.Debug("Subtitle conversion interrupted (client disconnect)", "path", path)
+		}
 	}
 }
 
@@ -493,4 +657,67 @@ func (c *ServeCmd) handleThumbnail(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "image/jpeg")
 	w.Header().Set("Cache-Control", "public, max-age=31536000")
 	w.Write(thumb)
+}
+
+func (c *ServeCmd) handleTrash(w http.ResponseWriter, r *http.Request) {
+	flags := c.GlobalFlags
+	flags.OnlyDeleted = true
+	flags.HideDeleted = false
+	flags.All = true
+
+	media, err := query.MediaQuery(context.Background(), c.Databases, flags)
+	if err != nil {
+		slog.Error("Trash query failed", "error", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(media)
+}
+
+func (c *ServeCmd) handleEmptyBin(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	flags := c.GlobalFlags
+	flags.OnlyDeleted = true
+	flags.HideDeleted = false
+	flags.All = true
+
+	media, err := query.MediaQuery(context.Background(), c.Databases, flags)
+	if err != nil {
+		slog.Error("Trash query failed", "error", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	count := 0
+	for _, m := range media {
+		if utils.FileExists(m.Path) {
+			if err := os.Remove(m.Path); err != nil {
+				slog.Error("Failed to delete file", "path", m.Path, "error", err)
+				continue
+			}
+		}
+
+		// Remove from DB
+		for _, dbPath := range c.Databases {
+			sqlDB, err := database.Connect(dbPath)
+			if err != nil {
+				continue
+			}
+			_, err = sqlDB.Exec("DELETE FROM media WHERE path = ?", m.Path)
+			sqlDB.Close()
+			if err == nil {
+				count++
+				break
+			}
+		}
+	}
+
+	slog.Info("Bin emptied", "files_removed", count)
+	fmt.Fprintf(w, "Deleted %d files", count)
 }

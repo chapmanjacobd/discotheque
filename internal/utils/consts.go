@@ -103,7 +103,7 @@ func ExtensionsToLike(exts []string) string {
 }
 
 var SubtitleExtensions = []string{
-	"srt", "vtt", "mks", "ass", "ssa",
+	"srt", "vtt", "mks", "ass", "ssa", "lrc", "idx", "sub",
 }
 
 var ArchiveExtensions = []string{

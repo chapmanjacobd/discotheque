@@ -1,14 +1,20 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Discotheque</title>
+    <title>𝐷𝑖𝑠𝑐𝑜𝑡ℎ𝑒𝑞𝑢𝑒</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
     <header>
-        <div class="logo">Discotheque</div>
+        <div class="logo">
+            <span class="disco-ball">🪩</span>
+            <span class="logo-text">Disco<span class="logo-suffix">theque</span></span>
+        </div>
         <div class="search-container">
             <span class="search-icon">🔍</span>
             <input type="text" id="search-input" placeholder="Search media...">
@@ -24,6 +30,13 @@
                 <h3>Categories</h3>
                 <div id="category-list">
                     <!-- Categories will be injected here -->
+                </div>
+            </section>
+
+            <section id="trash-section" class="hidden">
+                <h3>Maintenance</h3>
+                <div id="maintenance-list">
+                    <button id="trash-btn" class="category-btn">🗑️ Trash</button>
                 </div>
             </section>
         </aside>
@@ -65,58 +78,84 @@
     </main>
 
     <!-- Settings Modal -->
-    <div id="settings-modal" class="modal hidden">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>Settings</h2>
-                <button class="close-modal">&times;</button>
-            </div>
-            <div class="modal-body">
-                <section>
-                    <h3>Playback</h3>
-                    <div class="setting-item">
-                        <label for="setting-player">Default Player:</label>
-                        <select id="setting-player">
-                            <option value="browser">Browser (Internal)</option>
-                            <option value="system">System (mpv)</option>
-                        </select>
-                    </div>
-                    <div class="setting-item">
-                        <label for="setting-language">Preferred Language:</label>
-                        <input type="text" id="setting-language" placeholder="e.g. eng, spa, jp" value="">
-                    </div>
-                    <div class="setting-item">
-                        <label for="setting-theme">Theme:</label>
-                        <select id="setting-theme">
-                            <option value="auto">Auto (Browser)</option>
-                            <option value="light">Light</option>
-                            <option value="dark">Dark</option>
-                        </select>
-                    </div>
-                </section>
-
-                <section>
-                    <h3>Search</h3>
-                    <div class="setting-item">
-                        <label for="limit">Result Limit:</label>
-                        <div style="display: flex; gap: 10px; align-items: center;">
-                            <input type="number" id="limit" value="100" min="1">
-                            <label style="font-size: 0.8rem; display: flex; align-items: center; gap: 4px; white-space: nowrap; cursor: pointer;">
-                                <input type="checkbox" id="limit-all"> All
-                            </label>
+        <div id="settings-modal" class="modal hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Settings</h2>
+                    <button class="close-modal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <section>
+                        <h3>Playback</h3>
+                        <div class="setting-item">
+                            <label for="setting-player">Default Player:</label>
+                            <select id="setting-player">
+                                <option value="browser">Browser (Internal)</option>
+                                <option value="system">System (mpv)</option>
+                            </select>
                         </div>
-                    </div>
-                </section>
+                        <div class="setting-item">
+                            <label for="setting-language">Preferred Language:</label>
+                            <input type="text" id="setting-language" placeholder="e.g. eng, spa, jp" value="">
+                        </div>
+                        <div class="setting-item">
+                            <label for="setting-theme">Theme:</label>
+                            <select id="setting-theme">
+                                <option value="auto">Auto (Browser)</option>
+                                <option value="light">Light</option>
+                                <option value="dark">Dark</option>
+                            </select>
+                        </div>
+                        <div class="setting-item">
+                            <label for="setting-post-playback">After Playback:</label>
+                            <select id="setting-post-playback">
+                                <option value="nothing">Do nothing</option>
+                                <option value="delete">Delete file</option>
+                                <option value="ask">Ask to delete</option>
+                            </select>
+                        </div>
+                    </section>
 
-                <section id="db-settings">
-                    <h3>Databases</h3>
-                    <div id="db-checkbox-list">
-                        <!-- Database checkboxes will be injected here -->
-                    </div>
-                </section>
+                    <section>
+                        <h3>Search</h3>
+                        <div class="setting-item">
+                            <label for="limit">Result Limit:</label>
+                            <div style="display: flex; gap: 10px; align-items: center;">
+                                <input type="number" id="limit" value="100" min="1">
+                                <label style="font-size: 0.8rem; display: flex; align-items: center; gap: 4px; white-space: nowrap; cursor: pointer;">
+                                    <input type="checkbox" id="limit-all"> All
+                                </label>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section id="db-settings">
+                        <h3>Databases</h3>
+                        <div id="db-checkbox-list">
+                            <!-- Database checkboxes will be injected here -->
+                        </div>
+                    </section>
+                </div>
             </div>
         </div>
-    </div>
+
+        <!-- Confirm Delete Modal -->
+        <div id="confirm-modal" class="modal hidden">
+            <div class="modal-content" style="max-width: 400px;">
+                <div class="modal-header">
+                    <h2>Delete Item?</h2>
+                    <button class="close-modal">&times;</button>
+                </div>
+                <div class="modal-body" style="text-align: center;">
+                    <p id="confirm-msg">Playback finished. Move this file to trash?</p>
+                    <div style="display: flex; gap: 1rem; margin-top: 2rem; justify-content: center;">
+                        <button id="confirm-no" class="category-btn" style="flex: 1; text-align: center; background: var(--bg-color);">Keep</button>
+                        <button id="confirm-yes" class="category-btn" style="flex: 1; text-align: center; background: #e74c3c; color: white;">Delete</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
 
     <!-- Media Player (PiP Style) -->
     <div id="pip-player" class="pip-container hidden">
@@ -130,10 +169,12 @@
         <div id="media-viewer">
             <!-- Media tag (img, video, audio) will be injected here -->
         </div>
+        <div id="lyrics-display" class="hidden"></div>
     </div>
 
     <div id="toast" class="hidden"></div>
 
     <script src="app.js"></script>
 </body>
+
 </html>
