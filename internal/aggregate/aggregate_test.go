@@ -14,12 +14,10 @@ func TestIsSameGroup(t *testing.T) {
 	d10 := int64(10)
 
 	flags := models.GlobalFlags{
-		SimilarityFlags: models.SimilarityFlags{
-			FilterSizes:     true,
-			FilterDurations: true,
-			SizesDelta:      5.0,
-			DurationsDelta:  5.0,
-		},
+		FilterSizes:     true,
+		FilterDurations: true,
+		SizesDelta:      5.0,
+		DurationsDelta:  5.0,
 	}
 
 	m0 := models.MediaWithDB{Media: models.Media{Size: &s100, Duration: &d5}}
@@ -37,10 +35,8 @@ func TestIsSameGroup(t *testing.T) {
 
 func TestIsSameFolderGroup(t *testing.T) {
 	flags := models.GlobalFlags{
-		SimilarityFlags: models.SimilarityFlags{
-			FilterCounts: true,
-			CountsDelta:  5.0,
-		},
+		FilterCounts: true,
+		CountsDelta:  5.0,
 	}
 
 	f0 := models.FolderStats{ExistsCount: 100}
@@ -63,13 +59,11 @@ func TestClusterByNumbers(t *testing.T) {
 	d108 := int64(108)
 
 	flags := models.GlobalFlags{
-		SimilarityFlags: models.SimilarityFlags{
-			FilterSizes:     true,
-			FilterDurations: true,
-			SizesDelta:      5.0,
-			DurationsDelta:  5.0,
-			Similar:         true,
-		},
+		FilterSizes:     true,
+		FilterDurations: true,
+		SizesDelta:      5.0,
+		DurationsDelta:  5.0,
+		Similar:         true,
 	}
 
 	media := []models.MediaWithDB{
@@ -96,11 +90,9 @@ func TestClusterByNumbers(t *testing.T) {
 
 func TestClusterFoldersByNumbers(t *testing.T) {
 	flags := models.GlobalFlags{
-		SimilarityFlags: models.SimilarityFlags{
-			FilterCounts: true,
-			CountsDelta:  5.0,
-			Similar:      true,
-		},
+		FilterCounts: true,
+		CountsDelta:  5.0,
+		Similar:      true,
 	}
 
 	folders := []models.FolderStats{

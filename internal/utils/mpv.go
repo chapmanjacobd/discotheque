@@ -91,7 +91,7 @@ func MpvWatchLaterValue(path, key string) (string, error) {
 }
 
 // GetPlayhead calculates the playhead position based on session duration, existing playhead and mpv watch_later
-func GetPlayhead(flags models.PlaybackFlags, path string, startTime time.Time, existingPlayhead int, mediaDuration int) int {
+func GetPlayhead(flags models.GlobalFlags, path string, startTime time.Time, existingPlayhead int, mediaDuration int) int {
 	endTime := time.Now()
 	sessionDuration := int(endTime.Sub(startTime).Seconds())
 	pythonPlayhead := sessionDuration

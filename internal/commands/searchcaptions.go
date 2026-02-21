@@ -15,7 +15,7 @@ import (
 )
 
 type SearchCaptionsCmd struct {
-	models.PlaybackFlags
+	models.GlobalFlags
 	Database string   `arg:"" required:"" help:"SQLite database file" type:"existingfile"`
 	Search   []string `arg:"" required:"" help:"Search terms"`
 
@@ -24,6 +24,7 @@ type SearchCaptionsCmd struct {
 }
 
 func (c SearchCaptionsCmd) IsPlaybackTrait() {}
+func (c SearchCaptionsCmd) IsFTSTrait()      {}
 
 type MergedCaption struct {
 	Path  string

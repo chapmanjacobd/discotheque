@@ -33,7 +33,7 @@ func (c *TuiCmd) Run(ctx *kong.Context) error {
 		return fmt.Errorf("no media found")
 	}
 
-	query.SortMedia(media, models.PlaybackFlags{GlobalFlags: c.GlobalFlags})
+	query.SortMedia(media, c.GlobalFlags)
 
 	m := tui.NewModel(media)
 	p := tea.NewProgram(m, tea.WithAltScreen())

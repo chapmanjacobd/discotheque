@@ -15,6 +15,54 @@ type ReadmeCmd struct {
 func (c *ReadmeCmd) Run(ctx *kong.Context) error {
 	var sb strings.Builder
 
+	// Dynamic help filtering helper
+	filterNode := func(n *kong.Node) {
+		if n.Type == kong.CommandNode {
+			for _, flag := range n.Flags {
+				if flag.Group == nil {
+					continue
+				}
+
+				keep := false
+				target := n.Target.Interface()
+				switch flag.Group.Title {
+				case "Query":
+					_, keep = target.(models.QueryTrait)
+				case "Filter":
+					_, keep = target.(models.FilterTrait)
+				case "Sort":
+					_, keep = target.(models.SortTrait)
+				case "Display":
+					_, keep = target.(models.DisplayTrait)
+				case "Playback":
+					_, keep = target.(models.PlaybackTrait)
+				case "Text":
+					_, keep = target.(models.TextTrait)
+				case "Similarity":
+					_, keep = target.(models.SimilarityTrait)
+				case "Merge":
+					_, keep = target.(models.MergeTrait)
+				case "Action":
+					_, keep = target.(models.ActionTrait)
+				case "FTS":
+					_, keep = target.(models.FTSTrait)
+				case "Hashing":
+					_, keep = target.(models.HashingTrait)
+				case "Dedupe":
+					_, keep = target.(models.DedupeTrait)
+				case "History":
+					_, keep = target.(models.HistoryTrait)
+				default:
+					keep = true
+				}
+
+				if !keep {
+					flag.Hidden = true
+				}
+			}
+		}
+	}
+
 	sb.WriteString("# discotheque\n\n")
 	sb.WriteString("Golang implementation of xklb/library\n\n")
 	sb.WriteString("## Install\n\n")
@@ -66,6 +114,7 @@ func (c *ReadmeCmd) Run(ctx *kong.Context) error {
 		if node.Hidden {
 			continue
 		}
+		filterNode(node)
 		sb.WriteString(fmt.Sprintf("### %s\n\n", node.Name))
 		sb.WriteString(fmt.Sprintf("%s\n\n", node.Help))
 

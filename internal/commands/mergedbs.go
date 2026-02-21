@@ -13,7 +13,7 @@ import (
 )
 
 type MergeDBsCmd struct {
-	models.PlaybackFlags
+	models.GlobalFlags
 	TargetDB  string   `arg:"" required:"" help:"Target SQLite database file"`
 	SourceDBs []string `arg:"" required:"" help:"Source SQLite database files" type:"existingfile"`
 }

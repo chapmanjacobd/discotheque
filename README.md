@@ -109,6 +109,64 @@ Flags:
         Fetch siblings of matched files (each, all, if-audiobook)
   --fetch-siblings-max
         Maximum number of siblings to fetch
+  --cmd-0
+        Command to run if mpv exits with code 0
+  --cmd-1
+        Command to run if mpv exits with code 1
+  --cmd-2
+        Command to run if mpv exits with code 2
+  --cmd-3
+        Command to run if mpv exits with code 3
+  --cmd-4
+        Command to run if mpv exits with code 4
+  --cmd-5
+        Command to run if mpv exits with code 5
+  --cmd-6
+        Command to run if mpv exits with code 6
+  --cmd-7
+        Command to run if mpv exits with code 7
+  --cmd-8
+        Command to run if mpv exits with code 8
+  --cmd-9
+        Command to run if mpv exits with code 9
+  --cmd-10
+        Command to run if mpv exits with code 10
+  --cmd-11
+        Command to run if mpv exits with code 11
+  --cmd-12
+        Command to run if mpv exits with code 12
+  --cmd-13
+        Command to run if mpv exits with code 13
+  --cmd-14
+        Command to run if mpv exits with code 14
+  --cmd-15
+        Command to run if mpv exits with code 15
+  --cmd-20
+        Command to run if mpv exits with code 20
+  --cmd-127
+        Command to run if mpv exits with code 127
+  -I, --interactive
+        Interactive decision making after playback
+  --trash
+        Trash files after action
+  --post-action
+        Post-action: none, delete, mark-deleted, move, copy
+  --delete-files
+        Delete files after action
+  --delete-rows
+        Delete rows from database
+  --mark-deleted
+        Mark as deleted in database
+  --move-to
+        Move files to directory
+  --copy-to
+        Copy files to directory
+  --action-limit
+        Stop after N files
+  --action-size
+        Stop after N bytes (e.g., 10GB)
+  --track-history
+        Track playback history
   -v, --verbose
         Enable verbose logging
   --simulate
@@ -257,6 +315,14 @@ $ disco print my_videos.db --big-dirs -u count
 $ disco print --help
 
 Flags:
+  -q, --query
+        Raw SQL query (overrides all query building)
+  -L, --limit
+        Limit results per database
+  -a, --all
+        Return all results (no limit)
+  --offset
+        Skip N results
   -s, --include
         Include paths matching pattern
   -E, --exclude
@@ -349,8 +415,6 @@ Flags:
         Use natural sorting
   -r, --random
         Random order
-  -k, --re-rank
-        Add key/value pairs re-rank sorting by multiple attributes (COLUMN=WEIGHT)
   -c, --columns
         Columns to display
   -B, --big-dirs
@@ -405,6 +469,8 @@ Flags:
         Filter for duplicate words (true/false)
   --unique-only
         Filter for unique words (true/false)
+  -k, --re-rank
+        Add key/value pairs re-rank sorting by multiple attributes (COLUMN=WEIGHT)
   --fts
         Use full-text search if available
   --fts-table
@@ -444,6 +510,14 @@ $ disco search my_videos.db 'cyberpunk' --video-only
 $ disco search --help
 
 Flags:
+  -q, --query
+        Raw SQL query (overrides all query building)
+  -L, --limit
+        Limit results per database
+  -a, --all
+        Return all results (no limit)
+  --offset
+        Skip N results
   -s, --include
         Include paths matching pattern
   -E, --exclude
@@ -536,8 +610,6 @@ Flags:
         Use natural sorting
   -r, --random
         Random order
-  -k, --re-rank
-        Add key/value pairs re-rank sorting by multiple attributes (COLUMN=WEIGHT)
   -c, --columns
         Columns to display
   -B, --big-dirs
@@ -574,6 +646,8 @@ Flags:
         Filter folders by total size
   --folder-counts
         Filter folders by number of subfolders
+  -k, --re-rank
+        Add key/value pairs re-rank sorting by multiple attributes (COLUMN=WEIGHT)
   --fts
         Use full-text search if available
   --fts-table
@@ -606,18 +680,12 @@ Search captions using FTS
 $ disco search-captions --help
 
 Flags:
-  -v, --verbose
-        Enable verbose logging
-  --simulate
-        Dry run; don't actually do anything
-  -y, --no-confirm
-        Don't ask for confirmation
-  -T, --timeout
-        Quit after N minutes/seconds
-  --threads
-        Use N threads for parallel processing
-  -i, --ignore-errors
-        Ignore errors and continue to next file
+  --fts
+        Use full-text search if available
+  --fts-table
+        FTS table name
+  -R, --related
+        Find media related to the first result
   -O, --play-in-order
         Play media in order
   --no-play-in-order
@@ -660,6 +728,18 @@ Flags:
         Chromecast device name
   --cast-with-local
         Play music locally at the same time as chromecast
+  -v, --verbose
+        Enable verbose logging
+  --simulate
+        Dry run; don't actually do anything
+  -y, --no-confirm
+        Don't ask for confirmation
+  -T, --timeout
+        Quit after N minutes/seconds
+  --threads
+        Use N threads for parallel processing
+  -i, --ignore-errors
+        Ignore errors and continue to next file
   --open
         Open results in media player
   --overlap
@@ -868,18 +948,6 @@ Flags:
         Filter folders by total size
   --folder-counts
         Filter folders by number of subfolders
-  -v, --verbose
-        Enable verbose logging
-  --simulate
-        Dry run; don't actually do anything
-  -y, --no-confirm
-        Don't ask for confirmation
-  -T, --timeout
-        Quit after N minutes/seconds
-  --threads
-        Use N threads for parallel processing
-  -i, --ignore-errors
-        Ignore errors and continue to next file
   --cmd-0
         Command to run if mpv exits with code 0
   --cmd-1
@@ -920,6 +988,20 @@ Flags:
         Interactive decision making after playback
   --trash
         Trash files after action
+  -t, --only-tables
+        Comma separated specific table(s)
+  --primary-keys
+        Comma separated primary keys
+  --business-keys
+        Comma separated business keys
+  --upsert
+        Upsert rows on conflict
+  --ignore
+        Ignore rows on conflict (only-new-rows)
+  --only-target-columns
+        Only copy columns that exist in target
+  --skip-columns
+        Columns to skip during merge
   --post-action
         Post-action: none, delete, mark-deleted, move, copy
   --delete-files
@@ -938,20 +1020,18 @@ Flags:
         Stop after N bytes (e.g., 10GB)
   --track-history
         Track playback history
-  -t, --only-tables
-        Comma separated specific table(s)
-  --primary-keys
-        Comma separated primary keys
-  --business-keys
-        Comma separated business keys
-  --upsert
-        Upsert rows on conflict
-  --ignore
-        Ignore rows on conflict (only-new-rows)
-  --only-target-columns
-        Only copy columns that exist in target
-  --skip-columns
-        Columns to skip during merge
+  -v, --verbose
+        Enable verbose logging
+  --simulate
+        Dry run; don't actually do anything
+  -y, --no-confirm
+        Don't ask for confirmation
+  -T, --timeout
+        Quit after N minutes/seconds
+  --threads
+        Use N threads for parallel processing
+  -i, --ignore-errors
+        Ignore errors and continue to next file
 ```
 
 </details>
@@ -1172,6 +1252,42 @@ Flags:
         Fetch siblings of matched files (each, all, if-audiobook)
   --fetch-siblings-max
         Maximum number of siblings to fetch
+  -c, --columns
+        Columns to display
+  -B, --big-dirs
+        Aggregate by parent directory
+  -j, --json
+        Output results as JSON
+  --summarize
+        Print aggregate statistics
+  -f, --frequency
+        Group statistics by time frequency (daily, weekly, monthly, yearly)
+  --tui
+        Interactive TUI mode
+  --file-counts
+        Filter by number of files in directory (e.g., >5, 10%1)
+  --group-by-extensions
+        Group by file extensions
+  --group-by-mime-types
+        Group by mimetypes
+  --group-by-size
+        Group by size buckets
+  -D, --depth
+        Aggregate at specific directory depth
+  --min-depth
+        Minimum depth for aggregation
+  --max-depth
+        Maximum depth for aggregation
+  --parents
+        Include parent directories in aggregation
+  --folders-only
+        Only show folders
+  --files-only
+        Only show files
+  --folder-sizes
+        Filter folders by total size
+  --folder-counts
+        Filter folders by number of subfolders
   -v, --verbose
         Enable verbose logging
   --simulate
@@ -1297,8 +1413,6 @@ Flags:
         Use natural sorting
   -r, --random
         Random order
-  -k, --re-rank
-        Add key/value pairs re-rank sorting by multiple attributes (COLUMN=WEIGHT)
   -c, --columns
         Columns to display
   -B, --big-dirs
@@ -1335,6 +1449,8 @@ Flags:
         Filter folders by total size
   --folder-counts
         Filter folders by number of subfolders
+  -k, --re-rank
+        Add key/value pairs re-rank sorting by multiple attributes (COLUMN=WEIGHT)
   -v, --verbose
         Enable verbose logging
   --simulate
@@ -1381,6 +1497,90 @@ Flags:
         Filter out matches with less than this ratio (0.7-0.9)
   --dedupe-cmd
         Command to run for deduplication (rmlint-style: cmd duplicate keep)
+  -s, --include
+        Include paths matching pattern
+  -E, --exclude
+        Exclude paths matching pattern
+  --search
+        Search terms (space-separated for AND, | for OR)
+  --category
+        Filter by category
+  --regex
+        Filter paths by regex pattern
+  --path-contains
+        Path must contain all these strings
+  -S, --size
+        Size range (e.g., >100MB, 1GB%10)
+  -d, --duration
+        Duration range (e.g., >1hour, 30min%10)
+  --duration-from-size
+        Constrain media to duration of videos which match any size constraints
+  -e, --ext
+        Filter by extensions (e.g., .mp4,.mkv)
+  --created-after
+        Created after date (YYYY-MM-DD)
+  --created-before
+        Created before date (YYYY-MM-DD)
+  --modified-after
+        Modified after date (YYYY-MM-DD)
+  --modified-before
+        Modified before date (YYYY-MM-DD)
+  --deleted-after
+        Deleted after date (YYYY-MM-DD)
+  --deleted-before
+        Deleted before date (YYYY-MM-DD)
+  --played-after
+        Last played after date (YYYY-MM-DD)
+  --played-before
+        Last played before date (YYYY-MM-DD)
+  --watched
+        Filter by watched status (true/false)
+  --unfinished
+        Has playhead but not finished
+  -P, --partial
+        Filter by partial playback status
+  --play-count-min
+        Minimum play count
+  --play-count-max
+        Maximum play count
+  --completed
+        Show only completed items
+  --in-progress
+        Show only items in progress
+  --video-only
+        Only video files
+  --audio-only
+        Only audio files
+  --image-only
+        Only image files
+  --portrait
+        Only portrait orientation files
+  --scan-subtitles
+        Scan for external subtitles during import
+  --online-media-only
+        Exclude local media
+  --local-media-only
+        Exclude online media
+  --flexible-search
+        Flexible search (fuzzy)
+  --exact
+        Exact match for search
+  -w, --where
+        SQL where clause(s)
+  --exists
+        Filter out non-existent files
+  --mime-type
+        Filter by mimetype substring (e.g., video, mp4)
+  --no-mime-type
+        Exclude by mimetype substring
+  --hide-deleted
+        Exclude deleted files from results
+  --only-deleted
+        Include only deleted files in results
+  -o, --fetch-siblings
+        Fetch siblings of matched files (each, all, if-audiobook)
+  --fetch-siblings-max
+        Maximum number of siblings to fetch
   -v, --verbose
         Enable verbose logging
   --simulate
@@ -1499,8 +1699,6 @@ Flags:
         Use natural sorting
   -r, --random
         Random order
-  -k, --re-rank
-        Add key/value pairs re-rank sorting by multiple attributes (COLUMN=WEIGHT)
   -c, --columns
         Columns to display
   -B, --big-dirs
@@ -1537,6 +1735,8 @@ Flags:
         Filter folders by total size
   --folder-counts
         Filter folders by number of subfolders
+  -k, --re-rank
+        Add key/value pairs re-rank sorting by multiple attributes (COLUMN=WEIGHT)
   -v, --verbose
         Enable verbose logging
   --simulate
@@ -1655,6 +1855,64 @@ Flags:
         Fetch siblings of matched files (each, all, if-audiobook)
   --fetch-siblings-max
         Maximum number of siblings to fetch
+  --cmd-0
+        Command to run if mpv exits with code 0
+  --cmd-1
+        Command to run if mpv exits with code 1
+  --cmd-2
+        Command to run if mpv exits with code 2
+  --cmd-3
+        Command to run if mpv exits with code 3
+  --cmd-4
+        Command to run if mpv exits with code 4
+  --cmd-5
+        Command to run if mpv exits with code 5
+  --cmd-6
+        Command to run if mpv exits with code 6
+  --cmd-7
+        Command to run if mpv exits with code 7
+  --cmd-8
+        Command to run if mpv exits with code 8
+  --cmd-9
+        Command to run if mpv exits with code 9
+  --cmd-10
+        Command to run if mpv exits with code 10
+  --cmd-11
+        Command to run if mpv exits with code 11
+  --cmd-12
+        Command to run if mpv exits with code 12
+  --cmd-13
+        Command to run if mpv exits with code 13
+  --cmd-14
+        Command to run if mpv exits with code 14
+  --cmd-15
+        Command to run if mpv exits with code 15
+  --cmd-20
+        Command to run if mpv exits with code 20
+  --cmd-127
+        Command to run if mpv exits with code 127
+  -I, --interactive
+        Interactive decision making after playback
+  --trash
+        Trash files after action
+  --post-action
+        Post-action: none, delete, mark-deleted, move, copy
+  --delete-files
+        Delete files after action
+  --delete-rows
+        Delete rows from database
+  --mark-deleted
+        Mark as deleted in database
+  --move-to
+        Move files to directory
+  --copy-to
+        Copy files to directory
+  --action-limit
+        Stop after N files
+  --action-size
+        Stop after N bytes (e.g., 10GB)
+  --track-history
+        Track playback history
   -v, --verbose
         Enable verbose logging
   --simulate
@@ -1775,8 +2033,6 @@ Flags:
         Use natural sorting
   -r, --random
         Random order
-  -k, --re-rank
-        Add key/value pairs re-rank sorting by multiple attributes (COLUMN=WEIGHT)
   -c, --columns
         Columns to display
   -B, --big-dirs
@@ -1847,6 +2103,8 @@ Flags:
         Move grouped files into separate directories
   --print-groups
         Print clusters as JSON
+  -k, --re-rank
+        Add key/value pairs re-rank sorting by multiple attributes (COLUMN=WEIGHT)
   -v, --verbose
         Enable verbose logging
   --simulate
@@ -1965,8 +2223,6 @@ Flags:
         Use natural sorting
   -r, --random
         Random order
-  -k, --re-rank
-        Add key/value pairs re-rank sorting by multiple attributes (COLUMN=WEIGHT)
   -c, --columns
         Columns to display
   -B, --big-dirs
@@ -2037,6 +2293,8 @@ Flags:
         Move grouped files into separate directories
   --print-groups
         Print clusters as JSON
+  -k, --re-rank
+        Add key/value pairs re-rank sorting by multiple attributes (COLUMN=WEIGHT)
   -v, --verbose
         Enable verbose logging
   --simulate
@@ -2071,6 +2329,14 @@ $ disco watch my_videos.db --size '>1GB'
 $ disco watch --help
 
 Flags:
+  -q, --query
+        Raw SQL query (overrides all query building)
+  -L, --limit
+        Limit results per database
+  -a, --all
+        Return all results (no limit)
+  --offset
+        Skip N results
   -s, --include
         Include paths matching pattern
   -E, --exclude
@@ -2163,20 +2429,50 @@ Flags:
         Use natural sorting
   -r, --random
         Random order
+  -c, --columns
+        Columns to display
+  -B, --big-dirs
+        Aggregate by parent directory
+  -j, --json
+        Output results as JSON
+  --summarize
+        Print aggregate statistics
+  -f, --frequency
+        Group statistics by time frequency (daily, weekly, monthly, yearly)
+  --tui
+        Interactive TUI mode
+  --file-counts
+        Filter by number of files in directory (e.g., >5, 10%1)
+  --group-by-extensions
+        Group by file extensions
+  --group-by-mime-types
+        Group by mimetypes
+  --group-by-size
+        Group by size buckets
+  -D, --depth
+        Aggregate at specific directory depth
+  --min-depth
+        Minimum depth for aggregation
+  --max-depth
+        Maximum depth for aggregation
+  --parents
+        Include parent directories in aggregation
+  --folders-only
+        Only show folders
+  --files-only
+        Only show files
+  --folder-sizes
+        Filter folders by total size
+  --folder-counts
+        Filter folders by number of subfolders
   -k, --re-rank
         Add key/value pairs re-rank sorting by multiple attributes (COLUMN=WEIGHT)
-  -v, --verbose
-        Enable verbose logging
-  --simulate
-        Dry run; don't actually do anything
-  -y, --no-confirm
-        Don't ask for confirmation
-  -T, --timeout
-        Quit after N minutes/seconds
-  --threads
-        Use N threads for parallel processing
-  -i, --ignore-errors
-        Ignore errors and continue to next file
+  --fts
+        Use full-text search if available
+  --fts-table
+        FTS table name
+  -R, --related
+        Find media related to the first result
   -O, --play-in-order
         Play media in order
   --no-play-in-order
@@ -2253,6 +2549,12 @@ Flags:
         Interactive decision making after playback
   --trash
         Trash files after action
+  --cast
+        Cast to chromecast groups
+  --cast-device
+        Chromecast device name
+  --cast-with-local
+        Play music locally at the same time as chromecast
   --post-action
         Post-action: none, delete, mark-deleted, move, copy
   --delete-files
@@ -2271,12 +2573,18 @@ Flags:
         Stop after N bytes (e.g., 10GB)
   --track-history
         Track playback history
-  --cast
-        Cast to chromecast groups
-  --cast-device
-        Chromecast device name
-  --cast-with-local
-        Play music locally at the same time as chromecast
+  -v, --verbose
+        Enable verbose logging
+  --simulate
+        Dry run; don't actually do anything
+  -y, --no-confirm
+        Don't ask for confirmation
+  -T, --timeout
+        Quit after N minutes/seconds
+  --threads
+        Use N threads for parallel processing
+  -i, --ignore-errors
+        Ignore errors and continue to next file
 ```
 
 </details>
@@ -2298,6 +2606,14 @@ $ disco listen my_music.db --random
 $ disco listen --help
 
 Flags:
+  -q, --query
+        Raw SQL query (overrides all query building)
+  -L, --limit
+        Limit results per database
+  -a, --all
+        Return all results (no limit)
+  --offset
+        Skip N results
   -s, --include
         Include paths matching pattern
   -E, --exclude
@@ -2390,20 +2706,50 @@ Flags:
         Use natural sorting
   -r, --random
         Random order
+  -c, --columns
+        Columns to display
+  -B, --big-dirs
+        Aggregate by parent directory
+  -j, --json
+        Output results as JSON
+  --summarize
+        Print aggregate statistics
+  -f, --frequency
+        Group statistics by time frequency (daily, weekly, monthly, yearly)
+  --tui
+        Interactive TUI mode
+  --file-counts
+        Filter by number of files in directory (e.g., >5, 10%1)
+  --group-by-extensions
+        Group by file extensions
+  --group-by-mime-types
+        Group by mimetypes
+  --group-by-size
+        Group by size buckets
+  -D, --depth
+        Aggregate at specific directory depth
+  --min-depth
+        Minimum depth for aggregation
+  --max-depth
+        Maximum depth for aggregation
+  --parents
+        Include parent directories in aggregation
+  --folders-only
+        Only show folders
+  --files-only
+        Only show files
+  --folder-sizes
+        Filter folders by total size
+  --folder-counts
+        Filter folders by number of subfolders
   -k, --re-rank
         Add key/value pairs re-rank sorting by multiple attributes (COLUMN=WEIGHT)
-  -v, --verbose
-        Enable verbose logging
-  --simulate
-        Dry run; don't actually do anything
-  -y, --no-confirm
-        Don't ask for confirmation
-  -T, --timeout
-        Quit after N minutes/seconds
-  --threads
-        Use N threads for parallel processing
-  -i, --ignore-errors
-        Ignore errors and continue to next file
+  --fts
+        Use full-text search if available
+  --fts-table
+        FTS table name
+  -R, --related
+        Find media related to the first result
   -O, --play-in-order
         Play media in order
   --no-play-in-order
@@ -2480,6 +2826,12 @@ Flags:
         Interactive decision making after playback
   --trash
         Trash files after action
+  --cast
+        Cast to chromecast groups
+  --cast-device
+        Chromecast device name
+  --cast-with-local
+        Play music locally at the same time as chromecast
   --post-action
         Post-action: none, delete, mark-deleted, move, copy
   --delete-files
@@ -2498,12 +2850,18 @@ Flags:
         Stop after N bytes (e.g., 10GB)
   --track-history
         Track playback history
-  --cast
-        Cast to chromecast groups
-  --cast-device
-        Chromecast device name
-  --cast-with-local
-        Play music locally at the same time as chromecast
+  -v, --verbose
+        Enable verbose logging
+  --simulate
+        Dry run; don't actually do anything
+  -y, --no-confirm
+        Don't ask for confirmation
+  -T, --timeout
+        Quit after N minutes/seconds
+  --threads
+        Use N threads for parallel processing
+  -i, --ignore-errors
+        Ignore errors and continue to next file
 ```
 
 </details>
@@ -2763,8 +3121,6 @@ Flags:
         Use natural sorting
   -r, --random
         Random order
-  -k, --re-rank
-        Add key/value pairs re-rank sorting by multiple attributes (COLUMN=WEIGHT)
   -c, --columns
         Columns to display
   -B, --big-dirs
@@ -2801,18 +3157,8 @@ Flags:
         Filter folders by total size
   --folder-counts
         Filter folders by number of subfolders
-  -v, --verbose
-        Enable verbose logging
-  --simulate
-        Dry run; don't actually do anything
-  -y, --no-confirm
-        Don't ask for confirmation
-  -T, --timeout
-        Quit after N minutes/seconds
-  --threads
-        Use N threads for parallel processing
-  -i, --ignore-errors
-        Ignore errors and continue to next file
+  -k, --re-rank
+        Add key/value pairs re-rank sorting by multiple attributes (COLUMN=WEIGHT)
   --cmd-0
         Command to run if mpv exits with code 0
   --cmd-1
@@ -2871,6 +3217,18 @@ Flags:
         Stop after N bytes (e.g., 10GB)
   --track-history
         Track playback history
+  -v, --verbose
+        Enable verbose logging
+  --simulate
+        Dry run; don't actually do anything
+  -y, --no-confirm
+        Don't ask for confirmation
+  -T, --timeout
+        Quit after N minutes/seconds
+  --threads
+        Use N threads for parallel processing
+  -i, --ignore-errors
+        Ignore errors and continue to next file
 ```
 
 </details>
@@ -3284,6 +3642,12 @@ Calculate a hash based on small file segments
 $ disco sample-hash --help
 
 Flags:
+  --hash-gap
+        Gap between segments (0.0-1.0 as percentage of file size, or absolute bytes if >1)
+  --hash-chunk-size
+        Size of each segment to hash
+  --hash-threads
+        Number of threads to use for hashing a single file
   -v, --verbose
         Enable verbose logging
   --simulate
@@ -3296,12 +3660,6 @@ Flags:
         Use N threads for parallel processing
   -i, --ignore-errors
         Ignore errors and continue to next file
-  --hash-gap
-        Gap between segments (0.0-1.0 as percentage of file size, or absolute bytes if >1)
-  --hash-chunk-size
-        Size of each segment to hash
-  --hash-threads
-        Number of threads to use for hashing a single file
 ```
 
 </details>
@@ -3410,18 +3768,6 @@ Flags:
         Random order
   -k, --re-rank
         Add key/value pairs re-rank sorting by multiple attributes (COLUMN=WEIGHT)
-  -v, --verbose
-        Enable verbose logging
-  --simulate
-        Dry run; don't actually do anything
-  -y, --no-confirm
-        Don't ask for confirmation
-  -T, --timeout
-        Quit after N minutes/seconds
-  --threads
-        Use N threads for parallel processing
-  -i, --ignore-errors
-        Ignore errors and continue to next file
   --cmd-0
         Command to run if mpv exits with code 0
   --cmd-1
@@ -3480,6 +3826,18 @@ Flags:
         Stop after N bytes (e.g., 10GB)
   --track-history
         Track playback history
+  -v, --verbose
+        Enable verbose logging
+  --simulate
+        Dry run; don't actually do anything
+  -y, --no-confirm
+        Don't ask for confirmation
+  -T, --timeout
+        Quit after N minutes/seconds
+  --threads
+        Use N threads for parallel processing
+  -i, --ignore-errors
+        Ignore errors and continue to next file
 ```
 
 </details>
@@ -3706,18 +4064,6 @@ Merge multiple SQLite databases
 $ disco merge-dbs --help
 
 Flags:
-  -v, --verbose
-        Enable verbose logging
-  --simulate
-        Dry run; don't actually do anything
-  -y, --no-confirm
-        Don't ask for confirmation
-  -T, --timeout
-        Quit after N minutes/seconds
-  --threads
-        Use N threads for parallel processing
-  -i, --ignore-errors
-        Ignore errors and continue to next file
   -t, --only-tables
         Comma separated specific table(s)
   --primary-keys
@@ -3732,6 +4078,18 @@ Flags:
         Only copy columns that exist in target
   --skip-columns
         Columns to skip during merge
+  -v, --verbose
+        Enable verbose logging
+  --simulate
+        Dry run; don't actually do anything
+  -y, --no-confirm
+        Don't ask for confirmation
+  -T, --timeout
+        Quit after N minutes/seconds
+  --threads
+        Use N threads for parallel processing
+  -i, --ignore-errors
+        Ignore errors and continue to next file
 ```
 
 </details>

@@ -14,7 +14,7 @@ import (
 )
 
 type SearchDBCmd struct {
-	models.PlaybackFlags
+	models.GlobalFlags
 	Database string   `arg:"" required:"" help:"SQLite database file" type:"existingfile"`
 	Table    string   `arg:"" required:"" help:"Table name (fuzzy matching supported)"`
 	Search   []string `arg:"" required:"" help:"Search terms"`

@@ -16,7 +16,7 @@ import (
 )
 
 type MediaCheckCmd struct {
-	models.PlaybackFlags
+	models.GlobalFlags
 	Databases []string `arg:"" required:"" help:"SQLite database files" type:"existingfile"`
 
 	ChunkSize         float64 `help:"Chunk size in seconds. If set, recommended to use >0.1 seconds" default:"0.5"`
