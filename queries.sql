@@ -120,6 +120,28 @@ UPDATE media
 SET categories = ?
 WHERE path = ?;
 
+-- name: GetCategoryStats :many
+SELECT 'sports' as category, COUNT(*) as count FROM media WHERE time_deleted = 0 AND categories LIKE '%;sports;%'
+UNION ALL
+SELECT 'fitness' as category, COUNT(*) as count FROM media WHERE time_deleted = 0 AND categories LIKE '%;fitness;%'
+UNION ALL
+SELECT 'documentary' as category, COUNT(*) as count FROM media WHERE time_deleted = 0 AND categories LIKE '%;documentary;%'
+UNION ALL
+SELECT 'comedy' as category, COUNT(*) as count FROM media WHERE time_deleted = 0 AND categories LIKE '%;comedy;%'
+UNION ALL
+SELECT 'music' as category, COUNT(*) as count FROM media WHERE time_deleted = 0 AND categories LIKE '%;music;%'
+UNION ALL
+SELECT 'educational' as category, COUNT(*) as count FROM media WHERE time_deleted = 0 AND categories LIKE '%;educational;%'
+UNION ALL
+SELECT 'news' as category, COUNT(*) as count FROM media WHERE time_deleted = 0 AND categories LIKE '%;news;%'
+UNION ALL
+SELECT 'gaming' as category, COUNT(*) as count FROM media WHERE time_deleted = 0 AND categories LIKE '%;gaming;%'
+UNION ALL
+SELECT 'tech' as category, COUNT(*) as count FROM media WHERE time_deleted = 0 AND categories LIKE '%;tech;%'
+UNION ALL
+SELECT 'audiobook' as category, COUNT(*) as count FROM media WHERE time_deleted = 0 AND categories LIKE '%;audiobook;%'
+ORDER BY count DESC;
+
 -- name: UpsertMedia :exec
 INSERT INTO media (
     path, title, duration, size, time_created, time_modified,

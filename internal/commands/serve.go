@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -48,6 +49,7 @@ func (c *ServeCmd) Run(ctx *kong.Context) error {
 	}
 
 	http.HandleFunc("/api/databases", c.handleDatabases)
+	http.HandleFunc("/api/categories", c.handleCategories)
 	http.HandleFunc("/api/query", c.handleQuery)
 	http.HandleFunc("/api/play", c.handlePlay)
 	http.HandleFunc("/api/delete", c.handleDelete)
@@ -86,6 +88,45 @@ func (c *ServeCmd) handleDatabases(w http.ResponseWriter, r *http.Request) {
 		Trashcan:  c.Trashcan,
 	}
 	json.NewEncoder(w).Encode(resp)
+}
+
+func (c *ServeCmd) handleCategories(w http.ResponseWriter, r *http.Request) {
+	counts := make(map[string]int64)
+
+	for _, dbPath := range c.Databases {
+		sqlDB, err := database.Connect(dbPath)
+		if err != nil {
+			continue
+		}
+		queries := database.New(sqlDB)
+		stats, err := queries.GetCategoryStats(r.Context())
+		sqlDB.Close()
+		if err != nil {
+			continue
+		}
+
+		for _, s := range stats {
+			counts[s.Category] = counts[s.Category] + s.Count
+		}
+	}
+
+	type catStat struct {
+		Category string `json:"category"`
+		Count    int64  `json:"count"`
+	}
+	var res []catStat
+	for k, v := range counts {
+		if v > 0 {
+			res = append(res, catStat{Category: k, Count: v})
+		}
+	}
+
+	sort.Slice(res, func(i, j int) bool {
+		return res[i].Count > res[j].Count
+	})
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(res)
 }
 
 func (c *ServeCmd) handleQuery(w http.ResponseWriter, r *http.Request) {
@@ -582,14 +623,10 @@ func (c *ServeCmd) handleSubtitles(w http.ResponseWriter, r *http.Request) {
 	isImageSub := ext == ".idx" || ext == ".sub" || ext == ".sup"
 
 	if streamIndex != "" {
-		// Try OCR for embedded streams. If it's already text, FFmpeg might complain, 
-		// but usually the 'ocr' filter works on the decoded frames.
-		args = []string{"-i", path, "-filter_complex", "[0:s:" + streamIndex + "]ocr", "-f", "webvtt", "pipe:1"}
-	} else if isImageSub {
-		// Standalone image-based file
-		args = []string{"-i", path, "-filter_complex", "ocr", "-f", "webvtt", "pipe:1"}
+		// Embedded tracks
+		args = []string{"-i", path, "-map", "0:s:" + streamIndex, "-f", "webvtt", "pipe:1"}
 	} else {
-		// Standalone text-based file (srt, lrc, ass, etc.)
+		// Standalone file (srt, lrc, ass, etc.)
 		args = []string{"-i", path, "-f", "webvtt", "pipe:1"}
 	}
 
@@ -601,8 +638,8 @@ func (c *ServeCmd) handleSubtitles(w http.ResponseWriter, r *http.Request) {
 	if err := cmd.Run(); err != nil {
 		if r.Context().Err() == nil {
 			msg := "Failed to convert subtitles"
-			if ext == ".idx" || ext == ".sub" || ext == ".sup" || streamIndex != "" {
-				msg = "Failed to convert/OCR subtitles"
+			if isImageSub || streamIndex != "" {
+				msg = "Failed to convert subtitles (image-based formats require OCR which is not yet supported for direct VTT streaming)"
 			}
 			slog.Error(msg, "path", path, "error", err)
 		} else {

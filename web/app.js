@@ -20,11 +20,6 @@ document.addEventListener('DOMContentLoaded', () => {
     let allDatabases = [];
     let searchAbortController = null;
 
-    const categories = [
-        "sports", "fitness", "documentary", "comedy", "music", 
-        "educational", "news", "gaming", "tech", "audiobook"
-    ];
-
     // --- State Management ---
     const state = {
         view: 'grid',
@@ -44,7 +39,8 @@ document.addEventListener('DOMContentLoaded', () => {
         language: localStorage.getItem('disco-language') || '',
         theme: localStorage.getItem('disco-theme') || 'auto',
         postPlaybackAction: localStorage.getItem('disco-post-playback') || 'nothing',
-        trashcan: false
+        trashcan: false,
+        categories: []
     };
 
     // Initialize UI from state
@@ -79,6 +75,17 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } catch (err) {
             console.error('Failed to fetch databases', err);
+        }
+    }
+
+    async function fetchCategories() {
+        try {
+            const resp = await fetch('/api/categories');
+            if (!resp.ok) throw new Error('Failed to fetch categories');
+            state.categories = await resp.json();
+            renderCategoryList();
+        } catch (err) {
+            console.error('Failed to fetch categories', err);
         }
     }
 
@@ -569,10 +576,14 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderCategoryList() {
         if (!categoryList) return;
         
+        const trashBtn = document.getElementById('trash-btn');
+
         categoryList.innerHTML = `
             <button class="category-btn ${state.filters.category === '' ? 'active' : ''}" data-cat="">All Media</button>
-        ` + categories.map(cat => `
-            <button class="category-btn ${state.filters.category === cat ? 'active' : ''}" data-cat="${cat}">${cat}</button>
+        ` + state.categories.map(c => `
+            <button class="category-btn ${state.filters.category === c.category ? 'active' : ''}" data-cat="${c.category}">
+                ${c.category} <small>(${c.count})</small>
+            </button>
         `).join('');
 
         categoryList.querySelectorAll('.category-btn').forEach(btn => {
@@ -858,6 +869,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Initial load
     fetchDatabases();
+    fetchCategories();
     renderCategoryList();
     performSearch();
     setupAutoReload();

@@ -49,6 +49,57 @@ func (q *Queries) GetAllMediaMetadata(ctx context.Context) ([]GetAllMediaMetadat
 	return items, nil
 }
 
+const getCategoryStats = `-- name: GetCategoryStats :many
+SELECT 'sports' as category, COUNT(*) as count FROM media WHERE time_deleted = 0 AND categories LIKE '%;sports;%'
+UNION ALL
+SELECT 'fitness' as category, COUNT(*) as count FROM media WHERE time_deleted = 0 AND categories LIKE '%;fitness;%'
+UNION ALL
+SELECT 'documentary' as category, COUNT(*) as count FROM media WHERE time_deleted = 0 AND categories LIKE '%;documentary;%'
+UNION ALL
+SELECT 'comedy' as category, COUNT(*) as count FROM media WHERE time_deleted = 0 AND categories LIKE '%;comedy;%'
+UNION ALL
+SELECT 'music' as category, COUNT(*) as count FROM media WHERE time_deleted = 0 AND categories LIKE '%;music;%'
+UNION ALL
+SELECT 'educational' as category, COUNT(*) as count FROM media WHERE time_deleted = 0 AND categories LIKE '%;educational;%'
+UNION ALL
+SELECT 'news' as category, COUNT(*) as count FROM media WHERE time_deleted = 0 AND categories LIKE '%;news;%'
+UNION ALL
+SELECT 'gaming' as category, COUNT(*) as count FROM media WHERE time_deleted = 0 AND categories LIKE '%;gaming;%'
+UNION ALL
+SELECT 'tech' as category, COUNT(*) as count FROM media WHERE time_deleted = 0 AND categories LIKE '%;tech;%'
+UNION ALL
+SELECT 'audiobook' as category, COUNT(*) as count FROM media WHERE time_deleted = 0 AND categories LIKE '%;audiobook;%'
+ORDER BY count DESC
+`
+
+type GetCategoryStatsRow struct {
+	Category string `json:"category"`
+	Count    int64  `json:"count"`
+}
+
+func (q *Queries) GetCategoryStats(ctx context.Context) ([]GetCategoryStatsRow, error) {
+	rows, err := q.db.QueryContext(ctx, getCategoryStats)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetCategoryStatsRow{}
+	for rows.Next() {
+		var i GetCategoryStatsRow
+		if err := rows.Scan(&i.Category, &i.Count); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getHistoryCount = `-- name: GetHistoryCount :one
 SELECT COUNT(*) FROM history WHERE media_path = ?
 `
