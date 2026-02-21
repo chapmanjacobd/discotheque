@@ -42,31 +42,25 @@ func (c *ServeCmd) IsFilterTrait()   {}
 func (c *ServeCmd) IsSortTrait()     {}
 func (c *ServeCmd) IsPlaybackTrait() {}
 
-func (c *ServeCmd) Run(ctx *kong.Context) error {
-	models.SetupLogging(c.Verbose)
-	c.ApplicationStartTime = time.Now().UnixNano()
-
-	if _, err := exec.LookPath("ffmpeg"); err != nil {
-		slog.Warn("ffmpeg not found in PATH, on-the-fly transcoding will be unavailable")
-	}
-
-	http.HandleFunc("/api/databases", c.handleDatabases)
-	http.HandleFunc("/api/categories", c.handleCategories)
-	http.HandleFunc("/api/ratings", c.handleRatings)
-	http.HandleFunc("/api/query", c.handleQuery)
-	http.HandleFunc("/api/play", c.handlePlay)
-	http.HandleFunc("/api/delete", c.handleDelete)
-	http.HandleFunc("/api/progress", c.handleProgress)
-	http.HandleFunc("/api/rate", c.handleRate)
-	http.HandleFunc("/api/events", c.handleEvents)
-	http.HandleFunc("/api/raw", c.handleRaw)
-	http.HandleFunc("/api/subtitles", c.handleSubtitles)
-	http.HandleFunc("/api/thumbnail", c.handleThumbnail)
-	http.HandleFunc("/opds", c.handleOPDS)
+func (c *ServeCmd) Mux() http.Handler {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api/databases", c.handleDatabases)
+	mux.HandleFunc("/api/categories", c.handleCategories)
+	mux.HandleFunc("/api/ratings", c.handleRatings)
+	mux.HandleFunc("/api/query", c.handleQuery)
+	mux.HandleFunc("/api/play", c.handlePlay)
+	mux.HandleFunc("/api/delete", c.handleDelete)
+	mux.HandleFunc("/api/progress", c.handleProgress)
+	mux.HandleFunc("/api/rate", c.handleRate)
+	mux.HandleFunc("/api/events", c.handleEvents)
+	mux.HandleFunc("/api/raw", c.handleRaw)
+	mux.HandleFunc("/api/subtitles", c.handleSubtitles)
+	mux.HandleFunc("/api/thumbnail", c.handleThumbnail)
+	mux.HandleFunc("/opds", c.handleOPDS)
 
 	if c.Trashcan {
-		http.HandleFunc("/api/trash", c.handleTrash)
-		http.HandleFunc("/api/empty-bin", c.handleEmptyBin)
+		mux.HandleFunc("/api/trash", c.handleTrash)
+		mux.HandleFunc("/api/empty-bin", c.handleEmptyBin)
 	}
 
 	// Serve static files
@@ -78,10 +72,21 @@ func (c *ServeCmd) Run(ctx *kong.Context) error {
 		slog.Info("Serving embedded static files")
 		handler = http.FileServer(http.FS(web.FS))
 	}
-	http.Handle("/", handler)
+	mux.Handle("/", handler)
+	return mux
+}
 
+func (c *ServeCmd) Run(ctx *kong.Context) error {
+	models.SetupLogging(c.Verbose)
+	c.ApplicationStartTime = time.Now().UnixNano()
+
+	if _, err := exec.LookPath("ffmpeg"); err != nil {
+		slog.Warn("ffmpeg not found in PATH, on-the-fly transcoding will be unavailable")
+	}
+
+	handler := c.Mux()
 	slog.Info("Server starting", "port", c.Port)
-	return http.ListenAndServe(fmt.Sprintf(":%d", c.Port), nil)
+	return http.ListenAndServe(fmt.Sprintf(":%d", c.Port), handler)
 }
 
 func (c *ServeCmd) handleDatabases(w http.ResponseWriter, r *http.Request) {
