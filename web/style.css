@@ -310,10 +310,15 @@ main {
     min-height: 1.2rem;
 }
 
+#results-container {
+    flex: 1;
+}
+
 .grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
     gap: 1.5rem;
+    align-content: start;
 }
 
 .list {
@@ -497,11 +502,15 @@ main {
     background: var(--hover-color);
 }
 
+.details-table th:first-child,
+.details-table td:first-child {
+    width: 100%;
+}
+
 .table-cell-title {
     display: flex;
     align-items: center;
     gap: 10px;
-    max-width: 400px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -542,21 +551,28 @@ main {
 
 #toast {
     position: fixed;
-    bottom: 2rem;
-    left: 50%;
-    transform: translateX(-50%);
-    background: var(--sidebar-bg);
-    border: 1px solid var(--accent-color);
-    padding: 0.8rem 2rem;
-    border-radius: 50px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-    z-index: 100;
-    transition: opacity 0.3s, transform 0.3s;
+    top: 1.5rem;
+    left: 1.5rem;
+    background: color-mix(in srgb, var(--card-bg), transparent 20%);
+    border: 1px solid var(--border-color);
+    border-left: 4px solid var(--accent-color);
+    padding: 1rem 1.5rem;
+    border-radius: 8px;
+    box-shadow: var(--shadow);
+    z-index: 10000;
+    transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
 }
 
 #toast.hidden {
     opacity: 0;
-    transform: translateX(-50%) translateY(20px);
+    transform: translateX(-120%);
     pointer-events: none;
 }
 
@@ -579,7 +595,7 @@ main {
 }
 
 .modal-content {
-    background: var(--sidebar-bg);
+    background: var(--sidebar-bg) !important;
     border-radius: 12px;
     width: 90%;
     max-width: 600px;
@@ -588,6 +604,7 @@ main {
 }
 
 .modal-header {
+    background: var(--bg-color) !important;
     padding: 1rem 1.5rem;
     border-bottom: 1px solid var(--border-color);
     display: flex;

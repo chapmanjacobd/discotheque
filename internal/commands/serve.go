@@ -245,24 +245,7 @@ func (c *ServeCmd) handlePlay(w http.ResponseWriter, r *http.Request) {
 
 	if !strings.HasPrefix(req.Path, "http") && !utils.FileExists(req.Path) {
 		slog.Warn("File not found, marking as deleted in databases", "path", req.Path)
-		now := time.Now().Unix()
-		for _, dbPath := range c.Databases {
-			sqlDB, err := database.Connect(dbPath)
-			if err != nil {
-				slog.Error("Failed to connect to database", "db", dbPath, "error", err)
-				continue
-			}
-			queries := database.New(sqlDB)
-			err = queries.MarkDeleted(r.Context(), database.MarkDeletedParams{
-				Path:        req.Path,
-				TimeDeleted: sql.NullInt64{Int64: now, Valid: true},
-			})
-			sqlDB.Close()
-			if err != nil {
-				slog.Error("Failed to mark file as deleted", "db", dbPath, "path", req.Path, "error", err)
-			}
-		}
-
+		c.markDeletedInAllDBs(r.Context(), req.Path, true)
 		http.Error(w, "file not found", http.StatusNotFound)
 		return
 	}
@@ -277,6 +260,30 @@ func (c *ServeCmd) handlePlay(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
+}
+
+func (c *ServeCmd) markDeletedInAllDBs(ctx context.Context, path string, deleted bool) {
+	var deleteTime int64 = 0
+	if deleted {
+		deleteTime = time.Now().Unix()
+	}
+
+	for _, dbPath := range c.Databases {
+		sqlDB, err := database.Connect(dbPath)
+		if err != nil {
+			slog.Error("Failed to connect to database", "db", dbPath, "error", err)
+			continue
+		}
+		queries := database.New(sqlDB)
+		err = queries.MarkDeleted(ctx, database.MarkDeletedParams{
+			Path:        path,
+			TimeDeleted: sql.NullInt64{Int64: deleteTime, Valid: deleted},
+		})
+		sqlDB.Close()
+		if err != nil {
+			slog.Error("Failed to mark file as deleted", "db", dbPath, "path", path, "error", err)
+		}
+	}
 }
 
 func (c *ServeCmd) handleDelete(w http.ResponseWriter, r *http.Request) {
@@ -294,27 +301,7 @@ func (c *ServeCmd) handleDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var deleteTime int64 = 0
-	if !req.Restore {
-		deleteTime = time.Now().Unix()
-	}
-
-	for _, dbPath := range c.Databases {
-		sqlDB, err := database.Connect(dbPath)
-		if err != nil {
-			continue
-		}
-		queries := database.New(sqlDB)
-		err = queries.MarkDeleted(r.Context(), database.MarkDeletedParams{
-			Path:        req.Path,
-			TimeDeleted: sql.NullInt64{Int64: deleteTime, Valid: !req.Restore},
-		})
-		sqlDB.Close()
-		if err == nil {
-			break
-		}
-	}
-
+	c.markDeletedInAllDBs(r.Context(), req.Path, !req.Restore)
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -352,9 +339,6 @@ func (c *ServeCmd) handleProgress(w http.ResponseWriter, r *http.Request) {
 			now, now, req.Playhead, req.Path)
 
 		sqlDB.Close()
-		if err == nil {
-			break
-		}
 	}
 
 	w.WriteHeader(http.StatusOK)
@@ -382,9 +366,6 @@ func (c *ServeCmd) handleRate(w http.ResponseWriter, r *http.Request) {
 		}
 		_, err = sqlDB.ExecContext(r.Context(), "UPDATE media SET score = ? WHERE path = ?", req.Score, req.Path)
 		sqlDB.Close()
-		if err == nil {
-			break
-		}
 	}
 
 	w.WriteHeader(http.StatusOK)
@@ -443,7 +424,8 @@ func (c *ServeCmd) handleRaw(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !utils.FileExists(path) {
-		slog.Warn("File not found on disk", "path", path)
+		slog.Warn("File not found on disk, marking as deleted in databases", "path", path)
+		c.markDeletedInAllDBs(r.Context(), path, true)
 		http.Error(w, "File not found", http.StatusNotFound)
 		return
 	}
@@ -889,11 +871,12 @@ func (c *ServeCmd) handleEmptyBin(w http.ResponseWriter, r *http.Request) {
 			if err != nil {
 				continue
 			}
-			_, err = sqlDB.Exec("DELETE FROM media WHERE path = ?", m.Path)
+			res, err := sqlDB.Exec("DELETE FROM media WHERE path = ?", m.Path)
 			sqlDB.Close()
 			if err == nil {
-				count++
-				break
+				if rows, _ := res.RowsAffected(); rows > 0 {
+					count++
+				}
 			}
 		}
 	}

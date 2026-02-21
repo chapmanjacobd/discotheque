@@ -31,9 +31,9 @@ document.addEventListener('DOMContentLoaded', () => {
             rating: '',
             sort: 'path',
             reverse: false,
-            limit: 100,
-            all: false,
-            excludedDbs: []
+            limit: parseInt(localStorage.getItem('disco-limit')) || 100,
+            all: localStorage.getItem('disco-limit-all') === 'true',
+            excludedDbs: JSON.parse(localStorage.getItem('disco-excluded-dbs') || '[]')
         },
         applicationStartTime: null,
         player: localStorage.getItem('disco-player') || 'browser',
@@ -71,6 +71,51 @@ document.addEventListener('DOMContentLoaded', () => {
     function closeModal(id) {
         document.getElementById(id).classList.add('hidden');
     }
+
+    // --- Navigation & URL ---
+    function syncUrl() {
+        const params = new URLSearchParams();
+        if (state.page === 'trash') {
+            params.set('view', 'trash');
+        } else {
+            if (state.filters.category) params.set('category', state.filters.category);
+            if (state.filters.rating !== '') params.set('rating', state.filters.rating);
+            if (state.filters.search) params.set('search', state.filters.search);
+        }
+        
+        const newUrl = params.toString() ? `?${params.toString()}` : window.location.pathname;
+        if (window.location.search !== `?${params.toString()}`) {
+            window.history.pushState(state.filters, '', newUrl);
+        }
+    }
+
+    function readUrl() {
+        const params = new URLSearchParams(window.location.search);
+        const view = params.get('view');
+        
+        if (view === 'trash') {
+            state.page = 'trash';
+            state.filters.category = '';
+            state.filters.rating = '';
+        } else {
+            state.page = 'search';
+            state.filters.category = params.get('category') || '';
+            state.filters.rating = params.get('rating') || '';
+            state.filters.search = params.get('search') || '';
+            if (searchInput) searchInput.value = state.filters.search;
+        }
+    }
+
+    window.onpopstate = () => {
+        readUrl();
+        if (state.page === 'trash') {
+            fetchTrash();
+        } else {
+            performSearch();
+        }
+        renderCategoryList();
+        renderRatingList();
+    };
 
     // --- API Calls ---
     async function fetchDatabases() {
@@ -118,6 +163,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!ratingList) return;
 
         const trashBtn = document.getElementById('trash-btn');
+        if (trashBtn && state.page !== 'trash') trashBtn.classList.remove('active');
 
         const sortedRatings = [...state.ratings].sort((a, b) => {
             if (a.rating === 0) return 1;
@@ -152,6 +198,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function performSearch() {
         state.page = 'search';
+        syncUrl();
         if (searchAbortController) {
             searchAbortController.abort();
         }
@@ -161,6 +208,9 @@ document.addEventListener('DOMContentLoaded', () => {
         state.filters.sort = sortBy.value;
         state.filters.limit = parseInt(limitInput.value) || 100;
         state.filters.all = limitAll ? limitAll.checked : false;
+
+        localStorage.setItem('disco-limit', state.filters.limit);
+        localStorage.setItem('disco-limit-all', state.filters.all);
 
         if (limitInput) limitInput.disabled = state.filters.all;
 
@@ -211,6 +261,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function fetchTrash() {
         state.page = 'trash';
+        syncUrl();
         try {
             const resp = await fetch('/api/trash');
             if (!resp.ok) throw new Error('Failed to fetch trash');
@@ -229,7 +280,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const resp = await fetch('/api/empty-bin', { method: 'POST' });
             if (!resp.ok) throw new Error('Failed to empty bin');
             const msg = await resp.text();
-            showToast(msg);
+            showToast(msg, '🔥');
             fetchTrash();
         } catch (err) {
             console.error('Empty bin failed:', err);
@@ -276,7 +327,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (!resp.ok) throw new Error('Action failed');
             
-            showToast(restore ? 'Item restored' : 'Item moved to trash');
+            if (restore) {
+                showToast('Item restored');
+            } else {
+                const filename = path.split('/').pop();
+                showToast(`Trashed ${filename}`, '🗑️');
+            }
             
             if (state.page === 'trash') {
                 fetchTrash();
@@ -365,8 +421,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (currentMedia.length === 0) return;
         
         let currentIndex = -1;
+        let itemGone = false;
         if (state.playback.item) {
             currentIndex = currentMedia.findIndex(m => m.path === state.playback.item.path);
+            if (currentIndex === -1) itemGone = true;
         }
 
         if (currentIndex === -1) {
@@ -378,7 +436,13 @@ document.addEventListener('DOMContentLoaded', () => {
             // Nothing ever played, n -> 0, p -> last
             nextIndex = offset > 0 ? 0 : currentMedia.length - 1;
         } else {
-            nextIndex = currentIndex + offset;
+            // If the item is gone (e.g. deleted), the list shifted.
+            // The next item is now at the same index.
+            if (itemGone && offset > 0) {
+                nextIndex = currentIndex + (offset - 1);
+            } else {
+                nextIndex = currentIndex + offset;
+            }
         }
 
         if (nextIndex >= 0 && nextIndex < currentMedia.length) {
@@ -744,6 +808,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 } else {
                     state.filters.excludedDbs.push(val);
                 }
+                localStorage.setItem('disco-excluded-dbs', JSON.stringify(state.filters.excludedDbs));
                 performSearch();
             };
         });
@@ -753,6 +818,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!categoryList) return;
         
         const trashBtn = document.getElementById('trash-btn');
+        if (trashBtn && state.page !== 'trash') trashBtn.classList.remove('active');
 
         const sortedCategories = [...state.categories].sort((a, b) => {
             if (a.category === 'Uncategorized') return 1;
@@ -814,8 +880,12 @@ document.addEventListener('DOMContentLoaded', () => {
         return '📄';
     }
 
-    function showToast(msg) {
-        toast.textContent = msg;
+    function showToast(msg, customEmoji) {
+        let icon = customEmoji;
+        if (!icon) {
+            icon = msg.toLowerCase().includes('fail') || msg.toLowerCase().includes('error') ? '❌' : 'ℹ️';
+        }
+        toast.innerHTML = `<span>${icon}</span> <span>${msg}</span>`;
         toast.classList.remove('hidden');
         setTimeout(() => toast.classList.add('hidden'), 3000);
     }
@@ -848,10 +918,25 @@ document.addEventListener('DOMContentLoaded', () => {
             case 'p':
                 playSibling(-1);
                 return;
+            case 'c':
+                if (state.playback.item) {
+                    const path = state.playback.item.path;
+                    navigator.clipboard.writeText(path).then(() => {
+                        showToast(`Copied path to clipboard`, '📋');
+                    }).catch(err => {
+                        console.error('Failed to copy path:', err);
+                        showToast('Failed to copy path');
+                    });
+                }
+                return;
             case 'delete':
                 if (state.playback.item && !pipPlayer.classList.contains('hidden')) {
                     const itemToDelete = state.playback.item;
-                    closePiP();
+                    if (e.shiftKey) {
+                        closePiP();
+                    } else {
+                        playSibling(1);
+                    }
                     deleteMedia(itemToDelete.path);
                     return;
                 }
@@ -1038,7 +1123,9 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     if (searchInput) {
-        searchInput.oninput = debouncedSearch;
+        searchInput.oninput = () => {
+            debouncedSearch();
+        };
         searchInput.onkeypress = (e) => { if (e.key === 'Enter') performSearch(); };
     }
 
@@ -1093,6 +1180,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // Initial load
+    readUrl();
     fetchDatabases();
     fetchCategories();
     fetchRatings();
