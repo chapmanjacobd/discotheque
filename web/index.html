@@ -19,6 +19,9 @@
             <span class="search-icon">🔍</span>
             <input type="text" id="search-input" placeholder="Search media...">
         </div>
+        <div id="results-info">
+            <span id="results-count"></span>
+        </div>
         <div class="header-actions">
             <button id="settings-button" title="Settings">⚙️</button>
         </div>
@@ -74,10 +77,6 @@
                 </div>
             </div>
 
-            <div id="results-info">
-                <span id="results-count"></span>
-            </div>
-
             <div id="results-container" class="grid">
                 <!-- Media items will be injected here -->
             </div>
@@ -85,86 +84,93 @@
     </main>
 
     <!-- Settings Modal -->
-        <div id="settings-modal" class="modal hidden">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h2>Settings</h2>
-                    <button class="close-modal">&times;</button>
-                </div>
-                <div class="modal-body">
-                    <section>
-                        <h3>Playback</h3>
-                        <div class="setting-item">
-                            <label for="setting-player">Default Player:</label>
-                            <select id="setting-player">
-                                <option value="browser">Browser (Internal)</option>
-                                <option value="system">System (mpv)</option>
-                            </select>
-                        </div>
-                        <div class="setting-item">
-                            <label for="setting-language">Preferred Language:</label>
-                            <input type="text" id="setting-language" placeholder="e.g. eng, spa, jp" value="">
-                        </div>
-                        <div class="setting-item">
-                            <label for="setting-theme">Theme:</label>
-                            <select id="setting-theme">
-                                <option value="auto">Auto (Browser)</option>
-                                <option value="light">Light</option>
-                                <option value="dark">Dark</option>
-                            </select>
-                        </div>
-                                            <div class="setting-item">
-                                                <label for="setting-post-playback">After Playback:</label>
-                                                <select id="setting-post-playback">
-                                                    <option value="nothing">Do nothing</option>
-                                                    <option value="delete">Delete file</option>
-                                                    <option value="ask">Ask to delete</option>
-                                                </select>
-                                            </div>
-                                                                                    <div class="setting-item">
-                                                                                        <label for="setting-local-resume">Local Auto-resume:</label>
-                                                                                        <input type="checkbox" id="setting-local-resume" checked>
-                                                                                    </div>
-                                                                                </section>
-                                                                                                            <section>
-                        <h3>Search</h3>
-                        <div class="setting-item">
-                            <label for="limit">Result Limit:</label>
-                            <div style="display: flex; gap: 10px; align-items: center;">
-                                <input type="number" id="limit" value="100" min="1">
-                                <label style="font-size: 0.8rem; display: flex; align-items: center; gap: 4px; white-space: nowrap; cursor: pointer;">
-                                    <input type="checkbox" id="limit-all"> All
-                                </label>
-                            </div>
-                        </div>
-                    </section>
-
-                    <section id="db-settings">
-                        <h3>Databases</h3>
-                        <div id="db-checkbox-list">
-                            <!-- Database checkboxes will be injected here -->
-                        </div>
-                    </section>
-                </div>
+    <div id="settings-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Settings</h2>
+                <button class="close-modal">&times;</button>
             </div>
-        </div>
-
-        <!-- Confirm Delete Modal -->
-        <div id="confirm-modal" class="modal hidden">
-            <div class="modal-content" style="max-width: 400px;">
-                <div class="modal-header">
-                    <h2>Delete Item?</h2>
-                    <button class="close-modal">&times;</button>
-                </div>
-                <div class="modal-body" style="text-align: center;">
-                    <p id="confirm-msg">Playback finished. Move this file to trash?</p>
-                    <div style="display: flex; gap: 1rem; margin-top: 2rem; justify-content: center;">
-                        <button id="confirm-no" class="category-btn" style="flex: 1; text-align: center; background: var(--bg-color);">Keep</button>
-                        <button id="confirm-yes" class="category-btn" style="flex: 1; text-align: center; background: #e74c3c; color: white;">Delete</button>
+            <div class="modal-body">
+                <section>
+                    <h3>Playback</h3>
+                    <div class="setting-item">
+                        <label for="setting-player">Default Player:</label>
+                        <select id="setting-player">
+                            <option value="browser">Browser (Internal)</option>
+                            <option value="system">System (mpv)</option>
+                        </select>
                     </div>
+                    <div class="setting-item">
+                        <label for="setting-language">Preferred Language:</label>
+                        <input type="text" id="setting-language" placeholder="e.g. eng, spa, jp" value="">
+                    </div>
+                    <div class="setting-item">
+                        <label for="setting-theme">Theme:</label>
+                        <select id="setting-theme">
+                            <option value="auto">Auto (Browser)</option>
+                            <option value="light">Light</option>
+                            <option value="dark">Dark</option>
+                        </select>
+                    </div>
+                    <div class="setting-item">
+                        <label for="setting-post-playback">After Playback:</label>
+                        <select id="setting-post-playback">
+                            <option value="nothing">Do nothing</option>
+                            <option value="delete">Delete file</option>
+                            <option value="ask">Ask to delete</option>
+                        </select>
+                    </div>
+                    <div class="setting-item">
+                        <label for="setting-autoplay">Autoplay Next:</label>
+                        <input type="checkbox" id="setting-autoplay" checked>
+                    </div>
+                    <div class="setting-item">
+                        <label for="setting-local-resume">Auto-resume:</label>
+                        <input type="checkbox" id="setting-local-resume" checked>
+                    </div>
+                </section>
+                <section>
+                    <h3>Search</h3>
+                    <div class="setting-item">
+                        <label for="limit">Result Limit:</label>
+                        <div style="display: flex; gap: 10px; align-items: center;">
+                            <input type="number" id="limit" value="100" min="1">
+                            <label
+                                style="font-size: 0.8rem; display: flex; align-items: center; gap: 4px; white-space: nowrap; cursor: pointer;">
+                                <input type="checkbox" id="limit-all"> All
+                            </label>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="db-settings">
+                    <h3>Databases</h3>
+                    <div id="db-checkbox-list">
+                        <!-- Database checkboxes will be injected here -->
+                    </div>
+                </section>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirm Delete Modal -->
+    <div id="confirm-modal" class="modal hidden">
+        <div class="modal-content" style="max-width: 400px;">
+            <div class="modal-header">
+                <h2>Delete Item?</h2>
+                <button class="close-modal">&times;</button>
+            </div>
+            <div class="modal-body" style="text-align: center;">
+                <p id="confirm-msg">Playback finished. Move this file to trash?</p>
+                <div style="display: flex; gap: 1rem; margin-top: 2rem; justify-content: center;">
+                    <button id="confirm-no" class="category-btn"
+                        style="flex: 1; text-align: center; background: var(--bg-color);">Keep</button>
+                    <button id="confirm-yes" class="category-btn"
+                        style="flex: 1; text-align: center; background: #e74c3c; color: white;">Delete</button>
                 </div>
             </div>
         </div>
+    </div>
 
 
     <!-- Media Player (PiP Style) -->

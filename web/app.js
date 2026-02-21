@@ -40,6 +40,7 @@ document.addEventListener('DOMContentLoaded', () => {
         language: localStorage.getItem('disco-language') || '',
         theme: localStorage.getItem('disco-theme') || 'auto',
         postPlaybackAction: localStorage.getItem('disco-post-playback') || 'nothing',
+        autoplay: localStorage.getItem('disco-autoplay') !== 'false',
         localResume: localStorage.getItem('disco-local-resume') !== 'false',
         trashcan: false,
         globalProgress: false,
@@ -59,6 +60,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('setting-language').value = state.language;
     document.getElementById('setting-theme').value = state.theme;
     document.getElementById('setting-post-playback').value = state.postPlaybackAction;
+    document.getElementById('setting-autoplay').checked = state.autoplay;
     document.getElementById('setting-local-resume').checked = state.localResume;
     if (limitInput) limitInput.value = state.filters.limit;
     if (limitAll) limitAll.checked = state.filters.all;
@@ -911,24 +913,29 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // 1. Independent shortcuts (don't require active PiP)
+        if (!e.ctrlKey && !e.metaKey && !e.altKey) {
+            switch (e.key.toLowerCase()) {
+                case 'n':
+                    playSibling(1);
+                    return;
+                case 'p':
+                    playSibling(-1);
+                    return;
+                case 'c':
+                    if (state.playback.item) {
+                        const path = state.playback.item.path;
+                        navigator.clipboard.writeText(path).then(() => {
+                            showToast(`Copied path to clipboard`, '📋');
+                        }).catch(err => {
+                            console.error('Failed to copy path:', err);
+                            showToast('Failed to copy path');
+                        });
+                    }
+                    return;
+            }
+        }
+
         switch (e.key.toLowerCase()) {
-            case 'n':
-                playSibling(1);
-                return;
-            case 'p':
-                playSibling(-1);
-                return;
-            case 'c':
-                if (state.playback.item) {
-                    const path = state.playback.item.path;
-                    navigator.clipboard.writeText(path).then(() => {
-                        showToast(`Copied path to clipboard`, '📋');
-                    }).catch(err => {
-                        console.error('Failed to copy path:', err);
-                        showToast('Failed to copy path');
-                    });
-                }
-                return;
             case 'delete':
                 if (state.playback.item && !pipPlayer.classList.contains('hidden')) {
                     const itemToDelete = state.playback.item;
@@ -1028,15 +1035,20 @@ document.addEventListener('DOMContentLoaded', () => {
     function handlePostPlayback(item) {
         if (state.postPlaybackAction === 'delete') {
             deleteMedia(item.path);
+            if (state.autoplay) playSibling(1);
         } else if (state.postPlaybackAction === 'ask') {
             openModal('confirm-modal');
             document.getElementById('confirm-yes').onclick = () => {
                 closeModal('confirm-modal');
                 deleteMedia(item.path);
+                if (state.autoplay) playSibling(1);
             };
             document.getElementById('confirm-no').onclick = () => {
                 closeModal('confirm-modal');
+                if (state.autoplay) playSibling(1);
             };
+        } else {
+            if (state.autoplay) playSibling(1);
         }
     }
 
@@ -1107,6 +1119,12 @@ document.addEventListener('DOMContentLoaded', () => {
     if (settingPostPlayback) settingPostPlayback.onchange = (e) => {
         state.postPlaybackAction = e.target.value;
         localStorage.setItem('disco-post-playback', state.postPlaybackAction);
+    };
+
+    const settingAutoplay = document.getElementById('setting-autoplay');
+    if (settingAutoplay) settingAutoplay.onchange = (e) => {
+        state.autoplay = e.target.checked;
+        localStorage.setItem('disco-autoplay', state.autoplay);
     };
 
     const settingLocalResume = document.getElementById('setting-local-resume');
