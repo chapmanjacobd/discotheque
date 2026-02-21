@@ -330,13 +330,15 @@ func (c *ServeCmd) handleProgress(w http.ResponseWriter, r *http.Request) {
 
 		// Use raw SQL to update progress to avoid complex sqlc param mapping if not existing
 		// We want to increment play_count only once per session ideally, but for now we follow simple logic
-		_, err = sqlDB.ExecContext(r.Context(), `
+		if _, err := sqlDB.ExecContext(r.Context(), `
 			UPDATE media 
 			SET time_last_played = ?,
 			    time_first_played = COALESCE(time_first_played, ?),
 			    playhead = ?
 			WHERE path = ?`,
-			now, now, req.Playhead, req.Path)
+			now, now, req.Playhead, req.Path); err != nil {
+			slog.Error("Failed to update progress", "db", dbPath, "error", err)
+		}
 
 		sqlDB.Close()
 	}
@@ -364,7 +366,9 @@ func (c *ServeCmd) handleRate(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			continue
 		}
-		_, err = sqlDB.ExecContext(r.Context(), "UPDATE media SET score = ? WHERE path = ?", req.Score, req.Path)
+		if _, err := sqlDB.ExecContext(r.Context(), "UPDATE media SET score = ? WHERE path = ?", req.Score, req.Path); err != nil {
+			slog.Error("Failed to update rating", "db", dbPath, "error", err)
+		}
 		sqlDB.Close()
 	}
 

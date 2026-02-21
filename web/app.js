@@ -10,7 +10,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const viewDetails = document.getElementById('view-details');
     const categoryList = document.getElementById('category-list');
     const toast = document.getElementById('toast');
-    
+
     const pipPlayer = document.getElementById('pip-player');
     const pipViewer = document.getElementById('media-viewer');
     const pipTitle = document.getElementById('media-title');
@@ -84,7 +84,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (state.filters.rating !== '') params.set('rating', state.filters.rating);
             if (state.filters.search) params.set('search', state.filters.search);
         }
-        
+
         const newUrl = params.toString() ? `?${params.toString()}` : window.location.pathname;
         if (window.location.search !== `?${params.toString()}`) {
             window.history.pushState(state.filters, '', newUrl);
@@ -94,7 +94,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function readUrl() {
         const params = new URLSearchParams(window.location.search);
         const view = params.get('view');
-        
+
         if (view === 'trash') {
             state.page = 'trash';
             state.filters.category = '';
@@ -128,7 +128,7 @@ document.addEventListener('DOMContentLoaded', () => {
             allDatabases = data.databases;
             state.trashcan = data.trashcan;
             state.globalProgress = data.global_progress;
-            
+
             renderDbSettingsList(allDatabases);
             if (state.trashcan) {
                 document.getElementById('trash-section').classList.remove('hidden');
@@ -188,11 +188,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 const rating = e.target.dataset.rating;
                 state.filters.rating = rating;
                 state.filters.category = ''; // Clear category filter
-                
+
                 document.querySelectorAll('.category-btn').forEach(b => b.classList.remove('active'));
                 if (trashBtn) trashBtn.classList.remove('active');
                 e.target.classList.add('active');
-                
+
                 performSearch();
             };
         });
@@ -218,20 +218,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
         try {
             const params = new URLSearchParams();
-            
+
                         if (state.filters.search) params.append('search', state.filters.search);
                         if (state.filters.category) params.append('category', state.filters.category);
                         if (state.filters.rating !== '') params.append('rating', state.filters.rating);
                         params.append('sort', state.filters.sort);
-            
+
             if (state.filters.reverse) params.append('reverse', 'true');
-            
+
             if (state.filters.all) {
                 params.append('all', 'true');
             } else {
                 params.append('limit', state.filters.limit);
             }
-            
+
             state.filters.types.forEach(t => {
                 if (t === 'video') params.append('video', 'true');
                 if (t === 'audio') params.append('audio', 'true');
@@ -241,7 +241,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const resp = await fetch(`/api/query?${params.toString()}`, {
                 signal: searchAbortController.signal
             });
-            
+
             if (!resp.ok) {
                 const text = await resp.text();
                 throw new Error(text || `Server returned ${resp.status}`);
@@ -252,7 +252,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Client-side DB filtering
             currentMedia = data.filter(item => !state.filters.excludedDbs.includes(item.db));
-            
+
             renderResults();
         } catch (err) {
             if (err.name === 'AbortError') return;
@@ -277,7 +277,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function emptyBin() {
         if (!confirm('Are you sure you want to permanently delete all files in the trash?')) return;
-        
+
         try {
             const resp = await fetch('/api/empty-bin', { method: 'POST' });
             if (!resp.ok) throw new Error('Failed to empty bin');
@@ -294,7 +294,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const itemEl = document.querySelector(`[data-path="${CSS.escape(path)}"]`);
         const content = document.querySelector('.content');
         const main = document.querySelector('main');
-        
+
         if (itemEl && !restore) {
             itemEl.classList.add('fade-out');
 
@@ -310,14 +310,14 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             if (!resp.ok) throw new Error('Action failed');
-            
+
             if (restore) {
                 showToast('Item restored');
             } else {
                 const filename = path.split('/').pop();
                 showToast(`Trashed ${filename}`, '🗑️');
             }
-            
+
             if (state.page === 'trash') {
                 fetchTrash();
             } else {
@@ -380,7 +380,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const now = Date.now();
         const sessionTime = (now - state.playback.startTime) / 1000;
-        
+
         if (!isComplete && sessionTime < 90) return; // 90s threshold
         if (!isComplete && (now - state.playback.lastUpdate) < 30000) return; // 30s interval
 
@@ -390,10 +390,10 @@ document.addEventListener('DOMContentLoaded', () => {
             await fetch('/api/progress', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                    path: item.path, 
-                    playhead: isComplete ? 0 : Math.floor(playhead), 
-                    duration: Math.floor(duration) 
+                body: JSON.stringify({
+                    path: item.path,
+                    playhead: isComplete ? 0 : Math.floor(playhead),
+                    duration: Math.floor(duration)
                 })
             });
         } catch (err) {
@@ -403,7 +403,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function playSibling(offset) {
         if (currentMedia.length === 0) return;
-        
+
         let currentIndex = -1;
         let itemGone = false;
         if (state.playback.item) {
@@ -460,7 +460,7 @@ document.addEventListener('DOMContentLoaded', () => {
         pipViewer.innerHTML = '';
         lyricsDisplay.classList.add('hidden');
         lyricsDisplay.textContent = '';
-        
+
         pipPlayer.classList.remove('hidden');
         pipPlayer.classList.remove('minimized');
 
@@ -496,7 +496,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 track.label = label;
                 track.srclang = state.language || 'en';
                 track.src = trackUrl;
-                
+
                 track.onload = () => {
                     // Try to auto-enable
                     if (el.textTracks.length <= 1) {
@@ -515,7 +515,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 el.appendChild(track);
                 // Hint to browser to load it
                 if (el.textTracks.length <= 1) track.default = true;
-                
+
                 return track;
             };
 
@@ -525,10 +525,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 codecs.forEach((codec, index) => {
                     const isExt = codec.startsWith('.');
                     const label = isExt ? `External (${codec})` : (codec || `Embedded #${index + 1}`);
-                    const trackUrl = isExt ? 
+                    const trackUrl = isExt ?
                         `/api/subtitles?path=${encodeURIComponent(item.path.substring(0, item.path.lastIndexOf('.')) + codec)}` :
                         `/api/subtitles?path=${encodeURIComponent(path)}&index=${index}`;
-                    
+
                     addTrack(trackUrl, label, index);
                 });
             }
@@ -565,13 +565,13 @@ document.addEventListener('DOMContentLoaded', () => {
             track.src = `/api/subtitles?path=${encodeURIComponent(path)}`;
             track.srclang = state.language || 'en';
             el.appendChild(track);
-            
+
             track.onload = () => {
                 const textTrack = el.textTracks[0];
                 if (textTrack.cues && textTrack.cues.length > 0) {
                     lyricsDisplay.classList.remove('hidden');
                     textTrack.mode = 'hidden';
-                    
+
                     el.ontimeupdate = () => {
                         const cue = Array.from(textTrack.activeCues || []).pop();
                         if (cue) {
@@ -659,9 +659,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const size = formatSize(item.size);
             const duration = formatDuration(item.duration);
             const thumbUrl = `/api/thumbnail?path=${encodeURIComponent(item.path)}`;
-            
+
             const isTrash = state.page === 'trash';
-            const actionBtn = isTrash ? 
+            const actionBtn = isTrash ?
                 `<button class="media-action-btn restore" title="Restore">↺</button>` :
                 `<button class="media-action-btn delete" title="Move to Trash">🗑️</button>`;
 
@@ -695,7 +695,7 @@ document.addEventListener('DOMContentLoaded', () => {
         resultsContainer.className = 'details-view';
         const table = document.createElement('table');
         table.className = 'details-table';
-        
+
         const isTrash = state.page === 'trash';
         const sortIcon = (field) => {
             if (state.filters.sort !== field) return '↕️';
@@ -775,7 +775,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderDbSettingsList(dbs) {
         const list = document.getElementById('db-checkbox-list');
         if (!list) return;
-        
+
         list.innerHTML = dbs.map(db => `
             <label class="db-checkbox-item">
                 <input type="checkbox" value="${db}" ${!state.filters.excludedDbs.includes(db) ? 'checked' : ''}>
@@ -800,7 +800,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function renderCategoryList() {
         if (!categoryList) return;
-        
+
         const trashBtn = document.getElementById('trash-btn');
         if (trashBtn && state.page !== 'trash') trashBtn.classList.remove('active');
 
@@ -823,11 +823,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 const cat = e.target.dataset.cat;
                 state.filters.category = cat;
                 state.filters.rating = ''; // Clear rating filter
-                
+
                 document.querySelectorAll('.category-btn').forEach(b => b.classList.remove('active'));
                 if (trashBtn) trashBtn.classList.remove('active');
                 e.target.classList.add('active');
-                
+
                 performSearch();
             };
         });
@@ -1053,8 +1053,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const debouncedSearch = debounce(performSearch, 300);
 
     const settingsBtn = document.getElementById('settings-button');
-    if (settingsBtn) settingsBtn.onclick = () => openModal('settings-modal');
-    
+    if (settingsBtn) settingsBtn.onclick = () => {
+        calculateStorageSize();
+        openModal('settings-modal');
+    };
+
     document.querySelectorAll('.close-modal').forEach(btn => {
         btn.onclick = (e) => {
             const modal = e.target.closest('.modal');
@@ -1064,7 +1067,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const closePipBtn = document.querySelector('.close-pip');
     if (closePipBtn) closePipBtn.onclick = closePiP;
-    
+
     const pipMinimizeBtn = document.getElementById('pip-minimize');
     if (pipMinimizeBtn) pipMinimizeBtn.onclick = () => {
         pipPlayer.classList.toggle('minimized');
@@ -1080,7 +1083,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (settingLanguage) settingLanguage.oninput = (e) => {
         state.language = e.target.value;
         localStorage.setItem('disco-language', state.language);
-        
+
         // Update current tracks
         const media = pipViewer.querySelector('video, audio');
         if (media) {
@@ -1114,6 +1117,41 @@ document.addEventListener('DOMContentLoaded', () => {
         state.localResume = e.target.checked;
         localStorage.setItem('disco-local-resume', state.localResume);
     };
+
+    function calculateStorageSize() {
+        const display = document.getElementById('storage-size');
+        if (!display) return;
+
+        let total = 0;
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            const val = localStorage.getItem(key);
+            total += (key.length + val.length) * 2; // Rough estimate in bytes (UTF-16)
+        }
+
+        display.textContent = formatSize(total);
+    }
+
+    const clearStorageBtn = document.getElementById('clear-storage-btn');
+    if (clearStorageBtn) {
+        clearStorageBtn.onclick = () => {
+            const keysToKeep = [
+                'disco-player', 'disco-language', 'disco-theme',
+                'disco-post-playback', 'disco-autoplay', 'disco-local-resume',
+                'disco-limit', 'disco-limit-all', 'disco-excluded-dbs'
+            ];
+
+            const keys = Object.keys(localStorage);
+            keys.forEach(key => {
+                if (key.startsWith('disco-') && !keysToKeep.includes(key)) {
+                    localStorage.removeItem(key);
+                }
+            });
+
+            showToast(`Cleared temporary items`, '🧹');
+            calculateStorageSize();
+        };
+    }
 
     // Close modal on outside click
     window.onclick = (event) => {
