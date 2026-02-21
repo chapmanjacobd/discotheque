@@ -28,6 +28,7 @@ document.addEventListener('DOMContentLoaded', () => {
             types: ['video', 'audio'], // Default selection
             search: '',
             category: '',
+            rating: '',
             sort: 'path',
             reverse: false,
             limit: 100,
@@ -43,6 +44,7 @@ document.addEventListener('DOMContentLoaded', () => {
         trashcan: false,
         globalProgress: false,
         categories: [],
+        ratings: [],
         playback: {
             item: null,
             timer: null,
@@ -100,6 +102,54 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    async function fetchRatings() {
+        try {
+            const resp = await fetch('/api/ratings');
+            if (!resp.ok) throw new Error('Failed to fetch ratings');
+            state.ratings = await resp.json();
+            renderRatingList();
+        } catch (err) {
+            console.error('Failed to fetch ratings', err);
+        }
+    }
+
+    function renderRatingList() {
+        const ratingList = document.getElementById('rating-list');
+        if (!ratingList) return;
+
+        const trashBtn = document.getElementById('trash-btn');
+
+        const sortedRatings = [...state.ratings].sort((a, b) => {
+            if (a.rating === 0) return 1;
+            if (b.rating === 0) return -1;
+            return b.rating - a.rating; // Keep 5 stars at top
+        });
+
+        ratingList.innerHTML = sortedRatings.map(r => {
+            const stars = r.rating === 0 ? '☆☆☆☆☆' : '⭐'.repeat(r.rating);
+            const label = r.rating === 0 ? 'Unrated' : `${r.rating} Stars`;
+            return `
+                <button class="category-btn ${state.filters.rating === r.rating.toString() ? 'active' : ''}" data-rating="${r.rating}">
+                    ${stars} <small>(${r.count})</small>
+                </button>
+            `;
+        }).join('');
+
+        ratingList.querySelectorAll('.category-btn').forEach(btn => {
+            btn.onclick = (e) => {
+                const rating = e.target.dataset.rating;
+                state.filters.rating = rating;
+                state.filters.category = ''; // Clear category filter
+                
+                document.querySelectorAll('.category-btn').forEach(b => b.classList.remove('active'));
+                if (trashBtn) trashBtn.classList.remove('active');
+                e.target.classList.add('active');
+                
+                performSearch();
+            };
+        });
+    }
+
     async function performSearch() {
         state.page = 'search';
         if (searchAbortController) {
@@ -117,10 +167,11 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const params = new URLSearchParams();
             
-            if (state.filters.search) params.append('search', state.filters.search);
-            if (state.filters.category) params.append('category', state.filters.category);
+                        if (state.filters.search) params.append('search', state.filters.search);
+                        if (state.filters.category) params.append('category', state.filters.category);
+                        if (state.filters.rating !== '') params.append('rating', state.filters.rating);
+                        params.append('sort', state.filters.sort);
             
-            params.append('sort', state.filters.sort);
             if (state.filters.reverse) params.append('reverse', 'true');
             
             if (state.filters.all) {
@@ -343,6 +394,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 body: JSON.stringify({ path: item.path, score: score })
             });
             showToast(`Rated: ${'⭐'.repeat(score)}`);
+            fetchRatings();
         } catch (err) {
             console.error('Failed to rate media:', err);
         }
@@ -702,9 +754,15 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const trashBtn = document.getElementById('trash-btn');
 
+        const sortedCategories = [...state.categories].sort((a, b) => {
+            if (a.category === 'Uncategorized') return 1;
+            if (b.category === 'Uncategorized') return -1;
+            return b.count - a.count;
+        });
+
         categoryList.innerHTML = `
             <button class="category-btn ${state.filters.category === '' ? 'active' : ''}" data-cat="">All Media</button>
-        ` + state.categories.map(c => `
+        ` + sortedCategories.map(c => `
             <button class="category-btn ${state.filters.category === c.category ? 'active' : ''}" data-cat="${c.category}">
                 ${c.category} <small>(${c.count})</small>
             </button>
@@ -714,8 +772,9 @@ document.addEventListener('DOMContentLoaded', () => {
             btn.onclick = (e) => {
                 const cat = e.target.dataset.cat;
                 state.filters.category = cat;
+                state.filters.rating = ''; // Clear rating filter
                 
-                categoryList.querySelectorAll('.category-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.category-btn').forEach(b => b.classList.remove('active'));
                 if (trashBtn) trashBtn.classList.remove('active');
                 e.target.classList.add('active');
                 
@@ -1036,6 +1095,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Initial load
     fetchDatabases();
     fetchCategories();
+    fetchRatings();
     renderCategoryList();
     performSearch();
     setupAutoReload();

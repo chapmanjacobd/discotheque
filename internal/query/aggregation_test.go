@@ -72,13 +72,17 @@ func TestAggregateByDepth(t *testing.T) {
 	}
 
 	// Depth 3: /home/user/vids and /home/user/music
-	got := AggregateByDepth(media, models.GlobalFlags{Depth: 3})
+	got := AggregateByDepth(media, models.GlobalFlags{
+		DisplayFlags: models.DisplayFlags{Depth: 3},
+	})
 	if len(got) != 2 {
 		t.Errorf("Expected 2 groups at depth 3, got %d", len(got))
 	}
 
 	// Parents mode
-	got = AggregateByDepth(media, models.GlobalFlags{Parents: true, MinDepth: 1})
+	got = AggregateByDepth(media, models.GlobalFlags{
+		DisplayFlags: models.DisplayFlags{Parents: true, MinDepth: 1},
+	})
 	// Should have: /home, /home/user, /home/user/vids, /home/user/vids/v1.mp4, /home/user/vids/v2.mp4, /home/user/music, /home/user/music/a1.mp3
 	if len(got) != 7 {
 		t.Errorf("Expected 7 groups in parents mode, got %d", len(got))
@@ -95,7 +99,9 @@ func TestAggregateByDepthExtended(t *testing.T) {
 		{Media: models.Media{Path: "/dir2/f3.mp4", Size: &size300}},
 	}
 
-	got := AggregateByDepth(media, models.GlobalFlags{Depth: 1})
+	got := AggregateByDepth(media, models.GlobalFlags{
+		DisplayFlags: models.DisplayFlags{Depth: 1},
+	})
 	if len(got) != 2 {
 		t.Errorf("Expected 2 groups, got %d", len(got))
 	}
@@ -125,8 +131,10 @@ func TestAggregatePostFiltering(t *testing.T) {
 
 	// Filter by size > 150
 	flags := models.GlobalFlags{
-		Depth:       1,
-		FolderSizes: []string{">150B"},
+		DisplayFlags: models.DisplayFlags{
+			Depth:       1,
+			FolderSizes: []string{">150B"},
+		},
 	}
 	got := AggregateMedia(media, flags)
 	if len(got) != 1 {

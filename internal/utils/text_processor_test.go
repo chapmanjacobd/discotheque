@@ -15,8 +15,10 @@ func TestTextProcessor(t *testing.T) {
 	}
 
 	flags := models.GlobalFlags{
-		WordSorts: []string{"alpha"},
-		LineSorts: []string{"count"},
+		TextFlags: models.TextFlags{
+			WordSorts: []string{"alpha"},
+			LineSorts: []string{"count"},
+		},
 	}
 
 	// All lines have 3 words, so count sorting won't change order if stable.

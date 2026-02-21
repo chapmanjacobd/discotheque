@@ -51,6 +51,7 @@ func (c *ServeCmd) Run(ctx *kong.Context) error {
 
 	http.HandleFunc("/api/databases", c.handleDatabases)
 	http.HandleFunc("/api/categories", c.handleCategories)
+	http.HandleFunc("/api/ratings", c.handleRatings)
 	http.HandleFunc("/api/query", c.handleQuery)
 	http.HandleFunc("/api/play", c.handlePlay)
 	http.HandleFunc("/api/delete", c.handleDelete)
@@ -134,6 +135,43 @@ func (c *ServeCmd) handleCategories(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(res)
 }
 
+func (c *ServeCmd) handleRatings(w http.ResponseWriter, r *http.Request) {
+	counts := make(map[int64]int64)
+
+	for _, dbPath := range c.Databases {
+		sqlDB, err := database.Connect(dbPath)
+		if err != nil {
+			continue
+		}
+		queries := database.New(sqlDB)
+		stats, err := queries.GetRatingStats(r.Context())
+		sqlDB.Close()
+		if err != nil {
+			continue
+		}
+
+		for _, s := range stats {
+			counts[s.Rating] = counts[s.Rating] + s.Count
+		}
+	}
+
+	type ratStat struct {
+		Rating int64 `json:"rating"`
+		Count  int64 `json:"count"`
+	}
+	var res []ratStat
+	for k, v := range counts {
+		res = append(res, ratStat{Rating: k, Count: v})
+	}
+
+	sort.Slice(res, func(i, j int) bool {
+		return res[i].Rating > res[j].Rating
+	})
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(res)
+}
+
 func (c *ServeCmd) handleQuery(w http.ResponseWriter, r *http.Request) {
 	flags := c.GlobalFlags
 
@@ -144,6 +182,15 @@ func (c *ServeCmd) handleQuery(w http.ResponseWriter, r *http.Request) {
 	}
 	if category := q.Get("category"); category != "" {
 		flags.Category = category
+	}
+	if rating := q.Get("rating"); rating != "" {
+		if r, err := strconv.Atoi(rating); err == nil {
+			if r == 0 {
+				flags.Where = append(flags.Where, "(score IS NULL OR score = 0)")
+			} else {
+				flags.Where = append(flags.Where, fmt.Sprintf("score = %d", r))
+			}
+		}
 	}
 	if sortBy := q.Get("sort"); sortBy != "" {
 		flags.SortBy = sortBy
@@ -293,7 +340,7 @@ func (c *ServeCmd) handleProgress(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			continue
 		}
-		
+
 		// Use raw SQL to update progress to avoid complex sqlc param mapping if not existing
 		// We want to increment play_count only once per session ideally, but for now we follow simple logic
 		_, err = sqlDB.ExecContext(r.Context(), `
@@ -301,9 +348,9 @@ func (c *ServeCmd) handleProgress(w http.ResponseWriter, r *http.Request) {
 			SET time_last_played = ?,
 			    time_first_played = COALESCE(time_first_played, ?),
 			    playhead = ?
-			WHERE path = ?`, 
+			WHERE path = ?`,
 			now, now, req.Playhead, req.Path)
-		
+
 		sqlDB.Close()
 		if err == nil {
 			break

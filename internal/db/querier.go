@@ -21,6 +21,7 @@ type Querier interface {
 	GetMediaByType(ctx context.Context, arg GetMediaByTypeParams) ([]Media, error)
 	GetPlaylists(ctx context.Context) ([]Playlists, error)
 	GetRandomMedia(ctx context.Context, limit int64) ([]Media, error)
+	GetRatingStats(ctx context.Context) ([]GetRatingStatsRow, error)
 	GetSiblingMedia(ctx context.Context, arg GetSiblingMediaParams) ([]Media, error)
 	GetStats(ctx context.Context) (GetStatsRow, error)
 	GetStatsByType(ctx context.Context) ([]GetStatsByTypeRow, error)

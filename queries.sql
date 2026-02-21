@@ -144,6 +144,13 @@ UNION ALL
 SELECT 'Uncategorized' as category, COUNT(*) as count FROM media WHERE time_deleted = 0 AND (categories IS NULL OR categories = '')
 ORDER BY count DESC;
 
+-- name: GetRatingStats :many
+SELECT CAST(COALESCE(score, 0) AS INTEGER) as rating, COUNT(*) as count
+FROM media
+WHERE time_deleted = 0
+GROUP BY rating
+ORDER BY rating DESC;
+
 -- name: UpsertMedia :exec
 INSERT INTO media (
     path, title, duration, size, time_created, time_modified,

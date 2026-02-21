@@ -69,6 +69,8 @@ UNION ALL
 SELECT 'tech' as category, COUNT(*) as count FROM media WHERE time_deleted = 0 AND categories LIKE '%;tech;%'
 UNION ALL
 SELECT 'audiobook' as category, COUNT(*) as count FROM media WHERE time_deleted = 0 AND categories LIKE '%;audiobook;%'
+UNION ALL
+SELECT 'Uncategorized' as category, COUNT(*) as count FROM media WHERE time_deleted = 0 AND (categories IS NULL OR categories = '')
 ORDER BY count DESC
 `
 
@@ -761,6 +763,42 @@ func (q *Queries) GetRandomMedia(ctx context.Context, limit int64) ([]Media, err
 			&i.Latitude,
 			&i.Longitude,
 		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getRatingStats = `-- name: GetRatingStats :many
+SELECT CAST(COALESCE(score, 0) AS INTEGER) as rating, COUNT(*) as count
+FROM media
+WHERE time_deleted = 0
+GROUP BY rating
+ORDER BY rating DESC
+`
+
+type GetRatingStatsRow struct {
+	Rating int64 `json:"rating"`
+	Count  int64 `json:"count"`
+}
+
+func (q *Queries) GetRatingStats(ctx context.Context) ([]GetRatingStatsRow, error) {
+	rows, err := q.db.QueryContext(ctx, getRatingStats)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetRatingStatsRow{}
+	for rows.Next() {
+		var i GetRatingStatsRow
+		if err := rows.Scan(&i.Rating, &i.Count); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

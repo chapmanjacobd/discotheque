@@ -80,7 +80,7 @@ func (c *ReadmeCmd) Run(ctx *kong.Context) error {
 		sb.WriteString("<details><summary>All Options</summary>\n\n")
 		sb.WriteString("```bash\n")
 		sb.WriteString(fmt.Sprintf("$ disco %s --help\n", node.Name))
-		
+
 		if len(node.Flags) > 0 {
 			sb.WriteString("\nFlags:\n")
 			for _, flag := range node.Flags {
@@ -95,7 +95,7 @@ func (c *ReadmeCmd) Run(ctx *kong.Context) error {
 				sb.WriteString(fmt.Sprintf("        %s\n", flag.Help))
 			}
 		}
-		
+
 		sb.WriteString("```\n\n")
 		sb.WriteString("</details>\n\n")
 	}

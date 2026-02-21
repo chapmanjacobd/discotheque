@@ -43,10 +43,14 @@ func TestComplexFilteringAndAggregation(t *testing.T) {
 		// Filter: Size > 50MB, Duration < 30min, Extension .mp4
 		cmd := &PrintCmd{
 			GlobalFlags: models.GlobalFlags{
-				Size:     []string{">50MB"},
-				Duration: []string{"<30min"},
-				Ext:      []string{".mp4"},
-				JSON:     true,
+				FilterFlags: models.FilterFlags{
+					Size:     []string{">50MB"},
+					Duration: []string{"<30min"},
+					Ext:      []string{".mp4"},
+				},
+				DisplayFlags: models.DisplayFlags{
+					JSON: true,
+				},
 			},
 			Args: []string{dbPath},
 		}
@@ -79,10 +83,14 @@ func TestComplexFilteringAndAggregation(t *testing.T) {
 		// Aggregate by directory (BigDirs), sort by size reverse
 		cmd := &PrintCmd{
 			GlobalFlags: models.GlobalFlags{
-				BigDirs: true,
-				SortBy:  "size",
-				Reverse: true,
-				JSON:    true,
+				DisplayFlags: models.DisplayFlags{
+					BigDirs: true,
+					JSON:    true,
+				},
+				SortFlags: models.SortFlags{
+					SortBy:  "size",
+					Reverse: true,
+				},
 			},
 			Args: []string{dbPath},
 		}
@@ -122,7 +130,9 @@ func TestClusterSort(t *testing.T) {
 	t.Run("BasicClustering", func(t *testing.T) {
 		cmd := &ClusterSortCmd{
 			GlobalFlags: models.GlobalFlags{
-				PrintGroups: true,
+				SimilarityFlags: models.SimilarityFlags{
+					PrintGroups: true,
+				},
 			},
 			InputPath: "-",
 		}
@@ -175,9 +185,13 @@ func TestStatsWithFrequency(t *testing.T) {
 	cmd := &StatsCmd{
 		Facet:     "watched",
 		Databases: []string{dbPath},
-		GlobalFlags: models.GlobalFlags{
-			Frequency: "daily",
-			JSON:      true,
+		PlaybackFlags: models.PlaybackFlags{
+			GlobalFlags: models.GlobalFlags{
+				DisplayFlags: models.DisplayFlags{
+					Frequency: "daily",
+					JSON:      true,
+				},
+			},
 		},
 	}
 

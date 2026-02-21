@@ -76,17 +76,17 @@ type FilterFlags struct {
 	InProgress   bool   `help:"Show only items in progress" group:"Filter"`
 
 	// Content type filters
-	VideoOnly       bool `help:"Only video files" group:"Filter"`
-	AudioOnly       bool `help:"Only audio files" group:"Filter"`
-	ImageOnly       bool `help:"Only image files" group:"Filter"`
-	Portrait        bool `help:"Only portrait orientation files" group:"Filter"`
-	ScanSubtitles   bool `help:"Scan for external subtitles during import" group:"Filter"`
-	OnlineMediaOnly bool `help:"Exclude local media" group:"Filter"`
-	LocalMediaOnly  bool `help:"Exclude online media" group:"Filter"`
-	FlexibleSearch  bool `help:"Flexible search (fuzzy)" group:"Filter"`
-	Exact           bool `help:"Exact match for search" group:"Filter"`
+	VideoOnly       bool     `help:"Only video files" group:"Filter"`
+	AudioOnly       bool     `help:"Only audio files" group:"Filter"`
+	ImageOnly       bool     `help:"Only image files" group:"Filter"`
+	Portrait        bool     `help:"Only portrait orientation files" group:"Filter"`
+	ScanSubtitles   bool     `help:"Scan for external subtitles during import" group:"Filter"`
+	OnlineMediaOnly bool     `help:"Exclude local media" group:"Filter"`
+	LocalMediaOnly  bool     `help:"Exclude online media" group:"Filter"`
+	FlexibleSearch  bool     `help:"Flexible search (fuzzy)" group:"Filter"`
+	Exact           bool     `help:"Exact match for search" group:"Filter"`
 	Where           []string `short:"w" help:"SQL where clause(s)" group:"Filter"`
-	Exists          bool `help:"Filter out non-existent files" group:"Filter"`
+	Exists          bool     `help:"Filter out non-existent files" group:"Filter"`
 
 	MimeType   []string `help:"Filter by mimetype substring (e.g., video, mp4)" group:"Filter"`
 	NoMimeType []string `help:"Exclude by mimetype substring" group:"Filter"`

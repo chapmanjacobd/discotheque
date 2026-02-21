@@ -223,6 +223,19 @@ main {
     font-weight: 500;
 }
 
+#rating-list, #category-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+#rating-list .category-btn, #category-list .category-btn {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
 #maintenance-list {
     display: flex;
     flex-direction: column;

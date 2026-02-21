@@ -2964,6 +2964,8 @@ Flags:
         Enable development mode (auto-reload)
   --trashcan
         Enable trash/recycle page and empty bin functionality
+  --global-progress
+        Enable server-side playback progress tracking
 ```
 
 </details>

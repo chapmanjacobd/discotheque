@@ -10,7 +10,7 @@ import (
 
 func FindMedia(root string, filter map[string]bool) (map[string]os.FileInfo, error) {
 	files := make(map[string]os.FileInfo)
-	
+
 	allowed := filter
 	if allowed == nil {
 		allowed = utils.MediaExtensionMap

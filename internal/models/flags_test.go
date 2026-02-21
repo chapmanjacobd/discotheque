@@ -7,7 +7,9 @@ import (
 
 func TestGlobalFlags_AfterApply(t *testing.T) {
 	flags := GlobalFlags{
-		Ext: []string{"mp4", ".mkv"},
+		FilterFlags: FilterFlags{
+			Ext: []string{"mp4", ".mkv"},
+		},
 	}
 	err := flags.AfterApply()
 	if err != nil {

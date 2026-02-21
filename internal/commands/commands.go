@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -1210,14 +1211,10 @@ func (c *AddCmd) Run(ctx *kong.Context) error {
 		if c.VideoOnly || c.AudioOnly {
 			filter = make(map[string]bool)
 			if c.VideoOnly {
-				for k, v := range utils.VideoExtensionMap {
-					filter[k] = v
-				}
+				maps.Copy(filter, utils.VideoExtensionMap)
 			}
 			if c.AudioOnly {
-				for k, v := range utils.AudioExtensionMap {
-					filter[k] = v
-				}
+				maps.Copy(filter, utils.AudioExtensionMap)
 			}
 		}
 
