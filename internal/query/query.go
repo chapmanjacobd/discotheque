@@ -66,8 +66,12 @@ func (qb *QueryBuilder) Build() (string, []any) {
 
 	// Category filter
 	if qb.Flags.Category != "" {
-		whereClauses = append(whereClauses, "categories LIKE '%' || ? || '%'")
-		args = append(args, ";"+qb.Flags.Category+";")
+		if qb.Flags.Category == "Uncategorized" {
+			whereClauses = append(whereClauses, "(categories IS NULL OR categories = '')")
+		} else {
+			whereClauses = append(whereClauses, "categories LIKE '%' || ? || '%'")
+			args = append(args, ";"+qb.Flags.Category+";")
+		}
 	}
 
 	// Search terms (FTS or LIKE)

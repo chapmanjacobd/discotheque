@@ -140,6 +140,8 @@ UNION ALL
 SELECT 'tech' as category, COUNT(*) as count FROM media WHERE time_deleted = 0 AND categories LIKE '%;tech;%'
 UNION ALL
 SELECT 'audiobook' as category, COUNT(*) as count FROM media WHERE time_deleted = 0 AND categories LIKE '%;audiobook;%'
+UNION ALL
+SELECT 'Uncategorized' as category, COUNT(*) as count FROM media WHERE time_deleted = 0 AND (categories IS NULL OR categories = '')
 ORDER BY count DESC;
 
 -- name: UpsertMedia :exec

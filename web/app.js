@@ -39,8 +39,17 @@ document.addEventListener('DOMContentLoaded', () => {
         language: localStorage.getItem('disco-language') || '',
         theme: localStorage.getItem('disco-theme') || 'auto',
         postPlaybackAction: localStorage.getItem('disco-post-playback') || 'nothing',
+        localResume: localStorage.getItem('disco-local-resume') !== 'false',
         trashcan: false,
-        categories: []
+        globalProgress: false,
+        categories: [],
+        playback: {
+            item: null,
+            timer: null,
+            startTime: null,
+            lastUpdate: 0,
+            lastPlayedIndex: -1
+        }
     };
 
     // Initialize UI from state
@@ -48,6 +57,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('setting-language').value = state.language;
     document.getElementById('setting-theme').value = state.theme;
     document.getElementById('setting-post-playback').value = state.postPlaybackAction;
+    document.getElementById('setting-local-resume').checked = state.localResume;
     if (limitInput) limitInput.value = state.filters.limit;
     if (limitAll) limitAll.checked = state.filters.all;
 
@@ -68,6 +78,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await resp.json();
             allDatabases = data.databases;
             state.trashcan = data.trashcan;
+            state.globalProgress = data.global_progress;
             
             renderDbSettingsList(allDatabases);
             if (state.trashcan) {
@@ -259,7 +270,90 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    async function updateProgress(item, playhead, duration, isComplete = false) {
+        // Local progress is always saved if enabled
+        if (state.localResume) {
+            const progress = JSON.parse(localStorage.getItem('disco-progress') || '{}');
+            if (isComplete) {
+                delete progress[item.path];
+            } else {
+                progress[item.path] = Math.floor(playhead);
+            }
+            localStorage.setItem('disco-progress', JSON.stringify(progress));
+        }
+
+        if (!state.globalProgress) return;
+
+        // Server sync logic
+        if (item.type.includes('audio') && duration < 420) return; // 7 minutes
+
+        const now = Date.now();
+        const sessionTime = (now - state.playback.startTime) / 1000;
+        
+        if (!isComplete && sessionTime < 90) return; // 90s threshold
+        if (!isComplete && (now - state.playback.lastUpdate) < 30000) return; // 30s interval
+
+        state.playback.lastUpdate = now;
+
+        try {
+            await fetch('/api/progress', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    path: item.path, 
+                    playhead: isComplete ? 0 : Math.floor(playhead), 
+                    duration: Math.floor(duration) 
+                })
+            });
+        } catch (err) {
+            console.error('Failed to update progress:', err);
+        }
+    }
+
+    function playSibling(offset) {
+        if (currentMedia.length === 0) return;
+        
+        let currentIndex = -1;
+        if (state.playback.item) {
+            currentIndex = currentMedia.findIndex(m => m.path === state.playback.item.path);
+        }
+
+        if (currentIndex === -1) {
+            currentIndex = state.playback.lastPlayedIndex;
+        }
+
+        let nextIndex;
+        if (currentIndex === -1) {
+            // Nothing ever played, n -> 0, p -> last
+            nextIndex = offset > 0 ? 0 : currentMedia.length - 1;
+        } else {
+            nextIndex = currentIndex + offset;
+        }
+
+        if (nextIndex >= 0 && nextIndex < currentMedia.length) {
+            playMedia(currentMedia[nextIndex]);
+        }
+    }
+
+    async function rateMedia(item, score) {
+        try {
+            await fetch('/api/rate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ path: item.path, score: score })
+            });
+            showToast(`Rated: ${'⭐'.repeat(score)}`);
+        } catch (err) {
+            console.error('Failed to rate media:', err);
+        }
+    }
+
     async function openInPiP(item) {
+        state.playback.item = item;
+        state.playback.startTime = Date.now();
+        state.playback.lastUpdate = 0;
+        state.playback.lastPlayedIndex = currentMedia.findIndex(m => m.path === item.path);
+
         const path = item.path;
         const type = item.type || "";
         pipTitle.textContent = path.split('/').pop();
@@ -278,6 +372,21 @@ document.addEventListener('DOMContentLoaded', () => {
             el.controls = true;
             el.autoplay = true;
             el.src = url;
+
+            if (state.localResume) {
+                const progress = JSON.parse(localStorage.getItem('disco-progress') || '{}');
+                const localPos = progress[item.path];
+                if (localPos) {
+                    el.currentTime = localPos;
+                } else if (state.globalProgress && item.playhead > 0) {
+                    el.currentTime = item.playhead;
+                }
+            }
+
+            el.ontimeupdate = () => {
+                const isComplete = (el.duration - el.currentTime < 90) && (el.currentTime / el.duration > 0.95);
+                updateProgress(item, el.currentTime, el.duration, isComplete);
+            };
 
             el.onended = () => handlePostPlayback(item);
 
@@ -332,6 +441,21 @@ document.addEventListener('DOMContentLoaded', () => {
             el.controls = true;
             el.autoplay = true;
             el.src = url;
+
+            if (state.localResume) {
+                const progress = JSON.parse(localStorage.getItem('disco-progress') || '{}');
+                const localPos = progress[item.path];
+                if (localPos) {
+                    el.currentTime = localPos;
+                } else if (state.globalProgress && item.playhead > 0) {
+                    el.currentTime = item.playhead;
+                }
+            }
+
+            el.ontimeupdate = () => {
+                const isComplete = (el.duration - el.currentTime < 90) && (el.currentTime / el.duration > 0.95);
+                updateProgress(item, el.currentTime, el.duration, isComplete);
+            };
 
             el.onended = () => handlePostPlayback(item);
 
@@ -657,12 +781,46 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        // 1. Independent shortcuts (don't require active PiP)
+        switch (e.key.toLowerCase()) {
+            case 'n':
+                playSibling(1);
+                return;
+            case 'p':
+                playSibling(-1);
+                return;
+            case 'delete':
+                if (state.playback.item && !pipPlayer.classList.contains('hidden')) {
+                    const itemToDelete = state.playback.item;
+                    closePiP();
+                    deleteMedia(itemToDelete.path);
+                    return;
+                }
+                break;
+        }
+
+        // 2. Rating shortcuts (require active PiP item but not necessarily visible/unpaused)
+        if (e.shiftKey && ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5'].includes(e.code)) {
+            if (state.playback.item) {
+                const score = parseInt(e.code.replace('Digit', ''));
+                rateMedia(state.playback.item, score);
+            }
+            return;
+        }
+
+        // 3. Playback shortcuts (require active & visible PiP)
         const media = pipViewer.querySelector('video, audio');
         if (!media || pipPlayer.classList.contains('hidden')) {
             return;
         }
 
         switch (e.key.toLowerCase()) {
+            case 'q':
+            case 'w':
+            case 's':
+            case 'escape':
+                closePiP();
+                break;
             case ' ':
             case 'k':
                 e.preventDefault();
@@ -695,9 +853,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 break;
             case '0': case '1': case '2': case '3': case '4':
             case '5': case '6': case '7': case '8': case '9':
-                const percent = parseInt(e.key) / 10;
-                if (!isNaN(media.duration)) {
-                    media.currentTime = media.duration * percent;
+                if (e.code.startsWith('Digit')) {
+                    const percent = parseInt(e.code.replace('Digit', '')) / 10;
+                    if (!isNaN(media.duration)) {
+                        media.currentTime = media.duration * percent;
+                    }
                 }
                 break;
         }
@@ -803,6 +963,12 @@ document.addEventListener('DOMContentLoaded', () => {
     if (settingPostPlayback) settingPostPlayback.onchange = (e) => {
         state.postPlaybackAction = e.target.value;
         localStorage.setItem('disco-post-playback', state.postPlaybackAction);
+    };
+
+    const settingLocalResume = document.getElementById('setting-local-resume');
+    if (settingLocalResume) settingLocalResume.onchange = (e) => {
+        state.localResume = e.target.checked;
+        localStorage.setItem('disco-local-resume', state.localResume);
     };
 
     // Close modal on outside click

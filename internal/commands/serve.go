@@ -31,6 +31,7 @@ type ServeCmd struct {
 	PublicDir            string   `help:"Override embedded web assets with local directory"`
 	Dev                  bool     `help:"Enable development mode (auto-reload)"`
 	Trashcan             bool     `help:"Enable trash/recycle page and empty bin functionality"`
+	GlobalProgress       bool     `help:"Enable server-side playback progress tracking"`
 	ApplicationStartTime int64    `kong:"-"`
 	thumbnailCache       sync.Map `kong:"-"`
 }
@@ -53,6 +54,8 @@ func (c *ServeCmd) Run(ctx *kong.Context) error {
 	http.HandleFunc("/api/query", c.handleQuery)
 	http.HandleFunc("/api/play", c.handlePlay)
 	http.HandleFunc("/api/delete", c.handleDelete)
+	http.HandleFunc("/api/progress", c.handleProgress)
+	http.HandleFunc("/api/rate", c.handleRate)
 	http.HandleFunc("/api/events", c.handleEvents)
 	http.HandleFunc("/api/raw", c.handleRaw)
 	http.HandleFunc("/api/subtitles", c.handleSubtitles)
@@ -81,11 +84,13 @@ func (c *ServeCmd) Run(ctx *kong.Context) error {
 func (c *ServeCmd) handleDatabases(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	resp := struct {
-		Databases []string `json:"databases"`
-		Trashcan  bool     `json:"trashcan"`
+		Databases      []string `json:"databases"`
+		Trashcan       bool     `json:"trashcan"`
+		GlobalProgress bool     `json:"global_progress"`
 	}{
-		Databases: c.Databases,
-		Trashcan:  c.Trashcan,
+		Databases:      c.Databases,
+		Trashcan:       c.Trashcan,
+		GlobalProgress: c.GlobalProgress,
 	}
 	json.NewEncoder(w).Encode(resp)
 }
@@ -257,6 +262,78 @@ func (c *ServeCmd) handleDelete(w http.ResponseWriter, r *http.Request) {
 			Path:        req.Path,
 			TimeDeleted: sql.NullInt64{Int64: deleteTime, Valid: !req.Restore},
 		})
+		sqlDB.Close()
+		if err == nil {
+			break
+		}
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
+func (c *ServeCmd) handleProgress(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		Path     string `json:"path"`
+		Playhead int64  `json:"playhead"`
+		Duration int64  `json:"duration"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	now := time.Now().Unix()
+	for _, dbPath := range c.Databases {
+		sqlDB, err := database.Connect(dbPath)
+		if err != nil {
+			continue
+		}
+		
+		// Use raw SQL to update progress to avoid complex sqlc param mapping if not existing
+		// We want to increment play_count only once per session ideally, but for now we follow simple logic
+		_, err = sqlDB.ExecContext(r.Context(), `
+			UPDATE media 
+			SET time_last_played = ?,
+			    time_first_played = COALESCE(time_first_played, ?),
+			    playhead = ?
+			WHERE path = ?`, 
+			now, now, req.Playhead, req.Path)
+		
+		sqlDB.Close()
+		if err == nil {
+			break
+		}
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
+func (c *ServeCmd) handleRate(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		Path  string  `json:"path"`
+		Score float64 `json:"score"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	for _, dbPath := range c.Databases {
+		sqlDB, err := database.Connect(dbPath)
+		if err != nil {
+			continue
+		}
+		_, err = sqlDB.ExecContext(r.Context(), "UPDATE media SET score = ? WHERE path = ?", req.Score, req.Path)
 		sqlDB.Close()
 		if err == nil {
 			break
