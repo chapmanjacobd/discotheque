@@ -32,7 +32,7 @@ func TestFindMedia(t *testing.T) {
 		}
 	}
 
-	found, err := FindMedia(tempDir)
+	found, err := FindMedia(tempDir, nil)
 	if err != nil {
 		t.Fatalf("FindMedia failed: %v", err)
 	}

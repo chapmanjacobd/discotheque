@@ -152,16 +152,45 @@ main {
     width: 220px;
     background-color: var(--sidebar-bg);
     border-right: 1px solid var(--border-color);
-    padding: 1.5rem 1rem;
+    padding: 1rem 0.5rem;
     overflow-y: auto;
 }
 
-.sidebar h3 {
+.sidebar details {
+    margin-bottom: 1rem;
+}
+
+.sidebar summary {
     font-size: 0.8rem;
     text-transform: uppercase;
     color: var(--text-muted);
-    margin-bottom: 1rem;
-    padding-left: 0.5rem;
+    margin-bottom: 0.5rem;
+    padding: 0.5rem;
+    cursor: pointer;
+    user-select: none;
+    font-weight: 600;
+    list-style: none; /* Remove default arrow */
+    display: flex;
+    align-items: center;
+    transition: color 0.2s;
+}
+
+.sidebar summary:hover {
+    color: var(--text-color);
+}
+
+/* Custom arrow for summary */
+.sidebar summary::before {
+    content: '▶';
+    display: inline-block;
+    font-size: 0.6rem;
+    margin-right: 0.8rem;
+    transition: transform 0.2s;
+    opacity: 0.5;
+}
+
+.sidebar details[open] > summary::before {
+    transform: rotate(90deg);
 }
 
 #category-list {
@@ -411,29 +440,91 @@ main {
     justify-content: space-between;
 }
 
-/* List view specifics */
-.list .media-card {
+/* Details table view */
+.details-view {
+    width: 100%;
+    overflow-x: auto;
+}
+
+.details-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+    background: var(--sidebar-bg);
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: var(--shadow);
+}
+
+.details-table th, .details-table td {
+    padding: 0.8rem 1rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.details-table th {
+    background: var(--card-bg);
+    font-weight: 600;
+    color: var(--text-muted);
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+}
+
+.details-table th:hover {
+    color: var(--text-color);
+}
+
+.details-table tbody tr {
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.details-table tbody tr:hover {
+    background: var(--hover-color);
+}
+
+.table-cell-title {
     display: flex;
     align-items: center;
-    padding: 0.5rem 1rem;
+    gap: 10px;
+    max-width: 400px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
-.list .media-thumb {
-    width: 60px;
-    height: 40px;
-    margin-right: 1rem;
+.table-icon {
+    font-size: 1.2rem;
 }
 
-.list .media-info {
-    flex: 1;
-    padding: 0;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
+.table-action-btn {
+    background: none;
+    border: 1px solid var(--border-color);
+    color: var(--text-muted);
+    padding: 4px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
 }
 
-.list .media-title {
-    margin-bottom: 0;
+.table-action-btn:hover {
+    background: #e74c3c;
+    color: white;
+    border-color: #e74c3c;
+}
+
+.details-table tr.poof {
+    animation: poof-row 0.2s ease-out forwards;
+    pointer-events: none;
+}
+
+@keyframes poof-row {
+    to {
+        transform: scale(0.95);
+        opacity: 0;
+        filter: blur(5px);
+    }
 }
 
 #toast {

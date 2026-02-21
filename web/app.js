@@ -7,7 +7,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const limitInput = document.getElementById('limit');
     const limitAll = document.getElementById('limit-all');
     const viewGrid = document.getElementById('view-grid');
-    const viewList = document.getElementById('view-list');
+    const viewDetails = document.getElementById('view-details');
     const categoryList = document.getElementById('category-list');
     const toast = document.getElementById('toast');
     
@@ -169,28 +169,30 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function deleteMedia(path, restore = false) {
-        const card = document.querySelector(`.media-card[data-path="${CSS.escape(path)}"]`);
+        const itemEl = document.querySelector(`[data-path="${CSS.escape(path)}"]`);
         const content = document.querySelector('.content');
         const main = document.querySelector('main');
         
-        if (card && !restore) {
-            // Randomize zip direction
-            const angle = Math.random() * Math.PI * 2;
-            const dist = 2000;
-            const x = Math.cos(angle) * dist;
-            const y = Math.sin(angle) * dist;
-            const rotate = (Math.random() * 180) - 90; // -90 to 90
-            const tilt = (Math.random() * 10) - 5; // -5 to 5 for anticipation
+        if (itemEl && !restore) {
+            // Randomize zip direction (only for cards)
+            if (itemEl.classList.contains('media-card')) {
+                const angle = Math.random() * Math.PI * 2;
+                const dist = 2000;
+                const x = Math.cos(angle) * dist;
+                const y = Math.sin(angle) * dist;
+                const rotate = (Math.random() * 180) - 90; // -90 to 90
+                const tilt = (Math.random() * 10) - 5; // -5 to 5 for anticipation
 
-            card.style.setProperty('--zip-x', `${x}px`);
-            card.style.setProperty('--zip-y', `${y}px`);
-            card.style.setProperty('--zip-rotate', `${rotate}deg`);
-            card.style.setProperty('--zip-tilt', `${tilt}deg`);
+                itemEl.style.setProperty('--zip-x', `${x}px`);
+                itemEl.style.setProperty('--zip-y', `${y}px`);
+                itemEl.style.setProperty('--zip-rotate', `${rotate}deg`);
+                itemEl.style.setProperty('--zip-tilt', `${tilt}deg`);
+            }
             
             // Disable overflow clipping so it can fly over sidebar/header
             if (content) content.style.overflow = 'visible';
             if (main) main.style.overflow = 'visible';
-            card.classList.add('poof');
+            itemEl.classList.add('poof');
 
             // Wait for animation (matched to 0.2s in CSS)
             await new Promise(r => setTimeout(r, 200));
@@ -215,7 +217,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (err) {
             console.error('Delete/Restore failed:', err);
             showToast('Action failed');
-            if (card) card.classList.remove('poof');
+            if (itemEl) itemEl.classList.remove('poof');
         } finally {
             if (content) content.style.overflow = '';
             if (main) main.style.overflow = '';
@@ -393,7 +395,8 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderResults() {
         if (state.page === 'trash') {
             resultsCount.innerHTML = `<span>${currentMedia.length} files in trash</span> <button id="empty-bin-btn" class="category-btn" style="margin-left: 1rem; background: #e74c3c; color: white;">Empty Bin</button>`;
-            document.getElementById('empty-bin-btn').onclick = emptyBin;
+            const emptyBtn = document.getElementById('empty-bin-btn');
+            if (emptyBtn) emptyBtn.onclick = emptyBin;
         } else {
             if (state.filters.all || currentMedia.length < state.filters.limit) {
                 resultsCount.textContent = `${currentMedia.length} files found`;
@@ -409,6 +412,12 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        if (state.view === 'details') {
+            renderDetailsTable();
+            return;
+        }
+
+        resultsContainer.className = 'grid';
         currentMedia.forEach(item => {
             const card = document.createElement('div');
             card.className = 'media-card';
@@ -449,6 +458,87 @@ document.addEventListener('DOMContentLoaded', () => {
 
             resultsContainer.appendChild(card);
         });
+    }
+
+    function renderDetailsTable() {
+        resultsContainer.className = 'details-view';
+        const table = document.createElement('table');
+        table.className = 'details-table';
+        
+        const isTrash = state.page === 'trash';
+        const sortIcon = (field) => {
+            if (state.filters.sort !== field) return '↕️';
+            return state.filters.reverse ? '🔽' : '🔼';
+        };
+
+        table.innerHTML = `
+            <thead>
+                <tr>
+                    <th data-sort="path">Name ${sortIcon('path')}</th>
+                    <th data-sort="size">Size ${sortIcon('size')}</th>
+                    <th data-sort="duration">Duration ${sortIcon('duration')}</th>
+                    <th data-sort="type">Type ${sortIcon('type')}</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        `;
+
+        const tbody = table.querySelector('tbody');
+        currentMedia.forEach(item => {
+            const tr = document.createElement('tr');
+            tr.onclick = () => playMedia(item);
+            tr.dataset.path = item.path;
+
+            const title = item.title || item.path.split('/').pop();
+            const actionIcon = isTrash ? '↺' : '🗑️';
+            const actionTitle = isTrash ? 'Restore' : 'Move to Trash';
+
+            tr.innerHTML = `
+                <td>
+                    <div class="table-cell-title" title="${item.path}">
+                        <span class="table-icon">${getIcon(item.type)}</span>
+                        ${title}
+                    </div>
+                </td>
+                <td>${formatSize(item.size)}</td>
+                <td>${formatDuration(item.duration)}</td>
+                <td>${item.type || ''}</td>
+                <td>
+                    <button class="table-action-btn" title="${actionTitle}">${actionIcon}</button>
+                </td>
+            `;
+
+            const btn = tr.querySelector('.table-action-btn');
+            btn.onclick = (e) => {
+                e.stopPropagation();
+                deleteMedia(item.path, isTrash);
+            };
+
+            tbody.appendChild(tr);
+        });
+
+        table.querySelectorAll('th[data-sort]').forEach(th => {
+            th.onclick = () => {
+                const field = th.dataset.sort;
+                if (state.filters.sort === field) {
+                    state.filters.reverse = !state.filters.reverse;
+                } else {
+                    state.filters.sort = field;
+                    state.filters.reverse = false;
+                }
+                // Sync with toolbar
+                sortBy.value = state.filters.sort;
+                if (state.filters.reverse) {
+                    sortReverseBtn.classList.add('active');
+                } else {
+                    sortReverseBtn.classList.remove('active');
+                }
+                performSearch();
+            };
+        });
+
+        resultsContainer.appendChild(table);
     }
 
     function renderDbSettingsList(dbs) {
@@ -701,16 +791,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (viewGrid) viewGrid.onclick = () => {
         state.view = 'grid';
-        resultsContainer.className = 'grid';
         viewGrid.classList.add('active');
-        viewList.classList.remove('active');
+        viewDetails.classList.remove('active');
+        renderResults();
     };
 
-    if (viewList) viewList.onclick = () => {
-        state.view = 'list';
-        resultsContainer.className = 'list';
-        viewList.classList.add('active');
+    if (viewDetails) viewDetails.onclick = () => {
+        state.view = 'details';
+        viewDetails.classList.add('active');
         viewGrid.classList.remove('active');
+        renderResults();
     };
 
     // Initial load

@@ -251,6 +251,13 @@ type GlobalFlags struct {
 	IgnoreErrors bool   `short:"i" help:"Ignore errors and continue to next file"`
 }
 
+// ControlFlags are a subset of flags for simple control commands
+type ControlFlags struct {
+	MpvSocket  string `help:"Mpv socket path" group:"Playback"`
+	CastDevice string `alias:"cast-to" help:"Chromecast device name" group:"Playback"`
+	Verbose    bool   `short:"v" help:"Enable verbose logging"`
+}
+
 func (g *GlobalFlags) AfterApply() error {
 	if g.Simulate {
 		g.DryRun = true

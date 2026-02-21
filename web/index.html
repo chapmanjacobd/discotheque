@@ -26,19 +26,19 @@
 
     <main>
         <aside class="sidebar">
-            <section>
-                <h3>Categories</h3>
+            <details open>
+                <summary>Categories</summary>
                 <div id="category-list">
                     <!-- Categories will be injected here -->
                 </div>
-            </section>
+            </details>
 
-            <section id="trash-section" class="hidden">
-                <h3>Maintenance</h3>
+            <details id="trash-section" class="hidden">
+                <summary>Maintenance</summary>
                 <div id="maintenance-list">
                     <button id="trash-btn" class="category-btn">🗑️ Trash</button>
                 </div>
-            </section>
+            </details>
         </aside>
 
         <section class="content">
@@ -63,7 +63,7 @@
 
                 <div class="view-toggle">
                     <button id="view-grid" class="active">Grid</button>
-                    <button id="view-list">List</button>
+                    <button id="view-details">Details</button>
                 </div>
             </div>
 

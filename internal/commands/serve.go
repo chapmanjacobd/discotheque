@@ -560,6 +560,15 @@ func (c *ServeCmd) handleSubtitles(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	if ext == ".idx" {
+		subPath := strings.TrimSuffix(path, ".idx") + ".sub"
+		if !utils.FileExists(subPath) {
+			slog.Warn("VobSub conversion requested but .sub file is missing", "idx", path)
+			http.Error(w, "Corresponding .sub file not found", http.StatusNotFound)
+			return
+		}
+	}
+
 	if ext == ".vtt" {
 		w.Header().Set("Content-Type", "text/vtt")
 		http.ServeFile(w, r, path)
@@ -570,11 +579,17 @@ func (c *ServeCmd) handleSubtitles(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/vtt")
 
 	var args []string
+	isImageSub := ext == ".idx" || ext == ".sub" || ext == ".sup"
+
 	if streamIndex != "" {
-		// Use -map to select the specific subtitle stream from the media file
-		args = []string{"-i", path, "-map", "0:s:" + streamIndex, "-f", "webvtt", "pipe:1"}
+		// Try OCR for embedded streams. If it's already text, FFmpeg might complain, 
+		// but usually the 'ocr' filter works on the decoded frames.
+		args = []string{"-i", path, "-filter_complex", "[0:s:" + streamIndex + "]ocr", "-f", "webvtt", "pipe:1"}
+	} else if isImageSub {
+		// Standalone image-based file
+		args = []string{"-i", path, "-filter_complex", "ocr", "-f", "webvtt", "pipe:1"}
 	} else {
-		// Standalone file (srt, lrc, ass, idx, etc.)
+		// Standalone text-based file (srt, lrc, ass, etc.)
 		args = []string{"-i", path, "-f", "webvtt", "pipe:1"}
 	}
 
@@ -585,7 +600,11 @@ func (c *ServeCmd) handleSubtitles(w http.ResponseWriter, r *http.Request) {
 	cmd.Stdout = w
 	if err := cmd.Run(); err != nil {
 		if r.Context().Err() == nil {
-			slog.Error("Failed to convert subtitles", "path", path, "error", err)
+			msg := "Failed to convert subtitles"
+			if ext == ".idx" || ext == ".sub" || ext == ".sup" || streamIndex != "" {
+				msg = "Failed to convert/OCR subtitles"
+			}
+			slog.Error(msg, "path", path, "error", err)
 		} else {
 			slog.Debug("Subtitle conversion interrupted (client disconnect)", "path", path)
 		}

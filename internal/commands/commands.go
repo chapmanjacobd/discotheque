@@ -1206,8 +1206,23 @@ func (c *AddCmd) Run(ctx *kong.Context) error {
 			ExtractorKey: sql.NullString{String: "Local", Valid: true},
 		})
 
+		var filter map[string]bool
+		if c.VideoOnly || c.AudioOnly {
+			filter = make(map[string]bool)
+			if c.VideoOnly {
+				for k, v := range utils.VideoExtensionMap {
+					filter[k] = v
+				}
+			}
+			if c.AudioOnly {
+				for k, v := range utils.AudioExtensionMap {
+					filter[k] = v
+				}
+			}
+		}
+
 		slog.Info("Scanning", "path", absRoot)
-		foundFiles, err := fs.FindMedia(absRoot)
+		foundFiles, err := fs.FindMedia(absRoot, filter)
 		if err != nil {
 			return err
 		}

@@ -12,7 +12,7 @@ import (
 )
 
 type MpvControlBase struct {
-	models.GlobalFlags
+	models.ControlFlags
 }
 
 func (c MpvControlBase) IsPlaybackTrait() {}

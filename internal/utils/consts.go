@@ -94,6 +94,28 @@ var ImageExtensions = []string{
 	"pbm", "pfm", "pgm", "phm", "pnm", "ppm", "ptif", "qoi", "tga",
 }
 
+var (
+	VideoExtensionMap = make(map[string]bool)
+	AudioExtensionMap = make(map[string]bool)
+	ImageExtensionMap = make(map[string]bool)
+	MediaExtensionMap = make(map[string]bool)
+)
+
+func init() {
+	for _, ext := range VideoExtensions {
+		VideoExtensionMap["."+ext] = true
+		MediaExtensionMap["."+ext] = true
+	}
+	for _, ext := range AudioExtensions {
+		AudioExtensionMap["."+ext] = true
+		MediaExtensionMap["."+ext] = true
+	}
+	for _, ext := range ImageExtensions {
+		ImageExtensionMap["."+ext] = true
+		MediaExtensionMap["."+ext] = true
+	}
+}
+
 func ExtensionsToLike(exts []string) string {
 	var parts []string
 	for _, ext := range exts {

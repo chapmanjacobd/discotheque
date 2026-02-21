@@ -1,12 +1,15 @@
-.PHONY: build test clean fmt lint sql install all
+.PHONY: build test clean fmt lint sql install all readme
 
 BINARY_NAME=disco
 BUILD_TAGS=fts5
 
-all: fmt lint sql test build
+all: fmt lint sql test build readme
 
 build:
 	go build -tags "$(BUILD_TAGS)" -o $(BINARY_NAME) ./cmd/disco
+
+readme: build
+	./$(BINARY_NAME) readme > README.md
 
 test:
 	go test -tags "$(BUILD_TAGS)" -coverprofile=coverage.out ./...

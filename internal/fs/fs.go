@@ -4,35 +4,18 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/chapmanjacobd/discotheque/internal/utils"
 )
 
-var MediaExtensions = map[string]bool{
-	".mp4":  true,
-	".mkv":  true,
-	".avi":  true,
-	".mov":  true,
-	".webm": true,
-	".flv":  true,
-	".m4v":  true,
-	".mpg":  true,
-	".mpeg": true,
-	".mp3":  true,
-	".flac": true,
-	".m4a":  true,
-	".opus": true,
-	".ogg":  true,
-	".wav":  true,
-	".jpg":  true,
-	".jpeg": true,
-	".png":  true,
-	".gif":  true,
-	".webp": true,
-	".tiff": true,
-	".bmp":  true,
-}
-
-func FindMedia(root string) (map[string]os.FileInfo, error) {
+func FindMedia(root string, filter map[string]bool) (map[string]os.FileInfo, error) {
 	files := make(map[string]os.FileInfo)
+	
+	allowed := filter
+	if allowed == nil {
+		allowed = utils.MediaExtensionMap
+	}
+
 	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -42,7 +25,7 @@ func FindMedia(root string) (map[string]os.FileInfo, error) {
 		}
 
 		ext := strings.ToLower(filepath.Ext(path))
-		if MediaExtensions[ext] {
+		if allowed[ext] {
 			info, err := d.Info()
 			if err != nil {
 				return nil // Skip files we can't access
