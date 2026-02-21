@@ -297,7 +297,6 @@ main {
 .content {
     flex: 1;
     padding: 2rem;
-    padding-right: 2rem;
     overflow-y: auto;
     display: flex;
     flex-direction: column;
@@ -314,6 +313,13 @@ main {
 
 #results-container {
     flex: 1;
+    width: 100%;
+}
+
+#results-container.details-view {
+    width: max-content;
+    min-width: 100%;
+    padding-right: 2rem;
 }
 
 .grid {
@@ -461,10 +467,6 @@ main {
 }
 
 /* Details table view */
-.details-view {
-    width: 100%;
-}
-
 .details-table {
     width: 100%;
     border-collapse: collapse;
@@ -571,11 +573,11 @@ main {
     font-weight: 500;
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
-    
+
     /* Animation state when visible */
     opacity: 1;
     transform: translateX(0) translateY(0);
-    transition: 
+    transition:
         opacity 0.2s ease-out,
         transform 0.4s cubic-bezier(0.23, 1, 0.32, 1);
 }
@@ -584,7 +586,7 @@ main {
     opacity: 0;
     transform: translateX(-100%) translateY(-10px);
     pointer-events: none;
-    transition: 
+    transition:
         opacity 0.2s ease-in,
         transform 0.3s cubic-bezier(0.55, 0.055, 0.675, 0.19);
 }
