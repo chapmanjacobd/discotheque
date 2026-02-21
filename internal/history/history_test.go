@@ -120,3 +120,76 @@ func TestUpdateHistorySimple(t *testing.T) {
 		t.Errorf("Expected done=1, got %d", done)
 	}
 }
+
+func TestTracker_MarkDeleted(t *testing.T) {
+	sqlDB, dbPath := setupTestDB(t)
+	defer sqlDB.Close()
+	defer os.Remove(dbPath)
+
+	path := "deleted.mp4"
+	sqlDB.Exec("INSERT INTO media (path) VALUES (?)", path)
+
+	tracker := NewTracker(sqlDB)
+	if err := tracker.MarkDeleted(context.Background(), path); err != nil {
+		t.Fatal(err)
+	}
+
+	var timeDeleted int64
+	err := sqlDB.QueryRow("SELECT time_deleted FROM media WHERE path = ?", path).Scan(&timeDeleted)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if timeDeleted == 0 {
+		t.Error("Expected time_deleted to be non-zero")
+	}
+}
+
+func TestUpdateHistoryWithTime(t *testing.T) {
+	sqlDB, dbPath := setupTestDB(t)
+	sqlDB.Close()
+	defer os.Remove(dbPath)
+
+	path := "old.mp3"
+	dbConn, _ := sql.Open("sqlite3", dbPath)
+	dbConn.Exec("INSERT INTO media (path) VALUES (?)", path)
+	dbConn.Close()
+
+	customTime := int64(1000000000)
+	if err := UpdateHistoryWithTime(dbPath, []string{path}, 10, customTime, false); err != nil {
+		t.Fatal(err)
+	}
+
+	dbConn, _ = sql.Open("sqlite3", dbPath)
+	defer dbConn.Close()
+	var lastPlayed int64
+	dbConn.QueryRow("SELECT time_last_played FROM media WHERE path = ?", path).Scan(&lastPlayed)
+	if lastPlayed != customTime {
+		t.Errorf("Expected lastPlayed %d, got %d", customTime, lastPlayed)
+	}
+}
+
+func TestDeleteHistoryByPaths(t *testing.T) {
+	sqlDB, dbPath := setupTestDB(t)
+	defer sqlDB.Close()
+	defer os.Remove(dbPath)
+
+	path := "todelete.mp4"
+	sqlDB.Exec("INSERT INTO media (path, play_count) VALUES (?, 5)", path)
+	sqlDB.Exec("INSERT INTO history (media_path, playhead) VALUES (?, 100)", path)
+
+	if err := DeleteHistoryByPaths(dbPath, []string{path}); err != nil {
+		t.Fatal(err)
+	}
+
+	var count int
+	sqlDB.QueryRow("SELECT COUNT(*) FROM history WHERE media_path = ?", path).Scan(&count)
+	if count != 0 {
+		t.Error("History record should be deleted")
+	}
+
+	var playCount int
+	sqlDB.QueryRow("SELECT play_count FROM media WHERE path = ?", path).Scan(&playCount)
+	if playCount != 0 {
+		t.Error("Play count should be reset")
+	}
+}

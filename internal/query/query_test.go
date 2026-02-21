@@ -4,12 +4,17 @@ import (
 	"context"
 	"database/sql"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/chapmanjacobd/discotheque/internal/models"
 	"github.com/chapmanjacobd/discotheque/internal/utils"
 	_ "github.com/mattn/go-sqlite3"
 )
+
+func ptr[T any](v T) *T {
+	return &v
+}
 
 func TestNewQueryBuilder(t *testing.T) {
 	flags := models.GlobalFlags{Query: "SELECT 1"}
@@ -85,6 +90,41 @@ func TestQueryBuilder_Build(t *testing.T) {
 			models.GlobalFlags{Partial: "s", Limit: 10, HideDeleted: true},
 			"SELECT * FROM media WHERE COALESCE(time_deleted, 0) = 0 AND COALESCE(time_first_played, 0) = 0 LIMIT 10",
 		},
+		{
+			"Duration filter",
+			models.GlobalFlags{Duration: []string{">1h"}, Limit: 10, HideDeleted: true},
+			"SELECT * FROM media WHERE COALESCE(time_deleted, 0) = 0 AND duration >= ? LIMIT 10",
+		},
+		{
+			"Size filter",
+			models.GlobalFlags{Size: []string{"<100MB"}, Limit: 10, HideDeleted: true},
+			"SELECT * FROM media WHERE COALESCE(time_deleted, 0) = 0 AND size <= ? LIMIT 10",
+		},
+		{
+			"Modified after",
+			models.GlobalFlags{ModifiedAfter: "2024-01-01", Limit: 10, HideDeleted: true},
+			"SELECT * FROM media WHERE COALESCE(time_deleted, 0) = 0 AND time_modified >= ? LIMIT 10",
+		},
+		{
+			"Created before",
+			models.GlobalFlags{CreatedBefore: "2024-01-01", Limit: 10, HideDeleted: true},
+			"SELECT * FROM media WHERE COALESCE(time_deleted, 0) = 0 AND time_created <= ? LIMIT 10",
+		},
+		{
+			"Audio Only",
+			models.GlobalFlags{AudioOnly: true, Limit: 10, HideDeleted: true},
+			"SELECT * FROM media WHERE COALESCE(time_deleted, 0) = 0 AND (" + utils.ExtensionsToLike(utils.AudioExtensions) + ") LIMIT 10",
+		},
+		{
+			"Text Only",
+			models.GlobalFlags{TextOnly: true, Limit: 10, HideDeleted: true},
+			"SELECT * FROM media WHERE COALESCE(time_deleted, 0) = 0 AND (" + utils.ExtensionsToLike(utils.TextExtensions) + ") LIMIT 10",
+		},
+		{
+			"Image Only",
+			models.GlobalFlags{ImageOnly: true, Limit: 10, HideDeleted: true},
+			"SELECT * FROM media WHERE COALESCE(time_deleted, 0) = 0 AND (" + utils.ExtensionsToLike(utils.ImageExtensions) + ") LIMIT 10",
+		},
 	}
 
 	for _, tt := range tests {
@@ -130,9 +170,11 @@ func TestFilterMedia(t *testing.T) {
 func TestSortMedia(t *testing.T) {
 	var size100 int64 = 100
 	var size200 int64 = 200
+	var dur10 int64 = 10
+	var dur20 int64 = 20
 	media := []models.MediaWithDB{
-		{Media: models.Media{Path: "b.mp4", Size: &size200}},
-		{Media: models.Media{Path: "a.mp4", Size: &size100}},
+		{Media: models.Media{Path: "b.mp4", Size: &size200, Duration: &dur10, PlayCount: ptr(int64(5))}},
+		{Media: models.Media{Path: "a.mp4", Size: &size100, Duration: &dur20, PlayCount: ptr(int64(10))}},
 	}
 
 	SortMedia(media, models.GlobalFlags{
@@ -149,6 +191,28 @@ func TestSortMedia(t *testing.T) {
 		t.Errorf("SortMedia by size failed, got %d", *media[0].Size)
 	}
 
+	SortMedia(media, models.GlobalFlags{
+		SortBy: "duration",
+	})
+	if *media[0].Duration != 10 {
+		t.Errorf("SortMedia by duration failed, got %d", *media[0].Duration)
+	}
+
+	SortMedia(media, models.GlobalFlags{
+		SortBy: "play_count",
+	})
+	if *media[0].PlayCount != 5 {
+		t.Errorf("SortMedia by play_count failed, got %d", *media[0].PlayCount)
+	}
+
+	SortMedia(media, models.GlobalFlags{
+		SortBy:  "path",
+		Reverse: true,
+	})
+	if media[0].Path != "b.mp4" {
+		t.Errorf("SortMedia by path reverse failed, got %s", media[0].Path)
+	}
+
 	// Test that SortBy is respected even when PlayInOrder is set to default
 	media = []models.MediaWithDB{
 		{Media: models.Media{Path: "a.mp4", Size: &size200}},
@@ -160,6 +224,18 @@ func TestSortMedia(t *testing.T) {
 	})
 	if *media[0].Size != 100 {
 		t.Errorf("SortMedia by size with natural_ps failed, got %d", *media[0].Size)
+	}
+}
+
+func TestSortMediaAdvanced(t *testing.T) {
+	media := []models.MediaWithDB{
+		{Media: models.Media{Path: "dir2/file.mp4"}},
+		{Media: models.Media{Path: "dir1/file.mp4"}},
+	}
+
+	SortMediaAdvanced(media, "natural_parent")
+	if !strings.Contains(media[0].Path, "dir1") {
+		t.Errorf("SortMediaAdvanced by natural_parent failed, got %s", media[0].Path)
 	}
 }
 

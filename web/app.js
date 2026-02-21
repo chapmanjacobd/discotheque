@@ -36,6 +36,7 @@ document.addEventListener('DOMContentLoaded', () => {
             excludedDbs: JSON.parse(localStorage.getItem('disco-excluded-dbs') || '[]')
         },
         applicationStartTime: null,
+        lastActivity: Date.now() - (4 * 60 * 1000), // 4 mins ago
         player: localStorage.getItem('disco-player') || 'browser',
         language: localStorage.getItem('disco-language') || '',
         theme: localStorage.getItem('disco-theme') || 'auto',
@@ -550,11 +551,14 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             el.ontimeupdate = () => {
-                const isComplete = (el.duration - el.currentTime < 90) && (el.currentTime / el.duration > 0.95);
+                const isComplete = (el.duration > 90) && (el.duration - el.currentTime < 90) && (el.currentTime / el.duration > 0.95);
                 updateProgress(item, el.currentTime, el.duration, isComplete);
             };
 
-            el.onended = () => handlePostPlayback(item);
+            el.onended = () => {
+                updateProgress(item, el.duration, el.duration, true);
+                handlePostPlayback(item);
+            };
 
             const addTrack = (trackUrl, label, index) => {
                 const track = document.createElement('track');
@@ -616,11 +620,14 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             el.ontimeupdate = () => {
-                const isComplete = (el.duration - el.currentTime < 90) && (el.currentTime / el.duration > 0.95);
+                const isComplete = (el.duration > 90) && (el.duration - el.currentTime < 90) && (el.currentTime / el.duration > 0.95);
                 updateProgress(item, el.currentTime, el.duration, isComplete);
             };
 
-            el.onended = () => handlePostPlayback(item);
+            el.onended = () => {
+                updateProgress(item, el.duration, el.duration, true);
+                handlePostPlayback(item);
+            };
 
             // Try to fetch lyrics (server will look for siblings)
             const track = document.createElement('track');
@@ -1299,6 +1306,32 @@ document.addEventListener('DOMContentLoaded', () => {
         viewGrid.classList.remove('active');
         renderResults();
     };
+
+    // --- Inactivity Tracking ---
+    const logo = document.querySelector('.logo-text');
+    const activityEvents = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart'];
+
+    activityEvents.forEach(name => {
+        window.addEventListener(name, () => {
+            const now = Date.now();
+            const inactiveTime = now - state.lastActivity;
+
+            if (inactiveTime > 3 * 60 * 1000) { // 3 minutes
+                if (logo) {
+                    logo.classList.remove('shimmering');
+                    void logo.offsetWidth; // Trigger reflow
+                    logo.classList.add('shimmering');
+
+                    // Remove class when done so it's clean
+                    logo.onanimationend = () => {
+                        logo.classList.remove('shimmering');
+                    };
+                }
+            }
+
+            state.lastActivity = now;
+        }, { passive: true });
+    });
 
     // Initial load
     readUrl();

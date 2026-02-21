@@ -88,13 +88,15 @@ header {
     background-size: 400% auto;
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
-    animation: shimmer 8s ease-in-out infinite;
     filter: drop-shadow(0 0 1px rgba(255, 0, 255, 0.3));
+}
+
+.logo-text.shimmering {
+    animation: shimmer 1s ease-in-out;
 }
 
 @keyframes shimmer {
     0% { background-position: 0% center; }
-    10% { background-position: 100% center; }
     100% { background-position: 100% center; }
 }
 

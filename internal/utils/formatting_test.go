@@ -1,7 +1,9 @@
 package utils
 
 import (
+	"strings"
 	"testing"
+	"time"
 )
 
 func TestFormatDuration(t *testing.T) {
@@ -83,26 +85,63 @@ func TestFormatPlaybackDuration(t *testing.T) {
 		{3600, 3000, 2000, "Duration: 16:40 (33:20 to 50:00)"}, // Swap: 3000, 2000 -> 2000, 3000.
 	}
 
-	// Actually, let's re-verify the Python expected values.
-	// (3600, 1800, 0, "Duration: 30:00 (30:00 to 1:00:00)")
-	// 1800 seconds is 30:00.
-	// (3600, 1800, 3000, "Duration: 20:00 (30:00 to 50:00)")
-	// 1800+3000 = 4800 > 3600. Swap: 1800, 3000 -> 3000, 1800.
-	// wait, if start=3000, end=1800.
-	// duration = 3000 - 1800 = 1200 (20:00).
-	// start_str = 1800 (30:00)? No, start_str = segment_start.
-	// If it was swapped, segment_start is 3000? No, 1800, 3000 -> 3000, 1800. segment_start is 3000.
-	// 3000 seconds is 50:00.
-	// Wait, the Python expected: "Duration: 20:00 (30:00 to 50:00)"
-	// 30:00 is 1800. 50:00 is 3000.
-	// So it seems it does segment_start, segment_end = sorted(segment_start, segment_end).
-	// My implementation: segmentStart, segmentEnd = segmentEnd, segmentStart (swapped).
-	// Let's adjust tests to match exactly what Python expected.
-
 	for _, tt := range tests {
 		result := FormatPlaybackDuration(tt.duration, tt.segmentStart, tt.segmentEnd)
 		if result != tt.expected {
 			t.Errorf("FormatPlaybackDuration(%d, %d, %d) = %q, want %q", tt.duration, tt.segmentStart, tt.segmentEnd, result, tt.expected)
 		}
+	}
+}
+
+func TestFormatTime(t *testing.T) {
+	ts := time.Now().Unix()
+	expected := time.Unix(ts, 0).Format("2006-01-02 15:04")
+	got := FormatTime(ts)
+	if got != expected {
+		t.Errorf("FormatTime incorrect, got %s, want %s", got, expected)
+	}
+	if FormatTime(0) != "-" {
+		t.Error("FormatTime(0) should be -")
+	}
+}
+
+func TestRelativeDatetime(t *testing.T) {
+	now := time.Now()
+	if RelativeDatetime(0) != "-" {
+		t.Error("RelativeDatetime(0) should be -")
+	}
+
+	// Test today
+	got := RelativeDatetime(now.Unix())
+	if !strings.HasPrefix(got, "today") {
+		t.Errorf("RelativeDatetime today failed, got %s", got)
+	}
+
+	// Test yesterday
+	yesterday := now.AddDate(0, 0, -1).Unix()
+	got = RelativeDatetime(yesterday)
+	if !strings.HasPrefix(got, "yesterday") {
+		t.Errorf("RelativeDatetime yesterday failed, got %s", got)
+	}
+
+	// Test 5 days ago (use a slightly larger offset to ensure it doesn't round down to 4)
+	fiveDaysAgo := now.Add(-5*24*time.Hour - 1*time.Minute).Unix()
+	got = RelativeDatetime(fiveDaysAgo)
+	if !strings.Contains(got, "5 days ago") {
+		t.Errorf("RelativeDatetime 5 days ago failed, got %s", got)
+	}
+
+	// Test tomorrow
+	tomorrow := now.AddDate(0, 0, 1).Unix()
+	got = RelativeDatetime(tomorrow)
+	if !strings.HasPrefix(got, "tomorrow") {
+		t.Errorf("RelativeDatetime tomorrow failed, got %s", got)
+	}
+
+	// Test in 5 days
+	inFiveDays := now.Add(5*24*time.Hour + 1*time.Minute).Unix()
+	got = RelativeDatetime(inFiveDays)
+	if !strings.Contains(got, "in 5 days") {
+		t.Errorf("RelativeDatetime in 5 days failed, got %s", got)
 	}
 }

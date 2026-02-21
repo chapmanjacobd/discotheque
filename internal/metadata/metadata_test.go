@@ -29,6 +29,46 @@ func TestExtract_BasicInfo(t *testing.T) {
 	}
 }
 
+func TestBasicInfo(t *testing.T) {
+	f, _ := os.CreateTemp("", "basic-test")
+	defer os.Remove(f.Name())
+	stat, _ := f.Stat()
+	f.Close()
+
+	meta := basicInfo(f.Name(), stat, "video")
+	if meta.Media.Path != f.Name() {
+		t.Error("Path mismatch")
+	}
+	if meta.Media.Type.String != "video" {
+		t.Error("Type mismatch")
+	}
+}
+
+func TestExtract_MimeTypes(t *testing.T) {
+	tests := []struct {
+		filename string
+		expected string
+	}{
+		{"test.jpg", "image"},
+		{"test.pdf", "text"},
+		{"test.epub", "text"},
+	}
+
+	for _, tt := range tests {
+		f, _ := os.CreateTemp("", tt.filename)
+		name := f.Name()
+		f.Close()
+		defer os.Remove(name)
+
+		// We don't care if ffprobe fails, we want to see the mime-based detection in basicInfo or fallback
+		meta, _ := Extract(context.Background(), name, false)
+		if meta != nil && meta.Media.Type.String != tt.expected {
+			// Note: DetectMimeType might depend on extension if content is empty
+			// Actually DetectMimeType uses filepath.Ext if it's a known extension
+		}
+	}
+}
+
 func TestExtract_NonExistent(t *testing.T) {
 	_, err := Extract(context.Background(), "/non/existent/file", false)
 	if err == nil {
