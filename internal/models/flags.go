@@ -80,7 +80,7 @@ type GlobalFlags struct {
 	VideoOnly       bool     `help:"Only video files" group:"Filter"`
 	AudioOnly       bool     `help:"Only audio files" group:"Filter"`
 	ImageOnly       bool     `help:"Only image files" group:"Filter"`
-	EbookOnly       bool     `help:"Only ebook files" group:"Filter"`
+	TextOnly        bool     `help:"Only text/ebook files" group:"Filter"`
 	Portrait        bool     `help:"Only portrait orientation files" group:"Filter"`
 	ScanSubtitles   bool     `help:"Scan for external subtitles during import" group:"Filter"`
 	OnlineMediaOnly bool     `help:"Exclude local media" group:"Filter"`

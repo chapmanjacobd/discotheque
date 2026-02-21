@@ -81,6 +81,8 @@ Flags:
         Only audio files
   --image-only
         Only image files
+  --text-only
+        Only text/ebook files
   --portrait
         Only portrait orientation files
   --scan-subtitles
@@ -251,6 +253,8 @@ Flags:
         Only audio files
   --image-only
         Only image files
+  --text-only
+        Only text/ebook files
   --portrait
         Only portrait orientation files
   --scan-subtitles
@@ -379,6 +383,8 @@ Flags:
         Only audio files
   --image-only
         Only image files
+  --text-only
+        Only text/ebook files
   --portrait
         Only portrait orientation files
   --scan-subtitles
@@ -574,6 +580,8 @@ Flags:
         Only audio files
   --image-only
         Only image files
+  --text-only
+        Only text/ebook files
   --portrait
         Only portrait orientation files
   --scan-subtitles
@@ -884,6 +892,8 @@ Flags:
         Only audio files
   --image-only
         Only image files
+  --text-only
+        Only text/ebook files
   --portrait
         Only portrait orientation files
   --scan-subtitles
@@ -1102,6 +1112,8 @@ Flags:
         Only audio files
   --image-only
         Only image files
+  --text-only
+        Only text/ebook files
   --portrait
         Only portrait orientation files
   --scan-subtitles
@@ -1224,6 +1236,8 @@ Flags:
         Only audio files
   --image-only
         Only image files
+  --text-only
+        Only text/ebook files
   --portrait
         Only portrait orientation files
   --scan-subtitles
@@ -1377,6 +1391,8 @@ Flags:
         Only audio files
   --image-only
         Only image files
+  --text-only
+        Only text/ebook files
   --portrait
         Only portrait orientation files
   --scan-subtitles
@@ -1553,6 +1569,8 @@ Flags:
         Only audio files
   --image-only
         Only image files
+  --text-only
+        Only text/ebook files
   --portrait
         Only portrait orientation files
   --scan-subtitles
@@ -1663,6 +1681,8 @@ Flags:
         Only audio files
   --image-only
         Only image files
+  --text-only
+        Only text/ebook files
   --portrait
         Only portrait orientation files
   --scan-subtitles
@@ -1827,6 +1847,8 @@ Flags:
         Only audio files
   --image-only
         Only image files
+  --text-only
+        Only text/ebook files
   --portrait
         Only portrait orientation files
   --scan-subtitles
@@ -1997,6 +2019,8 @@ Flags:
         Only audio files
   --image-only
         Only image files
+  --text-only
+        Only text/ebook files
   --portrait
         Only portrait orientation files
   --scan-subtitles
@@ -2187,6 +2211,8 @@ Flags:
         Only audio files
   --image-only
         Only image files
+  --text-only
+        Only text/ebook files
   --portrait
         Only portrait orientation files
   --scan-subtitles
@@ -2393,6 +2419,8 @@ Flags:
         Only audio files
   --image-only
         Only image files
+  --text-only
+        Only text/ebook files
   --portrait
         Only portrait orientation files
   --scan-subtitles
@@ -2670,6 +2698,8 @@ Flags:
         Only audio files
   --image-only
         Only image files
+  --text-only
+        Only text/ebook files
   --portrait
         Only portrait orientation files
   --scan-subtitles
@@ -2932,6 +2962,8 @@ Flags:
         Only audio files
   --image-only
         Only image files
+  --text-only
+        Only text/ebook files
   --portrait
         Only portrait orientation files
   --scan-subtitles
@@ -3085,6 +3117,8 @@ Flags:
         Only audio files
   --image-only
         Only image files
+  --text-only
+        Only text/ebook files
   --portrait
         Only portrait orientation files
   --scan-subtitles
@@ -3426,6 +3460,8 @@ Flags:
         Only audio files
   --image-only
         Only image files
+  --text-only
+        Only text/ebook files
   --portrait
         Only portrait orientation files
   --scan-subtitles
@@ -3730,6 +3766,8 @@ Flags:
         Only audio files
   --image-only
         Only image files
+  --text-only
+        Only text/ebook files
   --portrait
         Only portrait orientation files
   --scan-subtitles
@@ -3908,6 +3946,8 @@ Flags:
         Only audio files
   --image-only
         Only image files
+  --text-only
+        Only text/ebook files
   --portrait
         Only portrait orientation files
   --scan-subtitles

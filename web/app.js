@@ -79,6 +79,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const params = new URLSearchParams();
         if (state.page === 'trash') {
             params.set('view', 'trash');
+        } else if (state.filters.types.length === 1 && state.filters.types[0] === 'text') {
+            params.set('view', 'text');
         } else {
             if (state.filters.category) params.set('category', state.filters.category);
             if (state.filters.rating !== '') params.set('rating', state.filters.rating);
@@ -99,9 +101,13 @@ document.addEventListener('DOMContentLoaded', () => {
             state.page = 'trash';
             state.filters.category = '';
             state.filters.rating = '';
-        } else {
+        } else if (view === 'text') {
             state.page = 'search';
-            state.filters.category = params.get('category') || '';
+            state.filters.types = ['text'];
+            state.filters.category = '';
+            state.filters.rating = '';
+        } else {
+            state.page = 'search'; state.filters.category = params.get('category') || '';
             state.filters.rating = params.get('rating') || '';
             state.filters.search = params.get('search') || '';
             if (searchInput) searchInput.value = state.filters.search;
@@ -219,10 +225,10 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const params = new URLSearchParams();
 
-                        if (state.filters.search) params.append('search', state.filters.search);
-                        if (state.filters.category) params.append('category', state.filters.category);
-                        if (state.filters.rating !== '') params.append('rating', state.filters.rating);
-                        params.append('sort', state.filters.sort);
+            if (state.filters.search) params.append('search', state.filters.search);
+            if (state.filters.category) params.append('category', state.filters.category);
+            if (state.filters.rating !== '') params.append('rating', state.filters.rating);
+            params.append('sort', state.filters.sort);
 
             if (state.filters.reverse) params.append('reverse', 'true');
 
@@ -236,7 +242,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (t === 'video') params.append('video', 'true');
                 if (t === 'audio') params.append('audio', 'true');
                 if (t === 'image') params.append('image', 'true');
-                if (t === 'ebook') params.append('ebook', 'true');
+                if (t === 'text') params.append('text', 'true');
             });
 
             const resp = await fetch(`/api/query?${params.toString()}`, {
@@ -584,7 +590,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (type.includes('image')) {
             el = document.createElement('img');
             el.src = url;
-        } else if (type.includes('pdf')) {
+        } else if (type.includes('pdf') || type.includes('epub') || type.includes('mobi')) {
             el = document.createElement('iframe');
             el.src = url;
             el.style.width = '100%';
@@ -596,7 +602,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const videoExts = ['mp4', 'mkv', 'webm', 'mov', 'avi', 'wmv', 'flv', 'm4v', 'mpg', 'mpeg', 'ts', 'm2ts', '3gp'];
             const audioExts = ['mp3', 'flac', 'm4a', 'opus', 'ogg', 'wav', 'aac', 'wma', 'mka', 'm4b'];
             const imageExts = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp', 'tiff'];
-            const ebookExts = ['pdf', 'epub', 'mobi', 'azw', 'azw3', 'fb2', 'cbz', 'cbr'];
+            const textExts = ['pdf', 'epub', 'mobi', 'azw', 'azw3', 'fb2', 'cbz', 'cbr'];
 
             if (videoExts.includes(ext)) {
                 el = document.createElement('video');
@@ -608,14 +614,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 el.autoplay = true;
             } else if (imageExts.includes(ext)) {
                 el = document.createElement('img');
-            } else if (ext === 'pdf') {
+            } else if (textExts.includes(ext)) {
                 el = document.createElement('iframe');
                 el.style.width = '100%';
                 el.style.height = '80vh';
                 el.style.border = 'none';
-            } else if (ebookExts.includes(ext)) {
-                showToast('Ebooks require external player or PDF conversion', '📚');
-                return;
             } else {
                 showToast('Unsupported browser format');
                 return;

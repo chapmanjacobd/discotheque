@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -61,6 +62,7 @@ func (c *ServeCmd) Run(ctx *kong.Context) error {
 	http.HandleFunc("/api/raw", c.handleRaw)
 	http.HandleFunc("/api/subtitles", c.handleSubtitles)
 	http.HandleFunc("/api/thumbnail", c.handleThumbnail)
+	http.HandleFunc("/opds", c.handleOPDS)
 
 	if c.Trashcan {
 		http.HandleFunc("/api/trash", c.handleTrash)
@@ -215,8 +217,8 @@ func (c *ServeCmd) handleQuery(w http.ResponseWriter, r *http.Request) {
 	if image := q.Get("image"); image == "true" {
 		flags.ImageOnly = true
 	}
-	if ebook := q.Get("ebook"); ebook == "true" {
-		flags.EbookOnly = true
+	if text := q.Get("text"); text == "true" {
+		flags.TextOnly = true
 	}
 
 	media, err := query.MediaQuery(context.Background(), c.Databases, flags)
@@ -334,7 +336,7 @@ func (c *ServeCmd) handleProgress(w http.ResponseWriter, r *http.Request) {
 		// Use raw SQL to update progress to avoid complex sqlc param mapping if not existing
 		// We want to increment play_count only once per session ideally, but for now we follow simple logic
 		if _, err := sqlDB.ExecContext(r.Context(), `
-			UPDATE media 
+			UPDATE media
 			SET time_last_played = ?,
 			    time_first_played = COALESCE(time_first_played, ?),
 			    playhead = ?
@@ -878,16 +880,80 @@ func (c *ServeCmd) handleEmptyBin(w http.ResponseWriter, r *http.Request) {
 			if err != nil {
 				continue
 			}
-			res, err := sqlDB.Exec("DELETE FROM media WHERE path = ?", m.Path)
+			_, err = sqlDB.Exec("DELETE FROM media WHERE path = ?", m.Path)
 			sqlDB.Close()
 			if err == nil {
-				if rows, _ := res.RowsAffected(); rows > 0 {
-					count++
-				}
+				count++
+				break
 			}
 		}
 	}
 
 	slog.Info("Bin emptied", "files_removed", count)
 	fmt.Fprintf(w, "Deleted %d files", count)
+}
+
+func (c *ServeCmd) handleOPDS(w http.ResponseWriter, r *http.Request) {
+	flags := c.GlobalFlags
+	flags.TextOnly = true
+	flags.All = true
+
+	media, err := query.MediaQuery(r.Context(), c.Databases, flags)
+	if err != nil {
+		slog.Error("OPDS query failed", "error", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/atom+xml;charset=utf-8")
+	fmt.Fprint(w, `<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom" xmlns:opds="http://opds-spec.org/2010/catalog">
+  <id>discotheque-text</id>
+  <title>Discotheque Text</title>
+  <updated>`+time.Now().Format(time.RFC3339)+`</updated>
+  <author><name>Discotheque</name></author>
+`)
+
+	host := r.Host
+	scheme := "http"
+	if r.TLS != nil {
+		scheme = "https"
+	}
+
+	for _, m := range media {
+		title := m.Stem()
+		if m.Title != nil && *m.Title != "" {
+			title = *m.Title
+		}
+
+		author := "Unknown"
+		if m.Artist != nil && *m.Artist != "" {
+			author = *m.Artist
+		}
+
+		mime := "application/octet-stream"
+		if m.Type != nil {
+			mime = *m.Type
+		}
+
+		fmt.Fprintf(w, `
+  <entry>
+    <title>%s</title>
+    <id>%s</id>
+    <updated>%s</updated>
+    <author><name>%s</name></author>
+    <content type="text">%s</content>
+    <link rel="http://opds-spec.org/acquisition" href="%s://%s/api/raw?path=%s" type="%s"/>
+  </entry>`,
+			utils.EscapeXML(title),
+			utils.EscapeXML(m.Path),
+			time.Now().Format(time.RFC3339), // Ideally use modification time
+			utils.EscapeXML(author),
+			utils.EscapeXML(m.Path),
+			scheme, host, strings.ReplaceAll(url.QueryEscape(m.Path), "+", "%20"),
+			mime,
+		)
+	}
+
+	fmt.Fprint(w, "\n</feed>")
 }
