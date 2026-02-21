@@ -94,10 +94,15 @@ var ImageExtensions = []string{
 	"pbm", "pfm", "pgm", "phm", "pnm", "ppm", "ptif", "qoi", "tga",
 }
 
+var EbookExtensions = []string{
+	"epub", "mobi", "pdf", "azw", "azw3", "fb2", "djvu", "cbz", "cbr",
+}
+
 var (
 	VideoExtensionMap = make(map[string]bool)
 	AudioExtensionMap = make(map[string]bool)
 	ImageExtensionMap = make(map[string]bool)
+	EbookExtensionMap = make(map[string]bool)
 	MediaExtensionMap = make(map[string]bool)
 )
 
@@ -112,6 +117,10 @@ func init() {
 	}
 	for _, ext := range ImageExtensions {
 		ImageExtensionMap["."+ext] = true
+		MediaExtensionMap["."+ext] = true
+	}
+	for _, ext := range EbookExtensions {
+		EbookExtensionMap["."+ext] = true
 		MediaExtensionMap["."+ext] = true
 	}
 }

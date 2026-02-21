@@ -241,6 +241,9 @@ func (qb *QueryBuilder) Build() (string, []any) {
 	if qb.Flags.ImageOnly {
 		typeClauses = append(typeClauses, utils.ExtensionsToLike(utils.ImageExtensions))
 	}
+	if qb.Flags.EbookOnly {
+		typeClauses = append(typeClauses, utils.ExtensionsToLike(utils.EbookExtensions))
+	}
 	if len(typeClauses) > 0 {
 		whereClauses = append(whereClauses, "("+strings.Join(typeClauses, " OR ")+")")
 	}

@@ -236,6 +236,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (t === 'video') params.append('video', 'true');
                 if (t === 'audio') params.append('audio', 'true');
                 if (t === 'image') params.append('image', 'true');
+                if (t === 'ebook') params.append('ebook', 'true');
             });
 
             const resp = await fetch(`/api/query?${params.toString()}`, {
@@ -583,12 +584,19 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (type.includes('image')) {
             el = document.createElement('img');
             el.src = url;
+        } else if (type.includes('pdf')) {
+            el = document.createElement('iframe');
+            el.src = url;
+            el.style.width = '100%';
+            el.style.height = '80vh';
+            el.style.border = 'none';
         } else {
             // Fallback for cases where type is missing or ambiguous
             const ext = path.split('.').pop().toLowerCase();
             const videoExts = ['mp4', 'mkv', 'webm', 'mov', 'avi', 'wmv', 'flv', 'm4v', 'mpg', 'mpeg', 'ts', 'm2ts', '3gp'];
             const audioExts = ['mp3', 'flac', 'm4a', 'opus', 'ogg', 'wav', 'aac', 'wma', 'mka', 'm4b'];
             const imageExts = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp', 'tiff'];
+            const ebookExts = ['pdf', 'epub', 'mobi', 'azw', 'azw3', 'fb2', 'cbz', 'cbr'];
 
             if (videoExts.includes(ext)) {
                 el = document.createElement('video');
@@ -600,6 +608,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 el.autoplay = true;
             } else if (imageExts.includes(ext)) {
                 el = document.createElement('img');
+            } else if (ext === 'pdf') {
+                el = document.createElement('iframe');
+                el.style.width = '100%';
+                el.style.height = '80vh';
+                el.style.border = 'none';
+            } else if (ebookExts.includes(ext)) {
+                showToast('Ebooks require external player or PDF conversion', '📚');
+                return;
             } else {
                 showToast('Unsupported browser format');
                 return;
@@ -861,6 +877,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (type.includes('video')) return '🎬';
         if (type.includes('audio')) return '🎵';
         if (type.includes('image')) return '🖼️';
+        if (type.includes('epub') || type.includes('pdf') || type.includes('mobi')) return '📚';
         return '📄';
     }
 

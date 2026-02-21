@@ -215,6 +215,9 @@ func (c *ServeCmd) handleQuery(w http.ResponseWriter, r *http.Request) {
 	if image := q.Get("image"); image == "true" {
 		flags.ImageOnly = true
 	}
+	if ebook := q.Get("ebook"); ebook == "true" {
+		flags.EbookOnly = true
+	}
 
 	media, err := query.MediaQuery(context.Background(), c.Databases, flags)
 	if err != nil {
