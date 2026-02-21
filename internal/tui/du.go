@@ -15,8 +15,8 @@ import (
 )
 
 var (
-	sizeBarStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
-	barFullStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("42"))
+	sizeBarStyle = StyleMuted
+	barFullStyle = lipgloss.NewStyle().Foreground(ColorAccent)
 )
 
 type duItem struct {
@@ -97,13 +97,13 @@ func (m *DUModel) updateList() {
 	m.totalSize = maxSize
 
 	l := list.New(items, duDelegate{maxSize: maxSize}, 0, 0)
-	l.Title = "Disk Usage: " + m.currentPath
+	l.Title = "🪩  " + StyleLogoPrefix.Render("Disco") + StyleLogoSuffix.Render("theque") + " Disk Usage: " + m.currentPath
 	if m.currentPath == "" {
-		l.Title = "Disk Usage: Root"
+		l.Title = "🪩  " + StyleLogoPrefix.Render("Disco") + StyleLogoSuffix.Render("theque") + " Disk Usage: Root"
 	}
 	l.SetShowStatusBar(true)
 	l.SetFilteringEnabled(true)
-	l.Styles.Title = titleStyle
+	l.Styles.Title = StyleTitle
 	m.list = l
 }
 
@@ -120,16 +120,15 @@ func (d duDelegate) Render(w io.Writer, m list.Model, index int, listItem list.I
 		return
 	}
 
-	styles := list.NewDefaultItemStyles()
 	title := i.Title()
 	desc := i.Description()
 
 	if index == m.Index() {
-		title = styles.SelectedTitle.Render(title)
-		desc = styles.SelectedDesc.Render(desc)
+		title = StyleSelected.Render(title)
+		desc = StyleMuted.Render("  " + desc)
 	} else {
-		title = styles.NormalTitle.Render(title)
-		desc = styles.NormalDesc.Render(desc)
+		title = StyleNormal.Render(title)
+		desc = StyleMuted.Render("  " + desc)
 	}
 
 	barWidth := 20
@@ -174,7 +173,7 @@ func (m DUModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 	case tea.WindowSizeMsg:
-		h, v := docStyle.GetFrameSize()
+		h, v := StyleDoc.GetFrameSize()
 		m.list.SetSize(msg.Width-h, msg.Height-v)
 	}
 
@@ -187,5 +186,5 @@ func (m DUModel) View() string {
 	if m.quitting {
 		return ""
 	}
-	return docStyle.Render(m.list.View())
+	return StyleDoc.Render(m.list.View())
 }

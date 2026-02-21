@@ -73,9 +73,9 @@ func TestQueries(t *testing.T) {
 
 	t.Run("UpsertAndGet", func(t *testing.T) {
 		err := q.UpsertMedia(ctx, UpsertMediaParams{
-			Path: "test.mp4",
+			Path:  "test.mp4",
 			Title: sql.NullString{String: "Test Title", Valid: true},
-			Size: sql.NullInt64{Int64: 1000, Valid: true},
+			Size:  sql.NullInt64{Int64: 1000, Valid: true},
 		})
 		if err != nil {
 			t.Errorf("UpsertMedia failed: %v", err)
@@ -96,7 +96,7 @@ func TestQueries(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		
+
 		found := false
 		for _, s := range stats {
 			if s.Category == "comedy" && s.Count == 1 {

@@ -2,28 +2,63 @@ package tui
 
 import (
 	"fmt"
+	"io"
 
 	"github.com/chapmanjacobd/discotheque/internal/models"
 	"github.com/chapmanjacobd/discotheque/internal/utils"
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 )
 
-var (
-	docStyle   = lipgloss.NewStyle().Margin(1, 2)
-	titleStyle = lipgloss.NewStyle().MarginLeft(2)
-)
+type itemDelegate struct{}
+
+func (d itemDelegate) Height() int                               { return 2 }
+func (d itemDelegate) Spacing() int                              { return 1 }
+func (d itemDelegate) Update(msg tea.Msg, m *list.Model) tea.Cmd { return nil }
+func (d itemDelegate) Render(w io.Writer, m list.Model, index int, listItem list.Item) {
+	i, ok := listItem.(item)
+	if !ok {
+		return
+	}
+
+	title := i.Title()
+	desc := i.Description()
+
+	if index == m.Index() {
+		title = StyleSelected.Render(title)
+		desc = StyleMuted.Render("  " + desc)
+	} else {
+		title = StyleNormal.Render(title)
+		desc = StyleMuted.Render("  " + desc)
+	}
+
+	fmt.Fprintf(w, "%s\n%s", title, desc)
+}
 
 type item struct {
 	media models.MediaWithDB
 }
 
 func (i item) Title() string {
-	if i.media.Title != nil && *i.media.Title != "" {
-		return *i.media.Title
+	icon := "❓"
+	if i.media.Type != nil {
+		switch *i.media.Type {
+		case "audio":
+			icon = "🎵"
+		case "video":
+			icon = "🎬"
+		case "text":
+			icon = "📄"
+		case "image":
+			icon = "🖼️"
+		}
 	}
-	return i.media.Path
+
+	title := i.media.Path
+	if i.media.Title != nil && *i.media.Title != "" {
+		title = *i.media.Title
+	}
+	return icon + " " + title
 }
 
 func (i item) Description() string {
@@ -35,7 +70,13 @@ func (i item) Description() string {
 	if i.media.Size != nil {
 		size = utils.FormatSize(*i.media.Size)
 	}
-	return fmt.Sprintf("%s • %s • %s", dur, size, i.media.DB)
+
+	tags := ""
+	if i.media.Categories != nil && *i.media.Categories != "" {
+		tags = " • " + *i.media.Categories
+	}
+
+	return fmt.Sprintf("%s • %s • %s%s", dur, size, i.media.DB, tags)
 }
 
 func (i item) FilterValue() string {
@@ -58,11 +99,11 @@ func NewModel(media []models.MediaWithDB) Model {
 		items[i] = item{media: m}
 	}
 
-	l := list.New(items, list.NewDefaultDelegate(), 0, 0)
-	l.Title = "Discotheque Media Picker"
+	l := list.New(items, itemDelegate{}, 0, 0)
+	l.Title = "🪩  " + StyleLogoPrefix.Render("Disco") + StyleLogoSuffix.Render("theque") + " Media Picker"
 	l.SetShowStatusBar(true)
 	l.SetFilteringEnabled(true)
-	l.Styles.Title = titleStyle
+	l.Styles.Title = StyleTitle
 
 	return Model{list: l}
 }
@@ -86,7 +127,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		}
 	case tea.WindowSizeMsg:
-		h, v := docStyle.GetFrameSize()
+		h, v := StyleDoc.GetFrameSize()
 		m.list.SetSize(msg.Width-h, msg.Height-v)
 	}
 
@@ -99,7 +140,7 @@ func (m Model) View() string {
 	if m.quitting {
 		return ""
 	}
-	return docStyle.Render(m.list.View())
+	return StyleDoc.Render(m.list.View())
 }
 
 func (m Model) GetChoice() *models.MediaWithDB {

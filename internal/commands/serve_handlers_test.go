@@ -203,7 +203,7 @@ func TestServeCmd_Handlers(t *testing.T) {
 		// We can't easily test SSE with httptest.Recorder if it doesn't flush or if it blocks.
 		// But we can check if it returns the right content type.
 		w := httptest.NewRecorder()
-		
+
 		// Use a channel to timeout if it blocks
 		done := make(chan bool)
 		go func() {

@@ -12,8 +12,9 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
+//go:fix inline
 func ptr[T any](v T) *T {
-	return &v
+	return new(v)
 }
 
 func TestNewQueryBuilder(t *testing.T) {
@@ -173,8 +174,8 @@ func TestSortMedia(t *testing.T) {
 	var dur10 int64 = 10
 	var dur20 int64 = 20
 	media := []models.MediaWithDB{
-		{Media: models.Media{Path: "b.mp4", Size: &size200, Duration: &dur10, PlayCount: ptr(int64(5))}},
-		{Media: models.Media{Path: "a.mp4", Size: &size100, Duration: &dur20, PlayCount: ptr(int64(10))}},
+		{Media: models.Media{Path: "b.mp4", Size: &size200, Duration: &dur10, PlayCount: new(int64(5))}},
+		{Media: models.Media{Path: "a.mp4", Size: &size100, Duration: &dur20, PlayCount: new(int64(10))}},
 	}
 
 	SortMedia(media, models.GlobalFlags{
