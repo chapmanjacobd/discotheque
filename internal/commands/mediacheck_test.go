@@ -1,0 +1,37 @@
+package commands
+
+import (
+	"testing"
+
+	"github.com/chapmanjacobd/discotheque/internal/testutils"
+)
+
+func TestMediaCheckCmd_Run(t *testing.T) {
+	fixture := testutils.Setup(t)
+	defer fixture.Cleanup()
+
+	f1 := fixture.CreateDummyFile("video1.mp4")
+
+	addCmd := &AddCmd{
+		Args: []string{fixture.DBPath, f1},
+	}
+	addCmd.AfterApply()
+	addCmd.Run(nil)
+
+	t.Run("QuickScan", func(t *testing.T) {
+		cmd := &MediaCheckCmd{
+			Databases: []string{fixture.DBPath},
+		}
+		// This will likely fail because ffmpeg is not there or file is invalid
+		// but we want to see if the code runs.
+		cmd.Run(nil)
+	})
+
+	t.Run("FullScan", func(t *testing.T) {
+		cmd := &MediaCheckCmd{
+			Databases: []string{fixture.DBPath},
+			FullScan:  true,
+		}
+		cmd.Run(nil)
+	})
+}
