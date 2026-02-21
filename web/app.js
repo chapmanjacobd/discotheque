@@ -296,25 +296,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const main = document.querySelector('main');
         
         if (itemEl && !restore) {
-            // Randomize zip direction (only for cards)
-            if (itemEl.classList.contains('media-card')) {
-                const angle = Math.random() * Math.PI * 2;
-                const dist = 2000;
-                const x = Math.cos(angle) * dist;
-                const y = Math.sin(angle) * dist;
-                const rotate = (Math.random() * 180) - 90; // -90 to 90
-                const tilt = (Math.random() * 10) - 5; // -5 to 5 for anticipation
-
-                itemEl.style.setProperty('--zip-x', `${x}px`);
-                itemEl.style.setProperty('--zip-y', `${y}px`);
-                itemEl.style.setProperty('--zip-rotate', `${rotate}deg`);
-                itemEl.style.setProperty('--zip-tilt', `${tilt}deg`);
-            }
-            
-            // Disable overflow clipping so it can fly over sidebar/header
-            if (content) content.style.overflow = 'visible';
-            if (main) main.style.overflow = 'visible';
-            itemEl.classList.add('poof');
+            itemEl.classList.add('fade-out');
 
             // Wait for animation (matched to 0.2s in CSS)
             await new Promise(r => setTimeout(r, 200));
@@ -344,7 +326,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (err) {
             console.error('Delete/Restore failed:', err);
             showToast('Action failed');
-            if (itemEl) itemEl.classList.remove('poof');
+            if (itemEl) itemEl.classList.remove('fade-out');
         } finally {
             if (content) content.style.overflow = '';
             if (main) main.style.overflow = '';

@@ -413,29 +413,14 @@ main {
     opacity: 1;
 }
 
-.media-card.poof {
-    animation: poof 0.2s cubic-bezier(0.6, -0.28, 0.735, 0.045) forwards;
+.media-card.fade-out {
+    animation: fade-out 0.2s ease-out forwards;
     pointer-events: none;
-    position: relative;
-    z-index: 1500;
 }
 
-@keyframes poof {
-    0% {
-        transform: translate(0, 0) scale(1) rotate(0);
-        opacity: 1;
-    }
-    10% {
-        /* Faster Anticipation: slight shrink and tilt */
-        transform: translate(0, 0) scale(0.98) rotate(var(--zip-tilt, -2deg));
-        opacity: 1;
-    }
-    100% {
-        /* Zip off in random direction */
-        transform: translate(var(--zip-x, 2000px), var(--zip-y, 0)) scale(1.5) rotate(var(--zip-rotate, 45deg));
-        opacity: 0;
-        filter: blur(5px);
-    }
+@keyframes fade-out {
+    from { opacity: 1; transform: scale(1); }
+    to { opacity: 0; transform: scale(0.95); }
 }
 
 .media-action-btn:hover {
@@ -542,17 +527,9 @@ main {
     border-color: #e74c3c;
 }
 
-.details-table tr.poof {
-    animation: poof-row 0.2s ease-out forwards;
+.details-table tr.fade-out {
+    animation: fade-out 0.2s ease-out forwards;
     pointer-events: none;
-}
-
-@keyframes poof-row {
-    to {
-        transform: scale(0.95);
-        opacity: 0;
-        filter: blur(5px);
-    }
 }
 
 #toast {
