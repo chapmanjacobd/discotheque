@@ -349,6 +349,8 @@ Flags:
         Use natural sorting
   -r, --random
         Random order
+  -k, --re-rank
+        Add key/value pairs re-rank sorting by multiple attributes (COLUMN=WEIGHT)
   -c, --columns
         Columns to display
   -B, --big-dirs
@@ -403,8 +405,6 @@ Flags:
         Filter for duplicate words (true/false)
   --unique-only
         Filter for unique words (true/false)
-  -k, --re-rank
-        Add key/value pairs re-rank sorting by multiple attributes (COLUMN=WEIGHT)
   --fts
         Use full-text search if available
   --fts-table
@@ -536,6 +536,8 @@ Flags:
         Use natural sorting
   -r, --random
         Random order
+  -k, --re-rank
+        Add key/value pairs re-rank sorting by multiple attributes (COLUMN=WEIGHT)
   -c, --columns
         Columns to display
   -B, --big-dirs
@@ -572,8 +574,6 @@ Flags:
         Filter folders by total size
   --folder-counts
         Filter folders by number of subfolders
-  -k, --re-rank
-        Add key/value pairs re-rank sorting by multiple attributes (COLUMN=WEIGHT)
   --fts
         Use full-text search if available
   --fts-table
@@ -618,6 +618,48 @@ Flags:
         Use N threads for parallel processing
   -i, --ignore-errors
         Ignore errors and continue to next file
+  -O, --play-in-order
+        Play media in order
+  --no-play-in-order
+        Don't play media in order
+  --loop
+        Loop playback
+  -M, --mute
+        Start playback muted
+  --override-player
+        Override default player (e.g. --player 'vlc')
+  --start
+        Start playback at specific time/percentage
+  --end
+        Stop playback at specific time/percentage
+  --volume
+        Set initial volume (0-100)
+  --fullscreen
+        Start in fullscreen
+  --no-subtitles
+        Disable subtitles
+  --subtitle-mix
+        Probability to play no-subtitle content
+  -4, --interdimensional-cable
+        Duration to play (in seconds) while changing the channel
+  --speed
+        Playback speed
+  --save-playhead
+        Save playback position on quit
+  --mpv-socket
+        Mpv socket path
+  --watch-later-dir
+        Mpv watch_later directory
+  --player-args-sub
+        Player arguments for videos with subtitles
+  --player-args-no-sub
+        Player arguments for videos without subtitles
+  --cast
+        Cast to chromecast groups
+  --cast-device
+        Chromecast device name
+  --cast-with-local
+        Play music locally at the same time as chromecast
   --open
         Open results in media player
   --overlap
@@ -878,20 +920,6 @@ Flags:
         Interactive decision making after playback
   --trash
         Trash files after action
-  -t, --only-tables
-        Comma separated specific table(s)
-  --primary-keys
-        Comma separated primary keys
-  --business-keys
-        Comma separated business keys
-  --upsert
-        Upsert rows on conflict
-  --ignore
-        Ignore rows on conflict (only-new-rows)
-  --only-target-columns
-        Only copy columns that exist in target
-  --skip-columns
-        Columns to skip during merge
   --post-action
         Post-action: none, delete, mark-deleted, move, copy
   --delete-files
@@ -910,6 +938,20 @@ Flags:
         Stop after N bytes (e.g., 10GB)
   --track-history
         Track playback history
+  -t, --only-tables
+        Comma separated specific table(s)
+  --primary-keys
+        Comma separated primary keys
+  --business-keys
+        Comma separated business keys
+  --upsert
+        Upsert rows on conflict
+  --ignore
+        Ignore rows on conflict (only-new-rows)
+  --only-target-columns
+        Only copy columns that exist in target
+  --skip-columns
+        Columns to skip during merge
 ```
 
 </details>
@@ -1255,6 +1297,8 @@ Flags:
         Use natural sorting
   -r, --random
         Random order
+  -k, --re-rank
+        Add key/value pairs re-rank sorting by multiple attributes (COLUMN=WEIGHT)
   -c, --columns
         Columns to display
   -B, --big-dirs
@@ -1291,8 +1335,6 @@ Flags:
         Filter folders by total size
   --folder-counts
         Filter folders by number of subfolders
-  -k, --re-rank
-        Add key/value pairs re-rank sorting by multiple attributes (COLUMN=WEIGHT)
   -v, --verbose
         Enable verbose logging
   --simulate
@@ -1457,6 +1499,8 @@ Flags:
         Use natural sorting
   -r, --random
         Random order
+  -k, --re-rank
+        Add key/value pairs re-rank sorting by multiple attributes (COLUMN=WEIGHT)
   -c, --columns
         Columns to display
   -B, --big-dirs
@@ -1493,8 +1537,6 @@ Flags:
         Filter folders by total size
   --folder-counts
         Filter folders by number of subfolders
-  -k, --re-rank
-        Add key/value pairs re-rank sorting by multiple attributes (COLUMN=WEIGHT)
   -v, --verbose
         Enable verbose logging
   --simulate
@@ -1733,6 +1775,8 @@ Flags:
         Use natural sorting
   -r, --random
         Random order
+  -k, --re-rank
+        Add key/value pairs re-rank sorting by multiple attributes (COLUMN=WEIGHT)
   -c, --columns
         Columns to display
   -B, --big-dirs
@@ -1803,8 +1847,6 @@ Flags:
         Move grouped files into separate directories
   --print-groups
         Print clusters as JSON
-  -k, --re-rank
-        Add key/value pairs re-rank sorting by multiple attributes (COLUMN=WEIGHT)
   -v, --verbose
         Enable verbose logging
   --simulate
@@ -1923,6 +1965,8 @@ Flags:
         Use natural sorting
   -r, --random
         Random order
+  -k, --re-rank
+        Add key/value pairs re-rank sorting by multiple attributes (COLUMN=WEIGHT)
   -c, --columns
         Columns to display
   -B, --big-dirs
@@ -1993,8 +2037,6 @@ Flags:
         Move grouped files into separate directories
   --print-groups
         Print clusters as JSON
-  -k, --re-rank
-        Add key/value pairs re-rank sorting by multiple attributes (COLUMN=WEIGHT)
   -v, --verbose
         Enable verbose logging
   --simulate
@@ -2211,12 +2253,6 @@ Flags:
         Interactive decision making after playback
   --trash
         Trash files after action
-  --cast
-        Cast to chromecast groups
-  --cast-device
-        Chromecast device name
-  --cast-with-local
-        Play music locally at the same time as chromecast
   --post-action
         Post-action: none, delete, mark-deleted, move, copy
   --delete-files
@@ -2235,6 +2271,12 @@ Flags:
         Stop after N bytes (e.g., 10GB)
   --track-history
         Track playback history
+  --cast
+        Cast to chromecast groups
+  --cast-device
+        Chromecast device name
+  --cast-with-local
+        Play music locally at the same time as chromecast
 ```
 
 </details>
@@ -2438,12 +2480,6 @@ Flags:
         Interactive decision making after playback
   --trash
         Trash files after action
-  --cast
-        Cast to chromecast groups
-  --cast-device
-        Chromecast device name
-  --cast-with-local
-        Play music locally at the same time as chromecast
   --post-action
         Post-action: none, delete, mark-deleted, move, copy
   --delete-files
@@ -2462,6 +2498,12 @@ Flags:
         Stop after N bytes (e.g., 10GB)
   --track-history
         Track playback history
+  --cast
+        Cast to chromecast groups
+  --cast-device
+        Chromecast device name
+  --cast-with-local
+        Play music locally at the same time as chromecast
 ```
 
 </details>
@@ -2721,6 +2763,8 @@ Flags:
         Use natural sorting
   -r, --random
         Random order
+  -k, --re-rank
+        Add key/value pairs re-rank sorting by multiple attributes (COLUMN=WEIGHT)
   -c, --columns
         Columns to display
   -B, --big-dirs
@@ -2757,8 +2801,6 @@ Flags:
         Filter folders by total size
   --folder-counts
         Filter folders by number of subfolders
-  -k, --re-rank
-        Add key/value pairs re-rank sorting by multiple attributes (COLUMN=WEIGHT)
   -v, --verbose
         Enable verbose logging
   --simulate

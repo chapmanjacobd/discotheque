@@ -15,7 +15,7 @@ import (
 )
 
 type SearchCaptionsCmd struct {
-	models.GlobalFlags
+	models.PlaybackFlags
 	Database string   `arg:"" required:"" help:"SQLite database file" type:"existingfile"`
 	Search   []string `arg:"" required:"" help:"Search terms"`
 

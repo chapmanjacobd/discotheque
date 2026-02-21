@@ -22,27 +22,26 @@ type (
 	HistoryTrait    interface{ IsHistoryTrait() }
 )
 
-// GlobalFlags are flags available to core data commands (print, search, du, etc)
-type GlobalFlags struct {
+// CommonFlags are flags shared by almost all commands
+type CommonFlags struct {
+	Verbose      bool   `short:"v" help:"Enable verbose logging"`
+	Simulate     bool   `help:"Dry run; don't actually do anything"`
+	DryRun       bool   `kong:"-"` // Alias for Simulate
+	NoConfirm    bool   `short:"y" help:"Don't ask for confirmation"`
+	Yes          bool   `kong:"-"` // Alias for NoConfirm
+	Timeout      string `short:"T" help:"Quit after N minutes/seconds"`
+	Threads      int    `help:"Use N threads for parallel processing"`
+	IgnoreErrors bool   `short:"i" help:"Ignore errors and continue to next file"`
+}
+
+type QueryFlags struct {
 	Query  string `short:"q" help:"Raw SQL query (overrides all query building)" group:"Query"`
 	Limit  int    `short:"L" default:"100" help:"Limit results per database" group:"Query"`
 	All    bool   `short:"a" help:"Return all results (no limit)" group:"Query"`
 	Offset int    `help:"Skip N results" group:"Query"`
+}
 
-	// Dedupe profiles
-	Audio        bool `help:"Dedupe database by artist + album + title" group:"Dedupe"`
-	ExtractorID  bool `alias:"id" help:"Dedupe database by extractor_id" group:"Dedupe"`
-	TitleOnly    bool `help:"Dedupe database by title" group:"Dedupe"`
-	DurationOnly bool `help:"Dedupe database by duration" group:"Dedupe"`
-	Filesystem   bool `alias:"fs" help:"Dedupe filesystem database (hash)" group:"Dedupe"`
-
-	// Dedupe options
-	CompareDirs        bool    `help:"Compare directories" group:"Dedupe"`
-	Basename           bool    `help:"Match by basename similarity" group:"Dedupe"`
-	Dirname            bool    `help:"Match by dirname similarity" group:"Dedupe"`
-	MinSimilarityRatio float64 `default:"0.8" help:"Filter out matches with less than this ratio (0.7-0.9)" group:"Dedupe"`
-	DedupeCmd          string  `help:"Command to run for deduplication (rmlint-style: cmd duplicate keep)" group:"Dedupe"`
-
+type FilterFlags struct {
 	// Path filters
 	Include      []string `short:"s" help:"Include paths matching pattern" group:"Filter"`
 	Exclude      []string `short:"E" help:"Exclude paths matching pattern" group:"Filter"`
@@ -83,11 +82,11 @@ type GlobalFlags struct {
 	Portrait        bool `help:"Only portrait orientation files" group:"Filter"`
 	ScanSubtitles   bool `help:"Scan for external subtitles during import" group:"Filter"`
 	OnlineMediaOnly bool `help:"Exclude local media" group:"Filter"`
-	LocalMediaOnly  bool     `help:"Exclude online media" group:"Filter"`
-	FlexibleSearch  bool     `help:"Flexible search (fuzzy)" group:"Filter"`
-	Exact           bool     `help:"Exact match for search" group:"Filter"`
+	LocalMediaOnly  bool `help:"Exclude online media" group:"Filter"`
+	FlexibleSearch  bool `help:"Flexible search (fuzzy)" group:"Filter"`
+	Exact           bool `help:"Exact match for search" group:"Filter"`
 	Where           []string `short:"w" help:"SQL where clause(s)" group:"Filter"`
-	Exists          bool     `help:"Filter out non-existent files" group:"Filter"`
+	Exists          bool `help:"Filter out non-existent files" group:"Filter"`
 
 	MimeType   []string `help:"Filter by mimetype substring (e.g., video, mp4)" group:"Filter"`
 	NoMimeType []string `help:"Exclude by mimetype substring" group:"Filter"`
@@ -99,14 +98,17 @@ type GlobalFlags struct {
 	// Siblings
 	FetchSiblings    string `short:"o" help:"Fetch siblings of matched files (each, all, if-audiobook)" group:"Filter"`
 	FetchSiblingsMax int    `help:"Maximum number of siblings to fetch" group:"Filter"`
+}
 
-	// Sorting
+type SortFlags struct {
 	SortBy  string `short:"u" default:"path" help:"Sort by field" group:"Sort"`
 	Reverse bool   `short:"V" help:"Reverse sort order" group:"Sort"`
 	NatSort bool   `short:"n" help:"Use natural sorting" group:"Sort"`
 	Random  bool   `short:"r" help:"Random order" group:"Sort"`
+	ReRank  string `short:"k" alias:"rerank" help:"Add key/value pairs re-rank sorting by multiple attributes (COLUMN=WEIGHT)" group:"Sort"`
+}
 
-	// Display
+type DisplayFlags struct {
 	Columns   []string `short:"c" help:"Columns to display" group:"Display"`
 	BigDirs   bool     `short:"B" help:"Aggregate by parent directory" group:"Display"`
 	JSON      bool     `short:"j" help:"Output results as JSON" group:"Display"`
@@ -127,8 +129,9 @@ type GlobalFlags struct {
 	FilesOnly         bool     `help:"Only show files" group:"Display"`
 	FolderSizes       []string `help:"Filter folders by total size" group:"Display"`
 	FolderCounts      string   `help:"Filter folders by number of subfolders" group:"Display"`
+}
 
-	// Text processing and sorting (from regex_sort.py)
+type TextFlags struct {
 	RegexSort  bool     `help:"Sort by splitting lines and sorting words" alias:"rs" group:"Text"`
 	Regexs     []string `help:"Regex patterns for line splitting" alias:"re" group:"Text"`
 	WordSorts  []string `help:"Word sorting strategies" group:"Text"`
@@ -138,8 +141,9 @@ type GlobalFlags struct {
 	StopWords  []string `help:"List of words to ignore" group:"Text"`
 	Duplicates *bool    `help:"Filter for duplicate words (true/false)" group:"Text"`
 	UniqueOnly *bool    `help:"Filter for unique words (true/false)" group:"Text"`
+}
 
-	// Similarity clustering
+type SimilarityFlags struct {
 	Similar         bool    `help:"Find similar files or folders" group:"Similarity"`
 	SizesDelta      float64 `default:"10.0" help:"Size difference threshold (%)" group:"Similarity"`
 	CountsDelta     float64 `default:"3.0" help:"File count difference threshold (%)" group:"Similarity"`
@@ -152,38 +156,36 @@ type GlobalFlags struct {
 	TotalDurations  bool    `help:"Compare total durations (folders only)" group:"Similarity"`
 	OnlyDuplicates  bool    `help:"Only show duplicate items" group:"Similarity"`
 	OnlyOriginals   bool    `help:"Only show original items" group:"Similarity"`
+	ClusterSort     bool    `short:"C" help:"Group items by similarity" group:"Similarity"`
+	Clusters        int     `help:"Number of clusters" group:"Similarity"`
+	TFIDF           bool    `help:"Use TF-IDF for clustering" group:"Similarity"`
+	MoveGroups      bool    `help:"Move grouped files into separate directories" group:"Similarity"`
+	PrintGroups     bool    `help:"Print clusters as JSON" group:"Similarity"`
+}
 
-	// Clustering
-	ClusterSort bool `short:"C" help:"Group items by similarity" group:"Similarity"`
-	Clusters    int  `help:"Number of clusters" group:"Similarity"`
-	TFIDF       bool `help:"Use TF-IDF for clustering" group:"Similarity"`
-	MoveGroups  bool `help:"Move grouped files into separate directories" group:"Similarity"`
-	PrintGroups bool `help:"Print clusters as JSON" group:"Similarity"`
-
-	// Sorting Extensions
-	ReRank string `short:"k" alias:"rerank" help:"Add key/value pairs re-rank sorting by multiple attributes (COLUMN=WEIGHT)" group:"Sort"`
-
-	// FTS options
+type FTSFlags struct {
 	FTS      bool   `help:"Use full-text search if available" group:"FTS"`
 	FTSTable string `default:"media_fts" help:"FTS table name" group:"FTS"`
 	Related  int    `short:"R" help:"Find media related to the first result" group:"FTS"`
-
-	// Common options
-	Verbose      bool   `short:"v" help:"Enable verbose logging"`
-	Simulate     bool   `help:"Dry run; don't actually do anything"`
-	DryRun       bool   `kong:"-"` // Alias for Simulate
-	NoConfirm    bool   `short:"y" help:"Don't ask for confirmation"`
-	Yes          bool   `kong:"-"` // Alias for NoConfirm
-	Timeout      string `short:"T" help:"Quit after N minutes/seconds"`
-	Threads      int    `help:"Use N threads for parallel processing"`
-	IgnoreErrors bool   `short:"i" help:"Ignore errors and continue to next file"`
 }
 
-// PlaybackFlags includes global flags plus playback and action related flags
-type PlaybackFlags struct {
-	GlobalFlags
+type DedupeFlags struct {
+	// Dedupe profiles
+	Audio        bool `help:"Dedupe database by artist + album + title" group:"Dedupe"`
+	ExtractorID  bool `alias:"id" help:"Dedupe database by extractor_id" group:"Dedupe"`
+	TitleOnly    bool `help:"Dedupe database by title" group:"Dedupe"`
+	DurationOnly bool `help:"Dedupe database by duration" group:"Dedupe"`
+	Filesystem   bool `alias:"fs" help:"Dedupe filesystem database (hash)" group:"Dedupe"`
 
-	// Playback
+	// Dedupe options
+	CompareDirs        bool    `help:"Compare directories" group:"Dedupe"`
+	Basename           bool    `help:"Match by basename similarity" group:"Dedupe"`
+	Dirname            bool    `help:"Match by dirname similarity" group:"Dedupe"`
+	MinSimilarityRatio float64 `default:"0.8" help:"Filter out matches with less than this ratio (0.7-0.9)" group:"Dedupe"`
+	DedupeCmd          string  `help:"Command to run for deduplication (rmlint-style: cmd duplicate keep)" group:"Dedupe"`
+}
+
+type PlaybackOptions struct {
 	PlayInOrder           string  `short:"O" default:"natural_ps" help:"Play media in order" group:"Playback"`
 	NoPlayInOrder         bool    `help:"Don't play media in order" group:"Playback"`
 	Loop                  bool    `help:"Loop playback" group:"Playback"`
@@ -203,7 +205,9 @@ type PlaybackFlags struct {
 
 	PlayerArgsSub   []string `help:"Player arguments for videos with subtitles" group:"Playback"`
 	PlayerArgsNoSub []string `help:"Player arguments for videos without subtitles" group:"Playback"`
+}
 
+type ActionFlags struct {
 	Cmd0   string `help:"Command to run if mpv exits with code 0" group:"Action"`
 	Cmd1   string `help:"Command to run if mpv exits with code 1" group:"Action"`
 	Cmd2   string `help:"Command to run if mpv exits with code 2" group:"Action"`
@@ -226,27 +230,6 @@ type PlaybackFlags struct {
 	Interactive bool `short:"I" help:"Interactive decision making after playback" group:"Action"`
 	Trash       bool `help:"Trash files after action" group:"Action"`
 
-	// Hashing
-	HashGap       float64 `default:"0.1" help:"Gap between segments (0.0-1.0 as percentage of file size, or absolute bytes if >1)" group:"Hashing"`
-	HashChunkSize int64   `help:"Size of each segment to hash" group:"Hashing"`
-	HashThreads   int     `default:"1" help:"Number of threads to use for hashing a single file" group:"Hashing"`
-
-	// Chromecast
-	Cast          bool   `help:"Cast to chromecast groups" group:"Playback"`
-	CastDevice    string `alias:"cast-to" help:"Chromecast device name" group:"Playback"`
-	CastWithLocal bool   `help:"Play music locally at the same time as chromecast" group:"Playback"`
-
-	// Database merging and filtering
-	OnlyTables        []string `short:"t" help:"Comma separated specific table(s)" group:"Merge"`
-	PrimaryKeys       []string `help:"Comma separated primary keys" group:"Merge"`
-	BusinessKeys      []string `help:"Comma separated business keys" group:"Merge"`
-	Upsert            bool     `help:"Upsert rows on conflict" group:"Merge"`
-	Ignore            bool     `help:"Ignore rows on conflict (only-new-rows)" group:"Merge"`
-	OnlyNewRows       bool     `kong:"-"` // Alias for Ignore
-	OnlyTargetColumns bool     `help:"Only copy columns that exist in target" group:"Merge"`
-	SkipColumns       []string `help:"Columns to skip during merge" group:"Merge"`
-
-	// Actions
 	PostAction   string `help:"Post-action: none, delete, mark-deleted, move, copy" group:"Action"`
 	DeleteFiles  bool   `help:"Delete files after action" group:"Action"`
 	DeleteRows   bool   `help:"Delete rows from database" group:"Action"`
@@ -258,6 +241,52 @@ type PlaybackFlags struct {
 	TrackHistory bool   `default:"true" help:"Track playback history" group:"Action"`
 }
 
+type HashingFlags struct {
+	HashGap       float64 `default:"0.1" help:"Gap between segments (0.0-1.0 as percentage of file size, or absolute bytes if >1)" group:"Hashing"`
+	HashChunkSize int64   `help:"Size of each segment to hash" group:"Hashing"`
+	HashThreads   int     `default:"1" help:"Number of threads to use for hashing a single file" group:"Hashing"`
+}
+
+type ChromecastFlags struct {
+	Cast          bool   `help:"Cast to chromecast groups" group:"Playback"`
+	CastDevice    string `alias:"cast-to" help:"Chromecast device name" group:"Playback"`
+	CastWithLocal bool   `help:"Play music locally at the same time as chromecast" group:"Playback"`
+}
+
+type MergeFlags struct {
+	OnlyTables        []string `short:"t" help:"Comma separated specific table(s)" group:"Merge"`
+	PrimaryKeys       []string `help:"Comma separated primary keys" group:"Merge"`
+	BusinessKeys      []string `help:"Comma separated business keys" group:"Merge"`
+	Upsert            bool     `help:"Upsert rows on conflict" group:"Merge"`
+	Ignore            bool     `help:"Ignore rows on conflict (only-new-rows)" group:"Merge"`
+	OnlyNewRows       bool     `kong:"-"` // Alias for Ignore
+	OnlyTargetColumns bool     `help:"Only copy columns that exist in target" group:"Merge"`
+	SkipColumns       []string `help:"Columns to skip during merge" group:"Merge"`
+}
+
+// GlobalFlags are flags available to all data commands
+type GlobalFlags struct {
+	QueryFlags
+	DedupeFlags
+	FilterFlags
+	SortFlags
+	DisplayFlags
+	TextFlags
+	SimilarityFlags
+	FTSFlags
+	CommonFlags
+}
+
+// PlaybackFlags includes global flags plus playback and action related flags
+type PlaybackFlags struct {
+	GlobalFlags
+	PlaybackOptions
+	ActionFlags
+	HashingFlags
+	ChromecastFlags
+	MergeFlags
+}
+
 // ControlFlags are a subset of flags for simple control commands
 type ControlFlags struct {
 	MpvSocket  string `help:"Mpv socket path" group:"Playback"`
@@ -265,21 +294,32 @@ type ControlFlags struct {
 	Verbose    bool   `short:"v" help:"Enable verbose logging"`
 }
 
-func (g *GlobalFlags) AfterApply() error {
-	if g.Simulate {
-		g.DryRun = true
+func (c *CommonFlags) AfterApply() error {
+	if c.Simulate {
+		c.DryRun = true
 	}
-	if g.NoConfirm {
-		g.Yes = true
+	if c.NoConfirm {
+		c.Yes = true
 	}
-	if g.Ext != nil {
-		for i, ext := range g.Ext {
+	return nil
+}
+
+func (f *FilterFlags) AfterApply() error {
+	if f.Ext != nil {
+		for i, ext := range f.Ext {
 			if !strings.HasPrefix(ext, ".") {
-				g.Ext[i] = "." + ext
+				f.Ext[i] = "." + ext
 			}
 		}
 	}
 	return nil
+}
+
+func (g *GlobalFlags) AfterApply() error {
+	if err := g.CommonFlags.AfterApply(); err != nil {
+		return err
+	}
+	return g.FilterFlags.AfterApply()
 }
 
 func (p *PlaybackFlags) AfterApply() error {

@@ -639,6 +639,59 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
+    // --- Keyboard Shortcuts ---
+    window.addEventListener('keydown', (e) => {
+        // Don't trigger shortcuts if user is typing in an input
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') {
+            return;
+        }
+
+        const media = pipViewer.querySelector('video, audio');
+        if (!media || pipPlayer.classList.contains('hidden')) {
+            return;
+        }
+
+        switch (e.key.toLowerCase()) {
+            case ' ':
+            case 'k':
+                e.preventDefault();
+                if (media.paused) media.play();
+                else media.pause();
+                break;
+            case 'f':
+                if (media.tagName === 'VIDEO') {
+                    if (document.fullscreenElement) {
+                        document.exitFullscreen();
+                    } else {
+                        media.requestFullscreen();
+                    }
+                }
+                break;
+            case 'm':
+                media.muted = !media.muted;
+                break;
+            case 'j':
+                media.currentTime = Math.max(0, media.currentTime - 10);
+                break;
+            case 'l':
+                media.currentTime = Math.min(media.duration, media.currentTime + 10);
+                break;
+            case 'arrowleft':
+                media.currentTime = Math.max(0, media.currentTime - 5);
+                break;
+            case 'arrowright':
+                media.currentTime = Math.min(media.duration, media.currentTime + 5);
+                break;
+            case '0': case '1': case '2': case '3': case '4':
+            case '5': case '6': case '7': case '8': case '9':
+                const percent = parseInt(e.key) / 10;
+                if (!isNaN(media.duration)) {
+                    media.currentTime = media.duration * percent;
+                }
+                break;
+        }
+    });
+
     // --- Dev Mode Auto-Reload ---
     function setupAutoReload() {
         const events = new EventSource('/api/events');
