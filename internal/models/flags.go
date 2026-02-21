@@ -22,7 +22,7 @@ type (
 	HistoryTrait    interface{ IsHistoryTrait() }
 )
 
-// GlobalFlags are flags available to all commands
+// GlobalFlags are flags available to core data commands (print, search, du, etc)
 type GlobalFlags struct {
 	Query  string `short:"q" help:"Raw SQL query (overrides all query building)" group:"Query"`
 	Limit  int    `short:"L" default:"100" help:"Limit results per database" group:"Query"`
@@ -73,6 +73,8 @@ type GlobalFlags struct {
 	Partial      string `short:"P" help:"Filter by partial playback status" group:"Filter"`
 	PlayCountMin int    `help:"Minimum play count" group:"Filter"`
 	PlayCountMax int    `help:"Maximum play count" group:"Filter"`
+	Completed    bool   `help:"Show only completed items" group:"Filter"`
+	InProgress   bool   `help:"Show only items in progress" group:"Filter"`
 
 	// Content type filters
 	VideoOnly       bool `help:"Only video files" group:"Filter"`
@@ -81,7 +83,11 @@ type GlobalFlags struct {
 	Portrait        bool `help:"Only portrait orientation files" group:"Filter"`
 	ScanSubtitles   bool `help:"Scan for external subtitles during import" group:"Filter"`
 	OnlineMediaOnly bool `help:"Exclude local media" group:"Filter"`
-	LocalMediaOnly  bool `help:"Exclude online media" group:"Filter"`
+	LocalMediaOnly  bool     `help:"Exclude online media" group:"Filter"`
+	FlexibleSearch  bool     `help:"Flexible search (fuzzy)" group:"Filter"`
+	Exact           bool     `help:"Exact match for search" group:"Filter"`
+	Where           []string `short:"w" help:"SQL where clause(s)" group:"Filter"`
+	Exists          bool     `help:"Filter out non-existent files" group:"Filter"`
 
 	MimeType   []string `help:"Filter by mimetype substring (e.g., video, mp4)" group:"Filter"`
 	NoMimeType []string `help:"Exclude by mimetype substring" group:"Filter"`
@@ -154,15 +160,35 @@ type GlobalFlags struct {
 	MoveGroups  bool `help:"Move grouped files into separate directories" group:"Similarity"`
 	PrintGroups bool `help:"Print clusters as JSON" group:"Similarity"`
 
+	// Sorting Extensions
+	ReRank string `short:"k" alias:"rerank" help:"Add key/value pairs re-rank sorting by multiple attributes (COLUMN=WEIGHT)" group:"Sort"`
+
+	// FTS options
+	FTS      bool   `help:"Use full-text search if available" group:"FTS"`
+	FTSTable string `default:"media_fts" help:"FTS table name" group:"FTS"`
+	Related  int    `short:"R" help:"Find media related to the first result" group:"FTS"`
+
+	// Common options
+	Verbose      bool   `short:"v" help:"Enable verbose logging"`
+	Simulate     bool   `help:"Dry run; don't actually do anything"`
+	DryRun       bool   `kong:"-"` // Alias for Simulate
+	NoConfirm    bool   `short:"y" help:"Don't ask for confirmation"`
+	Yes          bool   `kong:"-"` // Alias for NoConfirm
+	Timeout      string `short:"T" help:"Quit after N minutes/seconds"`
+	Threads      int    `help:"Use N threads for parallel processing"`
+	IgnoreErrors bool   `short:"i" help:"Ignore errors and continue to next file"`
+}
+
+// PlaybackFlags includes global flags plus playback and action related flags
+type PlaybackFlags struct {
+	GlobalFlags
+
 	// Playback
 	PlayInOrder           string  `short:"O" default:"natural_ps" help:"Play media in order" group:"Playback"`
 	NoPlayInOrder         bool    `help:"Don't play media in order" group:"Playback"`
-	ReRank                string  `short:"k" alias:"rerank" help:"Add key/value pairs re-rank sorting by multiple attributes (COLUMN=WEIGHT)" group:"Sort"`
 	Loop                  bool    `help:"Loop playback" group:"Playback"`
 	Mute                  bool    `short:"M" help:"Start playback muted" group:"Playback"`
 	OverridePlayer        string  `help:"Override default player (e.g. --player 'vlc')" group:"Playback"`
-	Completed             bool    `help:"Show only completed items" group:"Playback"`
-	InProgress            bool    `help:"Show only items in progress" group:"Playback"`
 	Start                 string  `help:"Start playback at specific time/percentage" group:"Playback"`
 	End                   string  `help:"Stop playback at specific time/percentage" group:"Playback"`
 	Volume                int     `help:"Set initial volume (0-100)" group:"Playback"`
@@ -219,9 +245,6 @@ type GlobalFlags struct {
 	OnlyNewRows       bool     `kong:"-"` // Alias for Ignore
 	OnlyTargetColumns bool     `help:"Only copy columns that exist in target" group:"Merge"`
 	SkipColumns       []string `help:"Columns to skip during merge" group:"Merge"`
-	Where             []string `short:"w" help:"SQL where clause(s)" group:"Merge"`
-	Exact             bool     `help:"Exact match for search" group:"Merge"`
-	FlexibleSearch    bool     `help:"Flexible search (fuzzy)" group:"Merge"`
 
 	// Actions
 	PostAction   string `help:"Post-action: none, delete, mark-deleted, move, copy" group:"Action"`
@@ -230,25 +253,9 @@ type GlobalFlags struct {
 	MarkDeleted  bool   `help:"Mark as deleted in database" group:"Action"`
 	MoveTo       string `help:"Move files to directory" group:"Action"`
 	CopyTo       string `help:"Copy files to directory" group:"Action"`
-	ActionLimit  int    `help:"Stop after N files" group:"Action"`
+	ActionLimit  int    `help:"Stop after N files" help:"ActionLimit" group:"Action"`
 	ActionSize   string `help:"Stop after N bytes (e.g., 10GB)" group:"Action"`
-	Exists       bool   `help:"Filter out non-existent files" group:"Action"`
 	TrackHistory bool   `default:"true" help:"Track playback history" group:"Action"`
-
-	// FTS options
-	FTS      bool   `help:"Use full-text search if available" group:"FTS"`
-	FTSTable string `default:"media_fts" help:"FTS table name" group:"FTS"`
-	Related  int    `short:"R" help:"Find media related to the first result" group:"FTS"`
-
-	// Common options
-	Verbose      bool   `short:"v" help:"Enable verbose logging"`
-	Simulate     bool   `help:"Dry run; don't actually do anything"`
-	DryRun       bool   `kong:"-"` // Alias for Simulate
-	NoConfirm    bool   `short:"y" help:"Don't ask for confirmation"`
-	Yes          bool   `kong:"-"` // Alias for NoConfirm
-	Timeout      string `short:"T" help:"Quit after N minutes/seconds"`
-	Threads      int    `help:"Use N threads for parallel processing"`
-	IgnoreErrors bool   `short:"i" help:"Ignore errors and continue to next file"`
 }
 
 // ControlFlags are a subset of flags for simple control commands
@@ -265,9 +272,6 @@ func (g *GlobalFlags) AfterApply() error {
 	if g.NoConfirm {
 		g.Yes = true
 	}
-	if g.Ignore {
-		g.OnlyNewRows = true
-	}
 	if g.Ext != nil {
 		for i, ext := range g.Ext {
 			if !strings.HasPrefix(ext, ".") {
@@ -276,6 +280,13 @@ func (g *GlobalFlags) AfterApply() error {
 		}
 	}
 	return nil
+}
+
+func (p *PlaybackFlags) AfterApply() error {
+	if p.Ignore {
+		p.OnlyNewRows = true
+	}
+	return p.GlobalFlags.AfterApply()
 }
 
 var LogLevel = &slog.LevelVar{}

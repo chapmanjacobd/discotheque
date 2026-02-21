@@ -24,7 +24,7 @@ import (
 )
 
 type ServeCmd struct {
-	models.GlobalFlags
+	models.PlaybackFlags
 	Databases            []string `arg:"" required:"" help:"SQLite database files" type:"existingfile"`
 	Port                 int      `short:"p" default:"5555" help:"Port to listen on"`
 	PublicDir            string   `help:"Override embedded web assets with local directory"`
@@ -130,7 +130,7 @@ func (c *ServeCmd) handleQuery(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	query.SortMedia(media, flags)
+	query.SortMedia(media, models.PlaybackFlags{GlobalFlags: flags})
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(media)

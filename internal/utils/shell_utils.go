@@ -54,7 +54,7 @@ func RenameNoReplace(src, dst string) error {
 }
 
 // Trash moves a file to the system trash if available, otherwise deletes it
-func Trash(flags models.GlobalFlags, path string) error {
+func Trash(flags models.PlaybackFlags, path string) error {
 	if !FileExists(path) {
 		return nil
 	}

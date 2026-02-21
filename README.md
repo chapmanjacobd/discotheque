@@ -12,7 +12,14 @@ Golang implementation of xklb/library
 
 Add media to database
 
-<details><summary>Usage</summary>
+Examples:
+
+```bash
+$ disco add my_videos.db ~/Videos
+$ disco add --video-only my_videos.db /mnt/media
+```
+
+<details><summary>All Options</summary>
 
 ```bash
 $ disco add --help
@@ -64,6 +71,10 @@ Flags:
         Minimum play count
   --play-count-max
         Maximum play count
+  --completed
+        Show only completed items
+  --in-progress
+        Show only items in progress
   --video-only
         Only video files
   --audio-only
@@ -78,6 +89,14 @@ Flags:
         Exclude local media
   --local-media-only
         Exclude online media
+  --flexible-search
+        Flexible search (fuzzy)
+  --exact
+        Exact match for search
+  -w, --where
+        SQL where clause(s)
+  --exists
+        Filter out non-existent files
   --mime-type
         Filter by mimetype substring (e.g., video, mp4)
   --no-mime-type
@@ -112,7 +131,7 @@ Flags:
 
 Check for missing files and mark as deleted
 
-<details><summary>Usage</summary>
+<details><summary>All Options</summary>
 
 ```bash
 $ disco check --help
@@ -164,6 +183,10 @@ Flags:
         Minimum play count
   --play-count-max
         Maximum play count
+  --completed
+        Show only completed items
+  --in-progress
+        Show only items in progress
   --video-only
         Only video files
   --audio-only
@@ -178,6 +201,14 @@ Flags:
         Exclude local media
   --local-media-only
         Exclude online media
+  --flexible-search
+        Flexible search (fuzzy)
+  --exact
+        Exact match for search
+  -w, --where
+        SQL where clause(s)
+  --exists
+        Filter out non-existent files
   --mime-type
         Filter by mimetype substring (e.g., video, mp4)
   --no-mime-type
@@ -212,7 +243,15 @@ Flags:
 
 Print media information
 
-<details><summary>Usage</summary>
+Examples:
+
+```bash
+$ disco print my_videos.db
+$ disco print my_videos.db -u size --reverse
+$ disco print my_videos.db --big-dirs -u count
+```
+
+<details><summary>All Options</summary>
 
 ```bash
 $ disco print --help
@@ -264,6 +303,10 @@ Flags:
         Minimum play count
   --play-count-max
         Maximum play count
+  --completed
+        Show only completed items
+  --in-progress
+        Show only items in progress
   --video-only
         Only video files
   --audio-only
@@ -278,6 +321,14 @@ Flags:
         Exclude local media
   --local-media-only
         Exclude online media
+  --flexible-search
+        Flexible search (fuzzy)
+  --exact
+        Exact match for search
+  -w, --where
+        SQL where clause(s)
+  --exists
+        Filter out non-existent files
   --mime-type
         Filter by mimetype substring (e.g., video, mp4)
   --no-mime-type
@@ -354,66 +405,6 @@ Flags:
         Filter for unique words (true/false)
   -k, --re-rank
         Add key/value pairs re-rank sorting by multiple attributes (COLUMN=WEIGHT)
-  --cmd-0
-        Command to run if mpv exits with code 0
-  --cmd-1
-        Command to run if mpv exits with code 1
-  --cmd-2
-        Command to run if mpv exits with code 2
-  --cmd-3
-        Command to run if mpv exits with code 3
-  --cmd-4
-        Command to run if mpv exits with code 4
-  --cmd-5
-        Command to run if mpv exits with code 5
-  --cmd-6
-        Command to run if mpv exits with code 6
-  --cmd-7
-        Command to run if mpv exits with code 7
-  --cmd-8
-        Command to run if mpv exits with code 8
-  --cmd-9
-        Command to run if mpv exits with code 9
-  --cmd-10
-        Command to run if mpv exits with code 10
-  --cmd-11
-        Command to run if mpv exits with code 11
-  --cmd-12
-        Command to run if mpv exits with code 12
-  --cmd-13
-        Command to run if mpv exits with code 13
-  --cmd-14
-        Command to run if mpv exits with code 14
-  --cmd-15
-        Command to run if mpv exits with code 15
-  --cmd-20
-        Command to run if mpv exits with code 20
-  --cmd-127
-        Command to run if mpv exits with code 127
-  -I, --interactive
-        Interactive decision making after playback
-  --trash
-        Trash files after action
-  --post-action
-        Post-action: none, delete, mark-deleted, move, copy
-  --delete-files
-        Delete files after action
-  --delete-rows
-        Delete rows from database
-  --mark-deleted
-        Mark as deleted in database
-  --move-to
-        Move files to directory
-  --copy-to
-        Copy files to directory
-  --action-limit
-        Stop after N files
-  --action-size
-        Stop after N bytes (e.g., 10GB)
-  --exists
-        Filter out non-existent files
-  --track-history
-        Track playback history
   --fts
         Use full-text search if available
   --fts-table
@@ -440,7 +431,14 @@ Flags:
 
 Search media using FTS
 
-<details><summary>Usage</summary>
+Examples:
+
+```bash
+$ disco search my_videos.db 'matrix'
+$ disco search my_videos.db 'cyberpunk' --video-only
+```
+
+<details><summary>All Options</summary>
 
 ```bash
 $ disco search --help
@@ -492,6 +490,10 @@ Flags:
         Minimum play count
   --play-count-max
         Maximum play count
+  --completed
+        Show only completed items
+  --in-progress
+        Show only items in progress
   --video-only
         Only video files
   --audio-only
@@ -506,6 +508,14 @@ Flags:
         Exclude local media
   --local-media-only
         Exclude online media
+  --flexible-search
+        Flexible search (fuzzy)
+  --exact
+        Exact match for search
+  -w, --where
+        SQL where clause(s)
+  --exists
+        Filter out non-existent files
   --mime-type
         Filter by mimetype substring (e.g., video, mp4)
   --no-mime-type
@@ -590,58 +600,12 @@ Flags:
 
 Search captions using FTS
 
-<details><summary>Usage</summary>
+<details><summary>All Options</summary>
 
 ```bash
 $ disco search-captions --help
 
 Flags:
-  -O, --play-in-order
-        Play media in order
-  --no-play-in-order
-        Don't play media in order
-  --loop
-        Loop playback
-  -M, --mute
-        Start playback muted
-  --override-player
-        Override default player (e.g. --player 'vlc')
-  --completed
-        Show only completed items
-  --in-progress
-        Show only items in progress
-  --start
-        Start playback at specific time/percentage
-  --end
-        Stop playback at specific time/percentage
-  --volume
-        Set initial volume (0-100)
-  --fullscreen
-        Start in fullscreen
-  --no-subtitles
-        Disable subtitles
-  --subtitle-mix
-        Probability to play no-subtitle content
-  -4, --interdimensional-cable
-        Duration to play (in seconds) while changing the channel
-  --speed
-        Playback speed
-  --save-playhead
-        Save playback position on quit
-  --mpv-socket
-        Mpv socket path
-  --watch-later-dir
-        Mpv watch_later directory
-  --player-args-sub
-        Player arguments for videos with subtitles
-  --player-args-no-sub
-        Player arguments for videos without subtitles
-  --cast
-        Cast to chromecast groups
-  --cast-device
-        Chromecast device name
-  --cast-with-local
-        Play music locally at the same time as chromecast
   -v, --verbose
         Enable verbose logging
   --simulate
@@ -666,7 +630,7 @@ Flags:
 
 List scan roots (playlists)
 
-<details><summary>Usage</summary>
+<details><summary>All Options</summary>
 
 ```bash
 $ disco playlists --help
@@ -728,7 +692,7 @@ Flags:
 
 Search arbitrary database table
 
-<details><summary>Usage</summary>
+<details><summary>All Options</summary>
 
 ```bash
 $ disco search-db --help
@@ -788,6 +752,10 @@ Flags:
         Minimum play count
   --play-count-max
         Maximum play count
+  --completed
+        Show only completed items
+  --in-progress
+        Show only items in progress
   --video-only
         Only video files
   --audio-only
@@ -802,6 +770,14 @@ Flags:
         Exclude local media
   --local-media-only
         Exclude online media
+  --flexible-search
+        Flexible search (fuzzy)
+  --exact
+        Exact match for search
+  -w, --where
+        SQL where clause(s)
+  --exists
+        Filter out non-existent files
   --mime-type
         Filter by mimetype substring (e.g., video, mp4)
   --no-mime-type
@@ -850,6 +826,18 @@ Flags:
         Filter folders by total size
   --folder-counts
         Filter folders by number of subfolders
+  -v, --verbose
+        Enable verbose logging
+  --simulate
+        Dry run; don't actually do anything
+  -y, --no-confirm
+        Don't ask for confirmation
+  -T, --timeout
+        Quit after N minutes/seconds
+  --threads
+        Use N threads for parallel processing
+  -i, --ignore-errors
+        Ignore errors and continue to next file
   --cmd-0
         Command to run if mpv exits with code 0
   --cmd-1
@@ -904,12 +892,6 @@ Flags:
         Only copy columns that exist in target
   --skip-columns
         Columns to skip during merge
-  -w, --where
-        SQL where clause(s)
-  --exact
-        Exact match for search
-  --flexible-search
-        Flexible search (fuzzy)
   --post-action
         Post-action: none, delete, mark-deleted, move, copy
   --delete-files
@@ -926,22 +908,8 @@ Flags:
         Stop after N files
   --action-size
         Stop after N bytes (e.g., 10GB)
-  --exists
-        Filter out non-existent files
   --track-history
         Track playback history
-  -v, --verbose
-        Enable verbose logging
-  --simulate
-        Dry run; don't actually do anything
-  -y, --no-confirm
-        Don't ask for confirmation
-  -T, --timeout
-        Quit after N minutes/seconds
-  --threads
-        Use N threads for parallel processing
-  -i, --ignore-errors
-        Ignore errors and continue to next file
 ```
 
 </details>
@@ -950,7 +918,7 @@ Flags:
 
 Check media files for corruption
 
-<details><summary>Usage</summary>
+<details><summary>All Options</summary>
 
 ```bash
 $ disco media-check --help
@@ -1002,6 +970,10 @@ Flags:
         Minimum play count
   --play-count-max
         Maximum play count
+  --completed
+        Show only completed items
+  --in-progress
+        Show only items in progress
   --video-only
         Only video files
   --audio-only
@@ -1016,6 +988,14 @@ Flags:
         Exclude local media
   --local-media-only
         Exclude online media
+  --flexible-search
+        Flexible search (fuzzy)
+  --exact
+        Exact match for search
+  -w, --where
+        SQL where clause(s)
+  --exists
+        Filter out non-existent files
   --mime-type
         Filter by mimetype substring (e.g., video, mp4)
   --no-mime-type
@@ -1060,7 +1040,7 @@ Flags:
 
 Show information about files
 
-<details><summary>Usage</summary>
+<details><summary>All Options</summary>
 
 ```bash
 $ disco files-info --help
@@ -1112,6 +1092,10 @@ Flags:
         Minimum play count
   --play-count-max
         Maximum play count
+  --completed
+        Show only completed items
+  --in-progress
+        Show only items in progress
   --video-only
         Only video files
   --audio-only
@@ -1126,6 +1110,14 @@ Flags:
         Exclude local media
   --local-media-only
         Exclude online media
+  --flexible-search
+        Flexible search (fuzzy)
+  --exact
+        Exact match for search
+  -w, --where
+        SQL where clause(s)
+  --exists
+        Filter out non-existent files
   --mime-type
         Filter by mimetype substring (e.g., video, mp4)
   --no-mime-type
@@ -1158,7 +1150,14 @@ Flags:
 
 Show disk usage aggregation
 
-<details><summary>Usage</summary>
+Examples:
+
+```bash
+$ disco du my_videos.db
+$ disco du my_videos.db --depth 2
+```
+
+<details><summary>All Options</summary>
 
 ```bash
 $ disco disk-usage --help
@@ -1210,6 +1209,10 @@ Flags:
         Minimum play count
   --play-count-max
         Maximum play count
+  --completed
+        Show only completed items
+  --in-progress
+        Show only items in progress
   --video-only
         Only video files
   --audio-only
@@ -1224,6 +1227,14 @@ Flags:
         Exclude local media
   --local-media-only
         Exclude online media
+  --flexible-search
+        Flexible search (fuzzy)
+  --exact
+        Exact match for search
+  -w, --where
+        SQL where clause(s)
+  --exists
+        Filter out non-existent files
   --mime-type
         Filter by mimetype substring (e.g., video, mp4)
   --no-mime-type
@@ -1302,7 +1313,7 @@ Flags:
 
 Dedupe similar media
 
-<details><summary>Usage</summary>
+<details><summary>All Options</summary>
 
 ```bash
 $ disco dedupe --help
@@ -1348,7 +1359,7 @@ Flags:
 
 Show big directories aggregation
 
-<details><summary>Usage</summary>
+<details><summary>All Options</summary>
 
 ```bash
 $ disco big-dirs --help
@@ -1400,6 +1411,10 @@ Flags:
         Minimum play count
   --play-count-max
         Maximum play count
+  --completed
+        Show only completed items
+  --in-progress
+        Show only items in progress
   --video-only
         Only video files
   --audio-only
@@ -1414,6 +1429,14 @@ Flags:
         Exclude local media
   --local-media-only
         Exclude online media
+  --flexible-search
+        Flexible search (fuzzy)
+  --exact
+        Exact match for search
+  -w, --where
+        SQL where clause(s)
+  --exists
+        Filter out non-existent files
   --mime-type
         Filter by mimetype substring (e.g., video, mp4)
   --no-mime-type
@@ -1492,7 +1515,7 @@ Flags:
 
 Auto-group media into categories
 
-<details><summary>Usage</summary>
+<details><summary>All Options</summary>
 
 ```bash
 $ disco categorize --help
@@ -1552,6 +1575,10 @@ Flags:
         Minimum play count
   --play-count-max
         Maximum play count
+  --completed
+        Show only completed items
+  --in-progress
+        Show only items in progress
   --video-only
         Only video files
   --audio-only
@@ -1566,6 +1593,14 @@ Flags:
         Exclude local media
   --local-media-only
         Exclude online media
+  --flexible-search
+        Flexible search (fuzzy)
+  --exact
+        Exact match for search
+  -w, --where
+        SQL where clause(s)
+  --exists
+        Filter out non-existent files
   --mime-type
         Filter by mimetype substring (e.g., video, mp4)
   --no-mime-type
@@ -1578,66 +1613,6 @@ Flags:
         Fetch siblings of matched files (each, all, if-audiobook)
   --fetch-siblings-max
         Maximum number of siblings to fetch
-  --cmd-0
-        Command to run if mpv exits with code 0
-  --cmd-1
-        Command to run if mpv exits with code 1
-  --cmd-2
-        Command to run if mpv exits with code 2
-  --cmd-3
-        Command to run if mpv exits with code 3
-  --cmd-4
-        Command to run if mpv exits with code 4
-  --cmd-5
-        Command to run if mpv exits with code 5
-  --cmd-6
-        Command to run if mpv exits with code 6
-  --cmd-7
-        Command to run if mpv exits with code 7
-  --cmd-8
-        Command to run if mpv exits with code 8
-  --cmd-9
-        Command to run if mpv exits with code 9
-  --cmd-10
-        Command to run if mpv exits with code 10
-  --cmd-11
-        Command to run if mpv exits with code 11
-  --cmd-12
-        Command to run if mpv exits with code 12
-  --cmd-13
-        Command to run if mpv exits with code 13
-  --cmd-14
-        Command to run if mpv exits with code 14
-  --cmd-15
-        Command to run if mpv exits with code 15
-  --cmd-20
-        Command to run if mpv exits with code 20
-  --cmd-127
-        Command to run if mpv exits with code 127
-  -I, --interactive
-        Interactive decision making after playback
-  --trash
-        Trash files after action
-  --post-action
-        Post-action: none, delete, mark-deleted, move, copy
-  --delete-files
-        Delete files after action
-  --delete-rows
-        Delete rows from database
-  --mark-deleted
-        Mark as deleted in database
-  --move-to
-        Move files to directory
-  --copy-to
-        Copy files to directory
-  --action-limit
-        Stop after N files
-  --action-size
-        Stop after N bytes (e.g., 10GB)
-  --exists
-        Filter out non-existent files
-  --track-history
-        Track playback history
   -v, --verbose
         Enable verbose logging
   --simulate
@@ -1660,7 +1635,7 @@ Flags:
 
 Find similar files
 
-<details><summary>Usage</summary>
+<details><summary>All Options</summary>
 
 ```bash
 $ disco similar-files --help
@@ -1712,6 +1687,10 @@ Flags:
         Minimum play count
   --play-count-max
         Maximum play count
+  --completed
+        Show only completed items
+  --in-progress
+        Show only items in progress
   --video-only
         Only video files
   --audio-only
@@ -1726,6 +1705,14 @@ Flags:
         Exclude local media
   --local-media-only
         Exclude online media
+  --flexible-search
+        Flexible search (fuzzy)
+  --exact
+        Exact match for search
+  -w, --where
+        SQL where clause(s)
+  --exists
+        Filter out non-existent files
   --mime-type
         Filter by mimetype substring (e.g., video, mp4)
   --no-mime-type
@@ -1838,7 +1825,7 @@ Flags:
 
 Find similar folders
 
-<details><summary>Usage</summary>
+<details><summary>All Options</summary>
 
 ```bash
 $ disco similar-folders --help
@@ -1890,6 +1877,10 @@ Flags:
         Minimum play count
   --play-count-max
         Maximum play count
+  --completed
+        Show only completed items
+  --in-progress
+        Show only items in progress
   --video-only
         Only video files
   --audio-only
@@ -1904,6 +1895,14 @@ Flags:
         Exclude local media
   --local-media-only
         Exclude online media
+  --flexible-search
+        Flexible search (fuzzy)
+  --exact
+        Exact match for search
+  -w, --where
+        SQL where clause(s)
+  --exists
+        Filter out non-existent files
   --mime-type
         Filter by mimetype substring (e.g., video, mp4)
   --no-mime-type
@@ -2016,7 +2015,15 @@ Flags:
 
 Watch videos with mpv
 
-<details><summary>Usage</summary>
+Examples:
+
+```bash
+$ disco watch my_videos.db
+$ disco watch my_videos.db -r --limit 10
+$ disco watch my_videos.db --size '>1GB'
+```
+
+<details><summary>All Options</summary>
 
 ```bash
 $ disco watch --help
@@ -2068,6 +2075,10 @@ Flags:
         Minimum play count
   --play-count-max
         Maximum play count
+  --completed
+        Show only completed items
+  --in-progress
+        Show only items in progress
   --video-only
         Only video files
   --audio-only
@@ -2082,6 +2093,14 @@ Flags:
         Exclude local media
   --local-media-only
         Exclude online media
+  --flexible-search
+        Flexible search (fuzzy)
+  --exact
+        Exact match for search
+  -w, --where
+        SQL where clause(s)
+  --exists
+        Filter out non-existent files
   --mime-type
         Filter by mimetype substring (e.g., video, mp4)
   --no-mime-type
@@ -2102,22 +2121,30 @@ Flags:
         Use natural sorting
   -r, --random
         Random order
+  -k, --re-rank
+        Add key/value pairs re-rank sorting by multiple attributes (COLUMN=WEIGHT)
+  -v, --verbose
+        Enable verbose logging
+  --simulate
+        Dry run; don't actually do anything
+  -y, --no-confirm
+        Don't ask for confirmation
+  -T, --timeout
+        Quit after N minutes/seconds
+  --threads
+        Use N threads for parallel processing
+  -i, --ignore-errors
+        Ignore errors and continue to next file
   -O, --play-in-order
         Play media in order
   --no-play-in-order
         Don't play media in order
-  -k, --re-rank
-        Add key/value pairs re-rank sorting by multiple attributes (COLUMN=WEIGHT)
   --loop
         Loop playback
   -M, --mute
         Start playback muted
   --override-player
         Override default player (e.g. --player 'vlc')
-  --completed
-        Show only completed items
-  --in-progress
-        Show only items in progress
   --start
         Start playback at specific time/percentage
   --end
@@ -2206,22 +2233,8 @@ Flags:
         Stop after N files
   --action-size
         Stop after N bytes (e.g., 10GB)
-  --exists
-        Filter out non-existent files
   --track-history
         Track playback history
-  -v, --verbose
-        Enable verbose logging
-  --simulate
-        Dry run; don't actually do anything
-  -y, --no-confirm
-        Don't ask for confirmation
-  -T, --timeout
-        Quit after N minutes/seconds
-  --threads
-        Use N threads for parallel processing
-  -i, --ignore-errors
-        Ignore errors and continue to next file
 ```
 
 </details>
@@ -2230,7 +2243,14 @@ Flags:
 
 Listen to audio with mpv
 
-<details><summary>Usage</summary>
+Examples:
+
+```bash
+$ disco listen my_music.db
+$ disco listen my_music.db --random
+```
+
+<details><summary>All Options</summary>
 
 ```bash
 $ disco listen --help
@@ -2282,6 +2302,10 @@ Flags:
         Minimum play count
   --play-count-max
         Maximum play count
+  --completed
+        Show only completed items
+  --in-progress
+        Show only items in progress
   --video-only
         Only video files
   --audio-only
@@ -2296,6 +2320,14 @@ Flags:
         Exclude local media
   --local-media-only
         Exclude online media
+  --flexible-search
+        Flexible search (fuzzy)
+  --exact
+        Exact match for search
+  -w, --where
+        SQL where clause(s)
+  --exists
+        Filter out non-existent files
   --mime-type
         Filter by mimetype substring (e.g., video, mp4)
   --no-mime-type
@@ -2316,22 +2348,30 @@ Flags:
         Use natural sorting
   -r, --random
         Random order
+  -k, --re-rank
+        Add key/value pairs re-rank sorting by multiple attributes (COLUMN=WEIGHT)
+  -v, --verbose
+        Enable verbose logging
+  --simulate
+        Dry run; don't actually do anything
+  -y, --no-confirm
+        Don't ask for confirmation
+  -T, --timeout
+        Quit after N minutes/seconds
+  --threads
+        Use N threads for parallel processing
+  -i, --ignore-errors
+        Ignore errors and continue to next file
   -O, --play-in-order
         Play media in order
   --no-play-in-order
         Don't play media in order
-  -k, --re-rank
-        Add key/value pairs re-rank sorting by multiple attributes (COLUMN=WEIGHT)
   --loop
         Loop playback
   -M, --mute
         Start playback muted
   --override-player
         Override default player (e.g. --player 'vlc')
-  --completed
-        Show only completed items
-  --in-progress
-        Show only items in progress
   --start
         Start playback at specific time/percentage
   --end
@@ -2420,22 +2460,8 @@ Flags:
         Stop after N files
   --action-size
         Stop after N bytes (e.g., 10GB)
-  --exists
-        Filter out non-existent files
   --track-history
         Track playback history
-  -v, --verbose
-        Enable verbose logging
-  --simulate
-        Dry run; don't actually do anything
-  -y, --no-confirm
-        Don't ask for confirmation
-  -T, --timeout
-        Quit after N minutes/seconds
-  --threads
-        Use N threads for parallel processing
-  -i, --ignore-errors
-        Ignore errors and continue to next file
 ```
 
 </details>
@@ -2444,7 +2470,7 @@ Flags:
 
 Show library statistics
 
-<details><summary>Usage</summary>
+<details><summary>All Options</summary>
 
 ```bash
 $ disco stats --help
@@ -2496,6 +2522,10 @@ Flags:
         Minimum play count
   --play-count-max
         Maximum play count
+  --completed
+        Show only completed items
+  --in-progress
+        Show only items in progress
   --video-only
         Only video files
   --audio-only
@@ -2510,6 +2540,14 @@ Flags:
         Exclude local media
   --local-media-only
         Exclude online media
+  --flexible-search
+        Flexible search (fuzzy)
+  --exact
+        Exact match for search
+  -w, --where
+        SQL where clause(s)
+  --exists
+        Filter out non-existent files
   --mime-type
         Filter by mimetype substring (e.g., video, mp4)
   --no-mime-type
@@ -2578,7 +2616,14 @@ Flags:
 
 Show playback history
 
-<details><summary>Usage</summary>
+Examples:
+
+```bash
+$ disco history my_videos.db
+$ disco history my_videos.db --inprogress
+```
+
+<details><summary>All Options</summary>
 
 ```bash
 $ disco history --help
@@ -2630,6 +2675,10 @@ Flags:
         Minimum play count
   --play-count-max
         Maximum play count
+  --completed
+        Show only completed items
+  --in-progress
+        Show only items in progress
   --video-only
         Only video files
   --audio-only
@@ -2644,6 +2693,14 @@ Flags:
         Exclude local media
   --local-media-only
         Exclude online media
+  --flexible-search
+        Flexible search (fuzzy)
+  --exact
+        Exact match for search
+  -w, --where
+        SQL where clause(s)
+  --exists
+        Filter out non-existent files
   --mime-type
         Filter by mimetype substring (e.g., video, mp4)
   --no-mime-type
@@ -2702,6 +2759,18 @@ Flags:
         Filter folders by number of subfolders
   -k, --re-rank
         Add key/value pairs re-rank sorting by multiple attributes (COLUMN=WEIGHT)
+  -v, --verbose
+        Enable verbose logging
+  --simulate
+        Dry run; don't actually do anything
+  -y, --no-confirm
+        Don't ask for confirmation
+  -T, --timeout
+        Quit after N minutes/seconds
+  --threads
+        Use N threads for parallel processing
+  -i, --ignore-errors
+        Ignore errors and continue to next file
   --cmd-0
         Command to run if mpv exits with code 0
   --cmd-1
@@ -2758,22 +2827,8 @@ Flags:
         Stop after N files
   --action-size
         Stop after N bytes (e.g., 10GB)
-  --exists
-        Filter out non-existent files
   --track-history
         Track playback history
-  -v, --verbose
-        Enable verbose logging
-  --simulate
-        Dry run; don't actually do anything
-  -y, --no-confirm
-        Don't ask for confirmation
-  -T, --timeout
-        Quit after N minutes/seconds
-  --threads
-        Use N threads for parallel processing
-  -i, --ignore-errors
-        Ignore errors and continue to next file
 ```
 
 </details>
@@ -2782,7 +2837,7 @@ Flags:
 
 Add paths to playback history
 
-<details><summary>Usage</summary>
+<details><summary>All Options</summary>
 
 ```bash
 $ disco history-add --help
@@ -2808,7 +2863,7 @@ Flags:
 
 Import mpv watchlater files to history
 
-<details><summary>Usage</summary>
+<details><summary>All Options</summary>
 
 ```bash
 $ disco mpv-watchlater --help
@@ -2834,7 +2889,14 @@ Flags:
 
 Start Web UI server
 
-<details><summary>Usage</summary>
+Examples:
+
+```bash
+$ disco serve my_videos.db my_music.db
+$ disco serve --trashcan my_videos.db
+```
+
+<details><summary>All Options</summary>
 
 ```bash
 $ disco serve --help
@@ -2868,7 +2930,13 @@ Flags:
 
 Optimize database (VACUUM, ANALYZE, FTS optimize)
 
-<details><summary>Usage</summary>
+Examples:
+
+```bash
+$ disco optimize my_videos.db
+```
+
+<details><summary>All Options</summary>
 
 ```bash
 $ disco optimize --help
@@ -2894,7 +2962,7 @@ Flags:
 
 Interactive TUI media picker
 
-<details><summary>Usage</summary>
+<details><summary>All Options</summary>
 
 ```bash
 $ disco tui --help
@@ -2946,6 +3014,10 @@ Flags:
         Minimum play count
   --play-count-max
         Maximum play count
+  --completed
+        Show only completed items
+  --in-progress
+        Show only items in progress
   --video-only
         Only video files
   --audio-only
@@ -2960,6 +3032,14 @@ Flags:
         Exclude local media
   --local-media-only
         Exclude online media
+  --flexible-search
+        Flexible search (fuzzy)
+  --exact
+        Exact match for search
+  -w, --where
+        SQL where clause(s)
+  --exists
+        Filter out non-existent files
   --mime-type
         Filter by mimetype substring (e.g., video, mp4)
   --no-mime-type
@@ -3002,7 +3082,7 @@ Flags:
 
 Generate README.md content
 
-<details><summary>Usage</summary>
+<details><summary>All Options</summary>
 
 ```bash
 $ disco readme --help
@@ -3028,7 +3108,7 @@ Flags:
 
 Sort by splitting lines and sorting words
 
-<details><summary>Usage</summary>
+<details><summary>All Options</summary>
 
 ```bash
 $ disco regex-sort --help
@@ -3074,7 +3154,7 @@ Flags:
 
 Group items by similarity
 
-<details><summary>Usage</summary>
+<details><summary>All Options</summary>
 
 ```bash
 $ disco cluster-sort --help
@@ -3154,18 +3234,12 @@ Flags:
 
 Calculate a hash based on small file segments
 
-<details><summary>Usage</summary>
+<details><summary>All Options</summary>
 
 ```bash
 $ disco sample-hash --help
 
 Flags:
-  --hash-gap
-        Gap between segments (0.0-1.0 as percentage of file size, or absolute bytes if >1)
-  --hash-chunk-size
-        Size of each segment to hash
-  --hash-threads
-        Number of threads to use for hashing a single file
   -v, --verbose
         Enable verbose logging
   --simulate
@@ -3178,6 +3252,12 @@ Flags:
         Use N threads for parallel processing
   -i, --ignore-errors
         Ignore errors and continue to next file
+  --hash-gap
+        Gap between segments (0.0-1.0 as percentage of file size, or absolute bytes if >1)
+  --hash-chunk-size
+        Size of each segment to hash
+  --hash-threads
+        Number of threads to use for hashing a single file
 ```
 
 </details>
@@ -3186,7 +3266,7 @@ Flags:
 
 Open files with default application
 
-<details><summary>Usage</summary>
+<details><summary>All Options</summary>
 
 ```bash
 $ disco open --help
@@ -3238,6 +3318,10 @@ Flags:
         Minimum play count
   --play-count-max
         Maximum play count
+  --completed
+        Show only completed items
+  --in-progress
+        Show only items in progress
   --video-only
         Only video files
   --audio-only
@@ -3252,6 +3336,14 @@ Flags:
         Exclude local media
   --local-media-only
         Exclude online media
+  --flexible-search
+        Flexible search (fuzzy)
+  --exact
+        Exact match for search
+  -w, --where
+        SQL where clause(s)
+  --exists
+        Filter out non-existent files
   --mime-type
         Filter by mimetype substring (e.g., video, mp4)
   --no-mime-type
@@ -3274,6 +3366,18 @@ Flags:
         Random order
   -k, --re-rank
         Add key/value pairs re-rank sorting by multiple attributes (COLUMN=WEIGHT)
+  -v, --verbose
+        Enable verbose logging
+  --simulate
+        Dry run; don't actually do anything
+  -y, --no-confirm
+        Don't ask for confirmation
+  -T, --timeout
+        Quit after N minutes/seconds
+  --threads
+        Use N threads for parallel processing
+  -i, --ignore-errors
+        Ignore errors and continue to next file
   --cmd-0
         Command to run if mpv exits with code 0
   --cmd-1
@@ -3330,22 +3434,8 @@ Flags:
         Stop after N files
   --action-size
         Stop after N bytes (e.g., 10GB)
-  --exists
-        Filter out non-existent files
   --track-history
         Track playback history
-  -v, --verbose
-        Enable verbose logging
-  --simulate
-        Dry run; don't actually do anything
-  -y, --no-confirm
-        Don't ask for confirmation
-  -T, --timeout
-        Quit after N minutes/seconds
-  --threads
-        Use N threads for parallel processing
-  -i, --ignore-errors
-        Ignore errors and continue to next file
 ```
 
 </details>
@@ -3354,7 +3444,7 @@ Flags:
 
 Open URLs in browser
 
-<details><summary>Usage</summary>
+<details><summary>All Options</summary>
 
 ```bash
 $ disco browse --help
@@ -3406,6 +3496,10 @@ Flags:
         Minimum play count
   --play-count-max
         Maximum play count
+  --completed
+        Show only completed items
+  --in-progress
+        Show only items in progress
   --video-only
         Only video files
   --audio-only
@@ -3420,6 +3514,14 @@ Flags:
         Exclude local media
   --local-media-only
         Exclude online media
+  --flexible-search
+        Flexible search (fuzzy)
+  --exact
+        Exact match for search
+  -w, --where
+        SQL where clause(s)
+  --exists
+        Filter out non-existent files
   --mime-type
         Filter by mimetype substring (e.g., video, mp4)
   --no-mime-type
@@ -3454,7 +3556,7 @@ Flags:
 
 Show current mpv playback status
 
-<details><summary>Usage</summary>
+<details><summary>All Options</summary>
 
 ```bash
 $ disco now --help
@@ -3474,7 +3576,7 @@ Flags:
 
 Skip to next file in mpv
 
-<details><summary>Usage</summary>
+<details><summary>All Options</summary>
 
 ```bash
 $ disco next --help
@@ -3494,7 +3596,7 @@ Flags:
 
 Stop mpv playback
 
-<details><summary>Usage</summary>
+<details><summary>All Options</summary>
 
 ```bash
 $ disco stop --help
@@ -3514,7 +3616,7 @@ Flags:
 
 Toggle mpv pause state
 
-<details><summary>Usage</summary>
+<details><summary>All Options</summary>
 
 ```bash
 $ disco pause --help
@@ -3534,7 +3636,7 @@ Flags:
 
 Seek mpv playback
 
-<details><summary>Usage</summary>
+<details><summary>All Options</summary>
 
 ```bash
 $ disco seek --help
@@ -3554,12 +3656,24 @@ Flags:
 
 Merge multiple SQLite databases
 
-<details><summary>Usage</summary>
+<details><summary>All Options</summary>
 
 ```bash
 $ disco merge-dbs --help
 
 Flags:
+  -v, --verbose
+        Enable verbose logging
+  --simulate
+        Dry run; don't actually do anything
+  -y, --no-confirm
+        Don't ask for confirmation
+  -T, --timeout
+        Quit after N minutes/seconds
+  --threads
+        Use N threads for parallel processing
+  -i, --ignore-errors
+        Ignore errors and continue to next file
   -t, --only-tables
         Comma separated specific table(s)
   --primary-keys
@@ -3574,24 +3688,6 @@ Flags:
         Only copy columns that exist in target
   --skip-columns
         Columns to skip during merge
-  -w, --where
-        SQL where clause(s)
-  --exact
-        Exact match for search
-  --flexible-search
-        Flexible search (fuzzy)
-  -v, --verbose
-        Enable verbose logging
-  --simulate
-        Dry run; don't actually do anything
-  -y, --no-confirm
-        Don't ask for confirmation
-  -T, --timeout
-        Quit after N minutes/seconds
-  --threads
-        Use N threads for parallel processing
-  -i, --ignore-errors
-        Ignore errors and continue to next file
 ```
 
 </details>

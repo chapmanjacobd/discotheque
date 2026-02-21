@@ -154,7 +154,7 @@ func (c *PrintCmd) Run(ctx *kong.Context) error {
 	if c.RegexSort {
 		media = query.RegexSortMedia(media, c.GlobalFlags)
 	} else {
-		query.SortMedia(media, c.GlobalFlags)
+		query.SortMedia(media, models.PlaybackFlags{GlobalFlags: c.GlobalFlags})
 	}
 	return PrintMedia(c.Columns, media)
 }
@@ -353,7 +353,7 @@ func (c *SimilarFoldersCmd) Run(ctx *kong.Context) error {
 }
 
 type WatchCmd struct {
-	models.GlobalFlags
+	models.PlaybackFlags
 	Databases []string `arg:"" required:"" help:"SQLite database files" type:"existingfile"`
 }
 
@@ -370,9 +370,9 @@ func (c *WatchCmd) Run(ctx *kong.Context) error {
 	}
 
 	media = query.FilterMedia(media, c.GlobalFlags)
-	query.SortMedia(media, c.GlobalFlags)
+	query.SortMedia(media, c.PlaybackFlags)
 	if c.ReRank != "" {
-		media = query.ReRankMedia(media, c.GlobalFlags)
+		media = query.ReRankMedia(media, c.PlaybackFlags)
 	}
 
 	if len(media) == 0 {
@@ -455,7 +455,7 @@ func (c *WatchCmd) Run(ctx *kong.Context) error {
 		if c.Cast {
 			// CastPlay handles its own loop, but we want to handle one by one for Cable?
 			// For now, let's just call it with the single item
-			if err := CastPlay(c.GlobalFlags, []models.MediaWithDB{m}, false); err != nil {
+			if err := CastPlay(c.PlaybackFlags, []models.MediaWithDB{m}, false); err != nil {
 				slog.Error("Cast failed", "path", m.Path, "error", err)
 			}
 			continue
@@ -480,7 +480,7 @@ func (c *WatchCmd) Run(ctx *kong.Context) error {
 			if m.Playhead != nil {
 				existingPlayhead = int(*m.Playhead)
 			}
-			playhead := utils.GetPlayhead(c.GlobalFlags, m.Path, startTime, existingPlayhead, mediaDuration)
+			playhead := utils.GetPlayhead(c.PlaybackFlags, m.Path, startTime, existingPlayhead, mediaDuration)
 
 			if err := history.UpdateHistorySimple(m.DB, []string{m.Path}, playhead, false); err != nil {
 				slog.Error("Warning: failed to update history", "path", m.Path, "error", err)
@@ -501,19 +501,19 @@ func (c *WatchCmd) Run(ctx *kong.Context) error {
 			return nil
 		}
 
-		if err := RunExitCommand(c.GlobalFlags, exitCode, m.Path); err != nil {
+		if err := RunExitCommand(c.PlaybackFlags, exitCode, m.Path); err != nil {
 			slog.Error("Exit command failed", "code", exitCode, "error", err)
 		}
 
 		// Interactive decision
 		if c.Interactive {
-			if err := InteractiveDecision(c.GlobalFlags, m); err != nil {
+			if err := InteractiveDecision(c.PlaybackFlags, m); err != nil {
 				slog.Error("Interactive decision failed", "error", err)
 			}
 		}
 
 		// Execute post action for this item
-		if err := ExecutePostAction(c.GlobalFlags, []models.MediaWithDB{m}); err != nil {
+		if err := ExecutePostAction(c.PlaybackFlags, []models.MediaWithDB{m}); err != nil {
 			slog.Error("Post action failed", "path", m.Path, "error", err)
 		}
 
@@ -526,7 +526,7 @@ func (c *WatchCmd) Run(ctx *kong.Context) error {
 }
 
 type ListenCmd struct {
-	models.GlobalFlags
+	models.PlaybackFlags
 	Databases []string `arg:"" required:"" help:"SQLite database files" type:"existingfile"`
 }
 
@@ -543,9 +543,9 @@ func (c *ListenCmd) Run(ctx *kong.Context) error {
 	}
 
 	media = query.FilterMedia(media, c.GlobalFlags)
-	query.SortMedia(media, c.GlobalFlags)
+	query.SortMedia(media, c.PlaybackFlags)
 	if c.ReRank != "" {
-		media = query.ReRankMedia(media, c.GlobalFlags)
+		media = query.ReRankMedia(media, c.PlaybackFlags)
 	}
 
 	if len(media) == 0 {
@@ -601,7 +601,7 @@ func (c *ListenCmd) Run(ctx *kong.Context) error {
 		args = append(args, m.Path)
 
 		if c.Cast {
-			if err := CastPlay(c.GlobalFlags, []models.MediaWithDB{m}, true); err != nil {
+			if err := CastPlay(c.PlaybackFlags, []models.MediaWithDB{m}, true); err != nil {
 				slog.Error("Cast failed", "path", m.Path, "error", err)
 			}
 			continue
@@ -623,7 +623,7 @@ func (c *ListenCmd) Run(ctx *kong.Context) error {
 			if m.Playhead != nil {
 				existingPlayhead = int(*m.Playhead)
 			}
-			playhead := utils.GetPlayhead(c.GlobalFlags, m.Path, startTime, existingPlayhead, mediaDuration)
+			playhead := utils.GetPlayhead(c.PlaybackFlags, m.Path, startTime, existingPlayhead, mediaDuration)
 			history.UpdateHistorySimple(m.DB, []string{m.Path}, playhead, false)
 		}
 
@@ -638,20 +638,20 @@ func (c *ListenCmd) Run(ctx *kong.Context) error {
 			return nil
 		}
 
-		RunExitCommand(c.GlobalFlags, exitCode, m.Path)
+		RunExitCommand(c.PlaybackFlags, exitCode, m.Path)
 
 		if c.Interactive {
-			InteractiveDecision(c.GlobalFlags, m)
+			InteractiveDecision(c.PlaybackFlags, m)
 		}
 
-		ExecutePostAction(c.GlobalFlags, []models.MediaWithDB{m})
+		ExecutePostAction(c.PlaybackFlags, []models.MediaWithDB{m})
 	}
 
 	return nil
 }
 
 type OpenCmd struct {
-	models.GlobalFlags
+	models.PlaybackFlags
 	Databases []string `arg:"" required:"" help:"SQLite database files" type:"existingfile"`
 }
 
@@ -688,7 +688,7 @@ func (c *OpenCmd) Run(ctx *kong.Context) error {
 		}
 	}
 
-	return ExecutePostAction(c.GlobalFlags, media)
+	return ExecutePostAction(c.PlaybackFlags, media)
 }
 
 type BrowseCmd struct {
@@ -730,7 +730,7 @@ func (c *BrowseCmd) Run(ctx *kong.Context) error {
 }
 
 type StatsCmd struct {
-	models.GlobalFlags
+	models.PlaybackFlags
 	Facet     string   `arg:"" required:"" help:"One of: watched, deleted, created, modified"`
 	Databases []string `arg:"" required:"" help:"SQLite database files" type:"existingfile"`
 }
@@ -908,7 +908,7 @@ func (c *SearchCmd) Run(ctx *kong.Context) error {
 	}
 
 	media = query.FilterMedia(media, c.GlobalFlags)
-	query.SortMedia(media, c.GlobalFlags)
+	query.SortMedia(media, models.PlaybackFlags{GlobalFlags: c.GlobalFlags})
 
 	if c.JSON {
 		encoder := json.NewEncoder(os.Stdout)
@@ -929,7 +929,7 @@ func PrintFrequencyStats(stats []query.FrequencyStats) error {
 }
 
 type HistoryCmd struct {
-	models.GlobalFlags
+	models.PlaybackFlags
 	Databases []string `arg:"" required:"" help:"SQLite database files" type:"existingfile"`
 }
 
@@ -1003,7 +1003,7 @@ func (c *HistoryCmd) Run(ctx *kong.Context) error {
 	if c.Partial != "" {
 		query.SortHistory(media, c.Partial, c.Reverse)
 	} else {
-		query.SortMedia(media, c.GlobalFlags)
+		query.SortMedia(media, models.PlaybackFlags{GlobalFlags: c.GlobalFlags})
 	}
 	return PrintMedia(c.Columns, media)
 }
@@ -1085,7 +1085,7 @@ func (c *OptimizeCmd) Run(ctx *kong.Context) error {
 }
 
 type SampleHashCmd struct {
-	models.GlobalFlags
+	models.PlaybackFlags
 	Paths []string `arg:"" required:"" help:"Files to hash" type:"existingfile"`
 }
 
@@ -1569,7 +1569,7 @@ func PrintFolders(columns []string, folders []models.FolderStats) error {
 }
 
 // ExecutePostAction executes actions after a command
-func ExecutePostAction(flags models.GlobalFlags, media []models.MediaWithDB) error {
+func ExecutePostAction(flags models.PlaybackFlags, media []models.MediaWithDB) error {
 	action := flags.PostAction
 
 	if flags.DeleteFiles {
@@ -1642,7 +1642,7 @@ func ExecutePostAction(flags models.GlobalFlags, media []models.MediaWithDB) err
 	return nil
 }
 
-func RunExitCommand(flags models.GlobalFlags, exitCode int, path string) error {
+func RunExitCommand(flags models.PlaybackFlags, exitCode int, path string) error {
 	var cmdStr string
 	switch exitCode {
 	case 0:
@@ -1697,7 +1697,7 @@ func RunExitCommand(flags models.GlobalFlags, exitCode int, path string) error {
 	return cmd.Run()
 }
 
-func InteractiveDecision(flags models.GlobalFlags, m models.MediaWithDB) error {
+func InteractiveDecision(flags models.PlaybackFlags, m models.MediaWithDB) error {
 	fmt.Printf("\nAction for %s?\n", m.Path)
 	fmt.Println("  [k]eep (default)")
 	fmt.Println("  [d]elete")
@@ -1797,7 +1797,7 @@ func CopyMediaItem(destDir string, m models.MediaWithDB) error {
 	return nil
 }
 
-func CastPlay(flags models.GlobalFlags, media []models.MediaWithDB, audioOnly bool) error {
+func CastPlay(flags models.PlaybackFlags, media []models.MediaWithDB, audioOnly bool) error {
 	for _, m := range media {
 		if !utils.FileExists(m.Path) {
 			continue
@@ -1875,7 +1875,7 @@ func CastPlay(flags models.GlobalFlags, media []models.MediaWithDB, audioOnly bo
 }
 
 type DedupeCmd struct {
-	models.GlobalFlags
+	models.PlaybackFlags
 	Databases []string `arg:"" required:"" help:"SQLite database files" type:"existingfile"`
 }
 
@@ -1975,7 +1975,7 @@ func (c *DedupeCmd) Run(ctx *kong.Context) error {
 			// rmlint style is cmd duplicate keep
 			exec.Command("bash", "-c", cmdStr+" "+fmt.Sprintf("'%s'", d.DuplicatePath)+" "+fmt.Sprintf("'%s'", d.KeepPath)).Run()
 		} else if c.Trash {
-			utils.Trash(c.GlobalFlags, d.DuplicatePath)
+			utils.Trash(c.PlaybackFlags, d.DuplicatePath)
 		} else {
 			os.Remove(d.DuplicatePath)
 		}
@@ -2212,7 +2212,7 @@ func (c *DedupeCmd) getFSDuplicates(dbPath string) ([]DedupeDuplicate, error) {
 }
 
 type MpvWatchlaterCmd struct {
-	models.GlobalFlags
+	models.PlaybackFlags
 	Databases []string `arg:"" required:"" help:"SQLite database files" type:"existingfile"`
 }
 

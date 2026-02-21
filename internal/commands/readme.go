@@ -21,6 +21,46 @@ func (c *ReadmeCmd) Run(ctx *kong.Context) error {
 	sb.WriteString("    go install github.com/chapmanjacobd/discotheque/cmd/disco@latest\n\n")
 	sb.WriteString("## Usage\n\n")
 
+	examples := map[string][]string{
+		"add": {
+			"disco add my_videos.db ~/Videos",
+			"disco add --video-only my_videos.db /mnt/media",
+		},
+		"print": {
+			"disco print my_videos.db",
+			"disco print my_videos.db -u size --reverse",
+			"disco print my_videos.db --big-dirs -u count",
+		},
+		"search": {
+			"disco search my_videos.db 'matrix'",
+			"disco search my_videos.db 'cyberpunk' --video-only",
+		},
+		"watch": {
+			"disco watch my_videos.db",
+			"disco watch my_videos.db -r --limit 10",
+			"disco watch my_videos.db --size '>1GB'",
+		},
+		"listen": {
+			"disco listen my_music.db",
+			"disco listen my_music.db --random",
+		},
+		"serve": {
+			"disco serve my_videos.db my_music.db",
+			"disco serve --trashcan my_videos.db",
+		},
+		"disk-usage": {
+			"disco du my_videos.db",
+			"disco du my_videos.db --depth 2",
+		},
+		"history": {
+			"disco history my_videos.db",
+			"disco history my_videos.db --inprogress",
+		},
+		"optimize": {
+			"disco optimize my_videos.db",
+		},
+	}
+
 	// Iterate through subcommands
 	for _, node := range ctx.Model.Children {
 		if node.Hidden {
@@ -28,7 +68,16 @@ func (c *ReadmeCmd) Run(ctx *kong.Context) error {
 		}
 		sb.WriteString(fmt.Sprintf("### %s\n\n", node.Name))
 		sb.WriteString(fmt.Sprintf("%s\n\n", node.Help))
-		sb.WriteString("<details><summary>Usage</summary>\n\n")
+
+		if ex, ok := examples[node.Name]; ok {
+			sb.WriteString("Examples:\n\n```bash\n")
+			for _, line := range ex {
+				sb.WriteString(fmt.Sprintf("$ %s\n", line))
+			}
+			sb.WriteString("```\n\n")
+		}
+
+		sb.WriteString("<details><summary>All Options</summary>\n\n")
 		sb.WriteString("```bash\n")
 		sb.WriteString(fmt.Sprintf("$ disco %s --help\n", node.Name))
 		

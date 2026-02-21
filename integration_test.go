@@ -194,7 +194,7 @@ func TestIntegration_FilterSortAggregate(t *testing.T) {
 	}
 
 	// Sort by natural order (important for TV shows)
-	query.SortMedia(filtered, models.GlobalFlags{SortBy: "path", NatSort: true})
+	query.SortMedia(filtered, models.PlaybackFlags{GlobalFlags: models.GlobalFlags{SortBy: "path", NatSort: true}})
 
 	// Verify S01E01 comes before S01E10
 	var s01e01Idx, s01e10Idx int = -1, -1
@@ -371,7 +371,7 @@ func TestIntegration_RegexNaturalSortSize(t *testing.T) {
 	}
 
 	// Natural sort to get correct episode order
-	query.SortMedia(season1, models.GlobalFlags{SortBy: "path", NatSort: true})
+	query.SortMedia(season1, models.PlaybackFlags{GlobalFlags: models.GlobalFlags{SortBy: "path", NatSort: true}})
 
 	// Verify episode order
 	expectedOrder := []string{"S01E01.mp4", "S01E02.mp4", "S01E10.mp4"}
@@ -491,7 +491,7 @@ func TestIntegration_CompleteWatchWorkflow(t *testing.T) {
 	}
 
 	// Step 3: Natural sort (watch in order)
-	query.SortMedia(toWatch, models.GlobalFlags{SortBy: "path", NatSort: true})
+	query.SortMedia(toWatch, models.PlaybackFlags{GlobalFlags: models.GlobalFlags{SortBy: "path", NatSort: true}})
 
 	// Step 4: "Watch" first item
 	firstItem := toWatch[0]
@@ -625,7 +625,7 @@ func BenchmarkIntegration_FilterSort(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		filtered := query.FilterMedia(allMedia, flags)
-		query.SortMedia(filtered, models.GlobalFlags{SortBy: "path", NatSort: true})
+		query.SortMedia(filtered, models.PlaybackFlags{GlobalFlags: models.GlobalFlags{SortBy: "path", NatSort: true}})
 	}
 }
 

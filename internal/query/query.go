@@ -712,7 +712,7 @@ func FilterMedia(media []models.MediaWithDB, flags models.GlobalFlags) []models.
 }
 
 // SortMedia sorts media using various methods
-func SortMedia(media []models.MediaWithDB, flags models.GlobalFlags) {
+func SortMedia(media []models.MediaWithDB, flags models.PlaybackFlags) {
 	if flags.NoPlayInOrder {
 		sortMediaBasic(media, flags.SortBy, flags.Reverse, flags.NatSort)
 		return
@@ -863,7 +863,7 @@ func SortMediaAdvanced(media []models.MediaWithDB, config string) {
 }
 
 // ReRankMedia implements MCDA-like re-ranking
-func ReRankMedia(media []models.MediaWithDB, flags models.GlobalFlags) []models.MediaWithDB {
+func ReRankMedia(media []models.MediaWithDB, flags models.PlaybackFlags) []models.MediaWithDB {
 	if flags.ReRank == "" {
 		return media
 	}
