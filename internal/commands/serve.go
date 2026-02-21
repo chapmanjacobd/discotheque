@@ -817,7 +817,7 @@ func (c *ServeCmd) handleThumbnail(w http.ResponseWriter, r *http.Request) {
 	cmd := exec.CommandContext(r.Context(), "ffmpeg", append([]string{"-hide_banner", "-loglevel", "error"}, args...)...)
 	thumb, err := cmd.Output()
 	if err != nil {
-		slog.Debug("Thumbnail generation failed", "path", path, "error", err)
+		// slog.Debug("Thumbnail generation failed", "path", path, "error", err)
 		http.Error(w, "Failed to generate thumbnail", http.StatusInternalServerError)
 		return
 	}

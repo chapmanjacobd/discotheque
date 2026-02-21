@@ -319,7 +319,7 @@ main {
 #results-container.details-view {
     width: max-content;
     min-width: 100%;
-    padding-right: 2rem;
+    padding-right: 0.2rem;
 }
 
 .grid {

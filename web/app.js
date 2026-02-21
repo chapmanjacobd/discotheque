@@ -51,6 +51,7 @@ document.addEventListener('DOMContentLoaded', () => {
             timer: null,
             startTime: null,
             lastUpdate: 0,
+            lastLocalUpdate: 0,
             lastPlayedIndex: -1
         }
     };
@@ -260,6 +261,16 @@ document.addEventListener('DOMContentLoaded', () => {
             // Client-side DB filtering
             currentMedia = data.filter(item => !state.filters.excludedDbs.includes(item.db));
 
+            // Local sorting for play_count if global progress is disabled
+            if (!state.globalProgress && state.filters.sort === 'play_count') {
+                currentMedia.sort((a, b) => {
+                    const countA = getPlayCount(a);
+                    const countB = getPlayCount(b);
+                    if (state.filters.reverse) return countA - countB;
+                    return countB - countA;
+                });
+            }
+
             renderResults();
         } catch (err) {
             if (err.name === 'AbortError') return;
@@ -369,15 +380,31 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function updateProgress(item, playhead, duration, isComplete = false) {
+        const now = Date.now();
+
         // Local progress is always saved if enabled
         if (state.localResume) {
-            const progress = JSON.parse(localStorage.getItem('disco-progress') || '{}');
-            if (isComplete) {
-                delete progress[item.path];
-            } else {
-                progress[item.path] = Math.floor(playhead);
+            // Throttling: only update localStorage once per second
+            if (isComplete || (now - state.playback.lastLocalUpdate) >= 1000) {
+                const progress = JSON.parse(localStorage.getItem('disco-progress') || '{}');
+                if (isComplete) {
+                    delete progress[item.path];
+
+                    // Increment play count locally if global progress is disabled
+                    if (!state.globalProgress) {
+                        const counts = JSON.parse(localStorage.getItem('disco-play-counts') || '{}');
+                        counts[item.path] = (counts[item.path] || 0) + 1;
+                        localStorage.setItem('disco-play-counts', JSON.stringify(counts));
+                    }
+                } else {
+                    progress[item.path] = {
+                        pos: Math.floor(playhead),
+                        last: now
+                    };
+                }
+                localStorage.setItem('disco-progress', JSON.stringify(progress));
+                state.playback.lastLocalUpdate = now;
             }
-            localStorage.setItem('disco-progress', JSON.stringify(progress));
         }
 
         if (!state.globalProgress) return;
@@ -385,7 +412,6 @@ document.addEventListener('DOMContentLoaded', () => {
         // Server sync logic
         if (item.type.includes('audio') && duration < 420) return; // 7 minutes
 
-        const now = Date.now();
         const sessionTime = (now - state.playback.startTime) / 1000;
 
         if (!isComplete && sessionTime < 90) return; // 90s threshold
@@ -406,6 +432,42 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (err) {
             console.error('Failed to update progress:', err);
         }
+    }
+
+    function getLocalProgress(item) {
+        if (!state.localResume) return 0;
+        const progress = JSON.parse(localStorage.getItem('disco-progress') || '{}');
+        const entry = progress[item.path];
+        if (!entry) return 0;
+
+        let pos, last;
+        if (typeof entry === 'object') {
+            pos = entry.pos;
+            last = entry.last;
+        } else {
+            // backward compatibility
+            pos = entry;
+            last = Date.now();
+        }
+
+        // Expiration rule: for audio files less than 7 mins (420s) long
+        // forget progress if it has been more than 15 minutes (900s) since it was last played.
+        if (item.type && item.type.includes('audio') && item.duration < 420) {
+            const now = Date.now();
+            if ((now - last) > 15 * 60 * 1000) {
+                return 0;
+            }
+        }
+
+        return pos;
+    }
+
+    function getPlayCount(item) {
+        if (state.globalProgress && item.play_count !== undefined) {
+            return item.play_count || 0;
+        }
+        const counts = JSON.parse(localStorage.getItem('disco-play-counts') || '{}');
+        return counts[item.path] || 0;
     }
 
     function playSibling(offset) {
@@ -480,14 +542,11 @@ document.addEventListener('DOMContentLoaded', () => {
             el.autoplay = true;
             el.src = url;
 
-            if (state.localResume) {
-                const progress = JSON.parse(localStorage.getItem('disco-progress') || '{}');
-                const localPos = progress[item.path];
-                if (localPos) {
-                    el.currentTime = localPos;
-                } else if (state.globalProgress && item.playhead > 0) {
-                    el.currentTime = item.playhead;
-                }
+            const localPos = getLocalProgress(item);
+            if (localPos) {
+                el.currentTime = localPos;
+            } else if (state.globalProgress && item.playhead > 0) {
+                el.currentTime = item.playhead;
             }
 
             el.ontimeupdate = () => {
@@ -549,14 +608,11 @@ document.addEventListener('DOMContentLoaded', () => {
             el.autoplay = true;
             el.src = url;
 
-            if (state.localResume) {
-                const progress = JSON.parse(localStorage.getItem('disco-progress') || '{}');
-                const localPos = progress[item.path];
-                if (localPos) {
-                    el.currentTime = localPos;
-                } else if (state.globalProgress && item.playhead > 0) {
-                    el.currentTime = item.playhead;
-                }
+            const localPos = getLocalProgress(item);
+            if (localPos) {
+                el.currentTime = localPos;
+            } else if (state.globalProgress && item.playhead > 0) {
+                el.currentTime = item.playhead;
             }
 
             el.ontimeupdate = () => {
@@ -644,12 +700,14 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Rendering ---
     function renderResults() {
         if (state.page === 'trash') {
-            resultsCount.innerHTML = `<span>${currentMedia.length} files in trash</span> <button id="empty-bin-btn" class="category-btn" style="margin-left: 1rem; background: #e74c3c; color: white;">Empty Bin</button>`;
+            const unit = currentMedia.length === 1 ? 'file' : 'files';
+            resultsCount.innerHTML = `<span>${currentMedia.length} ${unit} in trash</span> <button id="empty-bin-btn" class="category-btn" style="margin-left: 1rem; background: #e74c3c; color: white;">Empty Bin</button>`;
             const emptyBtn = document.getElementById('empty-bin-btn');
             if (emptyBtn) emptyBtn.onclick = emptyBin;
         } else {
             if (state.filters.all || currentMedia.length < state.filters.limit) {
-                resultsCount.textContent = `${currentMedia.length} files found`;
+                const unit = currentMedia.length === 1 ? 'file' : 'files';
+                resultsCount.textContent = `${currentMedia.length} ${unit} found`;
             } else {
                 resultsCount.textContent = '';
             }
@@ -677,6 +735,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const title = item.title || item.path.split('/').pop();
             const size = formatSize(item.size);
             const duration = formatDuration(item.duration);
+            const plays = getPlayCount(item);
             const thumbUrl = `/api/thumbnail?path=${encodeURIComponent(item.path)}`;
 
             const isTrash = state.page === 'trash';
@@ -696,6 +755,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div class="media-meta">
                         <span>${size}</span>
                         <span>${item.type || ''}</span>
+                        ${plays > 0 ? `<span title="Play count">▶️ ${plays}</span>` : ''}
                     </div>
                 </div>
             `;
@@ -728,6 +788,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <th data-sort="size">Size ${sortIcon('size')}</th>
                     <th data-sort="duration">Duration ${sortIcon('duration')}</th>
                     <th data-sort="type">Type ${sortIcon('type')}</th>
+                    <th data-sort="play_count">Plays ${sortIcon('play_count')}</th>
                     <th>Action</th>
                 </tr>
             </thead>
@@ -754,6 +815,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <td>${formatSize(item.size)}</td>
                 <td>${formatDuration(item.duration)}</td>
                 <td>${item.type || ''}</td>
+                <td>${getPlayCount(item) || ''}</td>
                 <td>
                     <button class="table-action-btn" title="${actionTitle}">${actionIcon}</button>
                 </td>
@@ -1158,7 +1220,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const keysToKeep = [
                 'disco-player', 'disco-language', 'disco-theme',
                 'disco-post-playback', 'disco-autoplay', 'disco-local-resume',
-                'disco-limit', 'disco-limit-all', 'disco-excluded-dbs'
+                'disco-limit', 'disco-limit-all', 'disco-excluded-dbs',
+                'disco-play-counts'
             ];
 
             const keys = Object.keys(localStorage);
