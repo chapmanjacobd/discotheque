@@ -1111,7 +1111,6 @@ func (c *ServeCmd) handlePlaylists(w http.ResponseWriter, r *http.Request) {
 			})
 			return err
 		})
-
 		if err != nil {
 			slog.Error("Failed to insert playlist", "title", req.Title, "path", playlistPath, "error", err)
 			http.Error(w, fmt.Sprintf("Failed to insert playlist: %v", err), http.StatusInternalServerError)
@@ -1136,7 +1135,6 @@ func (c *ServeCmd) handlePlaylists(w http.ResponseWriter, r *http.Request) {
 				TimeDeleted: sql.NullInt64{Int64: time.Now().Unix(), Valid: true},
 			})
 		})
-
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -1159,7 +1157,6 @@ func (c *ServeCmd) handlePlaylistItems(w http.ResponseWriter, r *http.Request) {
 			items, err = queries.GetPlaylistItems(r.Context(), id)
 			return err
 		})
-
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -1245,7 +1242,6 @@ func (c *ServeCmd) handlePlaylistItems(w http.ResponseWriter, r *http.Request) {
 				TrackNumber: sql.NullInt64{Int64: req.TrackNumber, Valid: req.TrackNumber != 0},
 			})
 		})
-
 		if err != nil {
 			slog.Error("Failed to add playlist item", "playlist_id", req.PlaylistID, "media_path", req.MediaPath, "error", err)
 			http.Error(w, fmt.Sprintf("Failed to add playlist item: %v", err), http.StatusInternalServerError)
@@ -1273,7 +1269,6 @@ func (c *ServeCmd) handlePlaylistItems(w http.ResponseWriter, r *http.Request) {
 				MediaPath:  req.MediaPath,
 			})
 		})
-
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return

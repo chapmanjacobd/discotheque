@@ -13,9 +13,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-var (
-	repairLocks sync.Map
-)
+var repairLocks sync.Map
 
 func getLock(path string) *sync.Mutex {
 	v, _ := repairLocks.LoadOrStore(path, &sync.Mutex{})
@@ -49,7 +47,7 @@ func Repair(dbPath string) error {
 	// Backup
 	backupPath := fmt.Sprintf("%s.corrupt.%d.bak", dbPath, time.Now().Unix())
 	slog.Info("Backing up corrupted database", "src", dbPath, "dst", backupPath)
-	
+
 	// Check if file exists before renaming
 	if _, err := os.Stat(dbPath); os.IsNotExist(err) {
 		return fmt.Errorf("database file not found: %s", dbPath)

@@ -43,9 +43,10 @@ document.addEventListener('DOMContentLoaded', () => {
         language: localStorage.getItem('disco-language') || '',
         theme: localStorage.getItem('disco-theme') || 'auto',
         postPlaybackAction: localStorage.getItem('disco-post-playback') || 'nothing',
+        defaultView: localStorage.getItem('disco-default-view') || 'pip',
         autoplay: localStorage.getItem('disco-autoplay') !== 'false',
         localResume: localStorage.getItem('disco-local-resume') !== 'false',
-        playerMode: 'pip', // 'pip' or 'theatre'
+        playerMode: localStorage.getItem('disco-default-view') || 'pip', // Initialize with preference
         trashcan: false,
         globalProgress: false,
         dev: false,
@@ -69,6 +70,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('setting-language').value = state.language;
     document.getElementById('setting-theme').value = state.theme;
     document.getElementById('setting-post-playback').value = state.postPlaybackAction;
+    document.getElementById('setting-default-view').value = state.defaultView;
     document.getElementById('setting-autoplay').checked = state.autoplay;
     document.getElementById('setting-local-resume').checked = state.localResume;
     if (limitInput) limitInput.value = state.filters.limit;
@@ -828,6 +830,27 @@ document.addEventListener('DOMContentLoaded', () => {
         lyricsDisplay.classList.add('hidden');
         lyricsDisplay.textContent = '';
 
+        // Apply mode
+        const theatreAnchor = document.getElementById('theatre-anchor');
+        const btn = document.getElementById('pip-theatre');
+
+        if (state.playerMode === 'theatre') {
+            pipPlayer.classList.add('theatre');
+            pipPlayer.classList.remove('minimized');
+            theatreAnchor.appendChild(pipPlayer);
+            if (btn) {
+                btn.textContent = '❐';
+                btn.title = 'Restore to PiP';
+            }
+        } else {
+            pipPlayer.classList.remove('theatre');
+            document.body.appendChild(pipPlayer);
+            if (btn) {
+                btn.textContent = '□';
+                btn.title = 'Theatre Mode';
+            }
+        }
+
         pipPlayer.classList.remove('hidden');
         pipPlayer.classList.remove('minimized');
 
@@ -1025,10 +1048,8 @@ document.addEventListener('DOMContentLoaded', () => {
         lyricsDisplay.textContent = '';
         pipPlayer.classList.add('hidden');
 
-        // Reset to PiP mode if in theatre
-        if (state.playerMode === 'theatre') {
-            toggleTheatreMode();
-        }
+        // Reset mode to default preference
+        state.playerMode = state.defaultView;
     }
 
     // --- Rendering ---
@@ -1197,7 +1218,7 @@ document.addEventListener('DOMContentLoaded', () => {
             tr.dataset.path = item.path;
 
             const title = item.title || item.path.split('/').pop();
-            
+
             let actions = '';
             if (isTrash) {
                 actions = `<button class="table-action-btn restore-btn" title="Restore">↺</button>`;
@@ -1694,6 +1715,16 @@ document.addEventListener('DOMContentLoaded', () => {
     if (settingPostPlayback) settingPostPlayback.onchange = (e) => {
         state.postPlaybackAction = e.target.value;
         localStorage.setItem('disco-post-playback', state.postPlaybackAction);
+    };
+
+    const settingDefaultView = document.getElementById('setting-default-view');
+    if (settingDefaultView) settingDefaultView.onchange = (e) => {
+        state.defaultView = e.target.value;
+        localStorage.setItem('disco-default-view', state.defaultView);
+
+        if (pipPlayer.classList.contains('hidden')) {
+            state.playerMode = state.defaultView;
+        }
     };
 
     const settingAutoplay = document.getElementById('setting-autoplay');

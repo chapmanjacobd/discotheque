@@ -3428,6 +3428,32 @@ Flags:
 
 </details>
 
+### repair
+
+Repair malformed database using sqlite3
+
+<details><summary>All Options</summary>
+
+```bash
+$ disco repair --help
+
+Flags:
+  -v, --verbose
+        Enable verbose logging
+  --simulate
+        Dry run; don't actually do anything
+  -y, --no-confirm
+        Don't ask for confirmation
+  -T, --timeout
+        Quit after N minutes/seconds
+  --threads
+        Use N threads for parallel processing
+  -i, --ignore-errors
+        Ignore errors and continue to next file
+```
+
+</details>
+
 ### tui
 
 Interactive TUI media picker
