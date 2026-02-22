@@ -816,61 +816,80 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    async function openInPiP(item) {
-        state.playback.item = item;
-        state.playback.startTime = Date.now();
-        state.playback.lastUpdate = 0;
-        state.playback.hasMarkedComplete = false;
-        state.playback.lastPlayedIndex = currentMedia.findIndex(m => m.path === item.path);
-
-        const path = item.path;
-        const type = item.type || "";
-        pipTitle.textContent = path.split('/').pop();
-        pipViewer.innerHTML = '';
-        lyricsDisplay.classList.add('hidden');
-        lyricsDisplay.textContent = '';
-
-        // Apply mode
-        const theatreAnchor = document.getElementById('theatre-anchor');
-        const btn = document.getElementById('pip-theatre');
-
-        if (state.playerMode === 'theatre') {
-            pipPlayer.classList.add('theatre');
+        async function openInPiP(item) {
+            state.playback.item = item;
+            state.playback.startTime = Date.now();
+            state.playback.lastUpdate = 0;
+            state.playback.hasMarkedComplete = false;
+            state.playback.lastPlayedIndex = currentMedia.findIndex(m => m.path === item.path);
+    
+            const path = item.path;
+            const type = item.type || "";
+            pipTitle.textContent = path.split('/').pop();
+            pipViewer.innerHTML = '';
+            lyricsDisplay.classList.add('hidden');
+            lyricsDisplay.textContent = '';
+    
+            // Apply mode
+            const theatreAnchor = document.getElementById('theatre-anchor');
+            const btn = document.getElementById('pip-theatre');
+            
+            if (state.playerMode === 'theatre') {
+                pipPlayer.classList.add('theatre');
+                pipPlayer.classList.remove('minimized');
+                theatreAnchor.appendChild(pipPlayer);
+                if (btn) {
+                    btn.textContent = '❐';
+                    btn.title = 'Restore to PiP';
+                }
+            } else {
+                pipPlayer.classList.remove('theatre');
+                document.body.appendChild(pipPlayer);
+                if (btn) {
+                    btn.textContent = '□';
+                    btn.title = 'Theatre Mode';
+                }
+            }
+    
+            pipPlayer.classList.remove('hidden');
             pipPlayer.classList.remove('minimized');
-            theatreAnchor.appendChild(pipPlayer);
-            if (btn) {
-                btn.textContent = '❐';
-                btn.title = 'Restore to PiP';
+    
+            // Check if item needs transcoding (provided by backend or fallback check)
+            let needsTranscode = item.transcode;
+            if (needsTranscode === undefined) {
+                 // Fallback if backend didn't provide it (e.g. older cached data)
+                 // Audio logic: assume mp3/m4a/ogg/wav/opus don't need it, others might
+                 if (type.includes('audio')) {
+                     needsTranscode = !type.includes('mp3') && !type.includes('m4a') && !type.includes('ogg') && !type.includes('wav') && !type.includes('opus');
+                 } else if (type.includes('video')) {
+                     needsTranscode = !type.includes('mp4') && !type.includes('webm') && !type.includes('mkv');
+                 }
             }
-        } else {
-            pipPlayer.classList.remove('theatre');
-            document.body.appendChild(pipPlayer);
-            if (btn) {
-                btn.textContent = '□';
-                btn.title = 'Theatre Mode';
+            
+            let localPos = getLocalProgress(item);
+            if (!localPos && state.globalProgress && item.playhead > 0) {
+                localPos = item.playhead;
             }
-        }
-
-        pipPlayer.classList.remove('hidden');
-        pipPlayer.classList.remove('minimized');
-
-        const url = `/api/raw?path=${encodeURIComponent(path)}`;
-        let el;
-
-        if (type.includes('video')) {
-            el = document.createElement('video');
-            el.controls = true;
-            el.autoplay = true;
-            el.src = url;
-
-            const localPos = getLocalProgress(item);
-            if (localPos) {
-                el.currentTime = localPos;
-            } else if (state.globalProgress && item.playhead > 0) {
-                el.currentTime = item.playhead;
+    
+            let startParam = '';
+            if (needsTranscode && localPos > 0) {
+                startParam = `&start=${localPos}`;
             }
-
-            el.ontimeupdate = () => {
+    
+            let url = `/api/raw?path=${encodeURIComponent(path)}${startParam}`;
+    
+            let el;
+    
+            if (type.includes('video')) {
+                el = document.createElement('video');
+                el.controls = true;
+                el.autoplay = true;
+                el.src = url;
+    
+                if (!needsTranscode && localPos) {
+                    el.currentTime = localPos;
+                }
+                el.ontimeupdate = () => {
                 const isComplete = (el.duration > 90) && (el.duration - el.currentTime < 90) && (el.currentTime / el.duration > 0.95);
                 updateProgress(item, el.currentTime, el.duration, isComplete);
             };
@@ -885,7 +904,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 track.kind = 'subtitles';
                 track.label = label;
                 track.srclang = state.language || 'en';
-                track.src = trackUrl;
+                track.src = trackUrl + startParam; // Append start param
 
                 track.onload = () => {
                     // Try to auto-enable
@@ -952,7 +971,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Try to fetch lyrics (server will look for siblings)
             const track = document.createElement('track');
             track.kind = 'subtitles';
-            track.src = `/api/subtitles?path=${encodeURIComponent(path)}`;
+            track.src = `/api/subtitles?path=${encodeURIComponent(path)}${startParam}`;
             track.srclang = state.language || 'en';
             el.appendChild(track);
 

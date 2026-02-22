@@ -35,6 +35,7 @@ type ServeCmd struct {
 	GlobalProgress       bool     `help:"Enable server-side playback progress tracking"`
 	ApplicationStartTime int64    `kong:"-"`
 	thumbnailCache       sync.Map `kong:"-"`
+	hasFfmpeg            bool     `kong:"-"`
 }
 
 func (c *ServeCmd) IsQueryTrait()    {}
@@ -138,6 +139,9 @@ func (c *ServeCmd) Run(ctx *kong.Context) error {
 
 	if _, err := exec.LookPath("ffmpeg"); err != nil {
 		slog.Warn("ffmpeg not found in PATH, on-the-fly transcoding will be unavailable")
+		c.hasFfmpeg = false
+	} else {
+		c.hasFfmpeg = true
 	}
 
 	handler := c.Mux()
@@ -307,6 +311,12 @@ func (c *ServeCmd) handleQuery(w http.ResponseWriter, r *http.Request) {
 		slog.Error("Query failed", "dbs", c.Databases, "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
+	}
+
+	if c.hasFfmpeg {
+		for i := range media {
+			media[i].Transcode = utils.GetTranscodeStrategy(media[i].Media).NeedsTranscode
+		}
 	}
 
 	query.SortMedia(media, flags)
@@ -538,12 +548,17 @@ func (c *ServeCmd) handleRaw(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	strategy := c.getTranscodeStrategy(m)
-	slog.Info("Transcode strategy determined", "path", path, "needsTranscode", strategy.needsTranscode, "videoCopy", strategy.videoCopy, "audioCopy", strategy.audioCopy, "targetMime", strategy.targetMime)
+	strategy := utils.GetTranscodeStrategy(m)
 
-	if strategy.needsTranscode {
-		if _, err := exec.LookPath("ffmpeg"); err == nil {
-			c.handleTranscode(w, r, path, m, strategy)
+	if strategy.NeedsTranscode {
+		if c.hasFfmpeg {
+			var startTime float64
+			if startStr := r.URL.Query().Get("start"); startStr != "" {
+				if s, err := strconv.ParseFloat(startStr, 64); err == nil {
+					startTime = s
+				}
+			}
+			c.handleTranscode(w, r, path, m, strategy, startTime)
 			return
 		} else {
 			slog.Error("ffmpeg not found in PATH, skipping transcoding", "path", path)
@@ -673,24 +688,34 @@ func (c *ServeCmd) getTranscodeStrategy(m models.Media) transcodeStrategy {
 	return transcodeStrategy{needsTranscode: false}
 }
 
-func (c *ServeCmd) handleTranscode(w http.ResponseWriter, r *http.Request, path string, m models.Media, strategy transcodeStrategy) {
-	w.Header().Set("Content-Type", strategy.targetMime)
+func (c *ServeCmd) handleTranscode(w http.ResponseWriter, r *http.Request, path string, m models.Media, strategy utils.TranscodeStrategy, startTime float64) {
+	w.Header().Set("Content-Type", strategy.TargetMime)
 	w.Header().Set("Accept-Ranges", "bytes")
 
 	// Add flags to help with piped streaming duration and timestamp issues
 	var args []string
 
+	if startTime > 0 {
+		args = append(args, "-ss", fmt.Sprintf("%f", startTime))
+	}
+
 	args = append(args, "-fflags", "+genpts", "-i", path)
 
 	// If we have duration in metadata, tell ffmpeg so it can write it to headers
 	if m.Duration != nil && *m.Duration > 0 {
-		args = append(args, "-t", fmt.Sprintf("%d", *m.Duration))
+		duration := float64(*m.Duration)
+		if startTime > 0 {
+			duration -= startTime
+		}
+		if duration > 0 {
+			args = append(args, "-t", fmt.Sprintf("%f", duration))
+		}
 	}
 
-	if strategy.videoCopy {
+	if strategy.VideoCopy {
 		args = append(args, "-c:v", "copy")
 	} else {
-		if strategy.targetMime == "video/mp4" {
+		if strategy.TargetMime == "video/mp4" {
 			args = append(args, "-c:v", "libx264", "-preset", "ultrafast", "-tune", "zerolatency", "-crf", "28")
 		} else {
 			// WebM
@@ -698,10 +723,10 @@ func (c *ServeCmd) handleTranscode(w http.ResponseWriter, r *http.Request, path 
 		}
 	}
 
-	if strategy.audioCopy {
+	if strategy.AudioCopy {
 		args = append(args, "-c:a", "copy")
 	} else {
-		if strategy.targetMime == "video/mp4" {
+		if strategy.TargetMime == "video/mp4" {
 			args = append(args, "-c:a", "aac", "-b:a", "128k", "-ac", "2")
 		} else {
 			// WebM supports Opus
@@ -711,7 +736,7 @@ func (c *ServeCmd) handleTranscode(w http.ResponseWriter, r *http.Request, path 
 
 	args = append(args, "-avoid_negative_ts", "make_zero", "-map_metadata", "-1", "-sn")
 
-	if strategy.targetMime == "video/mp4" {
+	if strategy.TargetMime == "video/mp4" {
 		// frag_keyframe+empty_moov+default_base_moof+global_sidx is the standard for fragmented streaming
 		args = append(args, "-f", "mp4", "-movflags", "frag_keyframe+empty_moov+default_base_moof+global_sidx", "pipe:1")
 	} else {
@@ -719,9 +744,8 @@ func (c *ServeCmd) handleTranscode(w http.ResponseWriter, r *http.Request, path 
 		args = append(args, "-f", "matroska", "-live", "1", "-reserve_index_space", "1024k", "-cluster_size_limit", "2M", "-cluster_time_limit", "5100", "pipe:1")
 	}
 
-	slog.Info("Streaming with transcode/remux", "path", path, "strategy", strategy)
 	ffmpegArgs := append([]string{"-hide_banner", "-loglevel", "error"}, args...)
-	slog.Debug("ffmpeg command", "args", strings.Join(ffmpegArgs, " "))
+	slog.Info("Streaming with transcode", "path", path, "start", startTime, "strategy", strategy, "args", strings.Join(ffmpegArgs, " "))
 
 	cmd := exec.CommandContext(r.Context(), "ffmpeg", ffmpegArgs...)
 	cmd.Stdout = w
@@ -799,6 +823,7 @@ func (c *ServeCmd) handleSubtitles(w http.ResponseWriter, r *http.Request) {
 
 	ext := strings.ToLower(filepath.Ext(path))
 	streamIndex := r.URL.Query().Get("index")
+	startStr := r.URL.Query().Get("start")
 
 	// If it's a media container but no index is specified, we should try to find an external sidecar
 	if streamIndex == "" && (ext == ".mkv" || ext == ".mp4" || ext == ".m4v" || ext == ".mov" || ext == ".webm") {
@@ -824,7 +849,7 @@ func (c *ServeCmd) handleSubtitles(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if ext == ".vtt" {
+	if ext == ".vtt" && startStr == "" {
 		w.Header().Set("Content-Type", "text/vtt")
 		http.ServeFile(w, r, path)
 		return
@@ -836,12 +861,18 @@ func (c *ServeCmd) handleSubtitles(w http.ResponseWriter, r *http.Request) {
 	var args []string
 	isImageSub := ext == ".idx" || ext == ".sub" || ext == ".sup"
 
+	if startStr != "" {
+		if s, err := strconv.ParseFloat(startStr, 64); err == nil && s > 0 {
+			args = append(args, "-ss", fmt.Sprintf("%f", s))
+		}
+	}
+
 	if streamIndex != "" {
 		// Embedded tracks
-		args = []string{"-i", path, "-map", "0:s:" + streamIndex, "-f", "webvtt", "pipe:1"}
+		args = append(args, "-i", path, "-map", "0:s:"+streamIndex, "-f", "webvtt", "pipe:1")
 	} else {
 		// Standalone file (srt, lrc, ass, etc.)
-		args = []string{"-i", path, "-f", "webvtt", "pipe:1"}
+		args = append(args, "-i", path, "-f", "webvtt", "pipe:1")
 	}
 
 	ffmpegArgs := append([]string{"-hide_banner", "-loglevel", "error"}, args...)
@@ -1211,10 +1242,14 @@ func (c *ServeCmd) handlePlaylistItems(w http.ResponseWriter, r *http.Request) {
 				Longitude:       item.Longitude,
 			})
 			m.TrackNumber = models.NullInt64Ptr(item.TrackNumber)
-			media = append(media, models.MediaWithDB{
+			mw := models.MediaWithDB{
 				Media: m,
 				DB:    dbPath,
-			})
+			}
+			if c.hasFfmpeg {
+				mw.Transcode = utils.GetTranscodeStrategy(m).NeedsTranscode
+			}
+			media = append(media, mw)
 		}
 
 		w.Header().Set("Content-Type", "application/json")

@@ -103,7 +103,8 @@ func (m *Media) ParentAtDepth(depth int) string {
 // MediaWithDB wraps Media with the database path it came from
 type MediaWithDB struct {
 	Media
-	DB string `json:"db,omitempty"`
+	DB        string `json:"db,omitempty"`
+	Transcode bool   `json:"transcode,omitempty"`
 }
 
 // FolderStats aggregates media by folder
