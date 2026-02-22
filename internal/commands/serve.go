@@ -552,6 +552,7 @@ func (c *ServeCmd) handleRaw(w http.ResponseWriter, r *http.Request) {
 	}
 
 	strategy := utils.GetTranscodeStrategy(m)
+	slog.Debug("handleRaw strategy", "path", path, "needs_transcode", strategy.NeedsTranscode, "vcopy", strategy.VideoCopy, "acopy", strategy.AudioCopy)
 
 	if strategy.NeedsTranscode {
 		if c.hasFfmpeg {
@@ -1300,21 +1301,34 @@ func (c *ServeCmd) handleHLSSegment(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "video/MP2T")
 
+	vcopy := r.URL.Query().Get("vcopy") == "true"
+	slog.Debug("HLS Segment request", "index", index, "start", startTime, "vcopy", vcopy, "path", path)
+
 	args := []string{
 		"-ss", fmt.Sprintf("%f", startTime),
 		"-i", path,
 		"-t", fmt.Sprintf("%d", HLS_SEGMENT_DURATION),
-		"-vf", "scale=-2:720", // Downscale to 720p for performance/bandwidth
-		"-c:v", "libx264",
-		"-preset", "veryfast",
+	}
+
+	if vcopy {
+		args = append(args, "-c:v", "copy")
+	} else {
+		args = append(args,
+			"-vf", "scale=-2:720", // Downscale to 720p for performance/bandwidth
+			"-c:v", "libx264",
+			"-preset", "ultrafast",
+			"-pix_fmt", "yuv420p",
+		)
+	}
+
+	args = append(args,
 		"-c:a", "aac",
 		"-b:a", "128k",
 		"-ac", "2",
-		"-pix_fmt", "yuv420p",
 		"-f", "mpegts",
 		"-output_ts_offset", fmt.Sprintf("%f", startTime), // Align timestamps
 		"pipe:1",
-	}
+	)
 
 	// Skip logging for segments to avoid spam
 	// slog.Debug("HLS Segment", "index", index, "start", startTime)

@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"log/slog"
 	"path/filepath"
 	"strings"
 
@@ -70,6 +71,7 @@ func GetTranscodeStrategy(m models.Media) TranscodeStrategy {
 		return TranscodeStrategy{NeedsTranscode: false}
 	}
 
+	var strategy TranscodeStrategy
 	if strings.HasPrefix(mime, "video") {
 		vNeeds := !isSupportedVideoCodec(vCodecs)
 		aNeeds := !isSupportedAudioCodec(aCodecs)
@@ -97,22 +99,30 @@ func GetTranscodeStrategy(m models.Media) TranscodeStrategy {
 		}
 
 		if vNeeds || aNeeds || !containerMatches {
-			return TranscodeStrategy{
+			strategy = TranscodeStrategy{
 				NeedsTranscode: true,
 				VideoCopy:      !vNeeds,
 				AudioCopy:      !aNeeds,
 				TargetMime:     targetMime,
 			}
+		} else {
+			strategy = TranscodeStrategy{NeedsTranscode: false}
 		}
 	} else if strings.HasPrefix(mime, "audio") {
 		if !isSupportedAudioCodec(aCodecs) || (ext != ".mp3" && ext != ".m4a" && ext != ".ogg" && ext != ".flac" && ext != ".wav" && ext != ".opus") {
-			return TranscodeStrategy{
+			strategy = TranscodeStrategy{
 				NeedsTranscode: true,
 				AudioCopy:      isSupportedAudioCodec(aCodecs),
 				TargetMime:     "audio/mpeg",
 			}
+		} else {
+			strategy = TranscodeStrategy{NeedsTranscode: false}
 		}
 	}
 
-	return TranscodeStrategy{NeedsTranscode: false}
+	if strategy.NeedsTranscode {
+		slog.Debug("Transcode Strategy", "path", m.Path, "video_copy", strategy.VideoCopy, "audio_copy", strategy.AudioCopy, "target", strategy.TargetMime, "vcodecs", vCodecs, "acodecs", aCodecs)
+	}
+
+	return strategy
 }
