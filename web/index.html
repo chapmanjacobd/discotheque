@@ -41,6 +41,14 @@
             </details>
 
             <details>
+                <summary>Playlists</summary>
+                <div id="playlist-list">
+                    <!-- Playlists will be injected here -->
+                </div>
+                <button id="new-playlist-btn" class="category-btn" style="width: 100%; margin-top: 0.5rem; border: 1px dashed var(--border-color);">+ New Playlist</button>
+            </details>
+
+            <details>
                 <summary>Ratings</summary>
                 <div id="rating-list">
                     <!-- Ratings will be injected here -->
@@ -199,6 +207,21 @@
             <!-- Media tag (img, video, audio) will be injected here -->
         </div>
         <div id="lyrics-display" class="hidden"></div>
+    </div>
+
+    <!-- Metadata Modal -->
+    <div id="metadata-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Media Metadata</h2>
+                <button class="close-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="metadata-content" class="metadata-grid">
+                    <!-- Metadata will be injected here -->
+                </div>
+            </div>
+        </div>
     </div>
 
     <div id="toast" class="hidden"></div>

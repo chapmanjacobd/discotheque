@@ -9,6 +9,9 @@ import (
 )
 
 type Querier interface {
+	AddPlaylistItem(ctx context.Context, arg AddPlaylistItemParams) error
+	ClearPlaylist(ctx context.Context, playlistID int64) error
+	DeletePlaylist(ctx context.Context, arg DeletePlaylistParams) error
 	GetAllMediaMetadata(ctx context.Context) ([]GetAllMediaMetadataRow, error)
 	GetCategoryStats(ctx context.Context) ([]GetCategoryStatsRow, error)
 	GetHistoryCount(ctx context.Context, mediaPath string) (int64, error)
@@ -19,6 +22,7 @@ type Querier interface {
 	GetMediaByPlayCount(ctx context.Context, arg GetMediaByPlayCountParams) ([]Media, error)
 	GetMediaBySize(ctx context.Context, arg GetMediaBySizeParams) ([]Media, error)
 	GetMediaByType(ctx context.Context, arg GetMediaByTypeParams) ([]Media, error)
+	GetPlaylistItems(ctx context.Context, playlistID int64) ([]GetPlaylistItemsRow, error)
 	GetPlaylists(ctx context.Context) ([]Playlists, error)
 	GetRandomMedia(ctx context.Context, limit int64) ([]Media, error)
 	GetRatingStats(ctx context.Context) ([]GetRatingStatsRow, error)
@@ -32,6 +36,7 @@ type Querier interface {
 	InsertHistory(ctx context.Context, arg InsertHistoryParams) error
 	InsertPlaylist(ctx context.Context, arg InsertPlaylistParams) (int64, error)
 	MarkDeleted(ctx context.Context, arg MarkDeletedParams) error
+	RemovePlaylistItem(ctx context.Context, arg RemovePlaylistItemParams) error
 	SearchCaptions(ctx context.Context, query string) ([]SearchCaptionsRow, error)
 	SearchMediaFTS(ctx context.Context, arg SearchMediaFTSParams) ([]Media, error)
 	UpdateMediaCategories(ctx context.Context, arg UpdateMediaCategoriesParams) error

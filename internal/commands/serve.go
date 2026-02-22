@@ -52,6 +52,8 @@ func (c *ServeCmd) Mux() http.Handler {
 	mux.HandleFunc("/api/delete", c.handleDelete)
 	mux.HandleFunc("/api/progress", c.handleProgress)
 	mux.HandleFunc("/api/rate", c.handleRate)
+	mux.HandleFunc("/api/playlists", c.handlePlaylists)
+	mux.HandleFunc("/api/playlists/items", c.handlePlaylistItems)
 	mux.HandleFunc("/api/events", c.handleEvents)
 	mux.HandleFunc("/api/raw", c.handleRaw)
 	mux.HandleFunc("/api/subtitles", c.handleSubtitles)
@@ -982,4 +984,233 @@ func (c *ServeCmd) handleOPDS(w http.ResponseWriter, r *http.Request) {
 	}
 
 	fmt.Fprint(w, "\n</feed>")
+}
+
+func (c *ServeCmd) handlePlaylists(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodGet {
+		type PlaylistWithDB struct {
+			database.Playlists
+			DB string `json:"db"`
+		}
+		var allPlaylists []PlaylistWithDB
+		for _, dbPath := range c.Databases {
+			sqlDB, err := database.Connect(dbPath)
+			if err != nil {
+				continue
+			}
+			queries := database.New(sqlDB)
+			pls, err := queries.GetPlaylists(r.Context())
+			sqlDB.Close()
+			if err == nil {
+				for _, p := range pls {
+					allPlaylists = append(allPlaylists, PlaylistWithDB{
+						Playlists: p,
+						DB:        dbPath,
+					})
+				}
+			}
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(allPlaylists)
+		return
+	}
+
+	if r.Method == http.MethodPost {
+		var req struct {
+			Title string `json:"title"`
+			Path  string `json:"path"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		dbPath := c.Databases[0]
+		sqlDB, err := database.Connect(dbPath)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		defer sqlDB.Close()
+		queries := database.New(sqlDB)
+		id, err := queries.InsertPlaylist(r.Context(), database.InsertPlaylistParams{
+			Title: sql.NullString{String: req.Title, Valid: true},
+			Path:  sql.NullString{String: req.Path, Valid: req.Path != ""},
+		})
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		json.NewEncoder(w).Encode(map[string]any{"id": id, "db": dbPath})
+		return
+	}
+
+	if r.Method == http.MethodDelete {
+		idStr := r.URL.Query().Get("id")
+		id, _ := strconv.ParseInt(idStr, 10, 64)
+		dbPath := r.URL.Query().Get("db")
+		if dbPath == "" {
+			dbPath = c.Databases[0]
+		}
+
+		sqlDB, err := database.Connect(dbPath)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		defer sqlDB.Close()
+		queries := database.New(sqlDB)
+		err = queries.DeletePlaylist(r.Context(), database.DeletePlaylistParams{
+			ID:          id,
+			TimeDeleted: sql.NullInt64{Int64: time.Now().Unix(), Valid: true},
+		})
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+}
+
+func (c *ServeCmd) handlePlaylistItems(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodGet {
+		idStr := r.URL.Query().Get("id")
+		id, _ := strconv.ParseInt(idStr, 10, 64)
+		dbPath := r.URL.Query().Get("db")
+
+		sqlDB, err := database.Connect(dbPath)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		defer sqlDB.Close()
+		queries := database.New(sqlDB)
+		items, err := queries.GetPlaylistItems(r.Context(), id)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		var media []models.MediaWithDB
+		for _, item := range items {
+			m := models.FromDB(database.Media{
+				Path:            item.Path,
+				Title:           item.Title,
+				Duration:        item.Duration,
+				Size:            item.Size,
+				TimeCreated:     item.TimeCreated,
+				TimeModified:    item.TimeModified,
+				TimeDeleted:     item.TimeDeleted,
+				TimeFirstPlayed: item.TimeFirstPlayed,
+				TimeLastPlayed:  item.TimeLastPlayed,
+				PlayCount:       item.PlayCount,
+				Playhead:        item.Playhead,
+				Type:            item.Type,
+				Width:           item.Width,
+				Height:          item.Height,
+				Fps:             item.Fps,
+				VideoCodecs:     item.VideoCodecs,
+				AudioCodecs:     item.AudioCodecs,
+				SubtitleCodecs:  item.SubtitleCodecs,
+				VideoCount:      item.VideoCount,
+				AudioCount:      item.AudioCount,
+				SubtitleCount:   item.SubtitleCount,
+				Album:           item.Album,
+				Artist:          item.Artist,
+				Genre:           item.Genre,
+				Mood:            item.Mood,
+				Bpm:             item.Bpm,
+				Key:             item.Key,
+				Decade:          item.Decade,
+				Categories:      item.Categories,
+				City:            item.City,
+				Country:         item.Country,
+				Description:     item.Description,
+				Language:        item.Language,
+				Webpath:         item.Webpath,
+				Uploader:        item.Uploader,
+				TimeUploaded:    item.TimeUploaded,
+				TimeDownloaded:  item.TimeDownloaded,
+				ViewCount:       item.ViewCount,
+				NumComments:     item.NumComments,
+				FavoriteCount:   item.FavoriteCount,
+				Score:           item.Score,
+				UpvoteRatio:     item.UpvoteRatio,
+				Latitude:        item.Latitude,
+				Longitude:       item.Longitude,
+			})
+			m.TrackNumber = models.NullInt64Ptr(item.TrackNumber)
+			media = append(media, models.MediaWithDB{
+				Media: m,
+				DB:    dbPath,
+			})
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(media)
+		return
+	}
+
+	if r.Method == http.MethodPost {
+		var req struct {
+			PlaylistID  int64  `json:"playlist_id"`
+			DB          string `json:"db"`
+			MediaPath   string `json:"media_path"`
+			TrackNumber int64  `json:"track_number"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		sqlDB, err := database.Connect(req.DB)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		defer sqlDB.Close()
+		queries := database.New(sqlDB)
+		err = queries.AddPlaylistItem(r.Context(), database.AddPlaylistItemParams{
+			PlaylistID:  req.PlaylistID,
+			MediaPath:   req.MediaPath,
+			TrackNumber: sql.NullInt64{Int64: req.TrackNumber, Valid: req.TrackNumber != 0},
+		})
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	if r.Method == http.MethodDelete {
+		var req struct {
+			PlaylistID int64  `json:"playlist_id"`
+			DB         string `json:"db"`
+			MediaPath  string `json:"media_path"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		sqlDB, err := database.Connect(req.DB)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		defer sqlDB.Close()
+		queries := database.New(sqlDB)
+		err = queries.RemovePlaylistItem(r.Context(), database.RemovePlaylistItemParams{
+			PlaylistID: req.PlaylistID,
+			MediaPath:  req.MediaPath,
+		})
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		return
+	}
 }

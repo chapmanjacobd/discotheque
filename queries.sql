@@ -215,15 +215,37 @@ ON CONFLICT(path) DO UPDATE SET
     longitude = excluded.longitude;
 
 -- name: InsertPlaylist :one
-INSERT INTO playlists (path, extractor_key, extractor_config)
-VALUES (?, ?, ?)
+INSERT INTO playlists (path, title, extractor_key, extractor_config)
+VALUES (?, ?, ?, ?)
 ON CONFLICT(path) DO UPDATE SET
+    title = COALESCE(excluded.title, playlists.title),
     extractor_key = excluded.extractor_key,
     extractor_config = excluded.extractor_config
 RETURNING id;
 
+-- name: DeletePlaylist :exec
+UPDATE playlists SET time_deleted = ? WHERE id = ?;
+
 -- name: GetPlaylists :many
-SELECT * FROM playlists WHERE time_deleted = 0;
+SELECT * FROM playlists WHERE time_deleted = 0 ORDER BY title, path;
+
+-- name: AddPlaylistItem :exec
+INSERT INTO playlist_items (playlist_id, media_path, track_number)
+VALUES (?, ?, ?)
+ON CONFLICT(playlist_id, media_path) DO UPDATE SET
+    track_number = excluded.track_number;
+
+-- name: RemovePlaylistItem :exec
+DELETE FROM playlist_items WHERE playlist_id = ? AND media_path = ?;
+
+-- name: GetPlaylistItems :many
+SELECT m.*, pi.track_number FROM media m
+JOIN playlist_items pi ON m.path = pi.media_path
+WHERE pi.playlist_id = ? AND m.time_deleted = 0
+ORDER BY pi.track_number, m.path;
+
+-- name: ClearPlaylist :exec
+DELETE FROM playlist_items WHERE playlist_id = ?;
 
 -- name: InsertCaption :exec
 INSERT INTO captions (media_path, time, text)

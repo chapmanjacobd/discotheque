@@ -23,12 +23,13 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- State Management ---
     const state = {
         view: 'grid',
-        page: 'search', // 'search', 'trash', or 'history'
+        page: 'search', // 'search', 'trash', 'history', or 'playlist'
         filters: {
             types: ['video', 'audio'], // Default selection
             search: '',
             category: '',
             rating: '',
+            playlist: null,
             sort: 'path',
             reverse: false,
             limit: parseInt(localStorage.getItem('disco-limit')) || 100,
@@ -47,6 +48,7 @@ document.addEventListener('DOMContentLoaded', () => {
         globalProgress: false,
         categories: [],
         ratings: [],
+        playlists: [],
         playback: {
             item: null,
             timer: null,
@@ -83,6 +85,10 @@ document.addEventListener('DOMContentLoaded', () => {
             params.set('view', 'trash');
         } else if (state.page === 'history') {
             params.set('view', 'history');
+        } else if (state.page === 'playlist' && state.filters.playlist) {
+            params.set('view', 'playlist');
+            params.set('id', state.filters.playlist.id);
+            params.set('db', state.filters.playlist.db);
         } else if (state.filters.types.length === 1 && state.filters.types[0] === 'text') {
             params.set('view', 'text');
         } else {
@@ -109,6 +115,14 @@ document.addEventListener('DOMContentLoaded', () => {
             state.page = 'history';
             state.filters.category = '';
             state.filters.rating = '';
+        } else if (view === 'playlist') {
+            state.page = 'playlist';
+            state.filters.playlist = {
+                id: parseInt(params.get('id')),
+                db: params.get('db')
+            };
+            state.filters.category = '';
+            state.filters.rating = '';
         } else if (view === 'text') {
             state.page = 'search';
             state.filters.types = ['text'];
@@ -128,11 +142,14 @@ document.addEventListener('DOMContentLoaded', () => {
             fetchTrash();
         } else if (state.page === 'history') {
             fetchHistory();
+        } else if (state.page === 'playlist' && state.filters.playlist) {
+            fetchPlaylistItems(state.filters.playlist);
         } else {
             performSearch();
         }
         renderCategoryList();
         renderRatingList();
+        renderPlaylistList();
     };
 
     // --- API Calls ---
@@ -173,6 +190,158 @@ document.addEventListener('DOMContentLoaded', () => {
             renderRatingList();
         } catch (err) {
             console.error('Failed to fetch ratings', err);
+        }
+    }
+
+    async function fetchPlaylists() {
+        try {
+            const resp = await fetch('/api/playlists');
+            if (!resp.ok) throw new Error('Failed to fetch playlists');
+            state.playlists = await resp.json();
+            renderPlaylistList();
+        } catch (err) {
+            console.error('Failed to fetch playlists', err);
+        }
+    }
+
+    function renderPlaylistList() {
+        const playlistList = document.getElementById('playlist-list');
+        if (!playlistList) return;
+
+        const trashBtn = document.getElementById('trash-btn');
+        const historyBtn = document.getElementById('history-btn');
+        if (trashBtn && state.page !== 'trash') trashBtn.classList.remove('active');
+        if (historyBtn && state.page !== 'history') historyBtn.classList.remove('active');
+
+        playlistList.innerHTML = state.playlists.map(p => `
+            <div class="category-btn ${state.page === 'playlist' && state.filters.playlist?.id === p.id ? 'active' : ''}" style="display: flex; justify-content: space-between; align-items: center;">
+                <span class="playlist-name" data-id="${p.id}" style="flex: 1; cursor: pointer;">📁 ${p.title || p.path || 'Unnamed'}</span>
+                <button class="delete-playlist-btn" data-id="${p.id}" data-db="${p.db}" style="background: none; border: none; opacity: 0.5; cursor: pointer;">&times;</button>
+            </div>
+        `).join('');
+
+        playlistList.querySelectorAll('.playlist-name').forEach(el => {
+            el.onclick = () => {
+                const id = parseInt(el.dataset.id);
+                const playlist = state.playlists.find(p => p.id === id);
+                state.page = 'playlist';
+                state.filters.playlist = playlist;
+                state.filters.category = '';
+                state.filters.rating = '';
+
+                document.querySelectorAll('.category-btn').forEach(b => b.classList.remove('active'));
+                el.parentElement.classList.add('active');
+
+                fetchPlaylistItems(playlist);
+            };
+        });
+
+        playlistList.querySelectorAll('.delete-playlist-btn').forEach(btn => {
+            btn.onclick = (e) => {
+                e.stopPropagation();
+                if (confirm('Delete this playlist?')) {
+                    deletePlaylist(btn.dataset.id, btn.dataset.db);
+                }
+            };
+        });
+    }
+
+    async function fetchPlaylistItems(playlist) {
+        state.page = 'playlist';
+        syncUrl();
+        try {
+            const resp = await fetch(`/api/playlists/items?id=${playlist.id}&db=${encodeURIComponent(playlist.db)}`);
+            if (!resp.ok) throw new Error('Failed to fetch playlist items');
+            currentMedia = await resp.json();
+            renderResults();
+        } catch (err) {
+            console.error('Playlist items fetch failed:', err);
+            showToast('Failed to load playlist');
+        }
+    }
+
+    async function deletePlaylist(id, db) {
+        try {
+            const resp = await fetch(`/api/playlists?id=${id}&db=${encodeURIComponent(db)}`, { method: 'DELETE' });
+            if (!resp.ok) throw new Error('Delete failed');
+            showToast('Playlist deleted');
+            fetchPlaylists();
+            if (state.page === 'playlist' && state.filters.playlist?.id == id) {
+                state.page = 'search';
+                performSearch();
+            }
+        } catch (err) {
+            console.error('Delete playlist failed:', err);
+        }
+    }
+
+    async function createPlaylist(title) {
+        try {
+            const resp = await fetch('/api/playlists', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title })
+            });
+            if (!resp.ok) throw new Error('Create failed');
+            showToast('Playlist created');
+            fetchPlaylists();
+        } catch (err) {
+            console.error('Create playlist failed:', err);
+        }
+    }
+
+    async function addToPlaylist(playlist, item) {
+        try {
+            const resp = await fetch('/api/playlists/items', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    playlist_id: playlist.id,
+                    db: playlist.db,
+                    media_path: item.path
+                })
+            });
+            if (!resp.ok) throw new Error('Add failed');
+            showToast('Added to playlist');
+        } catch (err) {
+            console.error('Add to playlist failed:', err);
+        }
+    }
+
+    async function removeFromPlaylist(playlist, item) {
+        try {
+            const resp = await fetch('/api/playlists/items', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    playlist_id: playlist.id,
+                    db: playlist.db,
+                    media_path: item.path
+                })
+            });
+            if (!resp.ok) throw new Error('Remove failed');
+            showToast('Removed from playlist');
+            fetchPlaylistItems(playlist);
+        } catch (err) {
+            console.error('Remove from playlist failed:', err);
+        }
+    }
+
+    async function updateTrackNumber(playlist, item, num) {
+        try {
+            const resp = await fetch('/api/playlists/items', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    playlist_id: playlist.id,
+                    db: playlist.db,
+                    media_path: item.path,
+                    track_number: parseInt(num)
+                })
+            });
+            if (!resp.ok) throw new Error('Update failed');
+        } catch (err) {
+            console.error('Update track number failed:', err);
         }
     }
 
@@ -731,6 +900,31 @@ document.addEventListener('DOMContentLoaded', () => {
         pipViewer.appendChild(el);
     }
 
+    function showMetadata(item) {
+        if (!item) return;
+        const content = document.getElementById('metadata-content');
+        if (!content) return;
+
+        const formatValue = (key, val) => {
+            if (val === null || val === undefined || val === '') return '-';
+            if (key.startsWith('time_') || key.endsWith('_played') || key.includes('_uploaded') || key.includes('_downloaded')) {
+                return new Date(val * 1000).toLocaleString();
+            }
+            if (key === 'size') return formatSize(val);
+            if (key === 'duration') return formatDuration(val);
+            if (typeof val === 'number') return val.toLocaleString();
+            return val;
+        };
+
+        const keys = Object.keys(item).sort();
+        content.innerHTML = keys.map(k => {
+            const label = k.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+            return `<div>${label}</div><div>${formatValue(k, item[k])}</div>`;
+        }).join('');
+
+        openModal('metadata-modal');
+    }
+
     function closePiP() {
         const media = pipViewer.querySelector('video, audio');
         if (media) {
@@ -753,6 +947,9 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (state.page === 'history') {
             const unit = currentMedia.length === 1 ? 'result' : 'results';
             resultsCount.textContent = `${currentMedia.length} recently played ${unit}`;
+        } else if (state.page === 'playlist') {
+            const unit = currentMedia.length === 1 ? 'result' : 'results';
+            resultsCount.textContent = `${currentMedia.length} ${unit} in ${state.filters.playlist?.title || 'playlist'}`;
         } else {
             if (state.filters.all || currentMedia.length < state.filters.limit) {
                 const unit = currentMedia.length === 1 ? 'result' : 'results';
@@ -788,16 +985,28 @@ document.addEventListener('DOMContentLoaded', () => {
             const thumbUrl = `/api/thumbnail?path=${encodeURIComponent(item.path)}`;
 
             const isTrash = state.page === 'trash';
-            const actionBtn = isTrash ?
-                `<button class="media-action-btn restore" title="Restore">↺</button>` :
-                `<button class="media-action-btn delete" title="Move to Trash">🗑️</button>`;
+            const isPlaylist = state.page === 'playlist';
+
+            let actionBtns = '';
+            if (isTrash) {
+                actionBtns = `<button class="media-action-btn restore" title="Restore">↺</button>`;
+            } else if (isPlaylist) {
+                actionBtns = `<button class="media-action-btn remove-playlist" title="Remove from Playlist">&times;</button>`;
+            } else {
+                actionBtns = `
+                    <button class="media-action-btn add-playlist" title="Add to Playlist">+</button>
+                    <button class="media-action-btn delete" title="Move to Trash">🗑️</button>
+                `;
+            }
 
             card.innerHTML = `
                 <div class="media-thumb">
                     <img src="${thumbUrl}" loading="lazy" onload="this.classList.add('loaded')" onerror="this.style.display='none'; this.nextElementSibling.style.display='block'">
                     <i style="display: none">${getIcon(item.type)}</i>
                     ${duration ? `<span class="media-duration">${duration}</span>` : ''}
-                    ${actionBtn}
+                    <div class="media-actions">
+                        ${actionBtns}
+                    </div>
                 </div>
                 <div class="media-info">
                     <div class="media-title" title="${item.path}">${title}</div>
@@ -809,10 +1018,42 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
             `;
 
-            const btn = card.querySelector('.media-action-btn');
-            btn.onclick = (e) => {
+            const btnDelete = card.querySelector('.media-action-btn.delete');
+            if (btnDelete) btnDelete.onclick = (e) => {
                 e.stopPropagation();
-                deleteMedia(item.path, isTrash);
+                deleteMedia(item.path, false);
+            };
+
+            const btnRestore = card.querySelector('.media-action-btn.restore');
+            if (btnRestore) btnRestore.onclick = (e) => {
+                e.stopPropagation();
+                deleteMedia(item.path, true);
+            };
+
+            const btnAddPlaylist = card.querySelector('.media-action-btn.add-playlist');
+            if (btnAddPlaylist) btnAddPlaylist.onclick = (e) => {
+                e.stopPropagation();
+                if (state.playlists.length === 0) {
+                    showToast('Create a playlist first');
+                    return;
+                }
+                // For simplicity, just add to the first playlist if only one, or prompt
+                if (state.playlists.length === 1) {
+                    addToPlaylist(state.playlists[0], item);
+                } else {
+                    const names = state.playlists.map((p, i) => `${i + 1}: ${p.title || p.path}`).join('\n');
+                    const choice = prompt(`Add to which playlist?\n${names}`);
+                    const idx = parseInt(choice) - 1;
+                    if (state.playlists[idx]) {
+                        addToPlaylist(state.playlists[idx], item);
+                    }
+                }
+            };
+
+            const btnRemovePlaylist = card.querySelector('.media-action-btn.remove-playlist');
+            if (btnRemovePlaylist) btnRemovePlaylist.onclick = (e) => {
+                e.stopPropagation();
+                removeFromPlaylist(state.filters.playlist, item);
             };
 
             resultsContainer.appendChild(card);
@@ -825,19 +1066,29 @@ document.addEventListener('DOMContentLoaded', () => {
         table.className = 'details-table';
 
         const isTrash = state.page === 'trash';
+        const isPlaylist = state.page === 'playlist';
+
         const sortIcon = (field) => {
             if (state.filters.sort !== field) return '↕️';
             return state.filters.reverse ? '🔽' : '🔼';
         };
 
+        let headers = `
+            <th data-sort="path">Name ${sortIcon('path')}</th>
+            <th data-sort="size">Size ${sortIcon('size')}</th>
+            <th data-sort="duration">Duration ${sortIcon('duration')}</th>
+            <th data-sort="type">Type ${sortIcon('type')}</th>
+            <th data-sort="play_count">Plays ${sortIcon('play_count')}</th>
+        `;
+
+        if (isPlaylist) {
+            headers = `<th>#</th>` + headers;
+        }
+
         table.innerHTML = `
             <thead>
                 <tr>
-                    <th data-sort="path">Name ${sortIcon('path')}</th>
-                    <th data-sort="size">Size ${sortIcon('size')}</th>
-                    <th data-sort="duration">Duration ${sortIcon('duration')}</th>
-                    <th data-sort="type">Type ${sortIcon('type')}</th>
-                    <th data-sort="play_count">Plays ${sortIcon('play_count')}</th>
+                    ${headers}
                     <th>Action</th>
                 </tr>
             </thead>
@@ -845,16 +1096,28 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
 
         const tbody = table.querySelector('tbody');
-        currentMedia.forEach(item => {
+        currentMedia.forEach((item, index) => {
             const tr = document.createElement('tr');
             tr.onclick = () => playMedia(item);
             tr.dataset.path = item.path;
 
             const title = item.title || item.path.split('/').pop();
-            const actionIcon = isTrash ? '↺' : '🗑️';
-            const actionTitle = isTrash ? 'Restore' : 'Move to Trash';
+            
+            let actions = '';
+            if (isTrash) {
+                actions = `<button class="table-action-btn restore-btn" title="Restore">↺</button>`;
+            } else if (isPlaylist) {
+                actions = `<button class="table-action-btn remove-btn" title="Remove from Playlist">&times;</button>`;
+            } else {
+                actions = `
+                    <div class="playlist-item-actions">
+                        <button class="table-action-btn add-btn" title="Add to Playlist">+</button>
+                        <button class="table-action-btn delete-btn" title="Move to Trash">🗑️</button>
+                    </div>
+                `;
+            }
 
-            tr.innerHTML = `
+            let cells = `
                 <td>
                     <div class="table-cell-title" title="${item.path}">
                         <span class="table-icon">${getIcon(item.type)}</span>
@@ -865,16 +1128,61 @@ document.addEventListener('DOMContentLoaded', () => {
                 <td>${formatDuration(item.duration)}</td>
                 <td>${item.type || ''}</td>
                 <td>${getPlayCount(item) || ''}</td>
-                <td>
-                    <button class="table-action-btn" title="${actionTitle}">${actionIcon}</button>
-                </td>
             `;
 
-            const btn = tr.querySelector('.table-action-btn');
-            btn.onclick = (e) => {
+            if (isPlaylist) {
+                cells = `<td><input type="number" class="track-number-input" value="${item.track_number || ''}" min="1"></td>` + cells;
+            }
+
+            tr.innerHTML = `
+                ${cells}
+                <td>${actions}</td>
+            `;
+
+            const btnDelete = tr.querySelector('.delete-btn');
+            if (btnDelete) btnDelete.onclick = (e) => {
                 e.stopPropagation();
-                deleteMedia(item.path, isTrash);
+                deleteMedia(item.path, false);
             };
+
+            const btnRestore = tr.querySelector('.restore-btn');
+            if (btnRestore) btnRestore.onclick = (e) => {
+                e.stopPropagation();
+                deleteMedia(item.path, true);
+            };
+
+            const btnAdd = tr.querySelector('.add-btn');
+            if (btnAdd) btnAdd.onclick = (e) => {
+                e.stopPropagation();
+                if (state.playlists.length === 0) {
+                    showToast('Create a playlist first');
+                    return;
+                }
+                if (state.playlists.length === 1) {
+                    addToPlaylist(state.playlists[0], item);
+                } else {
+                    const names = state.playlists.map((p, i) => `${i + 1}: ${p.title || p.path}`).join('\n');
+                    const choice = prompt(`Add to which playlist?\n${names}`);
+                    const idx = parseInt(choice) - 1;
+                    if (state.playlists[idx]) {
+                        addToPlaylist(state.playlists[idx], item);
+                    }
+                }
+            };
+
+            const btnRemove = tr.querySelector('.remove-btn');
+            if (btnRemove) btnRemove.onclick = (e) => {
+                e.stopPropagation();
+                removeFromPlaylist(state.filters.playlist, item);
+            };
+
+            const trackInput = tr.querySelector('.track-number-input');
+            if (trackInput) {
+                trackInput.onclick = (e) => e.stopPropagation();
+                trackInput.onchange = (e) => {
+                    updateTrackNumber(state.filters.playlist, item, e.target.value);
+                };
+            }
 
             tbody.appendChild(tr);
         });
@@ -1035,6 +1343,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 case 'p':
                     playSibling(-1);
+                    return;
+                case 'i':
+                    if (state.playback.item) {
+                        showMetadata(state.playback.item);
+                    }
                     return;
                 case 'c':
                     if (state.playback.item) {
@@ -1324,6 +1637,14 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
+    const newPlaylistBtn = document.getElementById('new-playlist-btn');
+    if (newPlaylistBtn) {
+        newPlaylistBtn.onclick = () => {
+            const title = prompt('Playlist Title:');
+            if (title) createPlaylist(title);
+        };
+    }
+
     // Toolbar logic
     document.querySelectorAll('.type-btn').forEach(btn => {
         btn.onclick = (e) => {
@@ -1395,6 +1716,7 @@ document.addEventListener('DOMContentLoaded', () => {
     fetchDatabases();
     fetchCategories();
     fetchRatings();
+    fetchPlaylists();
     renderCategoryList();
     performSearch();
     setupAutoReload();

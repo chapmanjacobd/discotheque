@@ -54,6 +54,8 @@ type Media struct {
 	UpvoteRatio    *float64 `json:"upvote_ratio,omitempty"`
 	Latitude       *float64 `json:"latitude,omitempty"`
 	Longitude      *float64 `json:"longitude,omitempty"`
+
+	TrackNumber *int64 `json:"track_number,omitempty"`
 }
 
 func (m *Media) Parent() string {

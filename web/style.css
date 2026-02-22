@@ -305,12 +305,22 @@ main {
 }
 
 #results-info {
-    margin-left: 0.6rem;
-    margin-top: 26px;
+    position: absolute;
+    top: 100%;
+    left: 2.2rem;
+    margin-top: 0.5rem;
     color: var(--text-muted);
     font-size: 0.85rem;
     white-space: nowrap;
-    pointer-events: none;
+    display: flex;
+    align-items: center;
+    pointer-events: auto;
+}
+
+#results-info .category-btn {
+    padding: 0.2rem 0.6rem;
+    font-size: 0.8rem;
+    margin-left: 0.8rem;
 }
 
 #results-container {
@@ -391,10 +401,23 @@ main {
     color: #fff
 }
 
-.media-action-btn {
+.media-actions {
     position: absolute;
     top: 5px;
     right: 5px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    opacity: 0;
+    transition: opacity 0.2s;
+    z-index: 5;
+}
+
+.media-card:hover .media-actions {
+    opacity: 1;
+}
+
+.media-action-btn {
     background: rgba(0,0,0,0.6);
     border: 2px solid #0006;
     color: white;
@@ -405,14 +428,8 @@ main {
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    opacity: 0;
-    transition: opacity 0.2s, background 0.2s;
+    transition: background 0.2s;
     font-size: 1rem;
-    z-index: 5;
-}
-
-.media-card:hover .media-action-btn {
-    opacity: 1;
 }
 
 .media-card.fade-out {
@@ -527,6 +544,27 @@ main {
     background: #e74c3c;
     color: white;
     border-color: #e74c3c;
+}
+
+.table-action-btn.move-btn:hover {
+    background: var(--accent-color);
+    border-color: var(--accent-color);
+}
+
+.playlist-item-actions {
+    display: flex;
+    gap: 4px;
+}
+
+.track-number-input {
+    width: 40px;
+    background: var(--bg-color);
+    border: 1px solid var(--border-color);
+    color: var(--text-color);
+    padding: 2px 4px;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    text-align: center;
 }
 
 .details-table tr.fade-out {
@@ -795,6 +833,22 @@ main {
 
 .modal-body section:first-child h3 {
     margin-top: 0;
+}
+
+.metadata-grid {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0.5rem 1.5rem;
+    font-size: 0.9rem;
+}
+
+.metadata-grid div:nth-child(odd) {
+    font-weight: 600;
+    color: var(--text-muted);
+}
+
+.metadata-grid div:nth-child(even) {
+    word-break: break-all;
 }
 
 ::-webkit-scrollbar {

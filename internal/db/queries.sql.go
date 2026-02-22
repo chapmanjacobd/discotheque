@@ -10,6 +10,47 @@ import (
 	"database/sql"
 )
 
+const addPlaylistItem = `-- name: AddPlaylistItem :exec
+INSERT INTO playlist_items (playlist_id, media_path, track_number)
+VALUES (?, ?, ?)
+ON CONFLICT(playlist_id, media_path) DO UPDATE SET
+    track_number = excluded.track_number
+`
+
+type AddPlaylistItemParams struct {
+	PlaylistID  int64         `json:"playlist_id"`
+	MediaPath   string        `json:"media_path"`
+	TrackNumber sql.NullInt64 `json:"track_number"`
+}
+
+func (q *Queries) AddPlaylistItem(ctx context.Context, arg AddPlaylistItemParams) error {
+	_, err := q.db.ExecContext(ctx, addPlaylistItem, arg.PlaylistID, arg.MediaPath, arg.TrackNumber)
+	return err
+}
+
+const clearPlaylist = `-- name: ClearPlaylist :exec
+DELETE FROM playlist_items WHERE playlist_id = ?
+`
+
+func (q *Queries) ClearPlaylist(ctx context.Context, playlistID int64) error {
+	_, err := q.db.ExecContext(ctx, clearPlaylist, playlistID)
+	return err
+}
+
+const deletePlaylist = `-- name: DeletePlaylist :exec
+UPDATE playlists SET time_deleted = ? WHERE id = ?
+`
+
+type DeletePlaylistParams struct {
+	TimeDeleted sql.NullInt64 `json:"time_deleted"`
+	ID          int64         `json:"id"`
+}
+
+func (q *Queries) DeletePlaylist(ctx context.Context, arg DeletePlaylistParams) error {
+	_, err := q.db.ExecContext(ctx, deletePlaylist, arg.TimeDeleted, arg.ID)
+	return err
+}
+
 const getAllMediaMetadata = `-- name: GetAllMediaMetadata :many
 SELECT path, size, time_modified, time_deleted FROM media
 `
@@ -668,8 +709,132 @@ func (q *Queries) GetMediaByType(ctx context.Context, arg GetMediaByTypeParams) 
 	return items, nil
 }
 
+const getPlaylistItems = `-- name: GetPlaylistItems :many
+SELECT m.path, m.title, m.duration, m.size, m.time_created, m.time_modified, m.time_deleted, m.time_first_played, m.time_last_played, m.play_count, m.playhead, m.type, m.width, m.height, m.fps, m.video_codecs, m.audio_codecs, m.subtitle_codecs, m.video_count, m.audio_count, m.subtitle_count, m.album, m.artist, m.genre, m.mood, m.bpm, m."key", m.decade, m.categories, m.city, m.country, m.description, m.language, m.webpath, m.uploader, m.time_uploaded, m.time_downloaded, m.view_count, m.num_comments, m.favorite_count, m.score, m.upvote_ratio, m.latitude, m.longitude, pi.track_number FROM media m
+JOIN playlist_items pi ON m.path = pi.media_path
+WHERE pi.playlist_id = ? AND m.time_deleted = 0
+ORDER BY pi.track_number, m.path
+`
+
+type GetPlaylistItemsRow struct {
+	Path            string          `json:"path"`
+	Title           sql.NullString  `json:"title"`
+	Duration        sql.NullInt64   `json:"duration"`
+	Size            sql.NullInt64   `json:"size"`
+	TimeCreated     sql.NullInt64   `json:"time_created"`
+	TimeModified    sql.NullInt64   `json:"time_modified"`
+	TimeDeleted     sql.NullInt64   `json:"time_deleted"`
+	TimeFirstPlayed sql.NullInt64   `json:"time_first_played"`
+	TimeLastPlayed  sql.NullInt64   `json:"time_last_played"`
+	PlayCount       sql.NullInt64   `json:"play_count"`
+	Playhead        sql.NullInt64   `json:"playhead"`
+	Type            sql.NullString  `json:"type"`
+	Width           sql.NullInt64   `json:"width"`
+	Height          sql.NullInt64   `json:"height"`
+	Fps             sql.NullFloat64 `json:"fps"`
+	VideoCodecs     sql.NullString  `json:"video_codecs"`
+	AudioCodecs     sql.NullString  `json:"audio_codecs"`
+	SubtitleCodecs  sql.NullString  `json:"subtitle_codecs"`
+	VideoCount      sql.NullInt64   `json:"video_count"`
+	AudioCount      sql.NullInt64   `json:"audio_count"`
+	SubtitleCount   sql.NullInt64   `json:"subtitle_count"`
+	Album           sql.NullString  `json:"album"`
+	Artist          sql.NullString  `json:"artist"`
+	Genre           sql.NullString  `json:"genre"`
+	Mood            sql.NullString  `json:"mood"`
+	Bpm             sql.NullInt64   `json:"bpm"`
+	Key             sql.NullString  `json:"key"`
+	Decade          sql.NullString  `json:"decade"`
+	Categories      sql.NullString  `json:"categories"`
+	City            sql.NullString  `json:"city"`
+	Country         sql.NullString  `json:"country"`
+	Description     sql.NullString  `json:"description"`
+	Language        sql.NullString  `json:"language"`
+	Webpath         sql.NullString  `json:"webpath"`
+	Uploader        sql.NullString  `json:"uploader"`
+	TimeUploaded    sql.NullInt64   `json:"time_uploaded"`
+	TimeDownloaded  sql.NullInt64   `json:"time_downloaded"`
+	ViewCount       sql.NullInt64   `json:"view_count"`
+	NumComments     sql.NullInt64   `json:"num_comments"`
+	FavoriteCount   sql.NullInt64   `json:"favorite_count"`
+	Score           sql.NullFloat64 `json:"score"`
+	UpvoteRatio     sql.NullFloat64 `json:"upvote_ratio"`
+	Latitude        sql.NullFloat64 `json:"latitude"`
+	Longitude       sql.NullFloat64 `json:"longitude"`
+	TrackNumber     sql.NullInt64   `json:"track_number"`
+}
+
+func (q *Queries) GetPlaylistItems(ctx context.Context, playlistID int64) ([]GetPlaylistItemsRow, error) {
+	rows, err := q.db.QueryContext(ctx, getPlaylistItems, playlistID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetPlaylistItemsRow{}
+	for rows.Next() {
+		var i GetPlaylistItemsRow
+		if err := rows.Scan(
+			&i.Path,
+			&i.Title,
+			&i.Duration,
+			&i.Size,
+			&i.TimeCreated,
+			&i.TimeModified,
+			&i.TimeDeleted,
+			&i.TimeFirstPlayed,
+			&i.TimeLastPlayed,
+			&i.PlayCount,
+			&i.Playhead,
+			&i.Type,
+			&i.Width,
+			&i.Height,
+			&i.Fps,
+			&i.VideoCodecs,
+			&i.AudioCodecs,
+			&i.SubtitleCodecs,
+			&i.VideoCount,
+			&i.AudioCount,
+			&i.SubtitleCount,
+			&i.Album,
+			&i.Artist,
+			&i.Genre,
+			&i.Mood,
+			&i.Bpm,
+			&i.Key,
+			&i.Decade,
+			&i.Categories,
+			&i.City,
+			&i.Country,
+			&i.Description,
+			&i.Language,
+			&i.Webpath,
+			&i.Uploader,
+			&i.TimeUploaded,
+			&i.TimeDownloaded,
+			&i.ViewCount,
+			&i.NumComments,
+			&i.FavoriteCount,
+			&i.Score,
+			&i.UpvoteRatio,
+			&i.Latitude,
+			&i.Longitude,
+			&i.TrackNumber,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getPlaylists = `-- name: GetPlaylists :many
-SELECT id, path, extractor_key, extractor_config, time_deleted FROM playlists WHERE time_deleted = 0
+SELECT id, path, title, extractor_key, extractor_config, time_deleted FROM playlists WHERE time_deleted = 0 ORDER BY title, path
 `
 
 func (q *Queries) GetPlaylists(ctx context.Context) ([]Playlists, error) {
@@ -684,6 +849,7 @@ func (q *Queries) GetPlaylists(ctx context.Context) ([]Playlists, error) {
 		if err := rows.Scan(
 			&i.ID,
 			&i.Path,
+			&i.Title,
 			&i.ExtractorKey,
 			&i.ExtractorConfig,
 			&i.TimeDeleted,
@@ -1241,9 +1407,10 @@ func (q *Queries) InsertHistory(ctx context.Context, arg InsertHistoryParams) er
 }
 
 const insertPlaylist = `-- name: InsertPlaylist :one
-INSERT INTO playlists (path, extractor_key, extractor_config)
-VALUES (?, ?, ?)
+INSERT INTO playlists (path, title, extractor_key, extractor_config)
+VALUES (?, ?, ?, ?)
 ON CONFLICT(path) DO UPDATE SET
+    title = COALESCE(excluded.title, playlists.title),
     extractor_key = excluded.extractor_key,
     extractor_config = excluded.extractor_config
 RETURNING id
@@ -1251,12 +1418,18 @@ RETURNING id
 
 type InsertPlaylistParams struct {
 	Path            sql.NullString `json:"path"`
+	Title           sql.NullString `json:"title"`
 	ExtractorKey    sql.NullString `json:"extractor_key"`
 	ExtractorConfig sql.NullString `json:"extractor_config"`
 }
 
 func (q *Queries) InsertPlaylist(ctx context.Context, arg InsertPlaylistParams) (int64, error) {
-	row := q.db.QueryRowContext(ctx, insertPlaylist, arg.Path, arg.ExtractorKey, arg.ExtractorConfig)
+	row := q.db.QueryRowContext(ctx, insertPlaylist,
+		arg.Path,
+		arg.Title,
+		arg.ExtractorKey,
+		arg.ExtractorConfig,
+	)
 	var id int64
 	err := row.Scan(&id)
 	return id, err
@@ -1275,6 +1448,20 @@ type MarkDeletedParams struct {
 
 func (q *Queries) MarkDeleted(ctx context.Context, arg MarkDeletedParams) error {
 	_, err := q.db.ExecContext(ctx, markDeleted, arg.TimeDeleted, arg.Path)
+	return err
+}
+
+const removePlaylistItem = `-- name: RemovePlaylistItem :exec
+DELETE FROM playlist_items WHERE playlist_id = ? AND media_path = ?
+`
+
+type RemovePlaylistItemParams struct {
+	PlaylistID int64  `json:"playlist_id"`
+	MediaPath  string `json:"media_path"`
+}
+
+func (q *Queries) RemovePlaylistItem(ctx context.Context, arg RemovePlaylistItemParams) error {
+	_, err := q.db.ExecContext(ctx, removePlaylistItem, arg.PlaylistID, arg.MediaPath)
 	return err
 }
 

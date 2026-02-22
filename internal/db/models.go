@@ -79,9 +79,16 @@ type MediaFts struct {
 	Title string `json:"title"`
 }
 
+type PlaylistItems struct {
+	PlaylistID  int64         `json:"playlist_id"`
+	MediaPath   string        `json:"media_path"`
+	TrackNumber sql.NullInt64 `json:"track_number"`
+}
+
 type Playlists struct {
 	ID              int64          `json:"id"`
 	Path            sql.NullString `json:"path"`
+	Title           sql.NullString `json:"title"`
 	ExtractorKey    sql.NullString `json:"extractor_key"`
 	ExtractorConfig sql.NullString `json:"extractor_config"`
 	TimeDeleted     sql.NullInt64  `json:"time_deleted"`
