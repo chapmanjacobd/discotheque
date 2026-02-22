@@ -228,6 +228,16 @@ func (c *ServeCmd) handleQuery(w http.ResponseWriter, r *http.Request) {
 	if text := q.Get("text"); text == "true" {
 		flags.TextOnly = true
 	}
+	if watched := q.Get("watched"); watched == "true" {
+		w := true
+		flags.Watched = &w
+	}
+	if unfinished := q.Get("unfinished"); unfinished == "true" {
+		flags.Unfinished = true
+	}
+	if completed := q.Get("completed"); completed == "true" {
+		flags.Completed = true
+	}
 
 	media, err := query.MediaQuery(context.Background(), c.Databases, flags)
 	if err != nil {
@@ -326,9 +336,10 @@ func (c *ServeCmd) handleProgress(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		Path     string `json:"path"`
-		Playhead int64  `json:"playhead"`
-		Duration int64  `json:"duration"`
+		Path      string `json:"path"`
+		Playhead  int64  `json:"playhead"`
+		Duration  int64  `json:"duration"`
+		Completed bool   `json:"completed"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -336,6 +347,11 @@ func (c *ServeCmd) handleProgress(w http.ResponseWriter, r *http.Request) {
 	}
 
 	now := time.Now().Unix()
+	increment := 0
+	if req.Completed {
+		increment = 1
+	}
+
 	for _, dbPath := range c.Databases {
 		sqlDB, err := database.Connect(dbPath)
 		if err != nil {
@@ -348,9 +364,10 @@ func (c *ServeCmd) handleProgress(w http.ResponseWriter, r *http.Request) {
 			UPDATE media
 			SET time_last_played = ?,
 			    time_first_played = COALESCE(time_first_played, ?),
-			    playhead = ?
+			    playhead = ?,
+			    play_count = COALESCE(play_count, 0) + ?
 			WHERE path = ?`,
-			now, now, req.Playhead, req.Path); err != nil {
+			now, now, req.Playhead, increment, req.Path); err != nil {
 			slog.Error("Failed to update progress", "db", dbPath, "error", err)
 		}
 

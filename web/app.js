@@ -23,7 +23,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- State Management ---
     const state = {
         view: 'grid',
-        page: 'search', // 'search' or 'trash'
+        page: 'search', // 'search', 'trash', or 'history'
         filters: {
             types: ['video', 'audio'], // Default selection
             search: '',
@@ -81,6 +81,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const params = new URLSearchParams();
         if (state.page === 'trash') {
             params.set('view', 'trash');
+        } else if (state.page === 'history') {
+            params.set('view', 'history');
         } else if (state.filters.types.length === 1 && state.filters.types[0] === 'text') {
             params.set('view', 'text');
         } else {
@@ -103,6 +105,10 @@ document.addEventListener('DOMContentLoaded', () => {
             state.page = 'trash';
             state.filters.category = '';
             state.filters.rating = '';
+        } else if (view === 'history') {
+            state.page = 'history';
+            state.filters.category = '';
+            state.filters.rating = '';
         } else if (view === 'text') {
             state.page = 'search';
             state.filters.types = ['text'];
@@ -120,6 +126,8 @@ document.addEventListener('DOMContentLoaded', () => {
         readUrl();
         if (state.page === 'trash') {
             fetchTrash();
+        } else if (state.page === 'history') {
+            fetchHistory();
         } else {
             performSearch();
         }
@@ -173,7 +181,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!ratingList) return;
 
         const trashBtn = document.getElementById('trash-btn');
+        const historyBtn = document.getElementById('history-btn');
         if (trashBtn && state.page !== 'trash') trashBtn.classList.remove('active');
+        if (historyBtn && state.page !== 'history') historyBtn.classList.remove('active');
 
         const sortedRatings = [...state.ratings].sort((a, b) => {
             if (a.rating === 0) return 1;
@@ -209,6 +219,12 @@ document.addEventListener('DOMContentLoaded', () => {
     async function performSearch() {
         state.page = 'search';
         syncUrl();
+
+        const trashBtn = document.getElementById('trash-btn');
+        const historyBtn = document.getElementById('history-btn');
+        if (trashBtn) trashBtn.classList.remove('active');
+        if (historyBtn) historyBtn.classList.remove('active');
+
         if (searchAbortController) {
             searchAbortController.abort();
         }
@@ -291,6 +307,28 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (err) {
             console.error('Trash fetch failed:', err);
             showToast('Failed to load trash');
+        }
+    }
+
+    async function fetchHistory() {
+        state.page = 'history';
+        syncUrl();
+        try {
+            const params = new URLSearchParams();
+            params.set('watched', 'true');
+            params.set('sort', 'time_last_played');
+            params.set('reverse', 'true');
+            if (state.filters.limit && !state.filters.all) {
+                params.set('limit', state.filters.limit);
+            }
+
+            const resp = await fetch(`/api/query?${params.toString()}`);
+            if (!resp.ok) throw new Error('Failed to fetch history');
+            currentMedia = await resp.json();
+            renderResults();
+        } catch (err) {
+            console.error('History fetch failed:', err);
+            showToast('Failed to load history');
         }
     }
 
@@ -427,7 +465,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 body: JSON.stringify({
                     path: item.path,
                     playhead: isComplete ? 0 : Math.floor(playhead),
-                    duration: Math.floor(duration)
+                    duration: Math.floor(duration),
+                    completed: isComplete
                 })
             });
         } catch (err) {
@@ -711,6 +750,9 @@ document.addEventListener('DOMContentLoaded', () => {
             resultsCount.innerHTML = `<span>${currentMedia.length} ${unit} in trash</span> <button id="empty-bin-btn" class="category-btn" style="margin-left: 1rem; background: #e74c3c; color: white;">Empty Bin</button>`;
             const emptyBtn = document.getElementById('empty-bin-btn');
             if (emptyBtn) emptyBtn.onclick = emptyBin;
+        } else if (state.page === 'history') {
+            const unit = currentMedia.length === 1 ? 'result' : 'results';
+            resultsCount.textContent = `${currentMedia.length} recently played ${unit}`;
         } else {
             if (state.filters.all || currentMedia.length < state.filters.limit) {
                 const unit = currentMedia.length === 1 ? 'result' : 'results';
@@ -890,7 +932,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!categoryList) return;
 
         const trashBtn = document.getElementById('trash-btn');
+        const historyBtn = document.getElementById('history-btn');
         if (trashBtn && state.page !== 'trash') trashBtn.classList.remove('active');
+        if (historyBtn && state.page !== 'history') historyBtn.classList.remove('active');
 
         const sortedCategories = [...state.categories].sort((a, b) => {
             if (a.category === 'Uncategorized') return 1;
@@ -1258,12 +1302,25 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const trashBtn = document.getElementById('trash-btn');
+    const historyBtn = document.getElementById('history-btn');
+
     if (trashBtn) {
         trashBtn.onclick = () => {
             // Remove active from other categories
             categoryList.querySelectorAll('.category-btn').forEach(b => b.classList.remove('active'));
+            if (historyBtn) historyBtn.classList.remove('active');
             trashBtn.classList.add('active');
             fetchTrash();
+        };
+    }
+
+    if (historyBtn) {
+        historyBtn.onclick = () => {
+            // Remove active from other categories
+            categoryList.querySelectorAll('.category-btn').forEach(b => b.classList.remove('active'));
+            if (trashBtn) trashBtn.classList.remove('active');
+            historyBtn.classList.add('active');
+            fetchHistory();
         };
     }
 
