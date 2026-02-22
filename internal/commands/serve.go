@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"math"
 	"net/http"
 	"net/url"
 	"os"
@@ -58,6 +59,8 @@ func (c *ServeCmd) Mux() http.Handler {
 	mux.HandleFunc("/api/playlists/items", c.handlePlaylistItems)
 	mux.HandleFunc("/api/events", c.handleEvents)
 	mux.HandleFunc("/api/raw", c.handleRaw)
+	mux.HandleFunc("/api/hls/playlist", c.handleHLSPlaylist)
+	mux.HandleFunc("/api/hls/segment", c.handleHLSSegment)
 	mux.HandleFunc("/api/subtitles", c.handleSubtitles)
 	mux.HandleFunc("/api/thumbnail", c.handleThumbnail)
 	mux.HandleFunc("/opds", c.handleOPDS)
@@ -1353,4 +1356,114 @@ func (c *ServeCmd) handleGenres(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
 	json.NewEncoder(w).Encode(res)
+}
+
+const HLS_SEGMENT_DURATION = 6
+
+func (c *ServeCmd) handleHLSPlaylist(w http.ResponseWriter, r *http.Request) {
+	path := r.URL.Query().Get("path")
+	if path == "" {
+		http.Error(w, "Path required", http.StatusBadRequest)
+		return
+	}
+
+	// Fetch media to get duration
+	var m models.Media
+	found := false
+	for _, dbPath := range c.Databases {
+		sqlDB, err := database.Connect(dbPath)
+		if err != nil {
+			continue
+		}
+		queries := database.New(sqlDB)
+		dbMedia, err := queries.GetMediaByPathExact(r.Context(), path)
+		sqlDB.Close()
+		if err == nil {
+			m = models.FromDB(dbMedia)
+			found = true
+			break
+		}
+	}
+
+	if !found || m.Duration == nil {
+		http.Error(w, "Media not found or no duration", http.StatusNotFound)
+		return
+	}
+
+	duration := float64(*m.Duration)
+	segments := int(math.Ceil(duration / HLS_SEGMENT_DURATION))
+
+	w.Header().Set("Content-Type", "application/vnd.apple.mpegurl")
+	w.Header().Set("Cache-Control", "no-cache")
+
+	fmt.Fprintf(w, "#EXTM3U\n")
+	fmt.Fprintf(w, "#EXT-X-VERSION:3\n")
+	fmt.Fprintf(w, "#EXT-X-TARGETDURATION:%d\n", HLS_SEGMENT_DURATION)
+	fmt.Fprintf(w, "#EXT-X-MEDIA-SEQUENCE:0\n")
+	fmt.Fprintf(w, "#EXT-X-PLAYLIST-TYPE:VOD\n")
+
+	for i := 0; i < segments; i++ {
+		segDuration := float64(HLS_SEGMENT_DURATION)
+		if i == segments-1 {
+			rem := math.Mod(duration, HLS_SEGMENT_DURATION)
+			if rem > 0 {
+				segDuration = rem
+			}
+		}
+		fmt.Fprintf(w, "#EXTINF:%f,\n", segDuration)
+		fmt.Fprintf(w, "/api/hls/segment?path=%s&index=%d\n", url.QueryEscape(path), i)
+	}
+
+	fmt.Fprintf(w, "#EXT-X-ENDLIST\n")
+}
+
+func (c *ServeCmd) handleHLSSegment(w http.ResponseWriter, r *http.Request) {
+	path := r.URL.Query().Get("path")
+	indexStr := r.URL.Query().Get("index")
+	if path == "" || indexStr == "" {
+		http.Error(w, "Path and index required", http.StatusBadRequest)
+		return
+	}
+
+	index, err := strconv.Atoi(indexStr)
+	if err != nil {
+		http.Error(w, "Invalid index", http.StatusBadRequest)
+		return
+	}
+
+	startTime := float64(index * HLS_SEGMENT_DURATION)
+
+	// Check if we have ffmpeg
+	if _, err := exec.LookPath("ffmpeg"); err != nil {
+		http.Error(w, "ffmpeg not found", http.StatusServiceUnavailable)
+		return
+	}
+
+	w.Header().Set("Content-Type", "video/MP2T")
+
+	args := []string{
+		"-ss", fmt.Sprintf("%f", startTime),
+		"-i", path,
+		"-t", fmt.Sprintf("%d", HLS_SEGMENT_DURATION),
+		"-vf", "scale=-2:720", // Downscale to 720p for performance/bandwidth
+		"-c:v", "libx264",
+		"-preset", "veryfast",
+		"-c:a", "aac",
+		"-b:a", "128k",
+		"-ac", "2",
+		"-pix_fmt", "yuv420p",
+		"-f", "mpegts",
+		"-output_ts_offset", fmt.Sprintf("%f", startTime), // Align timestamps
+		"pipe:1",
+	}
+
+	// Skip logging for segments to avoid spam
+	// slog.Debug("HLS Segment", "index", index, "start", startTime)
+
+	cmd := exec.CommandContext(r.Context(), "ffmpeg", append([]string{"-hide_banner", "-loglevel", "error"}, args...)...)
+	cmd.Stdout = w
+
+	if err := cmd.Run(); err != nil {
+		slog.Error("HLS transcoding failed", "path", path, "index", index, "error", err)
+	}
 }

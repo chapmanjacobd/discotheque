@@ -61,7 +61,8 @@ document.addEventListener('DOMContentLoaded', () => {
             lastUpdate: 0,
             lastLocalUpdate: 0,
             lastPlayedIndex: -1,
-            hasMarkedComplete: false
+            hasMarkedComplete: false,
+            hlsInstance: null
         }
     };
 
@@ -854,42 +855,76 @@ document.addEventListener('DOMContentLoaded', () => {
             pipPlayer.classList.remove('hidden');
             pipPlayer.classList.remove('minimized');
     
-            // Check if item needs transcoding (provided by backend or fallback check)
-            let needsTranscode = item.transcode;
-            if (needsTranscode === undefined) {
-                 // Fallback if backend didn't provide it (e.g. older cached data)
-                 // Audio logic: assume mp3/m4a/ogg/wav/opus don't need it, others might
-                 if (type.includes('audio')) {
-                     needsTranscode = !type.includes('mp3') && !type.includes('m4a') && !type.includes('ogg') && !type.includes('wav') && !type.includes('opus');
-                 } else if (type.includes('video')) {
-                     needsTranscode = !type.includes('mp4') && !type.includes('webm') && !type.includes('mkv');
-                 }
-            }
+                    // Check if item needs transcoding (provided by backend or fallback check)
+                    let needsTranscode = item.transcode;
+                    if (needsTranscode === undefined) {
+                         // Fallback if backend didn't provide it (e.g. older cached data)
+                         // Audio logic: assume mp3/m4a/ogg/wav/opus don't need it, others might
+                         if (type.includes('audio')) {
+                             needsTranscode = !type.includes('mp3') && !type.includes('m4a') && !type.includes('ogg') && !type.includes('wav') && !type.includes('opus');
+                         } else if (type.includes('video')) {
+                             needsTranscode = !type.includes('mp4') && !type.includes('webm') && !type.includes('mkv');
+                         }
+                    }
+                    
+                    let localPos = getLocalProgress(item);
+                    if (!localPos && state.globalProgress && item.playhead > 0) {
+                        localPos = item.playhead;
+                    }
             
-            let localPos = getLocalProgress(item);
-            if (!localPos && state.globalProgress && item.playhead > 0) {
-                localPos = item.playhead;
-            }
-    
-            let startParam = '';
-            if (needsTranscode && localPos > 0) {
-                startParam = `&start=${localPos}`;
-            }
-    
-            let url = `/api/raw?path=${encodeURIComponent(path)}${startParam}`;
-    
-            let el;
-    
-            if (type.includes('video')) {
-                el = document.createElement('video');
-                el.controls = true;
-                el.autoplay = true;
-                el.src = url;
-    
-                if (!needsTranscode && localPos) {
-                    el.currentTime = localPos;
-                }
-                el.ontimeupdate = () => {
+                    let startParam = '';
+                    // Only use startParam for legacy/fallback slicing, not for HLS
+                    if (needsTranscode && localPos > 0) {
+                        startParam = `&start=${localPos}`;
+                    }
+            
+                    // Standard raw URL (possibly sliced if using fallback)
+                    let url = `/api/raw?path=${encodeURIComponent(path)}${startParam}`;
+            
+                    if (state.playback.hlsInstance) {
+                        state.playback.hlsInstance.destroy();
+                        state.playback.hlsInstance = null;
+                    }
+            
+                    let el;
+            
+                    if (type.includes('video')) {
+                        el = document.createElement('video');
+                        el.controls = true;
+                        el.autoplay = true;
+            
+                        if (needsTranscode) {
+                            const hlsUrl = `/api/hls/playlist?path=${encodeURIComponent(path)}`;
+                            
+                            if (el.canPlayType('application/vnd.apple.mpegurl')) {
+                                // Native HLS (Safari)
+                                el.src = hlsUrl;
+                                el.addEventListener('loadedmetadata', () => {
+                                    if (localPos > 0) el.currentTime = localPos;
+                                }, { once: true });
+                            } else if (Hls.isSupported()) {
+                                // hls.js
+                                const hls = new Hls();
+                                hls.loadSource(hlsUrl);
+                                hls.attachMedia(el);
+                                hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                                    if (localPos > 0) el.currentTime = localPos;
+                                    el.play().catch(e => console.log("Auto-play blocked:", e));
+                                });
+                                state.playback.hlsInstance = hls;
+                            } else {
+                                // Fallback to sliced stream
+                                el.src = url;
+                            }
+                        } else {
+                            el.src = url;
+                            if (localPos) {
+                                el.currentTime = localPos;
+                            }
+                        }
+            
+                        el.ontimeupdate = () => {
+            
                 const isComplete = (el.duration > 90) && (el.duration - el.currentTime < 90) && (el.currentTime / el.duration > 0.95);
                 updateProgress(item, el.currentTime, el.duration, isComplete);
             };
@@ -1057,6 +1092,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function closePiP() {
+        if (state.playback.hlsInstance) {
+            state.playback.hlsInstance.destroy();
+            state.playback.hlsInstance = null;
+        }
         const media = pipViewer.querySelector('video, audio');
         if (media) {
             media.pause();
