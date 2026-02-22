@@ -555,13 +555,7 @@ func (c *ServeCmd) handleRaw(w http.ResponseWriter, r *http.Request) {
 
 	if strategy.NeedsTranscode {
 		if c.hasFfmpeg {
-			var startTime float64
-			if startStr := r.URL.Query().Get("start"); startStr != "" {
-				if s, err := strconv.ParseFloat(startStr, 64); err == nil {
-					startTime = s
-				}
-			}
-			c.handleTranscode(w, r, path, m, strategy, startTime)
+			c.handleTranscode(w, r, path, m, strategy)
 			return
 		} else {
 			slog.Error("ffmpeg not found in PATH, skipping transcoding", "path", path)
@@ -573,28 +567,18 @@ func (c *ServeCmd) handleRaw(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, path)
 }
 
-func (c *ServeCmd) handleTranscode(w http.ResponseWriter, r *http.Request, path string, m models.Media, strategy utils.TranscodeStrategy, startTime float64) {
+func (c *ServeCmd) handleTranscode(w http.ResponseWriter, r *http.Request, path string, m models.Media, strategy utils.TranscodeStrategy) {
 	w.Header().Set("Content-Type", strategy.TargetMime)
 	w.Header().Set("Accept-Ranges", "bytes")
 
 	// Add flags to help with piped streaming duration and timestamp issues
 	var args []string
 
-	if startTime > 0 {
-		args = append(args, "-ss", fmt.Sprintf("%f", startTime))
-	}
-
 	args = append(args, "-fflags", "+genpts", "-i", path)
 
 	// If we have duration in metadata, tell ffmpeg so it can write it to headers
 	if m.Duration != nil && *m.Duration > 0 {
-		duration := float64(*m.Duration)
-		if startTime > 0 {
-			duration -= startTime
-		}
-		if duration > 0 {
-			args = append(args, "-t", fmt.Sprintf("%f", duration))
-		}
+		args = append(args, "-t", fmt.Sprintf("%d", *m.Duration))
 	}
 
 	if strategy.VideoCopy {
@@ -630,7 +614,7 @@ func (c *ServeCmd) handleTranscode(w http.ResponseWriter, r *http.Request, path 
 	}
 
 	ffmpegArgs := append([]string{"-hide_banner", "-loglevel", "error"}, args...)
-	slog.Info("Streaming with transcode", "path", path, "start", startTime, "strategy", strategy, "args", strings.Join(ffmpegArgs, " "))
+	slog.Info("Streaming with transcode", "path", path, "strategy", strategy, "args", strings.Join(ffmpegArgs, " "))
 
 	cmd := exec.CommandContext(r.Context(), "ffmpeg", ffmpegArgs...)
 	cmd.Stdout = w
@@ -708,7 +692,6 @@ func (c *ServeCmd) handleSubtitles(w http.ResponseWriter, r *http.Request) {
 
 	ext := strings.ToLower(filepath.Ext(path))
 	streamIndex := r.URL.Query().Get("index")
-	startStr := r.URL.Query().Get("start")
 
 	// If it's a media container but no index is specified, we should try to find an external sidecar
 	if streamIndex == "" && (ext == ".mkv" || ext == ".mp4" || ext == ".m4v" || ext == ".mov" || ext == ".webm") {
@@ -734,7 +717,7 @@ func (c *ServeCmd) handleSubtitles(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if ext == ".vtt" && startStr == "" {
+	if ext == ".vtt" {
 		w.Header().Set("Content-Type", "text/vtt")
 		http.ServeFile(w, r, path)
 		return
@@ -745,12 +728,6 @@ func (c *ServeCmd) handleSubtitles(w http.ResponseWriter, r *http.Request) {
 
 	var args []string
 	isImageSub := ext == ".idx" || ext == ".sub" || ext == ".sup"
-
-	if startStr != "" {
-		if s, err := strconv.ParseFloat(startStr, 64); err == nil && s > 0 {
-			args = append(args, "-ss", fmt.Sprintf("%f", s))
-		}
-	}
 
 	if streamIndex != "" {
 		// Embedded tracks
@@ -1346,6 +1323,10 @@ func (c *ServeCmd) handleHLSSegment(w http.ResponseWriter, r *http.Request) {
 	cmd.Stdout = w
 
 	if err := cmd.Run(); err != nil {
-		slog.Error("HLS transcoding failed", "path", path, "index", index, "error", err)
+		if r.Context().Err() != nil {
+			slog.Debug("Client disconnected during HLS transcoding", "path", path, "index", index)
+		} else {
+			slog.Error("HLS transcoding failed", "path", path, "index", index, "error", err)
+		}
 	}
 }
