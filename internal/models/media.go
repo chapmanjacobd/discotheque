@@ -58,6 +58,28 @@ type Media struct {
 	TrackNumber *int64 `json:"track_number,omitempty"`
 }
 
+type Playlist struct {
+	ID              int64   `json:"id"`
+	Path            *string `json:"path,omitempty"`
+	Title           *string `json:"title,omitempty"`
+	ExtractorKey    *string `json:"extractor_key,omitempty"`
+	ExtractorConfig *string `json:"extractor_config,omitempty"`
+	TimeDeleted     *int64  `json:"time_deleted,omitempty"`
+	DB              string  `json:"db,omitempty"`
+}
+
+func PlaylistFromDB(p db.Playlists, dbPath string) Playlist {
+	return Playlist{
+		ID:              p.ID,
+		Path:            NullStringPtr(p.Path),
+		Title:           NullStringPtr(p.Title),
+		ExtractorKey:    NullStringPtr(p.ExtractorKey),
+		ExtractorConfig: NullStringPtr(p.ExtractorConfig),
+		TimeDeleted:     NullInt64Ptr(p.TimeDeleted),
+		DB:              dbPath,
+	}
+}
+
 func (m *Media) Parent() string {
 	return filepath.Dir(m.Path)
 }

@@ -308,7 +308,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const resp = await fetch(`/api/playlists/items?id=${playlist.id}&db=${encodeURIComponent(playlist.db)}`);
             if (!resp.ok) throw new Error('Failed to fetch playlist items');
-            currentMedia = await resp.json();
+            currentMedia = await resp.json() || [];
             renderResults();
         } catch (err) {
             console.error('Playlist items fetch failed:', err);
@@ -351,20 +351,25 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function addToPlaylist(playlist, item) {
+        const payload = {
+            playlist_id: playlist.id,
+            db: playlist.db,
+            media_path: item.path
+        };
         try {
             const resp = await fetch('/api/playlists/items', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    playlist_id: playlist.id,
-                    db: playlist.db,
-                    media_path: item.path
-                })
+                body: JSON.stringify(payload)
             });
-            if (!resp.ok) throw new Error('Add failed');
+            if (!resp.ok) {
+                const errorText = await resp.text();
+                throw new Error(`Add failed: ${errorText || resp.statusText}`);
+            }
             showToast('Added to playlist');
         } catch (err) {
-            console.error('Add to playlist failed:', err);
+            console.error('Add to playlist failed:', err, payload);
+            showToast(err.message);
         }
     }
 
@@ -1008,6 +1013,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Rendering ---
     function renderResults() {
+        if (!currentMedia) currentMedia = [];
         if (state.page === 'trash') {
             const unit = currentMedia.length === 1 ? 'file' : 'files';
             resultsCount.innerHTML = `<span>${currentMedia.length} ${unit} in trash</span> <button id="empty-bin-btn" class="category-btn" style="margin-left: 1rem; background: #e74c3c; color: white;">Empty Bin</button>`;
@@ -1416,12 +1422,22 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 case 'i':
                     if (state.playback.item) {
-                        showMetadata(state.playback.item);
+                        const modal = document.getElementById('metadata-modal');
+                        if (modal.classList.contains('hidden')) {
+                            showMetadata(state.playback.item);
+                        } else {
+                            closeModal('metadata-modal');
+                        }
                     }
                     return;
                 case '?':
                 case '/':
-                    openModal('help-modal');
+                    const helpModal = document.getElementById('help-modal');
+                    if (helpModal.classList.contains('hidden')) {
+                        openModal('help-modal');
+                    } else {
+                        closeModal('help-modal');
+                    }
                     return;
                 case 'c':
                     if (state.playback.item) {

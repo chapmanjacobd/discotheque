@@ -1022,11 +1022,7 @@ func (c *ServeCmd) handleOPDS(w http.ResponseWriter, r *http.Request) {
 
 func (c *ServeCmd) handlePlaylists(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodGet {
-		type PlaylistWithDB struct {
-			database.Playlists
-			DB string `json:"db"`
-		}
-		allPlaylists := make([]PlaylistWithDB, 0)
+		allPlaylists := make([]models.Playlist, 0)
 		for _, dbPath := range c.Databases {
 			sqlDB, err := database.Connect(dbPath)
 			if err != nil {
@@ -1037,10 +1033,7 @@ func (c *ServeCmd) handlePlaylists(w http.ResponseWriter, r *http.Request) {
 			sqlDB.Close()
 			if err == nil {
 				for _, p := range pls {
-					allPlaylists = append(allPlaylists, PlaylistWithDB{
-						Playlists: p,
-						DB:        dbPath,
-					})
+					allPlaylists = append(allPlaylists, models.PlaylistFromDB(p, dbPath))
 				}
 			}
 		}
@@ -1134,7 +1127,7 @@ func (c *ServeCmd) handlePlaylistItems(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		var media []models.MediaWithDB
+		media := make([]models.MediaWithDB, 0)
 		for _, item := range items {
 			m := models.FromDB(database.Media{
 				Path:            item.Path,
@@ -1208,7 +1201,8 @@ func (c *ServeCmd) handlePlaylistItems(w http.ResponseWriter, r *http.Request) {
 
 		sqlDB, err := database.Connect(req.DB)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			slog.Error("Failed to connect to database for playlist item add", "db", req.DB, "error", err)
+			http.Error(w, fmt.Sprintf("Failed to connect to database: %v", err), http.StatusInternalServerError)
 			return
 		}
 		defer sqlDB.Close()
@@ -1219,7 +1213,8 @@ func (c *ServeCmd) handlePlaylistItems(w http.ResponseWriter, r *http.Request) {
 			TrackNumber: sql.NullInt64{Int64: req.TrackNumber, Valid: req.TrackNumber != 0},
 		})
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			slog.Error("Failed to add playlist item", "playlist_id", req.PlaylistID, "media_path", req.MediaPath, "error", err)
+			http.Error(w, fmt.Sprintf("Failed to add playlist item: %v", err), http.StatusInternalServerError)
 			return
 		}
 		w.WriteHeader(http.StatusOK)
