@@ -79,6 +79,47 @@ func (c *ServeCmd) Mux() http.Handler {
 	return mux
 }
 
+// execDB connects to the database and executes fn. If a corruption error occurs,
+// it attempts to repair the database and retries the operation once.
+func (c *ServeCmd) execDB(ctx context.Context, dbPath string, fn func(*sql.DB) error) error {
+	const maxRetries = 1
+	var lastErr error
+
+	for i := 0; i <= maxRetries; i++ {
+		sqlDB, err := database.Connect(dbPath)
+		if err != nil {
+			// Connect error might be corruption too (e.g. invalid header)
+			if database.IsCorruptionError(err) && i < maxRetries {
+				slog.Warn("Database corruption detected on connect, attempting repair", "db", dbPath)
+				if repErr := database.Repair(dbPath); repErr != nil {
+					return fmt.Errorf("repair failed: %w (original error: %v)", repErr, err)
+				}
+				slog.Info("Database repaired, retrying connect", "db", dbPath)
+				continue
+			}
+			return err
+		}
+
+		err = fn(sqlDB)
+		sqlDB.Close() // Close immediately after use to allow repair tools to lock file if needed
+
+		if err != nil {
+			if database.IsCorruptionError(err) && i < maxRetries {
+				slog.Warn("Database corruption detected on query, attempting repair", "db", dbPath)
+				if repErr := database.Repair(dbPath); repErr != nil {
+					slog.Error("Database repair failed", "db", dbPath, "error", repErr)
+					return err // Return original error if repair fails
+				}
+				slog.Info("Database repaired, retrying operation", "db", dbPath)
+				continue
+			}
+			return err
+		}
+		return nil
+	}
+	return lastErr
+}
+
 func (c *ServeCmd) Run(ctx *kong.Context) error {
 	models.SetupLogging(c.Verbose)
 	c.ApplicationStartTime = time.Now().UnixNano()
@@ -315,17 +356,13 @@ func (c *ServeCmd) markDeletedInAllDBs(ctx context.Context, path string, deleted
 	}
 
 	for _, dbPath := range c.Databases {
-		sqlDB, err := database.Connect(dbPath)
-		if err != nil {
-			slog.Error("Failed to connect to database", "db", dbPath, "error", err)
-			continue
-		}
-		queries := database.New(sqlDB)
-		err = queries.MarkDeleted(ctx, database.MarkDeletedParams{
-			Path:        path,
-			TimeDeleted: sql.NullInt64{Int64: deleteTime, Valid: deleted},
+		err := c.execDB(ctx, dbPath, func(sqlDB *sql.DB) error {
+			queries := database.New(sqlDB)
+			return queries.MarkDeleted(ctx, database.MarkDeletedParams{
+				Path:        path,
+				TimeDeleted: sql.NullInt64{Int64: deleteTime, Valid: deleted},
+			})
 		})
-		sqlDB.Close()
 		if err != nil {
 			slog.Error("Failed to mark file as deleted", "db", dbPath, "path", path, "error", err)
 		}
@@ -375,25 +412,24 @@ func (c *ServeCmd) handleProgress(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for _, dbPath := range c.Databases {
-		sqlDB, err := database.Connect(dbPath)
-		if err != nil {
-			continue
-		}
-
-		// Use raw SQL to update progress to avoid complex sqlc param mapping if not existing
-		// We want to increment play_count only once per session ideally, but for now we follow simple logic
-		if _, err := sqlDB.ExecContext(r.Context(), `
+		err := c.execDB(r.Context(), dbPath, func(sqlDB *sql.DB) error {
+			// Use raw SQL to update progress to avoid complex sqlc param mapping if not existing
+			// We want to increment play_count only once per session ideally, but for now we follow simple logic
+			if _, err := sqlDB.ExecContext(r.Context(), `
 			UPDATE media
 			SET time_last_played = ?,
 			    time_first_played = COALESCE(time_first_played, ?),
 			    playhead = ?,
 			    play_count = COALESCE(play_count, 0) + ?
 			WHERE path = ?`,
-			now, now, req.Playhead, increment, req.Path); err != nil {
+				now, now, req.Playhead, increment, req.Path); err != nil {
+				return err
+			}
+			return nil
+		})
+		if err != nil {
 			slog.Error("Failed to update progress", "db", dbPath, "error", err)
 		}
-
-		sqlDB.Close()
 	}
 
 	w.WriteHeader(http.StatusOK)
@@ -415,14 +451,15 @@ func (c *ServeCmd) handleRate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for _, dbPath := range c.Databases {
-		sqlDB, err := database.Connect(dbPath)
+		err := c.execDB(r.Context(), dbPath, func(sqlDB *sql.DB) error {
+			if _, err := sqlDB.ExecContext(r.Context(), "UPDATE media SET score = ? WHERE path = ?", req.Score, req.Path); err != nil {
+				return err
+			}
+			return nil
+		})
 		if err != nil {
-			continue
-		}
-		if _, err := sqlDB.ExecContext(r.Context(), "UPDATE media SET score = ? WHERE path = ?", req.Score, req.Path); err != nil {
 			slog.Error("Failed to update rating", "db", dbPath, "error", err)
 		}
-		sqlDB.Close()
 	}
 
 	w.WriteHeader(http.StatusOK)
@@ -938,15 +975,19 @@ func (c *ServeCmd) handleEmptyBin(w http.ResponseWriter, r *http.Request) {
 
 		// Remove from DB
 		for _, dbPath := range c.Databases {
-			sqlDB, err := database.Connect(dbPath)
+			err := c.execDB(r.Context(), dbPath, func(sqlDB *sql.DB) error {
+				result, err := sqlDB.Exec("DELETE FROM media WHERE path = ?", m.Path)
+				if err != nil {
+					return err
+				}
+				rows, _ := result.RowsAffected()
+				if rows > 0 {
+					count++
+				}
+				return nil
+			})
 			if err != nil {
-				continue
-			}
-			_, err = sqlDB.Exec("DELETE FROM media WHERE path = ?", m.Path)
-			sqlDB.Close()
-			if err == nil {
-				count++
-				break
+				slog.Error("Failed to delete from DB", "db", dbPath, "error", err)
 			}
 		}
 	}
@@ -1024,17 +1065,19 @@ func (c *ServeCmd) handlePlaylists(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodGet {
 		allPlaylists := make([]models.Playlist, 0)
 		for _, dbPath := range c.Databases {
-			sqlDB, err := database.Connect(dbPath)
-			if err != nil {
-				continue
-			}
-			queries := database.New(sqlDB)
-			pls, err := queries.GetPlaylists(r.Context())
-			sqlDB.Close()
-			if err == nil {
+			err := c.execDB(r.Context(), dbPath, func(sqlDB *sql.DB) error {
+				queries := database.New(sqlDB)
+				pls, err := queries.GetPlaylists(r.Context())
+				if err != nil {
+					return err
+				}
 				for _, p := range pls {
 					allPlaylists = append(allPlaylists, models.PlaylistFromDB(p, dbPath))
 				}
+				return nil
+			})
+			if err != nil {
+				slog.Error("Failed to fetch playlists", "db", dbPath, "error", err)
 			}
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -1052,25 +1095,23 @@ func (c *ServeCmd) handlePlaylists(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		dbPath := c.Databases[0]
-		sqlDB, err := database.Connect(dbPath)
-		if err != nil {
-			slog.Error("Failed to connect to database for playlist creation", "db", dbPath, "error", err)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		defer sqlDB.Close()
-
 		playlistPath := req.Path
 		if playlistPath == "" {
 			playlistPath = "custom:" + utils.RandomString(12)
 		}
 
-		queries := database.New(sqlDB)
-		id, err := queries.InsertPlaylist(r.Context(), database.InsertPlaylistParams{
-			Title: sql.NullString{String: req.Title, Valid: true},
-			Path:  sql.NullString{String: playlistPath, Valid: true},
+		dbPath := c.Databases[0]
+		var id int64
+		err := c.execDB(r.Context(), dbPath, func(sqlDB *sql.DB) error {
+			queries := database.New(sqlDB)
+			var err error
+			id, err = queries.InsertPlaylist(r.Context(), database.InsertPlaylistParams{
+				Title: sql.NullString{String: req.Title, Valid: true},
+				Path:  sql.NullString{String: playlistPath, Valid: true},
+			})
+			return err
 		})
+
 		if err != nil {
 			slog.Error("Failed to insert playlist", "title", req.Title, "path", playlistPath, "error", err)
 			http.Error(w, fmt.Sprintf("Failed to insert playlist: %v", err), http.StatusInternalServerError)
@@ -1088,17 +1129,14 @@ func (c *ServeCmd) handlePlaylists(w http.ResponseWriter, r *http.Request) {
 			dbPath = c.Databases[0]
 		}
 
-		sqlDB, err := database.Connect(dbPath)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		defer sqlDB.Close()
-		queries := database.New(sqlDB)
-		err = queries.DeletePlaylist(r.Context(), database.DeletePlaylistParams{
-			ID:          id,
-			TimeDeleted: sql.NullInt64{Int64: time.Now().Unix(), Valid: true},
+		err := c.execDB(r.Context(), dbPath, func(sqlDB *sql.DB) error {
+			queries := database.New(sqlDB)
+			return queries.DeletePlaylist(r.Context(), database.DeletePlaylistParams{
+				ID:          id,
+				TimeDeleted: sql.NullInt64{Int64: time.Now().Unix(), Valid: true},
+			})
 		})
+
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -1113,15 +1151,15 @@ func (c *ServeCmd) handlePlaylistItems(w http.ResponseWriter, r *http.Request) {
 		idStr := r.URL.Query().Get("id")
 		id, _ := strconv.ParseInt(idStr, 10, 64)
 		dbPath := r.URL.Query().Get("db")
+		var items []database.GetPlaylistItemsRow
 
-		sqlDB, err := database.Connect(dbPath)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		defer sqlDB.Close()
-		queries := database.New(sqlDB)
-		items, err := queries.GetPlaylistItems(r.Context(), id)
+		err := c.execDB(r.Context(), dbPath, func(sqlDB *sql.DB) error {
+			queries := database.New(sqlDB)
+			var err error
+			items, err = queries.GetPlaylistItems(r.Context(), id)
+			return err
+		})
+
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -1199,19 +1237,15 @@ func (c *ServeCmd) handlePlaylistItems(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		sqlDB, err := database.Connect(req.DB)
-		if err != nil {
-			slog.Error("Failed to connect to database for playlist item add", "db", req.DB, "error", err)
-			http.Error(w, fmt.Sprintf("Failed to connect to database: %v", err), http.StatusInternalServerError)
-			return
-		}
-		defer sqlDB.Close()
-		queries := database.New(sqlDB)
-		err = queries.AddPlaylistItem(r.Context(), database.AddPlaylistItemParams{
-			PlaylistID:  req.PlaylistID,
-			MediaPath:   req.MediaPath,
-			TrackNumber: sql.NullInt64{Int64: req.TrackNumber, Valid: req.TrackNumber != 0},
+		err := c.execDB(r.Context(), req.DB, func(sqlDB *sql.DB) error {
+			queries := database.New(sqlDB)
+			return queries.AddPlaylistItem(r.Context(), database.AddPlaylistItemParams{
+				PlaylistID:  req.PlaylistID,
+				MediaPath:   req.MediaPath,
+				TrackNumber: sql.NullInt64{Int64: req.TrackNumber, Valid: req.TrackNumber != 0},
+			})
 		})
+
 		if err != nil {
 			slog.Error("Failed to add playlist item", "playlist_id", req.PlaylistID, "media_path", req.MediaPath, "error", err)
 			http.Error(w, fmt.Sprintf("Failed to add playlist item: %v", err), http.StatusInternalServerError)
@@ -1232,17 +1266,14 @@ func (c *ServeCmd) handlePlaylistItems(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		sqlDB, err := database.Connect(req.DB)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		defer sqlDB.Close()
-		queries := database.New(sqlDB)
-		err = queries.RemovePlaylistItem(r.Context(), database.RemovePlaylistItemParams{
-			PlaylistID: req.PlaylistID,
-			MediaPath:  req.MediaPath,
+		err := c.execDB(r.Context(), req.DB, func(sqlDB *sql.DB) error {
+			queries := database.New(sqlDB)
+			return queries.RemovePlaylistItem(r.Context(), database.RemovePlaylistItemParams{
+				PlaylistID: req.PlaylistID,
+				MediaPath:  req.MediaPath,
+			})
 		})
+
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return

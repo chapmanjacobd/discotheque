@@ -615,7 +615,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 body: JSON.stringify({ path, restore })
             });
 
-            if (!resp.ok) throw new Error('Action failed');
+            if (!resp.ok) {
+                const text = await resp.text();
+                throw new Error(text || 'Action failed');
+            }
 
             if (restore) {
                 showToast('Item restored');
@@ -1403,6 +1406,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!icon) {
             icon = msg.toLowerCase().includes('fail') || msg.toLowerCase().includes('error') ? '❌' : 'ℹ️';
         }
+
         toast.innerHTML = `<span>${icon}</span> <span>${msg}</span>`;
         toast.classList.remove('hidden');
         setTimeout(() => toast.classList.add('hidden'), 3000);
@@ -1454,6 +1458,13 @@ document.addEventListener('DOMContentLoaded', () => {
                         openModal('help-modal');
                     } else {
                         closeModal('help-modal');
+                    }
+                    return;
+                case 't':
+                    e.preventDefault();
+                    if (searchInput) {
+                        searchInput.focus();
+                        searchInput.select();
                     }
                     return;
                 case 'c':

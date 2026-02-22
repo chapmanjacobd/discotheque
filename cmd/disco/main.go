@@ -35,6 +35,7 @@ type CLI struct {
 	MpvWatchlater  commands.MpvWatchlaterCmd  `cmd:"" name:"mpv-watchlater" help:"Import mpv watchlater files to history"`
 	Serve          commands.ServeCmd          `cmd:"" help:"Start Web UI server"`
 	Optimize       commands.OptimizeCmd       `cmd:"" help:"Optimize database (VACUUM, ANALYZE, FTS optimize)"`
+	Repair         commands.RepairCmd         `cmd:"" help:"Repair malformed database using sqlite3"`
 	Tui            commands.TuiCmd            `cmd:"" help:"Interactive TUI media picker"`
 	Readme         commands.ReadmeCmd         `cmd:"" help:"Generate README.md content"`
 	RegexSort      commands.RegexSortCmd      `cmd:"" help:"Sort by splitting lines and sorting words" aliases:"rs"`
