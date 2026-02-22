@@ -872,14 +872,8 @@ document.addEventListener('DOMContentLoaded', () => {
             localPos = item.playhead;
         }
 
-        let startParam = '';
-        // Only use startParam for legacy/fallback slicing, not for HLS
-        if (needsTranscode && localPos > 0) {
-            startParam = `&start=${localPos}`;
-        }
-
         // Standard raw URL (possibly sliced if using fallback)
-        let url = `/api/raw?path=${encodeURIComponent(path)}${startParam}`;
+        let url = `/api/raw?path=${encodeURIComponent(path)}`;
 
         if (state.playback.hlsInstance) {
             state.playback.hlsInstance.destroy();
@@ -939,7 +933,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 track.kind = 'subtitles';
                 track.label = label;
                 track.srclang = state.language || 'en';
-                track.src = trackUrl + startParam; // Append start param
+                track.src = trackUrl; // Append start param
 
                 track.onload = () => {
                     // Try to auto-enable
@@ -1006,7 +1000,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Try to fetch lyrics (server will look for siblings)
             const track = document.createElement('track');
             track.kind = 'subtitles';
-            track.src = `/api/subtitles?path=${encodeURIComponent(path)}${startParam}`;
+            track.src = `/api/subtitles?path=${encodeURIComponent(path)}`;
             track.srclang = state.language || 'en';
             el.appendChild(track);
 
