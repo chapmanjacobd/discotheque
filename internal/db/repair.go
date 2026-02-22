@@ -169,6 +169,9 @@ func isHealthy(dbPath string) bool {
 	}
 	defer db.Close()
 
+	// Enable WAL mode to match application behavior and detect WAL corruption
+	_, _ = db.Exec("PRAGMA journal_mode=WAL")
+
 	// 1. Thorough integrity check
 	rows, err := db.Query("PRAGMA integrity_check")
 	if err != nil {
@@ -214,13 +217,25 @@ func isHealthy(dbPath string) bool {
 	}
 	defer tx.Rollback()
 
-	// Check for media table
+	// Check for media table and perform a REAL write if possible
 	var hasMedia bool
 	_ = db.QueryRow("SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='media')").Scan(&hasMedia)
 	if hasMedia {
-		if _, err = tx.Exec("UPDATE media SET time_deleted = time_deleted WHERE rowid = -1"); err != nil {
-			slog.Warn("Health check: write consistency check (media) failed", "error", err)
-			return false
+		var somePath string
+		_ = db.QueryRow("SELECT path FROM media LIMIT 1").Scan(&somePath)
+		
+		// If the table is not empty, we MUST update a real row to trigger the FTS and index logic.
+		// If we only update a non-existent row, the triggers will not fire and we won't detect FTS corruption.
+		if somePath != "" {
+			if _, err = tx.Exec("UPDATE media SET time_deleted = time_deleted WHERE path = ?", somePath); err != nil {
+				slog.Warn("Health check: write consistency check (media triggers) failed", "path", somePath, "error", err)
+				return false
+			}
+		} else {
+			if _, err = tx.Exec("UPDATE media SET time_deleted = time_deleted WHERE rowid = -1"); err != nil {
+				slog.Warn("Health check: write consistency check (media) failed", "error", err)
+				return false
+			}
 		}
 	} else {
 		// Generic write check for non-media DBs (e.g. in tests)

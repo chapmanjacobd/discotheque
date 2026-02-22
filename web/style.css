@@ -859,7 +859,7 @@ main {
     z-index: 2000;
     display: flex;
     flex-direction: column;
-    overflow: hidden;
+    overflow: visible;
     transition: width 0.3s, height 0.3s;
 }
 
@@ -933,6 +933,12 @@ main {
 
 .pip-controls button:hover {
     color: var(--text-color);
+}
+
+#pip-speed:hover {
+    border-color: var(--accent-color) !important;
+    color: var(--accent-color) !important;
+    background: var(--hover-color) !important;
 }
 
 #pip-stream-type {

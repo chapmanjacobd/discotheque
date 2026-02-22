@@ -122,6 +122,9 @@ document.addEventListener('DOMContentLoaded', () => {
         settingDefaultVideoRate.onchange = (e) => {
             state.defaultVideoRate = parseFloat(e.target.value);
             localStorage.setItem('disco-default-video-rate', state.defaultVideoRate);
+            if (state.playback.item && state.playback.item.type.includes('video')) {
+                setPlaybackRate(state.defaultVideoRate);
+            }
         };
     }
 
@@ -130,6 +133,9 @@ document.addEventListener('DOMContentLoaded', () => {
         settingDefaultAudioRate.onchange = (e) => {
             state.defaultAudioRate = parseFloat(e.target.value);
             localStorage.setItem('disco-default-audio-rate', state.defaultAudioRate);
+            if (state.playback.item && state.playback.item.type.includes('audio')) {
+                setPlaybackRate(state.defaultAudioRate);
+            }
         };
     }
 
@@ -191,14 +197,19 @@ document.addEventListener('DOMContentLoaded', () => {
             if (state.filters.max_score) params.set('max_score', state.filters.max_score);
         }
 
-        const newUrl = params.toString() ? `?${params.toString()}` : window.location.pathname;
-        if (window.location.search !== `?${params.toString()}`) {
-            window.history.pushState(state.filters, '', newUrl);
+        const paramString = params.toString();
+        const newHash = paramString ? `#${paramString}` : '';
+        
+        // Use replaceState to avoid spamming browser history during typing/filtering
+        if (window.location.hash !== newHash) {
+            window.history.replaceState(state.filters, '', window.location.pathname + newHash);
         }
     }
 
     function readUrl() {
-        const params = new URLSearchParams(window.location.search);
+        // Support both hash and search params, preferring hash for the new system
+        const hash = window.location.hash.substring(1);
+        const params = hash ? new URLSearchParams(hash) : new URLSearchParams(window.location.search);
         const view = params.get('view');
 
         if (view === 'trash') {
@@ -250,7 +261,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    window.onpopstate = () => {
+    const onUrlChange = () => {
         readUrl();
         if (state.page === 'trash') {
             fetchTrash();
@@ -266,6 +277,9 @@ document.addEventListener('DOMContentLoaded', () => {
         renderRatingList();
         renderPlaylistList();
     };
+
+    window.onpopstate = onUrlChange;
+    window.onhashchange = onUrlChange;
 
     // --- API Calls ---
     async function fetchDatabases() {
@@ -333,9 +347,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 const path = el.dataset.path;
                 const isDir = el.dataset.isDir === 'true';
                 if (isDir) {
-                    searchInput.value = path + '/';
+                    const newPath = path.endsWith('/') ? path : path + '/';
+                    searchInput.value = newPath;
                     searchInput.focus();
-                    fetchSuggestions(path + '/');
+                    fetchSuggestions(newPath);
                 } else {
                     searchInput.value = path;
                     searchSuggestions.classList.add('hidden');
@@ -636,6 +651,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function performSearch() {
         state.page = 'search';
+        state.filters.search = searchInput.value;
+        state.filters.sort = sortBy.value;
+        state.filters.limit = parseInt(limitInput.value) || 100;
+        state.filters.all = limitAll ? limitAll.checked : false;
+
         syncUrl();
 
         const trashBtn = document.getElementById('trash-btn');
@@ -647,11 +667,6 @@ document.addEventListener('DOMContentLoaded', () => {
             searchAbortController.abort();
         }
         searchAbortController = new AbortController();
-
-        state.filters.search = searchInput.value;
-        state.filters.sort = sortBy.value;
-        state.filters.limit = parseInt(limitInput.value) || 100;
-        state.filters.all = limitAll ? limitAll.checked : false;
 
         localStorage.setItem('disco-limit', state.filters.limit);
         localStorage.setItem('disco-limit-all', state.filters.all);
@@ -2295,8 +2310,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const path = el.dataset.path;
             const isDir = el.dataset.isDir === 'true';
             if (isDir) {
-                searchInput.value = path + '/';
-                fetchSuggestions(path + '/');
+                const newPath = path.endsWith('/') ? path : path + '/';
+                searchInput.value = newPath;
+                fetchSuggestions(newPath);
             } else {
                 searchInput.value = path;
                 searchSuggestions.classList.add('hidden');
@@ -2316,8 +2332,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const path = el.dataset.path;
             const isDir = el.dataset.isDir === 'true';
             if (isDir) {
-                searchInput.value = path + '/';
-                fetchSuggestions(path + '/');
+                const newPath = path.endsWith('/') ? path : path + '/';
+                searchInput.value = newPath;
+                fetchSuggestions(newPath);
             } else {
                 searchInput.value = path;
                 searchSuggestions.classList.add('hidden');
@@ -2604,9 +2621,6 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     if (searchInput) {
-        searchInput.oninput = () => {
-            debouncedSearch();
-        };
         searchInput.onkeypress = (e) => { if (e.key === 'Enter') performSearch(); };
     }
 
