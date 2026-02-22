@@ -12,13 +12,14 @@
 
 <body>
     <header>
+        <button id="menu-toggle" title="Menu">☰</button>
         <div class="logo">
             <span class="disco-ball">🪩</span>
             <span class="logo-text">Disco<span class="logo-suffix">thèque</span></span>
         </div>
         <div class="search-container">
             <span class="search-icon">🔍</span>
-            <input type="text" id="search-input" placeholder="Search media...">
+            <input type="text" id="search-input" placeholder="Search...">
             <div id="results-info">
                 <span id="results-count"></span>
             </div>
@@ -29,6 +30,7 @@
     </header>
 
     <main>
+        <div id="sidebar-overlay" class="hidden"></div>
         <aside class="sidebar">
             <div id="nav-list">
                 <button id="history-btn" class="category-btn" style="width: 100%; margin-bottom: 0.5rem;">🕒 History</button>
@@ -100,6 +102,19 @@
 
             <div id="results-container" class="grid">
                 <!-- Media items will be injected here -->
+            </div>
+
+            <div id="pagination-container" class="hidden">
+                <button id="prev-page" class="category-btn">Previous</button>
+                <span id="page-info">Page 1</span>
+                <button id="next-page" class="category-btn">Next</button>
+            </div>
+        </section>
+
+        <section id="detail-view" class="content hidden">
+            <button id="back-to-results" class="category-btn">← Back</button>
+            <div id="detail-content">
+                <!-- Detail content will be injected here -->
             </div>
         </section>
     </main>

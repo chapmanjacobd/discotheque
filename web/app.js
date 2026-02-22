@@ -11,6 +11,20 @@ document.addEventListener('DOMContentLoaded', () => {
     const categoryList = document.getElementById('category-list');
     const toast = document.getElementById('toast');
 
+    const paginationContainer = document.getElementById('pagination-container');
+    const prevPageBtn = document.getElementById('prev-page');
+    const nextPageBtn = document.getElementById('next-page');
+    const pageInfo = document.getElementById('page-info');
+
+    const detailView = document.getElementById('detail-view');
+    const searchView = document.querySelector('.content:not(#detail-view)');
+    const backToResultsBtn = document.getElementById('back-to-results');
+    const detailContent = document.getElementById('detail-content');
+
+    const menuToggle = document.getElementById('menu-toggle');
+    const sidebarOverlay = document.getElementById('sidebar-overlay');
+    const sidebar = document.querySelector('.sidebar');
+
     const pipPlayer = document.getElementById('pip-player');
     const pipViewer = document.getElementById('media-viewer');
     const pipTitle = document.getElementById('media-title');
@@ -24,6 +38,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const state = {
         view: 'grid',
         page: 'search', // 'search', 'trash', 'history', or 'playlist'
+        currentPage: 1,
         filters: {
             types: JSON.parse(localStorage.getItem('disco-types') || '["video", "audio"]'),
             search: '',
@@ -37,6 +52,7 @@ document.addEventListener('DOMContentLoaded', () => {
             all: localStorage.getItem('disco-limit-all') === 'true',
             excludedDbs: JSON.parse(localStorage.getItem('disco-excluded-dbs') || '[]')
         },
+        draggedItem: null,
         applicationStartTime: null,
         lastActivity: Date.now() - (4 * 60 * 1000), // 4 mins ago
         player: localStorage.getItem('disco-player') || 'browser',
@@ -316,6 +332,24 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    async function handlePlaylistReorder(draggedItem, targetItem) {
+        if (!state.filters.playlist) return;
+
+        const draggedTrackNum = draggedItem.track_number || 0;
+        const targetTrackNum = targetItem.track_number || 0;
+
+        // Simply swap track numbers for now as a basic reorder
+        try {
+            await updateTrackNumber(state.filters.playlist, draggedItem, targetTrackNum);
+            await updateTrackNumber(state.filters.playlist, targetItem, draggedTrackNum);
+            showToast('Playlist reordered');
+            fetchPlaylistItems(state.filters.playlist);
+        } catch (err) {
+            console.error('Reorder failed:', err);
+            showToast('Reorder failed');
+        }
+    }
+
     async function fetchPlaylistItems(playlist) {
         state.page = 'playlist';
         state.filters.genre = '';
@@ -505,6 +539,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 params.append('all', 'true');
             } else {
                 params.append('limit', state.filters.limit);
+                params.append('offset', (state.currentPage - 1) * state.filters.limit);
             }
 
             state.filters.types.forEach(t => {
@@ -800,6 +835,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (nextIndex >= 0 && nextIndex < currentMedia.length) {
             playMedia(currentMedia[nextIndex]);
+        } else if (nextIndex >= currentMedia.length && !state.filters.all && state.page === 'search') {
+            // End of current page, fetch next
+            state.currentPage++;
+            performSearch().then(() => {
+                if (currentMedia.length > 0) {
+                    playMedia(currentMedia[0]);
+                }
+            });
+        } else if (nextIndex < 0 && state.currentPage > 1 && !state.filters.all && state.page === 'search') {
+            // Beginning of current page, fetch previous
+            state.currentPage--;
+            performSearch().then(() => {
+                if (currentMedia.length > 0) {
+                    playMedia(currentMedia[currentMedia.length - 1]);
+                }
+            });
         }
     }
 
@@ -1101,6 +1152,87 @@ document.addEventListener('DOMContentLoaded', () => {
         state.playerMode = state.defaultView;
     }
 
+    function renderPagination() {
+        if (state.filters.all || state.page === 'trash' || state.page === 'playlist' || state.page === 'history') {
+            paginationContainer.classList.add('hidden');
+            return;
+        }
+
+        paginationContainer.classList.remove('hidden');
+        pageInfo.textContent = `Page ${state.currentPage}`;
+        prevPageBtn.disabled = state.currentPage === 1;
+        // We don't know the total count easily without an extra API call,
+        // so we'll just disable "Next" if the current page has fewer items than the limit.
+        nextPageBtn.disabled = currentMedia.length < state.filters.limit;
+    }
+
+    function showDetailView(item) {
+        state.page = 'detail';
+        searchView.classList.add('hidden');
+        detailView.classList.remove('hidden');
+
+        const title = item.title || item.path.split('/').pop();
+        const thumbUrl = `/api/thumbnail?path=${encodeURIComponent(item.path)}`;
+        const size = formatSize(item.size);
+        const duration = formatDuration(item.duration);
+        const plays = getPlayCount(item);
+
+        detailContent.innerHTML = `
+            <div class="detail-container">
+                <div class="detail-header">
+                    <img src="${thumbUrl}" class="detail-hero-thumb">
+                    <div class="detail-main-info">
+                        <h1>${title}</h1>
+                        <p class="detail-path">${item.path}</p>
+                        <div class="detail-stats">
+                            <span>${size}</span>
+                            <span>${duration}</span>
+                            <span>${item.type || 'Unknown'}</span>
+                            <span>▶️ ${plays} plays</span>
+                        </div>
+                        <div class="detail-actions">
+                            <button class="category-btn play-now-btn">▶ Play</button>
+                            <button class="category-btn add-playlist-btn">+ Add to Playlist</button>
+                            <button class="category-btn delete-item-btn">🗑 Trash</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="detail-metadata">
+                    <h3>Metadata</h3>
+                    <div class="metadata-grid">
+                        ${Object.keys(item).sort().map(k => {
+                            const val = item[k];
+                            if (val === null || val === undefined || val === '') return '';
+                            const label = k.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+                            return `<div>${label}</div><div>${val}</div>`;
+                        }).join('')}
+                    </div>
+                </div>
+            </div>
+        `;
+
+        detailContent.querySelector('.play-now-btn').onclick = () => playMedia(item);
+        detailContent.querySelector('.add-playlist-btn').onclick = () => {
+            if (state.playlists.length === 0) {
+                showToast('Create a playlist first');
+                return;
+            }
+            const names = state.playlists.map((p, i) => `${i + 1}: ${p.title || p.path}`).join('\n');
+            const choice = prompt(`Add to which playlist?\n${names}`);
+            const idx = parseInt(choice) - 1;
+            if (state.playlists[idx]) {
+                addToPlaylist(state.playlists[idx], item);
+            }
+        };
+        detailContent.querySelector('.delete-item-btn').onclick = () => {
+            if (confirm('Move to trash?')) {
+                deleteMedia(item.path);
+                searchView.classList.remove('hidden');
+                detailView.classList.add('hidden');
+            }
+        };
+    }
+
     // --- Rendering ---
     function renderResults() {
         if (!currentMedia) currentMedia = [];
@@ -1133,6 +1265,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (state.view === 'details') {
             renderDetailsTable();
+            renderPagination();
             return;
         }
 
@@ -1141,7 +1274,18 @@ document.addEventListener('DOMContentLoaded', () => {
             const card = document.createElement('div');
             card.className = 'media-card';
             card.dataset.path = item.path;
-            card.onclick = () => playMedia(item);
+            card.draggable = state.page === 'playlist'; // Enable drag for playlists
+
+            card.onclick = (e) => {
+                if (e.target.closest('.media-actions') || e.target.closest('.media-action-btn')) return;
+                playMedia(item);
+            };
+
+            // Double click for details on desktop, or maybe a dedicated button
+            card.ondblclick = (e) => {
+                e.stopPropagation();
+                showDetailView(item);
+            };
 
             const title = item.title || item.path.split('/').pop();
             const size = formatSize(item.size);
@@ -1156,9 +1300,13 @@ document.addEventListener('DOMContentLoaded', () => {
             if (isTrash) {
                 actionBtns = `<button class="media-action-btn restore" title="Restore">↺</button>`;
             } else if (isPlaylist) {
-                actionBtns = `<button class="media-action-btn remove-playlist" title="Remove from Playlist">&times;</button>`;
+                actionBtns = `
+                    <button class="media-action-btn remove-playlist" title="Remove from Playlist">&times;</button>
+                    <button class="media-action-btn info" title="Details">ℹ️</button>
+                `;
             } else {
                 actionBtns = `
+                    <button class="media-action-btn info" title="Details">ℹ️</button>
                     <button class="media-action-btn add-playlist" title="Add to Playlist">+</button>
                     <button class="media-action-btn delete" title="Move to Trash">🗑️</button>
                 `;
@@ -1183,6 +1331,38 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
             `;
 
+            // Drag and drop event listeners
+            if (isPlaylist) {
+                card.addEventListener('dragstart', (e) => {
+                    state.draggedItem = item;
+                    e.dataTransfer.effectAllowed = 'move';
+                    card.classList.add('dragging');
+                });
+
+                card.addEventListener('dragend', () => {
+                    card.classList.remove('dragging');
+                    state.draggedItem = null;
+                });
+
+                card.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+                    card.classList.add('drag-over');
+                });
+
+                card.addEventListener('dragleave', () => {
+                    card.classList.remove('drag-over');
+                });
+
+                card.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    card.classList.remove('drag-over');
+                    if (state.draggedItem && state.draggedItem !== item) {
+                        handlePlaylistReorder(state.draggedItem, item);
+                    }
+                });
+            }
+
             const btnDelete = card.querySelector('.media-action-btn.delete');
             if (btnDelete) btnDelete.onclick = (e) => {
                 e.stopPropagation();
@@ -1193,6 +1373,12 @@ document.addEventListener('DOMContentLoaded', () => {
             if (btnRestore) btnRestore.onclick = (e) => {
                 e.stopPropagation();
                 deleteMedia(item.path, true);
+            };
+
+            const btnInfo = card.querySelector('.media-action-btn.info');
+            if (btnInfo) btnInfo.onclick = (e) => {
+                e.stopPropagation();
+                showDetailView(item);
             };
 
             const btnAddPlaylist = card.querySelector('.media-action-btn.add-playlist');
@@ -1223,6 +1409,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             resultsContainer.appendChild(card);
         });
+        renderPagination();
     }
 
     function renderDetailsTable() {
@@ -1429,6 +1616,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 state.filters.category = cat;
                 state.filters.genre = ''; // Clear genre filter
                 state.filters.rating = ''; // Clear rating filter
+                state.currentPage = 1; // Reset pagination
 
                 document.querySelectorAll('.category-btn').forEach(b => b.classList.remove('active'));
                 if (trashBtn) trashBtn.classList.remove('active');
@@ -1928,6 +2116,26 @@ document.addEventListener('DOMContentLoaded', () => {
         renderResults();
     };
 
+    if (prevPageBtn) prevPageBtn.onclick = () => {
+        if (state.currentPage > 1) {
+            state.currentPage--;
+            performSearch();
+            resultsContainer.scrollTo(0, 0);
+        }
+    };
+
+    if (nextPageBtn) nextPageBtn.onclick = () => {
+        state.currentPage++;
+        performSearch();
+        resultsContainer.scrollTo(0, 0);
+    };
+
+    if (backToResultsBtn) backToResultsBtn.onclick = () => {
+        state.page = 'search';
+        detailView.classList.add('hidden');
+        searchView.classList.remove('hidden');
+    };
+
     // --- Inactivity Tracking ---
     const logo = document.querySelector('.logo-text');
     const activityEvents = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart'];
@@ -1952,6 +2160,30 @@ document.addEventListener('DOMContentLoaded', () => {
 
             state.lastActivity = now;
         }, { passive: true });
+    });
+
+    // --- Mobile Sidebar Controls ---
+    function toggleMobileSidebar() {
+        sidebar.classList.toggle('mobile-open');
+        sidebarOverlay.classList.toggle('hidden');
+    }
+
+    function closeMobileSidebar() {
+        sidebar.classList.remove('mobile-open');
+        sidebarOverlay.classList.add('hidden');
+    }
+
+    if (menuToggle) menuToggle.onclick = toggleMobileSidebar;
+    if (sidebarOverlay) sidebarOverlay.onclick = closeMobileSidebar;
+
+    // Close sidebar when clicking on a category, genre, rating or playlist on mobile
+    sidebar.addEventListener('click', (e) => {
+        const target = e.target;
+        if (target.closest('.category-btn') || target.closest('.playlist-name') || target.closest('#trash-btn') || target.closest('#history-btn')) {
+            if (window.innerWidth <= 768) {
+                closeMobileSidebar();
+            }
+        }
     });
 
     // Initial load

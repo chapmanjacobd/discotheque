@@ -283,6 +283,11 @@ func (c *ServeCmd) handleQuery(w http.ResponseWriter, r *http.Request) {
 			flags.Limit = l
 		}
 	}
+	if offset := q.Get("offset"); offset != "" {
+		if o, err := strconv.Atoi(offset); err == nil {
+			flags.Offset = o
+		}
+	}
 	if all := q.Get("all"); all == "true" {
 		flags.All = true
 	}

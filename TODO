@@ -1,0 +1,4 @@
+   * Native Browser PiP: Add support for the Picture-in-Picture API              (https://developer.mozilla.org/en-US/docs/Web/API/Picture-in-Picture_AP
+     I) for video, allowing users to watch content while switching tabs or
+     minimizing the browser.
+   * Audio Visualizer: For audio playback, add a Canvas-based frequency          visualizer. Since you're already using the <audio> tag, this can be         done via the Web Audio API.                                               * Waveform Seekbar: Replace the standard browser seekbar with a generated     waveform for audio files (using something like wavesurfer.js).
