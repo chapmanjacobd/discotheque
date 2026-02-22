@@ -223,7 +223,7 @@ func isHealthy(dbPath string) bool {
 	if hasMedia {
 		var somePath string
 		_ = db.QueryRow("SELECT path FROM media LIMIT 1").Scan(&somePath)
-		
+
 		// If the table is not empty, we MUST update a real row to trigger the FTS and index logic.
 		// If we only update a non-existent row, the triggers will not fire and we won't detect FTS corruption.
 		if somePath != "" {

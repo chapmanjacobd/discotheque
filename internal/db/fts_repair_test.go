@@ -56,7 +56,7 @@ END;
 
 	// Insert data
 	for i := 0; i < 100; i++ {
-		if _, err := db.Exec("INSERT INTO media (path, title) VALUES (?, ?)", 
+		if _, err := db.Exec("INSERT INTO media (path, title) VALUES (?, ?)",
 			fmt.Sprintf("file%d.mp4", i), fmt.Sprintf("Video %d", i)); err != nil {
 			t.Fatal(err)
 		}

@@ -853,7 +853,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (!resp.ok) {
                 if (resp.status === 404) {
-                    showToast('file not found');
+                    showToast('File not found, moved to trash', '🗑️');
+                    // Remove from current view if applicable
+                    currentMedia = currentMedia.filter(m => m.path !== path);
+                    renderResults();
                 } else {
                     showToast('Playback failed');
                 }
@@ -1039,6 +1042,22 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    function handleMediaError(item) {
+        showToast('File not found, moved to trash', '🗑️');
+        // Remove from current view if applicable
+        currentMedia = currentMedia.filter(m => m.path !== item.path);
+        renderResults();
+        
+        // Auto-skip to next
+        if (state.autoplay) {
+            setTimeout(() => {
+                playSibling(1);
+            }, 1200);
+        } else {
+            closePiP();
+        }
+    }
+
     async function openInPiP(item) {
         // Reset playback rate to default for new media if not currently playing something
         if (!state.playback.item) {
@@ -1154,6 +1173,8 @@ document.addEventListener('DOMContentLoaded', () => {
             el.controls = true;
             el.autoplay = true;
 
+            el.onerror = () => handleMediaError(item);
+
             if (needsTranscode) {
                 const hlsUrl = `/api/hls/playlist?path=${encodeURIComponent(path)}`;
 
@@ -1266,6 +1287,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 state.playback.wavesurfer = ws;
 
+                ws.on('error', () => handleMediaError(item));
+
                 ws.on('ready', () => {
                     const localPos = getLocalProgress(item);
                     if (localPos) {
@@ -1326,6 +1349,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 el.autoplay = true;
                 el.src = url;
                 el.playbackRate = state.playbackRate;
+
+                el.onerror = () => handleMediaError(item);
 
                 const localPos = getLocalProgress(item);
                 if (localPos) {
@@ -2010,37 +2035,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- Helpers ---
-    function formatSize(bytes) {
-        if (!bytes) return '-';
-        const units = ['B', 'KB', 'MB', 'GB', 'TB'];
-        let i = 0;
-        while (bytes >= 1024 && i < units.length - 1) {
-            bytes /= 1024;
-            i++;
-        }
-        return `${bytes.toFixed(1)} ${units[i]}`;
-    }
-
-    function formatDuration(seconds) {
-        if (!seconds) return '';
-        const h = Math.floor(seconds / 3600);
-        const m = Math.floor((seconds % 3600) / 60);
-        const s = seconds % 60;
-        return [h, m, s]
-            .map(v => v < 10 ? '0' + v : v)
-            .filter((v, i) => v !== '00' || i > 0)
-            .join(':');
-    }
-
-    function getIcon(type) {
-        if (!type) return '📄';
-        if (type.includes('video')) return '🎬';
-        if (type.includes('audio')) return '🎵';
-        if (type.includes('image')) return '🖼️';
-        if (type.includes('epub') || type.includes('pdf') || type.includes('mobi')) return '📚';
-        return '📄';
-    }
-
     function showToast(msg, customEmoji) {
         let icon = customEmoji;
         if (!icon) {
@@ -2781,3 +2775,36 @@ document.addEventListener('DOMContentLoaded', () => {
     performSearch();
     applyTheme();
 });
+
+// --- Helpers (Exported for testing) ---
+function formatSize(bytes) {
+    if (!bytes) return '-';
+    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    let i = 0;
+    while (bytes >= 1024 && i < units.length - 1) {
+        bytes /= 1024;
+        i++;
+    }
+    return `${bytes.toFixed(1)} ${units[i]}`;
+}
+
+function formatDuration(seconds) {
+    if (!seconds) return '';
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = seconds % 60;
+    
+    if (h > 0) {
+        return `${h}:${m < 10 ? '0' + m : m}:${s < 10 ? '0' + s : s}`;
+    }
+    return `${m}:${s < 10 ? '0' + s : s}`;
+}
+
+function getIcon(type) {
+    if (!type) return '📄';
+    if (type.includes('video')) return '🎬';
+    if (type.includes('audio')) return '🎵';
+    if (type.includes('image')) return '🖼️';
+    if (type.includes('epub') || type.includes('pdf') || type.includes('mobi')) return '📚';
+    return '📄';
+}
