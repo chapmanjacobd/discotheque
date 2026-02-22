@@ -25,14 +25,14 @@ document.addEventListener('DOMContentLoaded', () => {
         view: 'grid',
         page: 'search', // 'search', 'trash', 'history', or 'playlist'
         filters: {
-            types: ['video', 'audio'], // Default selection
+            types: JSON.parse(localStorage.getItem('disco-types') || '["video", "audio"]'),
             search: '',
             category: '',
             genre: '',
             rating: '',
             playlist: null,
-            sort: 'path',
-            reverse: false,
+            sort: localStorage.getItem('disco-sort') || 'path',
+            reverse: localStorage.getItem('disco-reverse') === 'true',
             limit: parseInt(localStorage.getItem('disco-limit')) || 100,
             all: localStorage.getItem('disco-limit-all') === 'true',
             excludedDbs: JSON.parse(localStorage.getItem('disco-excluded-dbs') || '[]')
@@ -45,6 +45,7 @@ document.addEventListener('DOMContentLoaded', () => {
         postPlaybackAction: localStorage.getItem('disco-post-playback') || 'nothing',
         autoplay: localStorage.getItem('disco-autoplay') !== 'false',
         localResume: localStorage.getItem('disco-local-resume') !== 'false',
+        playerMode: 'pip', // 'pip' or 'theatre'
         trashcan: false,
         globalProgress: false,
         dev: false,
@@ -72,6 +73,17 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('setting-local-resume').checked = state.localResume;
     if (limitInput) limitInput.value = state.filters.limit;
     if (limitAll) limitAll.checked = state.filters.all;
+
+    if (sortBy) sortBy.value = state.filters.sort;
+    if (sortReverseBtn && state.filters.reverse) sortReverseBtn.classList.add('active');
+
+    document.querySelectorAll('.type-btn').forEach(btn => {
+        if (state.filters.types.includes(btn.dataset.type)) {
+            btn.classList.add('active');
+        } else {
+            btn.classList.remove('active');
+        }
+    });
 
     // --- Modal Management ---
     function openModal(id) {
@@ -1009,6 +1021,11 @@ document.addEventListener('DOMContentLoaded', () => {
         lyricsDisplay.classList.add('hidden');
         lyricsDisplay.textContent = '';
         pipPlayer.classList.add('hidden');
+
+        // Reset to PiP mode if in theatre
+        if (state.playerMode === 'theatre') {
+            toggleTheatreMode();
+        }
     }
 
     // --- Rendering ---
@@ -1609,6 +1626,32 @@ document.addEventListener('DOMContentLoaded', () => {
         pipPlayer.classList.toggle('minimized');
     };
 
+    const pipTheatreBtn = document.getElementById('pip-theatre');
+    if (pipTheatreBtn) pipTheatreBtn.onclick = toggleTheatreMode;
+
+    function toggleTheatreMode() {
+        const theatreAnchor = document.getElementById('theatre-anchor');
+        const btn = document.getElementById('pip-theatre');
+        if (state.playerMode === 'pip') {
+            state.playerMode = 'theatre';
+            pipPlayer.classList.add('theatre');
+            pipPlayer.classList.remove('minimized'); // Ensure it's expanded
+            theatreAnchor.appendChild(pipPlayer);
+            if (btn) {
+                btn.textContent = '❐';
+                btn.title = 'Restore to PiP';
+            }
+        } else {
+            state.playerMode = 'pip';
+            pipPlayer.classList.remove('theatre');
+            document.body.appendChild(pipPlayer);
+            if (btn) {
+                btn.textContent = '□';
+                btn.title = 'Theatre Mode';
+            }
+        }
+    }
+
     const settingPlayer = document.getElementById('setting-player');
     if (settingPlayer) settingPlayer.onchange = (e) => {
         state.player = e.target.value;
@@ -1746,14 +1789,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 state.filters.types.push(type);
                 e.target.classList.add('active');
             }
+            localStorage.setItem('disco-types', JSON.stringify(state.filters.types));
             performSearch();
         };
     });
 
-    if (sortBy) sortBy.onchange = performSearch;
+    if (sortBy) sortBy.onchange = () => {
+        localStorage.setItem('disco-sort', sortBy.value);
+        performSearch();
+    };
 
     if (sortReverseBtn) sortReverseBtn.onclick = () => {
         state.filters.reverse = !state.filters.reverse;
+        localStorage.setItem('disco-reverse', state.filters.reverse);
         sortReverseBtn.classList.toggle('active');
         performSearch();
     };

@@ -727,6 +727,26 @@ main {
     display: none;
 }
 
+.pip-container.theatre {
+    position: static;
+    width: 100%;
+    box-shadow: none;
+    border: none;
+    border-bottom: 1px solid var(--border-color);
+    border-radius: 0;
+    margin-bottom: 1.5rem;
+    z-index: 100; /* Lower z-index so dropdowns can go over it */
+}
+
+.pip-container.theatre #pip-minimize {
+    display: none;
+}
+
+.pip-container.theatre #media-viewer img,
+.pip-container.theatre #media-viewer video {
+    max-height: 70vh;
+}
+
 .pip-header {
     padding: 0.6rem 1rem;
     background: var(--card-bg);
