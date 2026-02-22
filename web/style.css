@@ -847,6 +847,35 @@ main {
     word-break: break-all;
 }
 
+.shortcut-list section {
+    margin-bottom: 1.5rem;
+}
+
+.shortcut-list h3 {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    color: var(--accent-color);
+    margin-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 0.2rem;
+}
+
+.shortcut-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.3rem 0;
+    font-size: 0.9rem;
+}
+
+.shortcut-item span:first-child {
+    font-family: monospace;
+    background: var(--bg-color);
+    padding: 2px 6px;
+    border-radius: 4px;
+    border: 1px solid var(--border-color);
+}
+
 ::-webkit-scrollbar {
     width: 8px;
 }

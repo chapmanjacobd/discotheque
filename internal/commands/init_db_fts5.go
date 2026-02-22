@@ -22,5 +22,9 @@ func InitDB(sqlDB *sql.DB) error {
 		return err
 	}
 
-	return tx.Commit()
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+
+	return runMigrations(sqlDB)
 }

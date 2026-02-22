@@ -58,7 +58,8 @@ document.addEventListener('DOMContentLoaded', () => {
             startTime: null,
             lastUpdate: 0,
             lastLocalUpdate: 0,
-            lastPlayedIndex: -1
+            lastPlayedIndex: -1,
+            hasMarkedComplete: false
         }
     };
 
@@ -337,11 +338,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ title })
             });
-            if (!resp.ok) throw new Error('Create failed');
+            if (!resp.ok) {
+                const errorText = await resp.text();
+                throw new Error(`Create failed: ${errorText || resp.statusText}`);
+            }
             showToast('Playlist created');
             fetchPlaylists();
         } catch (err) {
             console.error('Create playlist failed:', err);
+            showToast(err.message);
         }
     }
 
@@ -648,6 +653,11 @@ document.addEventListener('DOMContentLoaded', () => {
     async function updateProgress(item, playhead, duration, isComplete = false) {
         const now = Date.now();
 
+        if (isComplete) {
+            if (state.playback.hasMarkedComplete) return;
+            state.playback.hasMarkedComplete = true;
+        }
+
         // Local progress is always saved if enabled
         if (state.localResume) {
             // Throttling: only update localStorage once per second
@@ -788,6 +798,7 @@ document.addEventListener('DOMContentLoaded', () => {
         state.playback.item = item;
         state.playback.startTime = Date.now();
         state.playback.lastUpdate = 0;
+        state.playback.hasMarkedComplete = false;
         state.playback.lastPlayedIndex = currentMedia.findIndex(m => m.path === item.path);
 
         const path = item.path;
@@ -1407,6 +1418,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (state.playback.item) {
                         showMetadata(state.playback.item);
                     }
+                    return;
+                case '?':
+                case '/':
+                    openModal('help-modal');
                     return;
                 case 'c':
                     if (state.playback.item) {

@@ -83,6 +83,18 @@ func (c *ServeCmd) Run(ctx *kong.Context) error {
 	models.SetupLogging(c.Verbose)
 	c.ApplicationStartTime = time.Now().UnixNano()
 
+	for _, dbPath := range c.Databases {
+		sqlDB, err := database.Connect(dbPath)
+		if err != nil {
+			slog.Error("Failed to connect to database on startup", "db", dbPath, "error", err)
+			continue
+		}
+		if err := InitDB(sqlDB); err != nil {
+			slog.Error("Failed to initialize database", "db", dbPath, "error", err)
+		}
+		sqlDB.Close()
+	}
+
 	if _, err := exec.LookPath("ffmpeg"); err != nil {
 		slog.Warn("ffmpeg not found in PATH, on-the-fly transcoding will be unavailable")
 	}
@@ -1050,17 +1062,25 @@ func (c *ServeCmd) handlePlaylists(w http.ResponseWriter, r *http.Request) {
 		dbPath := c.Databases[0]
 		sqlDB, err := database.Connect(dbPath)
 		if err != nil {
+			slog.Error("Failed to connect to database for playlist creation", "db", dbPath, "error", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		defer sqlDB.Close()
+
+		playlistPath := req.Path
+		if playlistPath == "" {
+			playlistPath = "custom:" + utils.RandomString(12)
+		}
+
 		queries := database.New(sqlDB)
 		id, err := queries.InsertPlaylist(r.Context(), database.InsertPlaylistParams{
 			Title: sql.NullString{String: req.Title, Valid: true},
-			Path:  sql.NullString{String: req.Path, Valid: req.Path != ""},
+			Path:  sql.NullString{String: playlistPath, Valid: true},
 		})
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			slog.Error("Failed to insert playlist", "title", req.Title, "path", playlistPath, "error", err)
+			http.Error(w, fmt.Sprintf("Failed to insert playlist: %v", err), http.StatusInternalServerError)
 			return
 		}
 		json.NewEncoder(w).Encode(map[string]any{"id": id, "db": dbPath})
