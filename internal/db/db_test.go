@@ -1,6 +1,8 @@
 package db
 
 import (
+	"database/sql"
+	"errors"
 	"os"
 	"testing"
 
@@ -24,5 +26,48 @@ func TestConnect(t *testing.T) {
 
 	if err := db.Ping(); err != nil {
 		t.Fatalf("Ping failed: %v", err)
+	}
+}
+
+func TestIsCorruptionError(t *testing.T) {
+	if IsCorruptionError(nil) {
+		t.Error("nil should not be corruption error")
+	}
+	if !IsCorruptionError(errors.New("database disk image is malformed")) {
+		t.Error("Expected corruption error")
+	}
+	if IsCorruptionError(errors.New("other error")) {
+		t.Error("other error should not be corruption error")
+	}
+}
+
+func TestIsHealthy(t *testing.T) {
+	// Unhealthy test
+	f, _ := os.CreateTemp("", "unhealthy-test-*.db")
+	unhealthyPath := f.Name()
+	f.WriteString("Not a SQLite database")
+	f.Close()
+	defer os.Remove(unhealthyPath)
+
+	if isHealthy(unhealthyPath) {
+		t.Error("Garbage file should not be healthy DB")
+	}
+
+	// Healthy test
+	f2, _ := os.CreateTemp("", "healthy-test-*.db")
+	healthyPath := f2.Name()
+	f2.Close()
+	defer os.Remove(healthyPath)
+
+	db, _ := sql.Open("sqlite3", healthyPath)
+	db.Exec("CREATE TABLE t(id INT)")
+	db.Close()
+
+	if !isHealthy(healthyPath) {
+		t.Error("Valid DB should be healthy")
+	}
+
+	if isHealthy("/non/existent/path") {
+		t.Error("Non-existent path should not be healthy")
 	}
 }

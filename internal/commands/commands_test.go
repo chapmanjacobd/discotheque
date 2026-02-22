@@ -613,3 +613,36 @@ func TestDeleteMediaItem(t *testing.T) {
 		t.Error("File still exists after DeleteMediaItem")
 	}
 }
+
+func TestExecutePostAction(t *testing.T) {
+	fixture := testutils.Setup(t)
+	defer fixture.Cleanup()
+
+	f1 := fixture.CreateDummyFile("media1.mp4")
+	m := models.MediaWithDB{
+		Media: models.Media{Path: f1},
+		DB:    fixture.DBPath,
+	}
+
+	// Test mark-deleted
+	flags := models.GlobalFlags{
+		PostAction: "mark-deleted",
+	}
+	// Manually init DB
+	dbConn := fixture.GetDB()
+	InitDB(dbConn)
+	dbConn.Exec("INSERT INTO media (path) VALUES (?)", f1)
+	dbConn.Close()
+
+	if err := ExecutePostAction(flags, []models.MediaWithDB{m}); err != nil {
+		t.Fatalf("ExecutePostAction mark-deleted failed: %v", err)
+	}
+
+	dbConn = fixture.GetDB()
+	defer dbConn.Close()
+	var timeDeleted int64
+	dbConn.QueryRow("SELECT time_deleted FROM media WHERE path = ?", f1).Scan(&timeDeleted)
+	if timeDeleted == 0 {
+		t.Error("Expected item to be marked as deleted")
+	}
+}

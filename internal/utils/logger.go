@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"strings"
 )
 
 type PlainHandler struct {
@@ -18,15 +19,16 @@ func (h *PlainHandler) Enabled(_ context.Context, level slog.Level) bool {
 }
 
 func (h *PlainHandler) Handle(_ context.Context, r slog.Record) error {
-	msg := r.Message
+	var msg strings.Builder
+	msg.WriteString(r.Message)
 	for _, a := range h.Attrs {
-		msg += fmt.Sprintf("\n    %s=%v", a.Key, a.Value.Any())
+		msg.WriteString(fmt.Sprintf("\n    %s=%v", a.Key, a.Value.Any()))
 	}
 	r.Attrs(func(a slog.Attr) bool {
-		msg += fmt.Sprintf("\n    %s=%v", a.Key, a.Value.Any())
+		msg.WriteString(fmt.Sprintf("\n    %s=%v", a.Key, a.Value.Any()))
 		return true
 	})
-	_, err := fmt.Fprintln(h.Out, msg)
+	_, err := fmt.Fprintln(h.Out, msg.String())
 	return err
 }
 

@@ -58,6 +58,7 @@ func (c *ServeCmd) Mux() http.Handler {
 	mux.HandleFunc("/api/playlists", c.handlePlaylists)
 	mux.HandleFunc("/api/playlists/items", c.handlePlaylistItems)
 	mux.HandleFunc("/api/events", c.handleEvents)
+	mux.HandleFunc("/api/ls", c.handleLs)
 	mux.HandleFunc("/api/raw", c.handleRaw)
 	mux.HandleFunc("/api/hls/playlist", c.handleHLSPlaylist)
 	mux.HandleFunc("/api/hls/segment", c.handleHLSSegment)
@@ -288,6 +289,24 @@ func (c *ServeCmd) handleQuery(w http.ResponseWriter, r *http.Request) {
 			flags.Offset = o
 		}
 	}
+	if minSize := q.Get("min_size"); minSize != "" {
+		flags.Size = append(flags.Size, ">"+minSize+"MB")
+	}
+	if maxSize := q.Get("max_size"); maxSize != "" {
+		flags.Size = append(flags.Size, "<"+maxSize+"MB")
+	}
+	if minDuration := q.Get("min_duration"); minDuration != "" {
+		flags.Duration = append(flags.Duration, ">"+minDuration+"min")
+	}
+	if maxDuration := q.Get("max_duration"); maxDuration != "" {
+		flags.Duration = append(flags.Duration, "<"+maxDuration+"min")
+	}
+	if minScore := q.Get("min_score"); minScore != "" {
+		flags.Where = append(flags.Where, "score >= "+minScore)
+	}
+	if maxScore := q.Get("max_score"); maxScore != "" {
+		flags.Where = append(flags.Where, "score <= "+maxScore)
+	}
 	if all := q.Get("all"); all == "true" {
 		flags.All = true
 	}
@@ -515,6 +534,102 @@ func (c *ServeCmd) handleEvents(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+}
+
+func (c *ServeCmd) handleLs(w http.ResponseWriter, r *http.Request) {
+	path := r.URL.Query().Get("path")
+	if path == "" {
+		path = "/"
+	}
+
+	if !strings.HasSuffix(path, "/") {
+		path += "/"
+	}
+
+	type LsEntry struct {
+		Name  string `json:"name"`
+		Path  string `json:"path"`
+		IsDir bool   `json:"is_dir"`
+		Type  string `json:"type,omitempty"`
+		InDB  bool   `json:"in_db"`
+	}
+
+	resultsMap := make(map[string]LsEntry)
+
+	for _, dbPath := range c.Databases {
+		err := c.execDB(r.Context(), dbPath, func(sqlDB *sql.DB) error {
+			// Find immediate files
+			// Using LIKE 'path/%' AND path NOT LIKE 'path/%/%'
+			// In SQLite, we can check if there's another slash after the path
+			rows, err := sqlDB.QueryContext(r.Context(), `
+				SELECT path, type FROM media 
+				WHERE time_deleted = 0 
+				  AND path LIKE ? || '%'
+				  AND INSTR(SUBSTR(path, LENGTH(?) + 1), '/') = 0`, path, path)
+			if err != nil {
+				return err
+			}
+			defer rows.Close()
+			for rows.Next() {
+				var p, t sql.NullString
+				if err := rows.Scan(&p, &t); err == nil && p.Valid {
+					name := filepath.Base(p.String)
+					resultsMap[p.String] = LsEntry{
+						Name:  name,
+						Path:  p.String,
+						IsDir: false,
+						Type:  t.String,
+						InDB:  true,
+					}
+				}
+			}
+
+			// Find immediate subfolders
+			// Subfolders are prefixes that have at least one more slash
+			rows, err = sqlDB.QueryContext(r.Context(), `
+				SELECT DISTINCT 
+					SUBSTR(path, 1, LENGTH(?) + INSTR(SUBSTR(path, LENGTH(?) + 1), '/')) as folder
+				FROM media 
+				WHERE time_deleted = 0 
+				  AND path LIKE ? || '%'
+				  AND INSTR(SUBSTR(path, LENGTH(?) + 1), '/') > 0`, path, path, path, path)
+			if err != nil {
+				return err
+			}
+			defer rows.Close()
+			for rows.Next() {
+				var f string
+				if err := rows.Scan(&f); err == nil && f != "" {
+					name := filepath.Base(f)
+					resultsMap[f] = LsEntry{
+						Name:  name,
+						Path:  f,
+						IsDir: true,
+						InDB:  true,
+					}
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			slog.Error("handleLs DB query failed", "db", dbPath, "error", err)
+		}
+	}
+
+	var results []LsEntry
+	for _, entry := range resultsMap {
+		results = append(results, entry)
+	}
+
+	sort.Slice(results, func(i, j int) bool {
+		if results[i].IsDir != results[j].IsDir {
+			return results[i].IsDir
+		}
+		return strings.ToLower(results[i].Name) < strings.ToLower(results[j].Name)
+	})
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(results)
 }
 
 func (c *ServeCmd) handleRaw(w http.ResponseWriter, r *http.Request) {

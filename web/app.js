@@ -29,10 +29,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const pipViewer = document.getElementById('media-viewer');
     const pipTitle = document.getElementById('media-title');
     const lyricsDisplay = document.getElementById('lyrics-display');
+    const searchSuggestions = document.getElementById('search-suggestions');
 
     let currentMedia = [];
     let allDatabases = [];
     let searchAbortController = null;
+    let suggestionAbortController = null;
+    let selectedSuggestionIndex = -1;
 
     // --- State Management ---
     const state = {
@@ -50,7 +53,13 @@ document.addEventListener('DOMContentLoaded', () => {
             reverse: localStorage.getItem('disco-reverse') === 'true',
             limit: parseInt(localStorage.getItem('disco-limit')) || 100,
             all: localStorage.getItem('disco-limit-all') === 'true',
-            excludedDbs: JSON.parse(localStorage.getItem('disco-excluded-dbs') || '[]')
+            excludedDbs: JSON.parse(localStorage.getItem('disco-excluded-dbs') || '[]'),
+            min_size: '',
+            max_size: '',
+            min_duration: '',
+            max_duration: '',
+            min_score: '',
+            max_score: ''
         },
         draggedItem: null,
         applicationStartTime: null,
@@ -62,6 +71,10 @@ document.addEventListener('DOMContentLoaded', () => {
         defaultView: localStorage.getItem('disco-default-view') || 'pip',
         autoplay: localStorage.getItem('disco-autoplay') !== 'false',
         localResume: localStorage.getItem('disco-local-resume') !== 'false',
+        defaultVideoRate: parseFloat(localStorage.getItem('disco-default-video-rate')) || 1.0,
+        defaultAudioRate: parseFloat(localStorage.getItem('disco-default-audio-rate')) || 1.0,
+        playbackRate: parseFloat(localStorage.getItem('disco-playback-rate')) || 1.0,
+        slideshowDelay: parseInt(localStorage.getItem('disco-slideshow-delay')) || 5,
         playerMode: localStorage.getItem('disco-default-view') || 'pip', // Initialize with preference
         trashcan: false,
         globalProgress: false,
@@ -73,12 +86,14 @@ document.addEventListener('DOMContentLoaded', () => {
         playback: {
             item: null,
             timer: null,
+            slideshowTimer: null,
             startTime: null,
             lastUpdate: 0,
             lastLocalUpdate: 0,
             lastPlayedIndex: -1,
             hasMarkedComplete: false,
-            hlsInstance: null
+            hlsInstance: null,
+            wavesurfer: null
         }
     };
 
@@ -90,8 +105,39 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('setting-default-view').value = state.defaultView;
     document.getElementById('setting-autoplay').checked = state.autoplay;
     document.getElementById('setting-local-resume').checked = state.localResume;
+    document.getElementById('setting-default-video-rate').value = state.defaultVideoRate;
+    document.getElementById('setting-default-audio-rate').value = state.defaultAudioRate;
+    document.getElementById('setting-slideshow-delay').value = state.slideshowDelay;
     if (limitInput) limitInput.value = state.filters.limit;
     if (limitAll) limitAll.checked = state.filters.all;
+
+    const settingDefaultVideoRate = document.getElementById('setting-default-video-rate');
+    if (settingDefaultVideoRate) {
+        settingDefaultVideoRate.onchange = (e) => {
+            state.defaultVideoRate = parseFloat(e.target.value);
+            localStorage.setItem('disco-default-video-rate', state.defaultVideoRate);
+        };
+    }
+
+    const settingDefaultAudioRate = document.getElementById('setting-default-audio-rate');
+    if (settingDefaultAudioRate) {
+        settingDefaultAudioRate.onchange = (e) => {
+            state.defaultAudioRate = parseFloat(e.target.value);
+            localStorage.setItem('disco-default-audio-rate', state.defaultAudioRate);
+        };
+    }
+
+    const settingSlideshowDelay = document.getElementById('setting-slideshow-delay');
+    if (settingSlideshowDelay) {
+        settingSlideshowDelay.onchange = (e) => {
+            state.slideshowDelay = parseInt(e.target.value);
+            localStorage.setItem('disco-slideshow-delay', state.slideshowDelay);
+            if (state.playback.slideshowTimer) {
+                stopSlideshow();
+                startSlideshow();
+            }
+        };
+    }
 
     if (sortBy) sortBy.value = state.filters.sort;
     if (sortReverseBtn && state.filters.reverse) sortReverseBtn.classList.add('active');
@@ -131,6 +177,12 @@ document.addEventListener('DOMContentLoaded', () => {
             if (state.filters.genre) params.set('genre', state.filters.genre);
             if (state.filters.rating !== '') params.set('rating', state.filters.rating);
             if (state.filters.search) params.set('search', state.filters.search);
+            if (state.filters.min_size) params.set('min_size', state.filters.min_size);
+            if (state.filters.max_size) params.set('max_size', state.filters.max_size);
+            if (state.filters.min_duration) params.set('min_duration', state.filters.min_duration);
+            if (state.filters.max_duration) params.set('max_duration', state.filters.max_duration);
+            if (state.filters.min_score) params.set('min_score', state.filters.min_score);
+            if (state.filters.max_score) params.set('max_score', state.filters.max_score);
         }
 
         const newUrl = params.toString() ? `?${params.toString()}` : window.location.pathname;
@@ -169,7 +221,26 @@ document.addEventListener('DOMContentLoaded', () => {
             state.filters.genre = params.get('genre') || '';
             state.filters.rating = params.get('rating') || '';
             state.filters.search = params.get('search') || '';
+            state.filters.min_size = params.get('min_size') || '';
+            state.filters.max_size = params.get('max_size') || '';
+            state.filters.min_duration = params.get('min_duration') || '';
+            state.filters.max_duration = params.get('max_duration') || '';
+            state.filters.min_score = params.get('min_score') || '';
+            state.filters.max_score = params.get('max_score') || '';
+
             if (searchInput) searchInput.value = state.filters.search;
+            const minSizeEl = document.getElementById('filter-min-size');
+            if (minSizeEl) minSizeEl.value = state.filters.min_size;
+            const maxSizeEl = document.getElementById('filter-max-size');
+            if (maxSizeEl) maxSizeEl.value = state.filters.max_size;
+            const minDurEl = document.getElementById('filter-min-duration');
+            if (minDurEl) minDurEl.value = state.filters.min_duration;
+            const maxDurEl = document.getElementById('filter-max-duration');
+            if (maxDurEl) maxDurEl.value = state.filters.max_duration;
+            const minScoreEl = document.getElementById('filter-min-score');
+            if (minScoreEl) minScoreEl.value = state.filters.min_score;
+            const maxScoreEl = document.getElementById('filter-max-score');
+            if (maxScoreEl) maxScoreEl.value = state.filters.max_score;
         }
     }
 
@@ -211,6 +282,63 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (err) {
             console.error('Failed to fetch databases', err);
         }
+    }
+
+    async function fetchSuggestions(path) {
+        if (suggestionAbortController) suggestionAbortController.abort();
+        suggestionAbortController = new AbortController();
+
+        try {
+            const resp = await fetch(`/api/ls?path=${encodeURIComponent(path)}`, {
+                signal: suggestionAbortController.signal
+            });
+            if (!resp.ok) throw new Error('Failed to fetch suggestions');
+            const data = await resp.json();
+            renderSuggestions(data);
+        } catch (err) {
+            if (err.name === 'AbortError') return;
+            console.error('Failed to fetch suggestions', err);
+            searchSuggestions.classList.add('hidden');
+        }
+    }
+
+    function renderSuggestions(items) {
+        if (!items || items.length === 0) {
+            searchSuggestions.classList.add('hidden');
+            return;
+        }
+
+        searchSuggestions.innerHTML = items.map((item, idx) => `
+            <div class="suggestion-item" data-path="${item.path}" data-is-dir="${item.is_dir}" data-index="${idx}">
+                <div class="suggestion-icon">${item.is_dir ? '📁' : getIcon(item.type)}</div>
+                <div class="suggestion-info">
+                    <div class="suggestion-name">${item.name}</div>
+                    <div class="suggestion-path">${item.path}</div>
+                </div>
+                ${item.in_db ? '<span class="suggestion-tag">In DB</span>' : ''}
+            </div>
+        `).join('');
+
+        searchSuggestions.classList.remove('hidden');
+        selectedSuggestionIndex = -1;
+
+        searchSuggestions.querySelectorAll('.suggestion-item').forEach(el => {
+            el.onclick = () => {
+                const path = el.dataset.path;
+                const isDir = el.dataset.isDir === 'true';
+                if (isDir) {
+                    searchInput.value = path + '/';
+                    searchInput.focus();
+                    fetchSuggestions(path + '/');
+                } else {
+                    searchInput.value = path;
+                    searchSuggestions.classList.add('hidden');
+                    // Find item in currentMedia or fetch it? 
+                    // For now let's just trigger a search for this exact path
+                    performSearch();
+                }
+            };
+        });
     }
 
     async function fetchCategories() {
@@ -542,6 +670,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 params.append('offset', (state.currentPage - 1) * state.filters.limit);
             }
 
+            if (state.filters.min_size) params.append('min_size', state.filters.min_size);
+            if (state.filters.max_size) params.append('max_size', state.filters.max_size);
+            if (state.filters.min_duration) params.append('min_duration', state.filters.min_duration);
+            if (state.filters.max_duration) params.append('max_duration', state.filters.max_duration);
+            if (state.filters.min_score) params.append('min_score', state.filters.min_score);
+            if (state.filters.max_score) params.append('max_score', state.filters.max_score);
+
             state.filters.types.forEach(t => {
                 if (t === 'video') params.append('video', 'true');
                 if (t === 'audio') params.append('audio', 'true');
@@ -805,6 +940,21 @@ document.addEventListener('DOMContentLoaded', () => {
         return counts[item.path] || 0;
     }
 
+    function setPlaybackRate(rate) {
+        state.playbackRate = rate;
+        localStorage.setItem('disco-playback-rate', rate);
+        const speedBtn = document.getElementById('pip-speed');
+        if (speedBtn) speedBtn.textContent = `${rate}x`;
+        
+        const media = pipViewer.querySelector('video, audio');
+        if (media) {
+            media.playbackRate = rate;
+        }
+        if (state.playback.wavesurfer) {
+            state.playback.wavesurfer.setPlaybackRate(rate);
+        }
+    }
+
     function playSibling(offset) {
         if (currentMedia.length === 0) return;
 
@@ -869,6 +1019,27 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function openInPiP(item) {
+        // Reset playback rate to default for new media if not currently playing something
+        if (!state.playback.item) {
+            const type = item.type || "";
+            if (type.includes('video')) {
+                state.playbackRate = state.defaultVideoRate;
+            } else if (type.includes('audio')) {
+                state.playbackRate = state.defaultAudioRate;
+            } else {
+                state.playbackRate = 1.0;
+            }
+            const speedBtn = document.getElementById('pip-speed');
+            if (speedBtn) speedBtn.textContent = `${state.playbackRate}x`;
+        }
+
+        const type = item.type || "";
+        // Handle Documents separately
+        if (type.includes('epub') || type.includes('pdf') || type.includes('mobi')) {
+            openInDocumentViewer(item);
+            return;
+        }
+
         state.playback.item = item;
         state.playback.startTime = Date.now();
         state.playback.lastUpdate = 0;
@@ -876,9 +1047,17 @@ document.addEventListener('DOMContentLoaded', () => {
         state.playback.lastPlayedIndex = currentMedia.findIndex(m => m.path === item.path);
 
         const path = item.path;
-        const type = item.type || "";
         pipTitle.textContent = path.split('/').pop();
         pipViewer.innerHTML = '';
+        const waveformContainer = document.getElementById('waveform-container');
+        if (waveformContainer) {
+            waveformContainer.classList.add('hidden');
+            waveformContainer.innerHTML = '';
+        }
+        if (state.playback.wavesurfer) {
+            state.playback.wavesurfer.destroy();
+            state.playback.wavesurfer = null;
+        }
         lyricsDisplay.classList.add('hidden');
         lyricsDisplay.textContent = '';
 
@@ -905,6 +1084,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
         pipPlayer.classList.remove('hidden');
         pipPlayer.classList.remove('minimized');
+
+        const slideshowBtn = document.getElementById('pip-slideshow');
+        if (slideshowBtn) {
+            if (type.includes('image')) {
+                slideshowBtn.classList.remove('hidden');
+            } else {
+                slideshowBtn.classList.add('hidden');
+                stopSlideshow();
+            }
+        }
 
         // Check if item needs transcoding (provided by backend)
         let needsTranscode = item.transcode === true;
@@ -950,6 +1139,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (el.canPlayType('application/vnd.apple.mpegurl')) {
                     // Native HLS (Safari)
                     el.src = hlsUrl;
+                    el.playbackRate = state.playbackRate;
                     el.addEventListener('loadedmetadata', () => {
                         if (localPos > 0) el.currentTime = localPos;
                     }, { once: true });
@@ -960,6 +1150,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     hls.attachMedia(el);
                     hls.on(Hls.Events.MANIFEST_PARSED, () => {
                         if (localPos > 0) el.currentTime = localPos;
+                        el.playbackRate = state.playbackRate;
                         el.play().catch(e => console.log("Auto-play blocked:", e));
                     });
                     state.playback.hlsInstance = hls;
@@ -969,6 +1160,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             } else {
                 el.src = url;
+                el.playbackRate = state.playbackRate;
                 if (localPos) {
                     el.currentTime = localPos;
                 }
@@ -1032,49 +1224,105 @@ document.addEventListener('DOMContentLoaded', () => {
             addTrack(`/api/subtitles?path=${encodeURIComponent(path)}`, 'External/Auto', 'auto');
 
         } else if (type.includes('audio')) {
-            el = document.createElement('audio');
-            el.controls = true;
-            el.autoplay = true;
-            el.src = url;
+            const waveformContainer = document.getElementById('waveform-container');
+            if (waveformContainer) {
+                waveformContainer.classList.remove('hidden');
+                
+                const ws = WaveSurfer.create({
+                    container: '#waveform-container',
+                    waveColor: '#77b3ff',
+                    progressColor: '#0051b8',
+                    cursorColor: '#2d3436',
+                    barWidth: 2,
+                    barRadius: 3,
+                    cursorWidth: 1,
+                    height: 80,
+                    hideScrollbar: true,
+                    normalize: true,
+                    url: url,
+                    audioRate: state.playbackRate,
+                });
 
-            const localPos = getLocalProgress(item);
-            if (localPos) {
-                el.currentTime = localPos;
-            } else if (state.globalProgress && item.playhead > 0) {
-                el.currentTime = item.playhead;
-            }
+                state.playback.wavesurfer = ws;
 
-            el.ontimeupdate = () => {
-                const isComplete = (el.duration > 90) && (el.duration - el.currentTime < 90) && (el.currentTime / el.duration > 0.95);
-                updateProgress(item, el.currentTime, el.duration, isComplete);
-            };
+                ws.on('ready', () => {
+                    const localPos = getLocalProgress(item);
+                    if (localPos) {
+                        ws.setTime(localPos);
+                    } else if (state.globalProgress && item.playhead > 0) {
+                        ws.setTime(item.playhead);
+                    }
+                    ws.play().catch(e => console.log("Auto-play blocked:", e));
+                });
 
-            el.onended = () => {
-                updateProgress(item, el.duration, el.duration, true);
-                handlePostPlayback(item);
-            };
+                ws.on('timeupdate', (currentTime) => {
+                    const duration = ws.getDuration();
+                    const isComplete = (duration > 90) && (duration - currentTime < 90) && (currentTime / duration > 0.95);
+                    updateProgress(item, currentTime, duration, isComplete);
+                });
 
-            // Try to fetch lyrics (server will look for siblings)
-            const track = document.createElement('track');
-            track.kind = 'subtitles';
-            track.src = `/api/subtitles?path=${encodeURIComponent(path)}`;
-            track.srclang = state.language || 'en';
-            el.appendChild(track);
+                ws.on('finish', () => {
+                    const duration = ws.getDuration();
+                    updateProgress(item, duration, duration, true);
+                    handlePostPlayback(item);
+                });
 
-            track.onload = () => {
-                const textTrack = el.textTracks[0];
-                if (textTrack.cues && textTrack.cues.length > 0) {
-                    lyricsDisplay.classList.remove('hidden');
-                    textTrack.mode = 'hidden';
+                // Mock element for lyrics compatibility if needed, 
+                // or we can just use ws events for lyrics.
+                // For now, let's try to keep the track logic by creating a hidden audio element
+                el = document.createElement('audio');
+                el.src = url;
+                el.playbackRate = state.playbackRate;
+                el.classList.add('hidden');
 
-                    el.ontimeupdate = () => {
-                        const cue = Array.from(textTrack.activeCues || []).pop();
-                        if (cue) {
-                            lyricsDisplay.textContent = cue.text;
-                        }
-                    };
+                // Try to fetch lyrics (server will look for siblings)
+                const track = document.createElement('track');
+                track.kind = 'subtitles';
+                track.src = `/api/subtitles?path=${encodeURIComponent(path)}`;
+                track.srclang = state.language || 'en';
+                el.appendChild(track);
+
+                track.onload = () => {
+                    const textTrack = el.textTracks[0];
+                    if (textTrack.cues && textTrack.cues.length > 0) {
+                        lyricsDisplay.classList.remove('hidden');
+                        textTrack.mode = 'hidden';
+
+                        ws.on('timeupdate', (currentTime) => {
+                            // Sync hidden audio for cues
+                            el.currentTime = currentTime;
+                            const cue = Array.from(textTrack.activeCues || []).pop();
+                            if (cue) {
+                                lyricsDisplay.textContent = cue.text;
+                            }
+                        });
+                    }
+                };
+            } else {
+                // Fallback to standard audio if container missing
+                el = document.createElement('audio');
+                el.controls = true;
+                el.autoplay = true;
+                el.src = url;
+                el.playbackRate = state.playbackRate;
+
+                const localPos = getLocalProgress(item);
+                if (localPos) {
+                    el.currentTime = localPos;
+                } else if (state.globalProgress && item.playhead > 0) {
+                    el.currentTime = item.playhead;
                 }
-            };
+
+                el.ontimeupdate = () => {
+                    const isComplete = (el.duration > 90) && (el.duration - el.currentTime < 90) && (el.currentTime / el.duration > 0.95);
+                    updateProgress(item, el.currentTime, el.duration, isComplete);
+                };
+
+                el.onended = () => {
+                    updateProgress(item, el.duration, el.duration, true);
+                    handlePostPlayback(item);
+                };
+            }
         } else if (type.includes('image')) {
             el = document.createElement('img');
             el.src = url;
@@ -1112,9 +1360,80 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
             el.src = url;
+            if (el.playbackRate !== undefined) el.playbackRate = state.playbackRate;
         }
 
         pipViewer.appendChild(el);
+    }
+
+    function openInDocumentViewer(item) {
+        const modal = document.getElementById('document-modal');
+        const title = document.getElementById('document-title');
+        const container = document.getElementById('document-container');
+        const epubViewer = document.getElementById('epub-viewer');
+        const pdfCanvas = document.getElementById('pdf-canvas');
+        const pageInfo = document.getElementById('doc-page-info');
+        const zoomInfo = document.getElementById('doc-zoom-info');
+
+        title.textContent = item.path.split('/').pop();
+        epubViewer.innerHTML = '';
+        pdfCanvas.classList.add('hidden');
+        epubViewer.classList.add('hidden');
+        
+        const url = `/api/raw?path=${encodeURIComponent(item.path)}`;
+        const type = item.type || '';
+
+        if (type.includes('epub')) {
+            epubViewer.classList.remove('hidden');
+            const book = ePub(url);
+            const rendition = book.renderTo("epub-viewer", {
+                width: "100%",
+                height: "100%",
+                flow: "scrolled",
+                manager: "continuous"
+            });
+            rendition.display();
+
+            document.getElementById('doc-prev').onclick = () => rendition.prev();
+            document.getElementById('doc-next').onclick = () => rendition.next();
+            
+            let zoom = 100;
+            document.getElementById('doc-zoom-in').onclick = () => {
+                zoom += 10;
+                epubViewer.style.fontSize = `${zoom}%`;
+                zoomInfo.textContent = `${zoom}%`;
+            };
+            document.getElementById('doc-zoom-out').onclick = () => {
+                zoom = Math.max(50, zoom - 10);
+                epubViewer.style.fontSize = `${zoom}%`;
+                zoomInfo.textContent = `${zoom}%`;
+            };
+            pageInfo.textContent = "EPUB Mode";
+        } else if (type.includes('pdf')) {
+            // Browsers have great built-in PDF viewers, let's use iframe but in the large modal
+            const iframe = document.createElement('iframe');
+            iframe.src = url;
+            iframe.style.width = '100%';
+            iframe.style.height = '100%';
+            iframe.style.border = 'none';
+            epubViewer.classList.remove('hidden');
+            epubViewer.appendChild(iframe);
+            pageInfo.textContent = "PDF Mode";
+            document.getElementById('doc-prev').onclick = null;
+            document.getElementById('doc-next').onclick = null;
+        } else {
+            // Fallback for other text
+            const iframe = document.createElement('iframe');
+            iframe.src = url;
+            iframe.style.width = '100%';
+            iframe.style.height = '100%';
+            iframe.style.border = 'none';
+            epubViewer.classList.remove('hidden');
+            epubViewer.appendChild(iframe);
+            pageInfo.textContent = "Text Mode";
+        }
+
+        openModal('document-modal');
     }
 
     function showMetadata(item) {
@@ -1142,10 +1461,43 @@ document.addEventListener('DOMContentLoaded', () => {
         openModal('metadata-modal');
     }
 
+    function startSlideshow() {
+        if (state.playback.slideshowTimer) return;
+        
+        const btn = document.getElementById('pip-slideshow');
+        if (btn) {
+            btn.textContent = '⏸️';
+            btn.classList.add('active');
+        }
+
+        state.playback.slideshowTimer = setInterval(() => {
+            playSibling(1);
+        }, state.slideshowDelay * 1000);
+        
+        showToast(`Slideshow started (${state.slideshowDelay}s)`);
+    }
+
+    function stopSlideshow() {
+        if (state.playback.slideshowTimer) {
+            clearInterval(state.playback.slideshowTimer);
+            state.playback.slideshowTimer = null;
+        }
+        const btn = document.getElementById('pip-slideshow');
+        if (btn) {
+            btn.textContent = '▶️';
+            btn.classList.remove('active');
+        }
+    }
+
     async function closePiP() {
+        stopSlideshow();
         if (state.playback.hlsInstance) {
             state.playback.hlsInstance.destroy();
             state.playback.hlsInstance = null;
+        }
+        if (state.playback.wavesurfer) {
+            state.playback.wavesurfer.destroy();
+            state.playback.wavesurfer = null;
         }
         const media = pipViewer.querySelector('video, audio');
         if (media) {
@@ -1699,6 +2051,8 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        const ws = state.playback.wavesurfer;
+
         // 1. Independent shortcuts (don't require active PiP)
         if (!e.ctrlKey && !e.metaKey && !e.altKey) {
             switch (e.key.toLowerCase()) {
@@ -1774,9 +2128,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // 3. Playback shortcuts (require active & visible PiP)
         const media = pipViewer.querySelector('video, audio');
-        if (!media || pipPlayer.classList.contains('hidden')) {
+        if ((!media && !ws) || pipPlayer.classList.contains('hidden')) {
             return;
         }
+
+        const isPlaying = ws ? ws.isPlaying() : !media.paused;
+        const duration = ws ? ws.getDuration() : media.duration;
+        const currentTime = ws ? ws.getCurrentTime() : media.currentTime;
+
+        const setTime = (t) => {
+            if (ws) ws.setTime(t);
+            else media.currentTime = t;
+        };
+
+        const playPause = () => {
+            if (ws) ws.playPause();
+            else if (media.paused) media.play();
+            else media.pause();
+        };
 
         switch (e.key.toLowerCase()) {
             case 'q':
@@ -1788,11 +2157,10 @@ document.addEventListener('DOMContentLoaded', () => {
             case ' ':
             case 'k':
                 e.preventDefault();
-                if (media.paused) media.play();
-                else media.pause();
+                playPause();
                 break;
             case 'f':
-                if (media.tagName === 'VIDEO') {
+                if (media && media.tagName === 'VIDEO') {
                     if (document.fullscreenElement) {
                         document.exitFullscreen();
                     } else {
@@ -1801,26 +2169,27 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 break;
             case 'm':
-                media.muted = !media.muted;
+                if (ws) ws.setMuted(!ws.getMuted());
+                else media.muted = !media.muted;
                 break;
             case 'j':
-                media.currentTime = Math.max(0, media.currentTime - 10);
+                setTime(Math.max(0, currentTime - 10));
                 break;
             case 'l':
-                media.currentTime = Math.min(media.duration, media.currentTime + 10);
+                setTime(Math.min(duration, currentTime + 10));
                 break;
             case 'arrowleft':
-                media.currentTime = Math.max(0, media.currentTime - 5);
+                setTime(Math.max(0, currentTime - 5));
                 break;
             case 'arrowright':
-                media.currentTime = Math.min(media.duration, media.currentTime + 5);
+                setTime(Math.min(duration, currentTime + 5));
                 break;
             case '0': case '1': case '2': case '3': case '4':
             case '5': case '6': case '7': case '8': case '9':
                 if (e.code.startsWith('Digit')) {
                     const percent = parseInt(e.code.replace('Digit', '')) / 10;
-                    if (!isNaN(media.duration)) {
-                        media.currentTime = media.duration * percent;
+                    if (!isNaN(duration)) {
+                        setTime(duration * percent);
                     }
                 }
                 break;
@@ -1883,6 +2252,78 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Event Listeners ---
     const debouncedSearch = debounce(performSearch, 300);
 
+    searchInput.oninput = (e) => {
+        const val = e.target.value;
+        if (val.startsWith('/') || val.startsWith('./')) {
+            // Path browsing
+            const lastSlash = val.lastIndexOf('/');
+            const dirPath = val.substring(0, lastSlash + 1);
+            if (dirPath) {
+                fetchSuggestions(dirPath);
+            } else {
+                fetchSuggestions('/');
+            }
+        } else {
+            searchSuggestions.classList.add('hidden');
+            debouncedSearch();
+        }
+    };
+
+    searchInput.onkeydown = (e) => {
+        const items = searchSuggestions.querySelectorAll('.suggestion-item');
+        if (searchSuggestions.classList.contains('hidden') || items.length === 0) return;
+
+        if (e.key === 'Tab') {
+            e.preventDefault();
+            if (selectedSuggestionIndex === -1) selectedSuggestionIndex = 0;
+            const el = items[selectedSuggestionIndex];
+            const path = el.dataset.path;
+            const isDir = el.dataset.isDir === 'true';
+            if (isDir) {
+                searchInput.value = path + '/';
+                fetchSuggestions(path + '/');
+            } else {
+                searchInput.value = path;
+                searchSuggestions.classList.add('hidden');
+                performSearch();
+            }
+        } else if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            selectedSuggestionIndex = (selectedSuggestionIndex + 1) % items.length;
+            updateSelectedSuggestion(items);
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            selectedSuggestionIndex = (selectedSuggestionIndex - 1 + items.length) % items.length;
+            updateSelectedSuggestion(items);
+        } else if (e.key === 'Enter' && selectedSuggestionIndex >= 0) {
+            e.preventDefault();
+            const el = items[selectedSuggestionIndex];
+            const path = el.dataset.path;
+            const isDir = el.dataset.isDir === 'true';
+            if (isDir) {
+                searchInput.value = path + '/';
+                fetchSuggestions(path + '/');
+            } else {
+                searchInput.value = path;
+                searchSuggestions.classList.add('hidden');
+                performSearch();
+            }
+        } else if (e.key === 'Escape') {
+            searchSuggestions.classList.add('hidden');
+        }
+    };
+
+    function updateSelectedSuggestion(items) {
+        items.forEach((item, idx) => {
+            if (idx === selectedSuggestionIndex) {
+                item.classList.add('selected');
+                item.scrollIntoView({ block: 'nearest' });
+            } else {
+                item.classList.remove('selected');
+            }
+        });
+    }
+
     const settingsBtn = document.getElementById('settings-button');
     if (settingsBtn) settingsBtn.onclick = () => {
         calculateStorageSize();
@@ -1899,22 +2340,109 @@ document.addEventListener('DOMContentLoaded', () => {
     const closePipBtn = document.querySelector('.close-pip');
     if (closePipBtn) closePipBtn.onclick = closePiP;
 
+    if (advancedFilterToggle) {
+        advancedFilterToggle.onclick = () => {
+            advancedFilters.classList.toggle('hidden');
+            advancedFilterToggle.textContent = advancedFilters.classList.contains('hidden') ? 'Filters ▽' : 'Filters △';
+        };
+    }
+
+    if (applyAdvancedFilters) {
+        applyAdvancedFilters.onclick = () => {
+            state.filters.min_size = document.getElementById('filter-min-size').value;
+            state.filters.max_size = document.getElementById('filter-max-size').value;
+            state.filters.min_duration = document.getElementById('filter-min-duration').value;
+            state.filters.max_duration = document.getElementById('filter-max-duration').value;
+            state.filters.min_score = document.getElementById('filter-min-score').value;
+            state.filters.max_score = document.getElementById('filter-max-score').value;
+            state.currentPage = 1;
+            performSearch();
+        };
+    }
+
+    if (resetAdvancedFilters) {
+        resetAdvancedFilters.onclick = () => {
+            document.getElementById('filter-min-size').value = '';
+            document.getElementById('filter-max-size').value = '';
+            document.getElementById('filter-min-duration').value = '';
+            document.getElementById('filter-max-duration').value = '';
+            document.getElementById('filter-min-score').value = '';
+            document.getElementById('filter-max-score').value = '';
+            state.filters.min_size = '';
+            state.filters.max_size = '';
+            state.filters.min_duration = '';
+            state.filters.max_duration = '';
+            state.filters.min_score = '';
+            state.filters.max_score = '';
+            state.currentPage = 1;
+            performSearch();
+        };
+    }
+
+    const pipSlideshowBtn = document.getElementById('pip-slideshow');
+    if (pipSlideshowBtn) {
+        pipSlideshowBtn.onclick = (e) => {
+            e.stopPropagation();
+            if (state.playback.slideshowTimer) {
+                stopSlideshow();
+            } else {
+                startSlideshow();
+            }
+        };
+    }
+
+    if (pipSpeedBtn) {
+        pipSpeedBtn.onclick = (e) => {
+            e.stopPropagation();
+            pipSpeedMenu.classList.toggle('hidden');
+        };
+    }
+
+    document.querySelectorAll('.speed-opt').forEach(btn => {
+        btn.onclick = (e) => {
+            e.stopPropagation();
+            const rate = parseFloat(btn.dataset.speed);
+            setPlaybackRate(rate);
+            pipSpeedMenu.classList.add('hidden');
+        };
+    });
+
+    // Close speed menu when clicking elsewhere
+    window.addEventListener('click', () => {
+        if (pipSpeedMenu) pipSpeedMenu.classList.add('hidden');
+    });
+
     const pipMinimizeBtn = document.getElementById('pip-minimize');
     if (pipMinimizeBtn) pipMinimizeBtn.onclick = () => {
         pipPlayer.classList.toggle('minimized');
+        const waveformContainer = document.getElementById('waveform-container');
+        if (waveformContainer && state.playback.item && state.playback.item.type.includes('audio')) {
+            if (pipPlayer.classList.contains('minimized')) {
+                waveformContainer.classList.add('hidden');
+            } else {
+                waveformContainer.classList.remove('hidden');
+            }
+        }
     };
 
     const pipStreamTypeBtn = document.getElementById('pip-stream-type');
     if (pipStreamTypeBtn) pipStreamTypeBtn.onclick = () => {
         if (!state.playback.item) return;
         state.playback.item.transcode = !state.playback.item.transcode;
-        const currentPos = pipViewer.querySelector('video, audio')?.currentTime || 0;
+        const currentPos = state.playback.wavesurfer ? state.playback.wavesurfer.getCurrentTime() : (pipViewer.querySelector('video, audio')?.currentTime || 0);
         openInPiP(state.playback.item);
-        const media = pipViewer.querySelector('video, audio');
-        if (media) {
-            media.onloadedmetadata = () => {
-                media.currentTime = currentPos;
-            };
+        
+        if (state.playback.wavesurfer) {
+            state.playback.wavesurfer.on('ready', () => {
+                state.playback.wavesurfer.setTime(currentPos);
+            });
+        } else {
+            const media = pipViewer.querySelector('video, audio');
+            if (media) {
+                media.onloadedmetadata = () => {
+                    media.currentTime = currentPos;
+                };
+            }
         }
     };
 
