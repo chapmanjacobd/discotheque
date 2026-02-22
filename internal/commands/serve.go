@@ -201,6 +201,9 @@ func (c *ServeCmd) handleQuery(w http.ResponseWriter, r *http.Request) {
 	}
 	if sortBy := q.Get("sort"); sortBy != "" {
 		flags.SortBy = sortBy
+		if sortBy == "random" {
+			flags.Random = true
+		}
 	}
 	if reverse := q.Get("reverse"); reverse == "true" {
 		flags.Reverse = true
@@ -236,6 +239,7 @@ func (c *ServeCmd) handleQuery(w http.ResponseWriter, r *http.Request) {
 	query.SortMedia(media, flags)
 
 	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
 	json.NewEncoder(w).Encode(media)
 }
 

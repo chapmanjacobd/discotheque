@@ -5,12 +5,14 @@ import (
 	"database/sql"
 	"fmt"
 	"math"
+	"math/rand"
 	"path/filepath"
 	"regexp"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/chapmanjacobd/discotheque/internal/db"
 	"github.com/chapmanjacobd/discotheque/internal/models"
@@ -720,6 +722,14 @@ func FilterMedia(media []models.MediaWithDB, flags models.GlobalFlags) []models.
 
 // SortMedia sorts media using various methods
 func SortMedia(media []models.MediaWithDB, flags models.GlobalFlags) {
+	if flags.Random {
+		r := rand.New(rand.NewSource(time.Now().UnixNano()))
+		r.Shuffle(len(media), func(i, j int) {
+			media[i], media[j] = media[j], media[i]
+		})
+		return
+	}
+
 	if flags.NoPlayInOrder {
 		sortMediaBasic(media, flags.SortBy, flags.Reverse, flags.NatSort)
 		return
@@ -729,16 +739,6 @@ func SortMedia(media []models.MediaWithDB, flags models.GlobalFlags) {
 	// we should respect it and skip the default play-in-order.
 	if flags.SortBy != "" && flags.SortBy != "path" {
 		sortMediaBasic(media, flags.SortBy, flags.Reverse, flags.NatSort)
-		return
-	}
-
-	// If Random is set, we typically want to respect the SQL random order
-	// unless the user EXPLICITLY requested a specific play-in-order.
-	// We check if PlayInOrder is different from the default "natural_ps"
-	isDefaultPlayInOrder := flags.PlayInOrder == "natural_ps" || flags.PlayInOrder == ""
-
-	if flags.Random && isDefaultPlayInOrder {
-		// Just keep the SQL order (which is random)
 		return
 	}
 
