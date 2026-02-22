@@ -573,124 +573,6 @@ func (c *ServeCmd) handleRaw(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, path)
 }
 
-type transcodeStrategy struct {
-	needsTranscode bool
-	videoCopy      bool
-	audioCopy      bool
-	targetMime     string
-}
-
-func (c *ServeCmd) getTranscodeStrategy(m models.Media) transcodeStrategy {
-	ext := strings.ToLower(filepath.Ext(m.Path))
-
-	// If it's a known non-media format, don't even try
-	if ext == ".sqlite" || ext == ".db" || ext == ".txt" {
-		return transcodeStrategy{needsTranscode: false}
-	}
-
-	isSupportedVideoCodec := func(codec string) bool {
-		codec = strings.ToLower(codec)
-		return strings.Contains(codec, "h264") || strings.Contains(codec, "avc1") || strings.Contains(codec, "vp8") || strings.Contains(codec, "vp9") || strings.Contains(codec, "av1")
-	}
-
-	isSupportedAudioCodec := func(codec string) bool {
-		if codec == "" {
-			return false
-		}
-		codec = strings.ToLower(codec)
-		// If it contains any incompatible codec, return false
-		incompatible := []string{"eac3", "ac3", "dts", "truehd", "mlp"}
-		for _, inc := range incompatible {
-			if strings.Contains(codec, inc) {
-				return false
-			}
-		}
-
-		// It must contain at least one supported codec
-		supported := []string{"aac", "mp3", "opus", "vorbis", "flac", "pcm", "wav"}
-		for _, sup := range supported {
-			if strings.Contains(codec, sup) {
-				return true
-			}
-		}
-		return false
-	}
-
-	vCodecs := ""
-	if m.VideoCodecs != nil {
-		vCodecs = *m.VideoCodecs
-	}
-	aCodecs := ""
-	if m.AudioCodecs != nil {
-		aCodecs = *m.AudioCodecs
-	}
-	sCodecs := ""
-	if m.SubtitleCodecs != nil {
-		sCodecs = *m.SubtitleCodecs
-	}
-
-	mime := ""
-	if m.Type != nil && *m.Type != "" {
-		mime = *m.Type
-	} else {
-		mime = utils.DetectMimeType(m.Path)
-	}
-
-	slog.Debug("Analyzing codecs for transcode", "path", m.Path, "vCodecs", vCodecs, "aCodecs", aCodecs, "sCodecs", sCodecs, "mime", mime, "ext", ext)
-
-	if strings.HasPrefix(mime, "image") {
-		return transcodeStrategy{needsTranscode: false}
-	}
-
-	if strings.HasPrefix(mime, "video") {
-		vNeeds := !isSupportedVideoCodec(vCodecs)
-		aNeeds := !isSupportedAudioCodec(aCodecs)
-
-		// Prefer WebM for VP9/VP8/AV1/Opus/Vorbis
-		preferWebm := strings.Contains(strings.ToLower(vCodecs), "vp9") || strings.Contains(strings.ToLower(vCodecs), "vp8") || strings.Contains(strings.ToLower(vCodecs), "av1") ||
-			strings.Contains(strings.ToLower(aCodecs), "opus") || strings.Contains(strings.ToLower(aCodecs), "vorbis")
-
-		targetMime := "video/mp4"
-		if preferWebm {
-			targetMime = "video/webm"
-		}
-
-		// Check if container already matches the target mime type
-		containerMatches := false
-		if targetMime == "video/mp4" {
-			// Most browsers support H264/AAC in MKV or MOV as well, but we'll be slightly conservative
-			if ext == ".mp4" || ext == ".m4v" || ext == ".mov" || ext == ".mkv" {
-				containerMatches = true
-			}
-		} else if targetMime == "video/webm" {
-			if ext == ".webm" || ext == ".mkv" {
-				containerMatches = true
-			}
-		}
-
-		slog.Debug("Transcode decision details", "vNeeds", vNeeds, "aNeeds", aNeeds, "preferWebm", preferWebm, "containerMatches", containerMatches, "targetMime", targetMime)
-
-		if vNeeds || aNeeds || !containerMatches {
-			return transcodeStrategy{
-				needsTranscode: true,
-				videoCopy:      !vNeeds,
-				audioCopy:      !aNeeds,
-				targetMime:     targetMime,
-			}
-		}
-	} else if strings.HasPrefix(mime, "audio") {
-		if !isSupportedAudioCodec(aCodecs) || (ext != ".mp3" && ext != ".m4a" && ext != ".ogg" && ext != ".flac" && ext != ".wav" && ext != ".opus") {
-			return transcodeStrategy{
-				needsTranscode: true,
-				audioCopy:      isSupportedAudioCodec(aCodecs),
-				targetMime:     "audio/mpeg",
-			}
-		}
-	}
-
-	return transcodeStrategy{needsTranscode: false}
-}
-
 func (c *ServeCmd) handleTranscode(w http.ResponseWriter, r *http.Request, path string, m models.Media, strategy utils.TranscodeStrategy, startTime float64) {
 	w.Header().Set("Content-Type", strategy.TargetMime)
 	w.Header().Set("Accept-Ranges", "bytes")
@@ -1402,7 +1284,7 @@ func (c *ServeCmd) handleHLSPlaylist(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "#EXT-X-MEDIA-SEQUENCE:0\n")
 	fmt.Fprintf(w, "#EXT-X-PLAYLIST-TYPE:VOD\n")
 
-	for i := 0; i < segments; i++ {
+	for i := range segments {
 		segDuration := float64(HLS_SEGMENT_DURATION)
 		if i == segments-1 {
 			rem := math.Mod(duration, HLS_SEGMENT_DURATION)
