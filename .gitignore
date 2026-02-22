@@ -1,3 +1,4 @@
+/*.repair.lock
 /tmp
 /coverage*
 /*.db-shm

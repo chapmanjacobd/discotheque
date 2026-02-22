@@ -34,7 +34,7 @@ func TestRepairRace(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		_, err = db.Exec("INSERT INTO test (name) VALUES (?)", fmt.Sprintf("name-%d", i))
 		if err != nil {
 			t.Fatal(err)
@@ -45,11 +45,11 @@ func TestRepairRace(t *testing.T) {
 	// Ensure WAL file exists for testing sidecar handling
 	walPath := dbPath + "-wal"
 	shmPath := dbPath + "-shm"
-	os.WriteFile(walPath, []byte("wal data"), 0644)
-	os.WriteFile(shmPath, []byte("shm data"), 0644)
+	os.WriteFile(walPath, []byte("wal data"), 0o644)
+	os.WriteFile(shmPath, []byte("shm data"), 0o644)
 
 	// Corrupt the main file
-	file, err := os.OpenFile(dbPath, os.O_WRONLY, 0644)
+	file, err := os.OpenFile(dbPath, os.O_WRONLY, 0o644)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -64,7 +64,7 @@ func TestRepairRace(t *testing.T) {
 	// Verify it's corrupt
 	if isHealthy(dbPath) {
 		t.Log("Warning: isHealthy didn't detect corruption at offset 5000, trying more extensive corruption")
-		file, _ = os.OpenFile(dbPath, os.O_WRONLY, 0644)
+		file, _ = os.OpenFile(dbPath, os.O_WRONLY, 0o644)
 		file.WriteAt([]byte("CORRUPT"), 100) // Near header
 		file.Close()
 		if isHealthy(dbPath) {
@@ -77,7 +77,7 @@ func TestRepairRace(t *testing.T) {
 	numGoroutines := 5
 	wg.Add(numGoroutines)
 
-	for i := 0; i < numGoroutines; i++ {
+	for i := range numGoroutines {
 		go func(id int) {
 			defer wg.Done()
 			err := Repair(dbPath)

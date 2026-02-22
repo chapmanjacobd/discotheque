@@ -118,6 +118,9 @@ func (c *ServeCmd) execDB(ctx context.Context, dbPath string, fn func(*sql.DB) e
 				slog.Info("Database repaired, retrying operation", "db", dbPath)
 				continue
 			}
+			if i > 0 {
+				slog.Error("Operation failed even after database repair", "db", dbPath, "error", err)
+			}
 			return err
 		}
 		return nil
@@ -149,8 +152,18 @@ func (c *ServeCmd) Run(ctx *kong.Context) error {
 	}
 
 	handler := c.Mux()
-	slog.Info("Server starting", "port", c.Port)
-	return http.ListenAndServe(fmt.Sprintf(":%d", c.Port), handler)
+	addr := fmt.Sprintf(":%d", c.Port)
+	slog.Info("Server starting", "addr", addr)
+
+	server := &http.Server{
+		Addr:         addr,
+		Handler:      handler,
+		ReadTimeout:  10 * time.Second,
+		WriteTimeout: 0, // Streaming responses (HLS, Raw files) need no write timeout or a very large one
+		IdleTimeout:  120 * time.Second,
+	}
+
+	return server.ListenAndServe()
 }
 
 func (c *ServeCmd) handleDatabases(w http.ResponseWriter, r *http.Request) {
@@ -173,19 +186,19 @@ func (c *ServeCmd) handleCategories(w http.ResponseWriter, r *http.Request) {
 	counts := make(map[string]int64)
 
 	for _, dbPath := range c.Databases {
-		sqlDB, err := database.Connect(dbPath)
+		err := c.execDB(r.Context(), dbPath, func(sqlDB *sql.DB) error {
+			queries := database.New(sqlDB)
+			stats, err := queries.GetCategoryStats(r.Context())
+			if err != nil {
+				return err
+			}
+			for _, s := range stats {
+				counts[s.Category] = counts[s.Category] + s.Count
+			}
+			return nil
+		})
 		if err != nil {
-			continue
-		}
-		queries := database.New(sqlDB)
-		stats, err := queries.GetCategoryStats(r.Context())
-		sqlDB.Close()
-		if err != nil {
-			continue
-		}
-
-		for _, s := range stats {
-			counts[s.Category] = counts[s.Category] + s.Count
+			slog.Error("Failed to fetch categories", "db", dbPath, "error", err)
 		}
 	}
 
@@ -213,19 +226,19 @@ func (c *ServeCmd) handleRatings(w http.ResponseWriter, r *http.Request) {
 	counts := make(map[int64]int64)
 
 	for _, dbPath := range c.Databases {
-		sqlDB, err := database.Connect(dbPath)
+		err := c.execDB(r.Context(), dbPath, func(sqlDB *sql.DB) error {
+			queries := database.New(sqlDB)
+			stats, err := queries.GetRatingStats(r.Context())
+			if err != nil {
+				return err
+			}
+			for _, s := range stats {
+				counts[s.Rating] = counts[s.Rating] + s.Count
+			}
+			return nil
+		})
 		if err != nil {
-			continue
-		}
-		queries := database.New(sqlDB)
-		stats, err := queries.GetRatingStats(r.Context())
-		sqlDB.Close()
-		if err != nil {
-			continue
-		}
-
-		for _, s := range stats {
-			counts[s.Rating] = counts[s.Rating] + s.Count
+			slog.Error("Failed to fetch ratings", "db", dbPath, "error", err)
 		}
 	}
 
@@ -333,7 +346,10 @@ func (c *ServeCmd) handleQuery(w http.ResponseWriter, r *http.Request) {
 		flags.Completed = true
 	}
 
-	media, err := query.MediaQuery(context.Background(), c.Databases, flags)
+	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+	defer cancel()
+
+	media, err := query.MediaQuery(ctx, c.Databases, flags)
 	if err != nil {
 		slog.Error("Query failed", "dbs", c.Databases, "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -644,17 +660,20 @@ func (c *ServeCmd) handleRaw(w http.ResponseWriter, r *http.Request) {
 	var m models.Media
 	found := false
 	for _, dbPath := range c.Databases {
-		sqlDB, err := database.Connect(dbPath)
-		if err != nil {
-			continue
-		}
-		queries := database.New(sqlDB)
-		dbMedia, err := queries.GetMediaByPathExact(r.Context(), path)
-		sqlDB.Close()
-		if err == nil {
-			m = models.FromDB(dbMedia)
-			found = true
+		err := c.execDB(r.Context(), dbPath, func(sqlDB *sql.DB) error {
+			queries := database.New(sqlDB)
+			dbMedia, err := queries.GetMediaByPathExact(r.Context(), path)
+			if err == nil {
+				m = models.FromDB(dbMedia)
+				found = true
+			}
+			return err
+		})
+		if found {
 			break
+		}
+		if err != nil && err != sql.ErrNoRows {
+			slog.Error("Database error in handleRaw", "db", dbPath, "error", err)
 		}
 	}
 
@@ -767,42 +786,42 @@ func (c *ServeCmd) handleSubtitles(w http.ResponseWriter, r *http.Request) {
 	// Verify path or siblings
 	found := false
 	for _, dbPath := range c.Databases {
-		sqlDB, err := database.Connect(dbPath)
-		if err != nil {
-			continue
-		}
-		queries := database.New(sqlDB)
-		_, err = queries.GetMediaByPathExact(r.Context(), path)
-		if err == nil {
-			found = true
-			sqlDB.Close()
-			break
-		}
+		err := c.execDB(r.Context(), dbPath, func(sqlDB *sql.DB) error {
+			queries := database.New(sqlDB)
+			_, err := queries.GetMediaByPathExact(r.Context(), path)
+			if err == nil {
+				found = true
+				return nil
+			}
 
-		// If path doesn't exist, it might be an external subtitle file next to a media file
-		// We'll check if any media in the database shares the same directory and base name
-		dir := filepath.Dir(path)
-		filename := filepath.Base(path)
-		base := strings.TrimSuffix(filename, filepath.Ext(filename))
-		// Handle cases like movie.en.srt by stripping one more extension if it exists
-		if secondExt := filepath.Ext(base); secondExt != "" {
-			base = strings.TrimSuffix(base, secondExt)
-		}
+			// If path doesn't exist, it might be an external subtitle file next to a media file
+			// We'll check if any media in the database shares the same directory and base name
+			dir := filepath.Dir(path)
+			filename := filepath.Base(path)
+			base := strings.TrimSuffix(filename, filepath.Ext(filename))
+			// Handle cases like movie.en.srt by stripping one more extension if it exists
+			if secondExt := filepath.Ext(base); secondExt != "" {
+				base = strings.TrimSuffix(base, secondExt)
+			}
 
-		// Simple check: does this directory contain ANY media we know with the same base name?
-		mediaInDir, _ := queries.GetMedia(r.Context(), 1000)
-		for _, m := range mediaInDir {
-			if filepath.Dir(m.Path) == dir {
-				mBase := strings.TrimSuffix(filepath.Base(m.Path), filepath.Ext(m.Path))
-				if mBase == base {
-					found = true
-					break
+			// Simple check: does this directory contain ANY media we know with the same base name?
+			mediaInDir, _ := queries.GetMedia(r.Context(), 1000)
+			for _, m := range mediaInDir {
+				if filepath.Dir(m.Path) == dir {
+					mBase := strings.TrimSuffix(filepath.Base(m.Path), filepath.Ext(m.Path))
+					if mBase == base {
+						found = true
+						break
+					}
 				}
 			}
-		}
-		sqlDB.Close()
+			return nil
+		})
 		if found {
 			break
+		}
+		if err != nil && err != sql.ErrNoRows {
+			slog.Error("Database error in handleSubtitles", "db", dbPath, "error", err)
 		}
 	}
 
@@ -893,16 +912,19 @@ func (c *ServeCmd) handleThumbnail(w http.ResponseWriter, r *http.Request) {
 	// Verify path exists in database to prevent arbitrary file access
 	found := false
 	for _, dbPath := range c.Databases {
-		sqlDB, err := database.Connect(dbPath)
-		if err != nil {
-			continue
-		}
-		queries := database.New(sqlDB)
-		_, err = queries.GetMediaByPathExact(r.Context(), path)
-		sqlDB.Close()
-		if err == nil {
-			found = true
+		err := c.execDB(r.Context(), dbPath, func(sqlDB *sql.DB) error {
+			queries := database.New(sqlDB)
+			_, err := queries.GetMediaByPathExact(r.Context(), path)
+			if err == nil {
+				found = true
+			}
+			return err
+		})
+		if found {
 			break
+		}
+		if err != nil && err != sql.ErrNoRows {
+			slog.Error("Database error in handleThumbnail", "db", dbPath, "error", err)
 		}
 	}
 
@@ -1307,21 +1329,21 @@ func (c *ServeCmd) handleGenres(w http.ResponseWriter, r *http.Request) {
 	counts := make(map[string]int64)
 
 	for _, dbPath := range c.Databases {
-		sqlDB, err := database.Connect(dbPath)
-		if err != nil {
-			continue
-		}
-		queries := database.New(sqlDB)
-		stats, err := queries.GetGenreStats(r.Context())
-		sqlDB.Close()
-		if err != nil {
-			continue
-		}
-
-		for _, s := range stats {
-			if s.Genre.Valid {
-				counts[s.Genre.String] = counts[s.Genre.String] + s.Count
+		err := c.execDB(r.Context(), dbPath, func(sqlDB *sql.DB) error {
+			queries := database.New(sqlDB)
+			stats, err := queries.GetGenreStats(r.Context())
+			if err != nil {
+				return err
 			}
+			for _, s := range stats {
+				if s.Genre.Valid {
+					counts[s.Genre.String] = counts[s.Genre.String] + s.Count
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			slog.Error("Failed to fetch genres", "db", dbPath, "error", err)
 		}
 	}
 
@@ -1358,17 +1380,20 @@ func (c *ServeCmd) handleHLSPlaylist(w http.ResponseWriter, r *http.Request) {
 	var m models.Media
 	found := false
 	for _, dbPath := range c.Databases {
-		sqlDB, err := database.Connect(dbPath)
-		if err != nil {
-			continue
-		}
-		queries := database.New(sqlDB)
-		dbMedia, err := queries.GetMediaByPathExact(r.Context(), path)
-		sqlDB.Close()
-		if err == nil {
-			m = models.FromDB(dbMedia)
-			found = true
+		err := c.execDB(r.Context(), dbPath, func(sqlDB *sql.DB) error {
+			queries := database.New(sqlDB)
+			dbMedia, err := queries.GetMediaByPathExact(r.Context(), path)
+			if err == nil {
+				m = models.FromDB(dbMedia)
+				found = true
+			}
+			return err
+		})
+		if found {
 			break
+		}
+		if err != nil && err != sql.ErrNoRows {
+			slog.Error("Database error in handleHLSPlaylist", "db", dbPath, "error", err)
 		}
 	}
 

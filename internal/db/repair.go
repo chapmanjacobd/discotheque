@@ -29,18 +29,17 @@ func IsCorruptionError(err error) bool {
 	return strings.Contains(err.Error(), "database disk image is malformed")
 }
 
-// Repair attempts to repair a corrupted SQLite database
 func Repair(dbPath string) error {
 	start := time.Now()
 
-	// 1. Process-local lock to avoid multiple goroutines in the same process
+	// 1. Process-local lock
 	mu := getLock(dbPath)
 	mu.Lock()
 	defer mu.Unlock()
 
-	// 2. Cross-process lock using a separate lock file
+	// 2. Cross-process lock
 	lockPath := dbPath + ".repair.lock"
-	lockFile, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, 0666)
+	lockFile, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, 0o666)
 	if err != nil {
 		return fmt.Errorf("failed to open lock file: %w", err)
 	}
@@ -49,7 +48,6 @@ func Repair(dbPath string) error {
 		os.Remove(lockPath)
 	}()
 
-	// Exclusive lock, blocks until available
 	if err := syscall.Flock(int(lockFile.Fd()), syscall.LOCK_EX); err != nil {
 		return fmt.Errorf("failed to acquire flock: %w", err)
 	}
@@ -57,10 +55,10 @@ func Repair(dbPath string) error {
 
 	waitDuration := time.Since(start)
 
-	// 3. Check if it's actually corrupt (maybe fixed by previous repair in race)
+	// 3. Check if it's actually corrupt
 	if isHealthy(dbPath) {
 		if waitDuration > 1*time.Millisecond {
-			slog.Info("Database was repaired by another process", "path", dbPath, "wait_time", waitDuration.String())
+			slog.Info("Database was repaired by another goroutine", "path", dbPath, "wait_time", waitDuration.String())
 		}
 		return nil
 	}
@@ -69,24 +67,18 @@ func Repair(dbPath string) error {
 		return fmt.Errorf("sqlite3 command line tool is required for auto-repair")
 	}
 
-	// 4. Move database and sidecar files to a temporary location
+	// 4. Backup
 	now := time.Now().Unix()
 	backupDir := fmt.Sprintf("%s.corrupt.%d", dbPath, now)
-	if err := os.MkdirAll(backupDir, 0755); err != nil {
+	if err := os.MkdirAll(backupDir, 0o755); err != nil {
 		return fmt.Errorf("failed to create backup directory: %w", err)
 	}
-	// We want to delete this directory on success, but keep it on total failure for manual inspection?
-	// The user asked to "unlink ... after it is all done", which implies success.
 
 	corruptMain := backupDir + "/main.db"
 	if err := os.Rename(dbPath, corruptMain); err != nil {
-		if os.IsNotExist(err) {
-			return fmt.Errorf("database file not found: %s", dbPath)
-		}
 		return fmt.Errorf("failed to move corrupted database: %w", err)
 	}
 
-	// Move sidecars
 	for _, suffix := range []string{"-wal", "-shm"} {
 		sidecar := dbPath + suffix
 		if _, err := os.Stat(sidecar); err == nil {
@@ -94,42 +86,73 @@ func Repair(dbPath string) error {
 		}
 	}
 
-	// 5. Recover into the original path
-	// This ensures that the new database starts fresh at the expected location.
+	// 5. Recover
 	slog.Info("Attempting recovery...", "from", corruptMain, "to", dbPath)
 
-	// Try .recover (more modern)
+	// Attempt .recover
 	cmdRecover := exec.Command("bash", "-c", fmt.Sprintf("sqlite3 \"%s\" \".recover\" | sqlite3 \"%s\"", corruptMain, dbPath))
 	out, err := cmdRecover.CombinedOutput()
-	
-	success := false
-	if err == nil && isHealthy(dbPath) {
-		slog.Info("Recovery successful via .recover")
-		success = true
-	} else {
-		slog.Warn(".recover failed or produced invalid DB, trying .dump", "error", err, "output", string(out))
-		os.Remove(dbPath) // Clean up failed attempt before next one
 
-		// Try .dump (classic fallback)
+	repairStepSuccess := false
+	if err == nil {
+		slog.Info("Initial recovery step successful via .recover")
+		repairStepSuccess = true
+	} else {
+		slog.Warn(".recover failed", "error", err, "output", string(out))
+		os.Remove(dbPath)
+
+		// Fallback to .dump
 		cmdDump := exec.Command("bash", "-c", fmt.Sprintf("sqlite3 \"%s\" \".dump\" | sqlite3 \"%s\"", corruptMain, dbPath))
 		out, err = cmdDump.CombinedOutput()
-		if err == nil && isHealthy(dbPath) {
-			slog.Info("Recovery successful via .dump")
-			success = true
+		if err == nil {
+			slog.Info("Initial recovery step successful via .dump")
+			repairStepSuccess = true
 		} else {
-			slog.Error("Recovery failed", "error", err, "output", string(out))
+			slog.Error("Recovery failed completely", "error", err, "output", string(out))
 		}
 	}
 
-	// 6. Cleanup
-	if success {
-		os.RemoveAll(backupDir)
-		return nil
-	}
+	if repairStepSuccess {
+		// 6. Polish and Verify
+		db, err := Connect(dbPath)
+		if err != nil {
+			slog.Error("Failed to open recovered database for polish", "error", err)
+		} else {
+			slog.Info("Running final polish (REINDEX, FTS REBUILD, VACUUM)...")
+			if _, err := db.Exec("REINDEX;"); err != nil {
+				slog.Warn("REINDEX failed", "error", err)
+			}
 
-	// If all failed, we should probably try to restore the "corrupt" file so at least it's back where it was
-	// but it's already failed twice.
-	return fmt.Errorf("all recovery attempts failed")
+			// FTS rebuilding is critical as corruption often hides here
+			var hasMediaFTS bool
+			_ = db.QueryRow("SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='media_fts')").Scan(&hasMediaFTS)
+			if hasMediaFTS {
+				if _, err := db.Exec("INSERT INTO media_fts(media_fts) VALUES('rebuild');"); err != nil {
+					slog.Warn("media_fts rebuild failed", "error", err)
+				}
+			}
+
+			var hasCaptionsFTS bool
+			_ = db.QueryRow("SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='captions_fts')").Scan(&hasCaptionsFTS)
+			if hasCaptionsFTS {
+				if _, err := db.Exec("INSERT INTO captions_fts(captions_fts) VALUES('rebuild');"); err != nil {
+					slog.Warn("captions_fts rebuild failed", "error", err)
+				}
+			}
+
+			if _, err := db.Exec("VACUUM;"); err != nil {
+				slog.Error("Final VACUUM failed", "error", err)
+			}
+			db.Close()
+		}
+
+		if isHealthy(dbPath) {
+			slog.Info("Database repair and polish successful")
+			os.RemoveAll(backupDir)
+			return nil
+		}
+	}
+	return fmt.Errorf("all recovery attempts failed to produce a healthy database")
 }
 
 func isHealthy(dbPath string) bool {
@@ -137,27 +160,85 @@ func isHealthy(dbPath string) bool {
 		return false
 	}
 
+	// Use sql.Open directly instead of Connect to avoid connection pool deadlocks.
+	// isHealthy needs to be able to open its own connection regardless of global pool limits.
 	db, err := sql.Open("sqlite3", dbPath)
 	if err != nil {
+		slog.Debug("Health check: failed to open connection", "path", dbPath, "error", err)
 		return false
 	}
 	defer db.Close()
 
-	var s string
-	err = db.QueryRow("PRAGMA integrity_check").Scan(&s)
+	// 1. Thorough integrity check
+	rows, err := db.Query("PRAGMA integrity_check")
 	if err != nil {
+		slog.Debug("Health check: PRAGMA integrity_check query failed", "error", err)
 		return false
 	}
-	if s != "ok" {
+	defer rows.Close()
+
+	foundOk := false
+	for rows.Next() {
+		var res string
+		if err := rows.Scan(&res); err != nil {
+			slog.Debug("Health check: failed to scan integrity row", "error", err)
+			return false
+		}
+		if res == "ok" {
+			foundOk = true
+		} else {
+			slog.Warn("Health check: integrity error found", "msg", res)
+			return false
+		}
+	}
+	if !foundOk {
+		slog.Debug("Health check: integrity_check returned no rows")
 		return false
 	}
 
-	// Try to read from sqlite_master to ensure the schema is readable
-	rows, err := db.Query("SELECT name FROM sqlite_master LIMIT 1")
-	if err != nil {
+	// 2. Schema check
+	row := db.QueryRow("SELECT name FROM sqlite_master LIMIT 1")
+	var name string
+	if err := row.Scan(&name); err != nil && err != sql.ErrNoRows {
+		slog.Debug("Health check: schema check failed", "error", err)
 		return false
 	}
-	rows.Close()
+
+	// 3. Write check
+	// We attempt to perform a real write inside a transaction and roll it back.
+	// This ensures that indices and FTS triggers are actually working.
+	tx, err := db.Begin()
+	if err != nil {
+		slog.Debug("Health check: failed to begin transaction", "error", err)
+		return false
+	}
+	defer tx.Rollback()
+
+	// Check for media table
+	var hasMedia bool
+	_ = db.QueryRow("SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='media')").Scan(&hasMedia)
+	if hasMedia {
+		if _, err = tx.Exec("UPDATE media SET time_deleted = time_deleted WHERE rowid = -1"); err != nil {
+			slog.Warn("Health check: write consistency check (media) failed", "error", err)
+			return false
+		}
+	} else {
+		// Generic write check for non-media DBs (e.g. in tests)
+		if _, err = tx.Exec("CREATE TEMP TABLE _health_check(id INT); DROP TABLE _health_check;"); err != nil {
+			slog.Debug("Health check: generic write check failed", "error", err)
+			return false
+		}
+	}
+
+	// Specifically check FTS virtual table consistency
+	var hasFTS bool
+	_ = db.QueryRow("SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='media_fts')").Scan(&hasFTS)
+	if hasFTS {
+		if _, err = tx.Exec("SELECT rowid FROM media_fts LIMIT 1"); err != nil && err != sql.ErrNoRows {
+			slog.Warn("Health check: FTS check (media_fts) failed", "error", err)
+			return false
+		}
+	}
 
 	return true
 }

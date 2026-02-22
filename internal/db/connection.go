@@ -31,5 +31,11 @@ func Connect(dbPath string) (*sql.DB, error) {
 		}
 	}
 
+	// Connection Pool Limits
+	// SQLite handles concurrent reads well in WAL mode, but concurrent writes
+	// can lead to "database is locked" errors. Limiting to 1 open connection
+	// ensures serialization and avoids many common SQLite concurrency issues.
+	db.SetMaxOpenConns(1)
+
 	return db, nil
 }

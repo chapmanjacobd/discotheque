@@ -2078,6 +2078,15 @@ document.addEventListener('DOMContentLoaded', () => {
                         }
                     }
                     return;
+                case 'd':
+                    if (state.page === 'detail') {
+                        searchView.classList.remove('hidden');
+                        detailView.classList.add('hidden');
+                        state.page = 'search';
+                    } else if (state.playback.item) {
+                        showDetailView(state.playback.item);
+                    }
+                    return;
                 case '?':
                 case '/':
                     const helpModal = document.getElementById('help-modal');

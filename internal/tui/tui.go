@@ -3,11 +3,14 @@ package tui
 import (
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/chapmanjacobd/discotheque/internal/models"
 	"github.com/chapmanjacobd/discotheque/internal/utils"
+	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
 type itemDelegate struct{}
@@ -88,9 +91,10 @@ func (i item) FilterValue() string {
 }
 
 type Model struct {
-	list     list.Model
-	choice   *models.MediaWithDB
-	quitting bool
+	list        list.Model
+	choice      *models.MediaWithDB
+	showDetails bool
+	quitting    bool
 }
 
 func NewModel(media []models.MediaWithDB) Model {
@@ -104,6 +108,22 @@ func NewModel(media []models.MediaWithDB) Model {
 	l.SetShowStatusBar(true)
 	l.SetFilteringEnabled(true)
 	l.Styles.Title = StyleTitle
+	l.AdditionalFullHelpKeys = func() []key.Binding {
+		return []key.Binding{
+			key.NewBinding(
+				key.WithKeys("d"),
+				key.WithHelp("d", "toggle details"),
+			),
+		}
+	}
+	l.AdditionalShortHelpKeys = func() []key.Binding {
+		return []key.Binding{
+			key.NewBinding(
+				key.WithKeys("d"),
+				key.WithHelp("d", "details"),
+			),
+		}
+	}
 
 	return Model{list: l}
 }
@@ -115,9 +135,21 @@ func (m Model) Init() tea.Cmd {
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
+		if m.showDetails {
+			if msg.String() == "d" || msg.String() == "esc" || msg.String() == "q" {
+				m.showDetails = false
+				return m, nil
+			}
+			return m, nil
+		}
+
 		if msg.String() == "ctrl+c" {
 			m.quitting = true
 			return m, tea.Quit
+		}
+		if msg.String() == "d" {
+			m.showDetails = true
+			return m, nil
 		}
 		if msg.String() == "enter" {
 			i, ok := m.list.SelectedItem().(item)
@@ -140,7 +172,69 @@ func (m Model) View() string {
 	if m.quitting {
 		return ""
 	}
+	if m.showDetails {
+		return StyleDoc.Render(m.renderDetails())
+	}
 	return StyleDoc.Render(m.list.View())
+}
+
+func (m Model) renderDetails() string {
+	i, ok := m.list.SelectedItem().(item)
+	if !ok {
+		return "No item selected"
+	}
+	media := i.media.Media
+
+	var sb strings.Builder
+	sb.WriteString(StyleHeader.Render("Media Details") + "\n\n")
+
+	addField := func(label, value string) {
+		if value != "" && value != "0" && value != "<nil>" {
+			sb.WriteString(lipgloss.NewStyle().Foreground(ColorAccent).Bold(true).Render(label+": ") + value + "\n")
+		}
+	}
+
+	addField("Path", media.Path)
+	if media.Title != nil {
+		addField("Title", *media.Title)
+	}
+	if media.Type != nil {
+		addField("Type", *media.Type)
+	}
+	if media.Duration != nil {
+		addField("Duration", utils.FormatDuration(int(*media.Duration)))
+	}
+	if media.Size != nil {
+		addField("Size", utils.FormatSize(*media.Size))
+	}
+	if media.VideoCodecs != nil {
+		addField("Video Codec", *media.VideoCodecs)
+	}
+	if media.AudioCodecs != nil {
+		addField("Audio Codec", *media.AudioCodecs)
+	}
+	if media.Width != nil && media.Height != nil {
+		addField("Resolution", fmt.Sprintf("%dx%d", *media.Width, *media.Height))
+	}
+	if media.Album != nil {
+		addField("Album", *media.Album)
+	}
+	if media.Artist != nil {
+		addField("Artist", *media.Artist)
+	}
+	if media.Genre != nil {
+		addField("Genre", *media.Genre)
+	}
+	if media.Categories != nil {
+		addField("Categories", *media.Categories)
+	}
+	if media.Score != nil {
+		addField("Score", fmt.Sprintf("%.1f", *media.Score))
+	}
+
+	sb.WriteString("\n" + StyleMuted.Render("Press 'd', 'esc', or 'q' to return"))
+
+	return sb.String()
 }
 
 func (m Model) GetChoice() *models.MediaWithDB {
