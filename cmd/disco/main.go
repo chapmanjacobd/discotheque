@@ -7,6 +7,7 @@ import (
 	"github.com/alecthomas/kong"
 	"github.com/chapmanjacobd/discotheque/internal/commands"
 	"github.com/chapmanjacobd/discotheque/internal/models"
+	"github.com/chapmanjacobd/discotheque/internal/utils"
 	_ "github.com/mattn/go-sqlite3"
 )
 
@@ -128,10 +129,10 @@ func main() {
 	}
 
 	// Configure logger
-	opts := &slog.HandlerOptions{
+	logger := slog.New(&utils.PlainHandler{
 		Level: models.LogLevel,
-	}
-	logger := slog.New(slog.NewTextHandler(os.Stderr, opts))
+		Out:   os.Stderr,
+	})
 	slog.SetDefault(logger)
 
 	err = ctx.Run(ctx)

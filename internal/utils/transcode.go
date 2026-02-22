@@ -1,7 +1,6 @@
 package utils
 
 import (
-	"log/slog"
 	"path/filepath"
 	"strings"
 
@@ -120,9 +119,11 @@ func GetTranscodeStrategy(m models.Media) TranscodeStrategy {
 		}
 	}
 
-	if strategy.NeedsTranscode {
-		slog.Debug("Transcode Strategy", "path", m.Path, "video_copy", strategy.VideoCopy, "audio_copy", strategy.AudioCopy, "target", strategy.TargetMime, "vcodecs", vCodecs, "acodecs", aCodecs)
-	}
+	// if strategy.NeedsTranscode {
+	// 	slog.Debug("Needs Transcode", "path", m.Path, "video_copy", strategy.VideoCopy, "audio_copy", strategy.AudioCopy, "target", strategy.TargetMime, "vcodecs", vCodecs, "acodecs", aCodecs)
+	// } else {
+	// 	slog.Debug("No need", "path", m.Path, "video_copy", strategy.VideoCopy, "audio_copy", strategy.AudioCopy, "target", strategy.TargetMime, "vcodecs", vCodecs, "acodecs", aCodecs)
+	// }
 
 	return strategy
 }

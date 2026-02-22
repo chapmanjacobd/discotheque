@@ -104,7 +104,7 @@ func (m *Media) ParentAtDepth(depth int) string {
 type MediaWithDB struct {
 	Media
 	DB        string `json:"db,omitempty"`
-	Transcode bool   `json:"transcode,omitempty"`
+	Transcode bool   `json:"transcode"`
 }
 
 // FolderStats aggregates media by folder

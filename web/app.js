@@ -855,16 +855,13 @@ document.addEventListener('DOMContentLoaded', () => {
         pipPlayer.classList.remove('hidden');
         pipPlayer.classList.remove('minimized');
 
-        // Check if item needs transcoding (provided by backend or fallback check)
-        let needsTranscode = item.transcode;
-        if (needsTranscode === undefined) {
-            // Fallback if backend didn't provide it (e.g. older cached data)
-            // Audio logic: assume mp3/m4a/ogg/wav/opus don't need it, others might
-            if (type.includes('audio')) {
-                needsTranscode = !type.includes('mp3') && !type.includes('m4a') && !type.includes('ogg') && !type.includes('wav') && !type.includes('opus');
-            } else if (type.includes('video')) {
-                needsTranscode = !type.includes('mp4') && !type.includes('webm') && !type.includes('mkv');
-            }
+        // Check if item needs transcoding (provided by backend)
+        let needsTranscode = item.transcode === true;
+        
+        const streamBtn = document.getElementById('pip-stream-type');
+        if (streamBtn) {
+            streamBtn.textContent = needsTranscode ? '🔄 HLS' : '⚡ Direct';
+            streamBtn.title = `Currently using ${needsTranscode ? 'Transcoding (HLS)' : 'Direct Stream'}. Click to switch.`;
         }
 
         let localPos = getLocalProgress(item);
@@ -1708,6 +1705,20 @@ document.addEventListener('DOMContentLoaded', () => {
     const pipMinimizeBtn = document.getElementById('pip-minimize');
     if (pipMinimizeBtn) pipMinimizeBtn.onclick = () => {
         pipPlayer.classList.toggle('minimized');
+    };
+
+    const pipStreamTypeBtn = document.getElementById('pip-stream-type');
+    if (pipStreamTypeBtn) pipStreamTypeBtn.onclick = () => {
+        if (!state.playback.item) return;
+        state.playback.item.transcode = !state.playback.item.transcode;
+        const currentPos = pipViewer.querySelector('video, audio')?.currentTime || 0;
+        openInPiP(state.playback.item);
+        const media = pipViewer.querySelector('video, audio');
+        if (media) {
+            media.onloadedmetadata = () => {
+                media.currentTime = currentPos;
+            };
+        }
     };
 
     const pipTheatreBtn = document.getElementById('pip-theatre');
