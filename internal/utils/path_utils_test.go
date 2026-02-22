@@ -1,6 +1,8 @@
 package utils
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -81,6 +83,7 @@ func TestPathTupleFromURL(t *testing.T) {
 		{"http://example.com/path/to/file.txt", "example.com/path/to", "file.txt"},
 		{"https://www.example.org/another/file.jpg", "www.example.org/another", "file.jpg"},
 		{"http://example.com/", "example.com", ""},
+		{"invalid url", "", "invalid url"},
 	}
 
 	for _, tt := range tests {
@@ -88,5 +91,47 @@ func TestPathTupleFromURL(t *testing.T) {
 		if gotParent != tt.expectedParent || gotFilename != tt.expectedFilename {
 			t.Errorf("PathTupleFromURL(%q) = (%q, %q), want (%q, %q)", tt.url, gotParent, gotFilename, tt.expectedParent, tt.expectedFilename)
 		}
+	}
+}
+
+func TestRandomString(t *testing.T) {
+	s := RandomString(10)
+	if len(s) != 10 {
+		t.Errorf("RandomString(10) len = %d, want 10", len(s))
+	}
+}
+
+func TestRandomFilename(t *testing.T) {
+	input := "test.txt"
+	got := RandomFilename(input)
+	if filepath.Ext(got) != ".txt" {
+		t.Errorf("RandomFilename extension mismatch: %s", got)
+	}
+}
+
+func TestStripMountSyntax(t *testing.T) {
+	if got := StripMountSyntax("/home/user"); got != "home/user" {
+		t.Errorf("StripMountSyntax failed: %s", got)
+	}
+}
+
+func TestFolderFunctions(t *testing.T) {
+	tmpDir, _ := os.MkdirTemp("", "folder-test")
+	defer os.RemoveAll(tmpDir)
+
+	if !IsEmptyFolder(tmpDir) {
+		t.Error("IsEmptyFolder should be true for empty dir")
+	}
+
+	f, _ := os.Create(filepath.Join(tmpDir, "file.txt"))
+	f.WriteString("hello")
+	f.Close()
+
+	if IsEmptyFolder(tmpDir) {
+		t.Error("IsEmptyFolder should be false for non-empty dir")
+	}
+
+	if got := FolderSize(tmpDir); got != 5 {
+		t.Errorf("FolderSize = %d, want 5", got)
 	}
 }

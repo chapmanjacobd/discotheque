@@ -3,6 +3,7 @@ package metadata
 import (
 	"context"
 	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -73,6 +74,77 @@ func TestExtract_NonExistent(t *testing.T) {
 	_, err := Extract(context.Background(), "/non/existent/file", false)
 	if err == nil {
 		t.Error("Expected error for non-existent file")
+	}
+}
+
+func TestExtract_WithMockFFProbe(t *testing.T) {
+	// Create a mock ffprobe script
+	tmpDir, _ := os.MkdirTemp("", "mock-path")
+	defer os.RemoveAll(tmpDir)
+
+	mockFFProbe := filepath.Join(tmpDir, "ffprobe")
+	script := `#!/bin/sh
+echo '{
+  "streams": [
+    {
+      "codec_type": "video",
+      "codec_name": "h264",
+      "width": 1920,
+      "height": 1080,
+      "avg_frame_rate": "30/1"
+    },
+    {
+      "codec_type": "audio",
+      "codec_name": "aac"
+    }
+  ],
+  "format": {
+    "duration": "123.45",
+    "tags": {
+      "title": "Mock Title",
+      "artist": "Mock Artist"
+    }
+  },
+  "chapters": [
+    {
+      "start_time": "10.0",
+      "tags": { "title": "Chapter 1" }
+    }
+  ]
+}'
+`
+	os.WriteFile(mockFFProbe, []byte(script), 0o755)
+
+	// Add tmpDir to PATH
+	oldPath := os.Getenv("PATH")
+	os.Setenv("PATH", tmpDir+string(os.PathListSeparator)+oldPath)
+	defer os.Setenv("PATH", oldPath)
+
+	f, _ := os.CreateTemp("", "mock-video.mp4")
+	defer os.Remove(f.Name())
+
+	meta, err := Extract(context.Background(), f.Name(), false)
+	if err != nil {
+		t.Fatalf("Extract failed: %v", err)
+	}
+
+	if meta.Media.Title.String != "Mock Title" {
+		t.Errorf("Expected title Mock Title, got %s", meta.Media.Title.String)
+	}
+	if meta.Media.Duration.Int64 != 123 {
+		t.Errorf("Expected duration 123, got %d", meta.Media.Duration.Int64)
+	}
+	if meta.Media.Width.Int64 != 1920 || meta.Media.Height.Int64 != 1080 {
+		t.Errorf("Expected 1920x1080, got %dx%d", meta.Media.Width.Int64, meta.Media.Height.Int64)
+	}
+	if meta.Media.VideoCodecs.String != "h264" {
+		t.Errorf("Expected h264 codec, got %s", meta.Media.VideoCodecs.String)
+	}
+	if meta.Media.AudioCodecs.String != "aac" {
+		t.Errorf("Expected aac codec, got %s", meta.Media.AudioCodecs.String)
+	}
+	if len(meta.Captions) != 1 || meta.Captions[0].Text.String != "Chapter 1" {
+		t.Errorf("Expected 1 caption 'Chapter 1', got %v", meta.Captions)
 	}
 }
 

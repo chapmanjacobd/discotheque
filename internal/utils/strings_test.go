@@ -249,3 +249,140 @@ func TestLoadString(t *testing.T) {
 		t.Errorf("LoadString() = %v, want just string", got)
 	}
 }
+
+func TestPathToSentence(t *testing.T) {
+	input := "/home/user/movie_title.mp4"
+	expected := "movie title mp4"
+	if got := PathToSentence(input); got != expected {
+		t.Errorf("PathToSentence(%q) = %q, want %q", input, got, expected)
+	}
+}
+
+func TestIsGenericTitle(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected bool
+	}{
+		{"", true},
+		{"Chapter 1", true},
+		{"Scene 1", true},
+		{"Untitled Chapter", true},
+		{"123", true},
+		{"00:01:02", true},
+		{"Real Title", false},
+	}
+	for _, tt := range tests {
+		if got := IsGenericTitle(tt.input); got != tt.expected {
+			t.Errorf("IsGenericTitle(%q) = %v, want %v", tt.input, got, tt.expected)
+		}
+	}
+}
+
+func TestIsDigit(t *testing.T) {
+	if !IsDigit("123") {
+		t.Error("IsDigit(123) should be true")
+	}
+	if IsDigit("12a") {
+		t.Error("IsDigit(12a) should be false")
+	}
+	if IsDigit("") {
+		t.Error("IsDigit('') should be false")
+	}
+}
+
+func TestIsTimecodeLike(t *testing.T) {
+	if !IsTimecodeLike("00:01:02") {
+		t.Error("IsTimecodeLike(00:01:02) should be true")
+	}
+	if !IsTimecodeLike("123") {
+		t.Error("IsTimecodeLike(123) should be true")
+	}
+	if IsTimecodeLike("abc") {
+		t.Error("IsTimecodeLike(abc) should be false")
+	}
+}
+
+func TestRemoveConsecutiveWhitespace(t *testing.T) {
+	input := "hello   world \t  again"
+	expected := "hello world again"
+	if got := RemoveConsecutiveWhitespace(input); got != expected {
+		t.Errorf("RemoveConsecutiveWhitespace(%q) = %q, want %q", input, got, expected)
+	}
+}
+
+func TestRemoveConsecutives(t *testing.T) {
+	if got := RemoveConsecutive("aaa", "a"); got != "a" {
+		t.Errorf("RemoveConsecutive(aaa) = %q, want a", got)
+	}
+	if got := RemoveConsecutives("aaabbb", []string{"a", "b"}); got != "ab" {
+		t.Errorf("RemoveConsecutives(aaabbb) = %q, want ab", got)
+	}
+}
+
+func TestRemovePrefixesSuffixes(t *testing.T) {
+	if got := RemovePrefixes("prepretest", []string{"pre"}); got != "test" {
+		t.Errorf("RemovePrefixes(prepretest) = %q, want test", got)
+	}
+	if got := RemoveSuffixes("testsuf", []string{"suf"}); got != "test" {
+		t.Errorf("RemoveSuffixes(testsuf) = %q, want test", got)
+	}
+}
+
+func TestUnParagraph(t *testing.T) {
+	input := "“Hello” world …"
+	expected := "'Hello' world ..."
+	if got := UnParagraph(input); got != expected {
+		t.Errorf("UnParagraph(%q) = %q, want %q", input, got, expected)
+	}
+}
+
+func TestTitle(t *testing.T) {
+	input := "hello world"
+	expected := "Hello World"
+	if got := Title(input); got != expected {
+		t.Errorf("Title(%q) = %q, want %q", input, got, expected)
+	}
+	if got := Title(""); got != "" {
+		t.Errorf("Title('') = %q, want ''", got)
+	}
+}
+
+func TestSplitAndTrim(t *testing.T) {
+	input := " a , b , c "
+	expected := []string{"a", "b", "c"}
+	got := SplitAndTrim(input, ",")
+	if !reflect.DeepEqual(got, expected) {
+		t.Errorf("SplitAndTrim() = %v, want %v", got, expected)
+	}
+}
+
+func TestRemoveExcessiveLinebreaks(t *testing.T) {
+	input := "a\n\n\n\nb"
+	expected := "a\n\nb"
+	if got := RemoveExcessiveLinebreaks(input); got != expected {
+		t.Errorf("RemoveExcessiveLinebreaks() = %q, want %q", got, expected)
+	}
+}
+
+func TestLastChars(t *testing.T) {
+	if got := LastChars("a.b.c"); got != "c" {
+		t.Errorf("LastChars(a.b.c) = %q, want c", got)
+	}
+}
+
+func TestFtsQuote(t *testing.T) {
+	input := []string{"hello", "world AND universe"}
+	expected := []string{"\"hello\"", "world AND universe"}
+	got := FtsQuote(input)
+	if !reflect.DeepEqual(got, expected) {
+		t.Errorf("FtsQuote() = %v, want %v", got, expected)
+	}
+}
+
+func TestEscapeXML(t *testing.T) {
+	input := "< & > \" '"
+	expected := "&lt; &amp; &gt; &quot; &apos;"
+	if got := EscapeXML(input); got != expected {
+		t.Errorf("EscapeXML() = %q, want %q", got, expected)
+	}
+}

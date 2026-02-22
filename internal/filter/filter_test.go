@@ -123,3 +123,17 @@ func TestApply_EmptyCriteria(t *testing.T) {
 		t.Fatalf("Expected %d results, got %d", len(media), len(result))
 	}
 }
+
+func TestApply_Exists(t *testing.T) {
+	media := []models.Media{
+		{Path: "filter_test.go"}, // This file exists
+		{Path: "/non/existent/file"},
+	}
+
+	criteria := Criteria{Exists: true}
+	result := Apply(media, criteria)
+
+	if len(result) != 1 {
+		t.Errorf("Expected 1 result, got %d", len(result))
+	}
+}

@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -33,5 +34,26 @@ func TestSizeTimeout(t *testing.T) {
 	}
 	if !SizeTimeout("10MB", 11*1024*1024) {
 		t.Error("SizeTimeout(10MB, 11MB) should be true")
+	}
+}
+
+func TestCmd(t *testing.T) {
+	res, err := Cmd("echo", "hello")
+	if err != nil {
+		t.Fatalf("Cmd failed: %v", err)
+	}
+	if strings.TrimSpace(res.Stdout) != "hello" {
+		t.Errorf("Expected hello, got %q", res.Stdout)
+	}
+	if res.ExitCode != 0 {
+		t.Errorf("Expected exit code 0, got %d", res.ExitCode)
+	}
+
+	res, err = Cmd("false")
+	if err != nil {
+		t.Fatalf("Cmd false failed with non-exit error: %v", err)
+	}
+	if res.ExitCode != 1 {
+		t.Errorf("Expected exit code 1, got %d", res.ExitCode)
 	}
 }

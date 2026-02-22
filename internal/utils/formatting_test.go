@@ -145,3 +145,15 @@ func TestRelativeDatetime(t *testing.T) {
 		t.Errorf("RelativeDatetime in 5 days failed, got %s", got)
 	}
 }
+
+func TestSecondsToHHMMSS(t *testing.T) {
+	if got := SecondsToHHMMSS(3661); got != "1:01:01" {
+		t.Errorf("SecondsToHHMMSS(3661) = %q, want 1:01:01", got)
+	}
+	if got := SecondsToHHMMSS(-3661); got != "-1:01:01" {
+		t.Errorf("SecondsToHHMMSS(-3661) = %q, want -1:01:01", got)
+	}
+	if got := SecondsToHHMMSS(61); got != "1:01" {
+		t.Errorf("SecondsToHHMMSS(61) = %q, want 1:01", got)
+	}
+}

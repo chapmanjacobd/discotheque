@@ -164,4 +164,35 @@ func TestDivideSequence(t *testing.T) {
 	if got := DivideSequence([]int{10, 0}); !math.IsInf(got, 1) {
 		t.Errorf("DivideSequence(10, 0) = %v, want +inf", got)
 	}
+	if got := DivideSequence[int](nil); got != 0 {
+		t.Errorf("DivideSequence(nil) = %v, want 0", got)
+	}
+}
+
+func TestUnique(t *testing.T) {
+	input := []int{1, 2, 2, 3, 1}
+	expected := []int{1, 2, 3}
+	got := Unique(input)
+	if !reflect.DeepEqual(got, expected) {
+		t.Errorf("Unique() = %v, want %v", got, expected)
+	}
+}
+
+func TestConcat(t *testing.T) {
+	s1 := []int{1, 2}
+	s2 := []int{3, 4}
+	expected := []int{1, 2, 3, 4}
+	got := Concat(s1, s2)
+	if !reflect.DeepEqual(got, expected) {
+		t.Errorf("Concat() = %v, want %v", got, expected)
+	}
+}
+
+func TestOrderedSet(t *testing.T) {
+	input := []int{1, 2, 2, 3, 1}
+	expected := []int{1, 2, 3}
+	got := OrderedSet(input)
+	if !reflect.DeepEqual(got, expected) {
+		t.Errorf("OrderedSet() = %v, want %v", got, expected)
+	}
 }

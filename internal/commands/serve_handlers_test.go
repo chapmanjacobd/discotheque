@@ -250,4 +250,21 @@ func TestServeCmd_Handlers(t *testing.T) {
 			t.Errorf("Expected 200 or 500, got 404")
 		}
 	})
+
+	t.Run("HandleOPDS", func(t *testing.T) {
+		db := fixture.GetDB()
+		db.Exec("INSERT INTO media (path, type, time_deleted) VALUES (?, 'application/pdf', 0)", "book.pdf")
+		db.Close()
+
+		req := httptest.NewRequest(http.MethodGet, "/opds", nil)
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Errorf("Expected 200, got %d", w.Code)
+		}
+		if !strings.Contains(w.Body.String(), "<feed") {
+			t.Errorf("Expected OPDS feed, got %s", w.Body.String())
+		}
+	})
 }

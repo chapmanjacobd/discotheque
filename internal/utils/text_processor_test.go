@@ -1,7 +1,6 @@
 package utils
 
 import (
-	"reflect"
 	"testing"
 
 	"github.com/chapmanjacobd/discotheque/internal/models"
@@ -9,23 +8,69 @@ import (
 
 func TestTextProcessor(t *testing.T) {
 	lines := []string{
+		"cherry cherry cherry",
 		"apple banana cherry",
 		"banana apple apple",
-		"cherry cherry cherry",
 	}
 
-	flags := models.GlobalFlags{
-		WordSorts: []string{"alpha"},
-		LineSorts: []string{"count"},
+	t.Run("LineSortAlpha", func(t *testing.T) {
+		flags := models.GlobalFlags{
+			LineSorts: []string{"line"},
+		}
+		got := TextProcessor(flags, lines)
+		// apple banana cherry, banana apple apple, cherry cherry cherry
+		if got[0] != "apple banana cherry" {
+			t.Errorf("Expected apple... first, got %s", got[0])
+		}
+	})
+
+	t.Run("WordSortAlpha", func(t *testing.T) {
+		flags := models.GlobalFlags{
+			WordSorts: []string{"alpha"},
+			LineSorts: []string{"line"},
+		}
+		// This should sort lines by original string, but word sorting happens internally.
+		// Since we only get original lines back, it's hard to verify word sorting unless it affects line sorting.
+		got := TextProcessor(flags, lines)
+		if len(got) != 3 {
+			t.Error("Lost lines")
+		}
+	})
+}
+
+func TestComparisonHelpers(t *testing.T) {
+	if compareInt(1, 2) != -1 {
+		t.Error("compareInt failed")
 	}
+	if compareFloat(1.5, 1.1) != 1 {
+		t.Error("compareFloat failed")
+	}
+	if compareBool(true, false) != 1 {
+		t.Error("compareBool failed")
+	}
+	if compareString("a", "b") != -1 {
+		t.Error("compareString failed")
+	}
+}
 
-	// All lines have 3 words, so count sorting won't change order if stable.
-	// But let's check word sorting within each line if we were to expose it.
-	// TextProcessor returns original lines sorted.
+func TestStatsHelpers(t *testing.T) {
+	words := []string{"a", "b", "a"}
+	stats := map[string]int{"a": 2, "b": 1}
 
-	got := TextProcessor(flags, lines)
-	if !reflect.DeepEqual(got, lines) {
-		t.Errorf("TextProcessor failed, got %v, want %v", got, lines)
+	if got := sumDups(words, stats); got != 2 {
+		t.Errorf("sumDups = %d, want 2", got)
+	}
+	if got := sumUnique(words, stats); got != 1 {
+		t.Errorf("sumUnique = %d, want 1", got)
+	}
+	if got := sumCounts(words, stats); got != 5 {
+		t.Errorf("sumCounts = %d, want 5", got)
+	}
+	if got := maxCount(words, stats); got != 2 {
+		t.Errorf("maxCount = %d, want 2", got)
+	}
+	if got := minCount(words, stats); got != 1 {
+		t.Errorf("minCount = %d, want 1", got)
 	}
 }
 

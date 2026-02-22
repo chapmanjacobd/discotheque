@@ -15,6 +15,13 @@ func TestSearchCaptionsCmd_Run(t *testing.T) {
 	sqlDB, _ := sql.Open("sqlite3", dbPath)
 	InitDB(sqlDB)
 
+	// Skip if FTS5 is not available
+	var name string
+	err := sqlDB.QueryRow("SELECT name FROM sqlite_master WHERE type='table' AND name='captions_fts'").Scan(&name)
+	if err != nil {
+		t.Skip("FTS5 not available, skipping search captions tests")
+	}
+
 	sqlDB.Exec("INSERT INTO media (path, title) VALUES (?, ?)", "/path/video1.mp4", "Video 1")
 	sqlDB.Exec("INSERT INTO captions (media_path, time, text) VALUES (?, ?, ?)", "/path/video1.mp4", 10.0, "hello world")
 	sqlDB.Exec("INSERT INTO captions (media_path, time, text) VALUES (?, ?, ?)", "/path/video1.mp4", 12.0, "this is overlapping")

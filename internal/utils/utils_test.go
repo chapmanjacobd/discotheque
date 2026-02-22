@@ -108,4 +108,56 @@ func TestDictFilterBool(t *testing.T) {
 	if len(got) != 1 || got["a"] != 1 {
 		t.Errorf("DictFilterBool() = %v, want {a: 1}", got)
 	}
+	if got := DictFilterBool(nil); got != nil {
+		t.Errorf("DictFilterBool(nil) = %v, want nil", got)
+	}
+	if got := DictFilterBool(map[string]any{"a": 0}); got != nil {
+		t.Errorf("DictFilterBool(all false) = %v, want nil", got)
+	}
+}
+
+func TestRangeMatches(t *testing.T) {
+	val10 := int64(10)
+	val20 := int64(20)
+	tests := []struct {
+		r     Range
+		val   int64
+		match bool
+	}{
+		{Range{Value: &val10}, 10, true},
+		{Range{Value: &val10}, 11, false},
+		{Range{Min: &val10}, 10, true},
+		{Range{Min: &val10}, 9, false},
+		{Range{Max: &val20}, 20, true},
+		{Range{Max: &val20}, 21, false},
+		{Range{Min: &val10, Max: &val20}, 15, true},
+	}
+	for _, tt := range tests {
+		if got := tt.r.Matches(tt.val); got != tt.match {
+			t.Errorf("%+v.Matches(%d) = %v, want %v", tt.r, tt.val, got, tt.match)
+		}
+	}
+}
+
+func TestToNull(t *testing.T) {
+	if got := ToNullInt64(123); !got.Valid || got.Int64 != 123 {
+		t.Errorf("ToNullInt64(123) failed: %v", got)
+	}
+	if got := ToNullInt64(0); got.Valid {
+		t.Error("ToNullInt64(0) should be invalid")
+	}
+
+	if got := ToNullString("hello"); !got.Valid || got.String != "hello" {
+		t.Errorf("ToNullString(hello) failed: %v", got)
+	}
+	if got := ToNullString(""); got.Valid {
+		t.Error("ToNullString('') should be invalid")
+	}
+
+	if got := ToNullFloat64(1.23); !got.Valid || got.Float64 != 1.23 {
+		t.Errorf("ToNullFloat64(1.23) failed: %v", got)
+	}
+	if got := ToNullFloat64(0); got.Valid {
+		t.Error("ToNullFloat64(0) should be invalid")
+	}
 }

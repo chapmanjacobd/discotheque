@@ -106,3 +106,171 @@ func TestFloatFromPercent(t *testing.T) {
 		}
 	}
 }
+
+func TestRandomFloat(t *testing.T) {
+	got := RandomFloat()
+	if got < 0 || got > 1 {
+		t.Errorf("RandomFloat() = %v, want in [0, 1)", got)
+	}
+}
+
+func TestRandomInt(t *testing.T) {
+	got := RandomInt(5, 10)
+	if got < 5 || got >= 10 {
+		t.Errorf("RandomInt(5, 10) = %v, want in [5, 10)", got)
+	}
+	if got2 := RandomInt(10, 5); got2 != 10 {
+		t.Errorf("RandomInt(10, 5) = %v, want 10", got2)
+	}
+}
+
+func TestLinearInterpolation(t *testing.T) {
+	data := [][2]float64{{0, 0}, {10, 100}}
+	tests := []struct {
+		x    float64
+		want float64
+	}{
+		{-1, 0},
+		{0, 0},
+		{5, 50},
+		{10, 100},
+		{11, 100},
+	}
+	for _, tt := range tests {
+		if got := LinearInterpolation(tt.x, data); got != tt.want {
+			t.Errorf("LinearInterpolation(%v) = %v, want %v", tt.x, got, tt.want)
+		}
+	}
+	if got := LinearInterpolation(5, nil); got != 0 {
+		t.Errorf("LinearInterpolation with nil data = %v, want 0", got)
+	}
+}
+
+func TestSafeMean(t *testing.T) {
+	if got := SafeMean([]int{1, 2, 3}); got != 2.0 {
+		t.Errorf("SafeMean([1, 2, 3]) = %v, want 2.0", got)
+	}
+	if got := SafeMean([]float64{}); got != 0 {
+		t.Errorf("SafeMean([]) = %v, want 0", got)
+	}
+}
+
+func TestSafeMedian(t *testing.T) {
+	if got := SafeMedian([]int{1, 3, 2}); got != 2.0 {
+		t.Errorf("SafeMedian([1, 3, 2]) = %v, want 2.0", got)
+	}
+	if got := SafeMedian([]int{1, 2, 3, 4}); got != 2.5 {
+		t.Errorf("SafeMedian([1, 2, 3, 4]) = %v, want 2.5", got)
+	}
+	if got := SafeMedian([]float64{}); got != 0 {
+		t.Errorf("SafeMedian([]) = %v, want 0", got)
+	}
+}
+
+func TestHumanToBits(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected int64
+	}{
+		{"1000", 1000},
+		{"1KBIT", 1000},
+		{"1M", 1000 * 1000},
+		{"1.5GBIT", 1500000000},
+	}
+	for _, tt := range tests {
+		got, err := HumanToBits(tt.input)
+		if err != nil {
+			t.Errorf("HumanToBits(%q) error: %v", tt.input, err)
+			continue
+		}
+		if got != tt.expected {
+			t.Errorf("HumanToBits(%q) = %d, want %d", tt.input, got, tt.expected)
+		}
+	}
+}
+
+func TestPercentageDifference(t *testing.T) {
+	if got := PercentageDifference(10, 10); got != 0 {
+		t.Errorf("PercentageDifference(10, 10) = %v, want 0", got)
+	}
+	if got := PercentageDifference(0, 0); got != 100.0 {
+		t.Errorf("PercentageDifference(0, 0) = %v, want 100.0", got)
+	}
+}
+
+func TestCalculateSegments(t *testing.T) {
+	got := CalculateSegments(100, 10, 0.1)
+	if len(got) == 0 {
+		t.Errorf("CalculateSegments(100, 10, 0.1) returned nil")
+	}
+	if got2 := CalculateSegments(20, 10, 0.1); len(got2) != 1 || got2[0] != 0 {
+		t.Errorf("CalculateSegments(20, 10, 0.1) = %v, want [0]", got2)
+	}
+	if got3 := CalculateSegments(0, 10, 0.1); got3 != nil {
+		t.Errorf("CalculateSegments(0, 10, 0.1) = %v, want nil", got3)
+	}
+}
+
+func TestCalculateSegmentsInt(t *testing.T) {
+	got := CalculateSegmentsInt(100, 10, 5)
+	if len(got) == 0 {
+		t.Errorf("CalculateSegmentsInt(100, 10, 5) returned nil")
+	}
+	if got2 := CalculateSegmentsInt(20, 10, 0.1); len(got2) != 1 || got2[0] != 0 {
+		t.Errorf("CalculateSegmentsInt(20, 10, 0.1) = %v, want [0]", got2)
+	}
+	if got3 := CalculateSegmentsInt(0, 10, 0.1); got3 != nil {
+		t.Errorf("CalculateSegmentsInt(0, 10, 0.1) = %v, want nil", got3)
+	}
+}
+
+func TestSafeIntFloat(t *testing.T) {
+	if got := SafeInt("123"); got == nil || *got != 123 {
+		t.Errorf("SafeInt(123) = %v, want 123", got)
+	}
+	if got := SafeInt(""); got != nil {
+		t.Errorf("SafeInt('') = %v, want nil", got)
+	}
+	if got := SafeInt("abc"); got != nil {
+		t.Errorf("SafeInt('abc') = %v, want nil", got)
+	}
+
+	if got := SafeFloat("123.45"); got == nil || *got != 123.45 {
+		t.Errorf("SafeFloat(123.45) = %v, want 123.45", got)
+	}
+	if got := SafeFloat(""); got != nil {
+		t.Errorf("SafeFloat('') = %v, want nil", got)
+	}
+}
+
+func TestSqlHumanTime(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"10", "10 minutes"},
+		{"10min", "10 minutes"},
+		{"10s", "10 seconds"},
+		{"other", "other"},
+	}
+	for _, tt := range tests {
+		if got := SqlHumanTime(tt.input); got != tt.expected {
+			t.Errorf("SqlHumanTime(%q) = %q, want %q", tt.input, got, tt.expected)
+		}
+	}
+}
+
+func TestMaxMin(t *testing.T) {
+	if got := Max(1, 2); got != 2 {
+		t.Errorf("Max(1, 2) = %v, want 2", got)
+	}
+	if got := Max(2, 1); got != 2 {
+		t.Errorf("Max(2, 1) = %v, want 2", got)
+	}
+	if got := Min(1, 2); got != 1 {
+		t.Errorf("Min(1, 2) = %v, want 1", got)
+	}
+	if got := Min(2, 1); got != 1 {
+		t.Errorf("Min(2, 1) = %v, want 1", got)
+	}
+}

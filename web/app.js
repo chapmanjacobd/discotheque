@@ -713,8 +713,8 @@ document.addEventListener('DOMContentLoaded', () => {
             if (emptyBtn) emptyBtn.onclick = emptyBin;
         } else {
             if (state.filters.all || currentMedia.length < state.filters.limit) {
-                const unit = currentMedia.length === 1 ? 'file' : 'files';
-                resultsCount.textContent = `${currentMedia.length} ${unit} found`;
+                const unit = currentMedia.length === 1 ? 'result' : 'results';
+                resultsCount.textContent = `${currentMedia.length} ${unit}`;
             } else {
                 resultsCount.textContent = '';
             }

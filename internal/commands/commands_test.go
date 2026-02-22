@@ -129,6 +129,33 @@ func TestSearchDBCmd_Run(t *testing.T) {
 			t.Errorf("Expected 1 row left, got %d", count)
 		}
 	})
+
+	t.Run("MarkDeletedRows", func(t *testing.T) {
+		dbConn, _ := sql.Open("sqlite3", dbPath)
+		dbConn.Exec("ALTER TABLE test ADD COLUMN time_deleted INTEGER")
+		dbConn.Exec("INSERT INTO test (name, val) VALUES ('banana', 'fruit')")
+		dbConn.Close()
+
+		cmd := &SearchDBCmd{
+			GlobalFlags: models.GlobalFlags{
+				MarkDeleted: true,
+			},
+			Database: dbPath,
+			Table:    "test",
+			Search:   []string{"banana"},
+		}
+		if err := cmd.Run(nil); err != nil {
+			t.Fatalf("SearchDBCmd failed: %v", err)
+		}
+
+		dbConn, _ = sql.Open("sqlite3", dbPath)
+		defer dbConn.Close()
+		var timeDeleted sql.NullInt64
+		dbConn.QueryRow("SELECT time_deleted FROM test WHERE name = 'banana'").Scan(&timeDeleted)
+		if !timeDeleted.Valid || timeDeleted.Int64 == 0 {
+			t.Error("Expected row to be marked as deleted")
+		}
+	})
 }
 
 func TestMergeDBsCmd_Run(t *testing.T) {

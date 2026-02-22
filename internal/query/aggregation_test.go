@@ -115,24 +115,49 @@ func TestAggregateByDepthExtended(t *testing.T) {
 	}
 }
 
-func TestAggregatePostFiltering(t *testing.T) {
+func TestAggregateMediaAllModes(t *testing.T) {
 	size100 := int64(100)
-	size200 := int64(200)
+	video := "video/mp4"
 	media := []models.MediaWithDB{
-		{Media: models.Media{Path: "/dir1/f1.mp4", Size: &size100}},
-		{Media: models.Media{Path: "/dir2/f2.mp4", Size: &size200}},
+		{Media: models.Media{Path: "test.mp4", Size: &size100, Type: &video}},
 	}
 
-	// Filter by size > 150
-	flags := models.GlobalFlags{
-		Depth:       1,
-		FolderSizes: []string{">150B"},
+	// Extensions
+	got := AggregateMedia(media, models.GlobalFlags{GroupByExtensions: true})
+	if len(got) != 1 || got[0].Path != ".mp4" {
+		t.Errorf("Extensions mode failed: %v", got)
 	}
-	got := AggregateMedia(media, flags)
+
+	// MimeTypes
+	got = AggregateMedia(media, models.GlobalFlags{GroupByMimeTypes: true})
+	if len(got) != 1 || got[0].Path != video {
+		t.Errorf("MimeTypes mode failed: %v", got)
+	}
+
+	// Size
+	got = AggregateMedia(media, models.GlobalFlags{GroupBySize: true})
 	if len(got) != 1 {
-		t.Errorf("Expected 1 group after filtering, got %d", len(got))
+		t.Errorf("Size mode failed: %v", got)
 	}
-	if got[0].Path != "/dir2" {
-		t.Errorf("Expected group /dir2, got %s", got[0].Path)
+}
+
+func TestAggregatePostFilteringExtra(t *testing.T) {
+	size100 := int64(100)
+	media := []models.MediaWithDB{
+		{Media: models.Media{Path: "/dir1/f1.mp4", Size: &size100}},
+		{Media: models.Media{Path: "/dir1/f2.mp4", Size: &size100}},
+		{Media: models.Media{Path: "/dir2/f1.mp4", Size: &size100}},
+	}
+
+	// Filter by FileCounts > 1
+	got := AggregateMedia(media, models.GlobalFlags{Depth: 1, FileCounts: ">1"})
+	if len(got) != 1 || got[0].Path != "/dir1" {
+		t.Errorf("FileCounts filtering failed: %v", got)
+	}
+
+	// Filter by FoldersOnly
+	got = AggregateMedia(media, models.GlobalFlags{Depth: 1, FoldersOnly: true})
+	if len(got) != 2 {
+		t.Errorf("FoldersOnly failed: %v", got)
 	}
 }

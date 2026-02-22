@@ -1,6 +1,9 @@
 package utils
 
 import (
+	"bufio"
+	"encoding/json"
+	"net"
 	"os"
 	"path/filepath"
 	"testing"
@@ -8,6 +11,57 @@ import (
 
 	"github.com/chapmanjacobd/discotheque/internal/models"
 )
+
+func TestMpvCall(t *testing.T) {
+	socketPath := filepath.Join(t.TempDir(), "mpv-test.sock")
+	ln, err := net.Listen("unix", socketPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ln.Close()
+
+	go func() {
+		conn, err := ln.Accept()
+		if err != nil {
+			return
+		}
+		defer conn.Close()
+		scanner := bufio.NewScanner(conn)
+		if scanner.Scan() {
+			resp := MpvResponse{Data: "pong"}
+			jsonData, _ := json.Marshal(resp)
+			conn.Write(append(jsonData, '\n'))
+		}
+	}()
+
+	resp, err := MpvCall(socketPath, "ping")
+	if err != nil {
+		t.Fatalf("MpvCall failed: %v", err)
+	}
+	if resp.Data != "pong" {
+		t.Errorf("Expected pong, got %v", resp.Data)
+	}
+}
+
+func TestMpvWatchLaterValue(t *testing.T) {
+	f, _ := os.CreateTemp("", "watch-later")
+	defer os.Remove(f.Name())
+	f.WriteString("key1=val1\nkey2=val2\n")
+	f.Close()
+
+	val, err := MpvWatchLaterValue(f.Name(), "key2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if val != "val2" {
+		t.Errorf("Expected val2, got %s", val)
+	}
+
+	val, _ = MpvWatchLaterValue(f.Name(), "missing")
+	if val != "" {
+		t.Errorf("Expected empty string for missing key, got %s", val)
+	}
+}
 
 func TestPathToMpvWatchLaterMD5(t *testing.T) {
 	path := "/home/xk/github/xk/lb/tests/data/test.mp4"

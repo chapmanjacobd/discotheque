@@ -12,11 +12,6 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-//go:fix inline
-func ptr[T any](v T) *T {
-	return new(v)
-}
-
 func TestNewQueryBuilder(t *testing.T) {
 	flags := models.GlobalFlags{Query: "SELECT 1"}
 	qb := NewQueryBuilder(flags)
@@ -368,7 +363,7 @@ func TestMediaQuery(t *testing.T) {
 	defer os.Remove(dbPath2)
 
 	schema := `
-	CREATE TABLE media (path TEXT PRIMARY KEY, time_deleted INTEGER DEFAULT 0);
+	CREATE TABLE media (path TEXT PRIMARY KEY, time_deleted INTEGER DEFAULT 0, size INTEGER, duration INTEGER);
 	CREATE TABLE history (id INTEGER PRIMARY KEY AUTOINCREMENT, media_path TEXT NOT NULL, time_played INTEGER, playhead INTEGER, done INTEGER);
 	CREATE TABLE captions (media_path TEXT NOT NULL, time REAL, text TEXT);
 	`
@@ -388,5 +383,79 @@ func TestMediaQuery(t *testing.T) {
 
 	if len(results) != 2 {
 		t.Fatalf("Expected 2 results, got %d", len(results))
+	}
+}
+
+func TestReRankMedia(t *testing.T) {
+	size100 := int64(100)
+	size200 := int64(200)
+	dur10 := int64(10)
+	dur20 := int64(20)
+	media := []models.MediaWithDB{
+		{Media: models.Media{Path: "a", Size: &size200, Duration: &dur10}},
+		{Media: models.Media{Path: "b", Size: &size100, Duration: &dur20}},
+	}
+
+	// Re-rank by size (desc) and duration (asc)
+	flags := models.GlobalFlags{ReRank: "-size=1 duration=1"}
+	got := ReRankMedia(media, flags)
+	if len(got) != 2 {
+		t.Errorf("Expected 2 results, got %d", len(got))
+	}
+}
+
+func TestSortHistory(t *testing.T) {
+	t1 := int64(1000)
+	t2 := int64(2000)
+	media := []models.MediaWithDB{
+		{Media: models.Media{Path: "a", TimeLastPlayed: &t1}},
+		{Media: models.Media{Path: "b", TimeLastPlayed: &t2}},
+	}
+
+	SortHistory(media, "p", false)
+	if len(media) != 2 {
+		t.Errorf("Expected 2 results, got %d", len(media))
+	}
+}
+
+func TestRegexSortMedia(t *testing.T) {
+	media := []models.MediaWithDB{
+		{Media: models.Media{Path: "movie_part2.mp4"}},
+		{Media: models.Media{Path: "movie_part1.mp4"}},
+	}
+
+	got := RegexSortMedia(media, models.GlobalFlags{RegexSort: true})
+	if len(got) != 2 {
+		t.Errorf("Expected 2 results, got %d", len(got))
+	}
+	if !strings.Contains(got[0].Path, "part1") {
+		t.Errorf("Expected part1 first, got %s", got[0].Path)
+	}
+}
+
+func TestHistoricalUsage(t *testing.T) {
+	f, _ := os.CreateTemp("", "hist-usage-test-*.db")
+	dbPath := f.Name()
+	f.Close()
+	defer os.Remove(dbPath)
+
+	dbConn, _ := sql.Open("sqlite3", dbPath)
+	dbConn.Exec("CREATE TABLE media (path TEXT PRIMARY KEY, time_deleted INTEGER DEFAULT 0, size INTEGER, duration INTEGER, time_last_played INTEGER)")
+	dbConn.Exec("INSERT INTO media (path, size, duration, time_last_played) VALUES ('a', 100, 10, 1704067200)") // 2024-01-01
+	dbConn.Close()
+
+	stats, err := HistoricalUsage(context.Background(), dbPath, "monthly", "time_last_played")
+	if err != nil {
+		t.Fatalf("HistoricalUsage failed: %v", err)
+	}
+	if len(stats) == 0 {
+		t.Error("Expected stats, got none")
+	}
+}
+
+func TestOverrideSort(t *testing.T) {
+	got := OverrideSort("month_created")
+	if !strings.Contains(got, "strftime") {
+		t.Errorf("OverrideSort failed: %s", got)
 	}
 }

@@ -154,3 +154,32 @@ func TestFilterNearDuplicates(t *testing.T) {
 		t.Errorf("Expected group to be split, got %d", len(got))
 	}
 }
+
+func TestClusterFoldersByName(t *testing.T) {
+	folders := []models.FolderStats{
+		{Path: "/path/to/movie_part1", Count: 1},
+		{Path: "/path/to/movie_part2", Count: 1},
+		{Path: "/path/to/completely_different_thing", Count: 1},
+	}
+
+	got := ClusterFoldersByName(models.GlobalFlags{Similar: false}, folders)
+	if len(got) != 2 {
+		t.Errorf("Expected 2 groups, got %d", len(got))
+	}
+}
+
+func TestClusterPaths(t *testing.T) {
+	lines := []string{
+		"/path/to/movie_a_part1.mp4",
+		"/path/to/movie_a_part2.mp4",
+		"/path/to/movie_b_part1.mp4",
+		"/path/to/movie_b_part2.mp4",
+		"/other/completely/different/file.txt",
+	}
+
+	got := ClusterPaths(models.GlobalFlags{Clusters: 2}, lines)
+	if len(got) < 1 {
+		t.Error("ClusterPaths returned no groups")
+	}
+	// KMeans is non-deterministic but with 2 clusters it should produce some grouping
+}

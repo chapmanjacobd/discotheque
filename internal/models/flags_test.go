@@ -7,7 +7,10 @@ import (
 
 func TestGlobalFlags_AfterApply(t *testing.T) {
 	flags := GlobalFlags{
-		Ext: []string{"mp4", ".mkv"},
+		Ext:       []string{"mp4", ".mkv"},
+		Simulate:  true,
+		NoConfirm: true,
+		Ignore:    true,
 	}
 	err := flags.AfterApply()
 	if err != nil {
@@ -18,6 +21,15 @@ func TestGlobalFlags_AfterApply(t *testing.T) {
 	}
 	if flags.Ext[1] != ".mkv" {
 		t.Errorf("Expected .mkv, got %s", flags.Ext[1])
+	}
+	if !flags.DryRun {
+		t.Error("Expected DryRun to be true when Simulate is true")
+	}
+	if !flags.Yes {
+		t.Error("Expected Yes to be true when NoConfirm is true")
+	}
+	if !flags.OnlyNewRows {
+		t.Error("Expected OnlyNewRows to be true when Ignore is true")
 	}
 }
 

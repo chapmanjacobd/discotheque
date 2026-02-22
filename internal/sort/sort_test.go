@@ -69,9 +69,11 @@ func TestApply_ByOtherFields(t *testing.T) {
 	titleB := "B"
 	var dur100 int64 = 100
 	var dur200 int64 = 200
+	var time100 int64 = 100
+	var time200 int64 = 200
 	media := []models.Media{
-		{Path: "2", Title: &titleB, Duration: &dur200},
-		{Path: "1", Title: &titleA, Duration: &dur100},
+		{Path: "2", Title: &titleB, Duration: &dur200, TimeCreated: &time200, TimeModified: &time200, TimeLastPlayed: &time200, PlayCount: &time200},
+		{Path: "1", Title: &titleA, Duration: &dur100, TimeCreated: &time100, TimeModified: &time100, TimeLastPlayed: &time100, PlayCount: &time100},
 	}
 
 	Apply(media, ByTitle, false, false)
@@ -82,6 +84,26 @@ func TestApply_ByOtherFields(t *testing.T) {
 	Apply(media, ByDuration, false, false)
 	if *media[0].Duration != 100 {
 		t.Errorf("Expected 100 first")
+	}
+
+	Apply(media, ByTimeCreated, false, false)
+	if *media[0].TimeCreated != 100 {
+		t.Errorf("Expected timeCreated 100 first")
+	}
+
+	Apply(media, ByTimeModified, false, false)
+	if *media[0].TimeModified != 100 {
+		t.Errorf("Expected timeModified 100 first")
+	}
+
+	Apply(media, ByTimePlayed, false, false)
+	if *media[0].TimeLastPlayed != 100 {
+		t.Errorf("Expected timePlayed 100 first")
+	}
+
+	Apply(media, ByPlayCount, false, false)
+	if *media[0].PlayCount != 100 {
+		t.Errorf("Expected playCount 100 first")
 	}
 
 	Apply(media, Method("invalid"), false, false)
