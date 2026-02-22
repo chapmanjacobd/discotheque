@@ -30,13 +30,18 @@ func IsCorruptionError(err error) bool {
 
 // Repair attempts to repair a corrupted SQLite database
 func Repair(dbPath string) error {
+	start := time.Now()
 	mu := getLock(dbPath)
 	mu.Lock()
 	defer mu.Unlock()
 
+	waitDuration := time.Since(start)
+
 	// Check if it's actually corrupt (maybe fixed by previous repair in race)
 	if isHealthy(dbPath) {
-		slog.Info("Database appears healthy (race condition handled), skipping repair", "path", dbPath)
+		if waitDuration > 1*time.Millisecond {
+			slog.Info("Database was repaired by another goroutine", "path", dbPath, "wait_time", waitDuration.String())
+		}
 		return nil
 	}
 
@@ -45,7 +50,8 @@ func Repair(dbPath string) error {
 	}
 
 	// Backup
-	backupPath := fmt.Sprintf("%s.corrupt.%d.bak", dbPath, time.Now().Unix())
+	now := time.Now().Unix()
+	backupPath := fmt.Sprintf("%s.corrupt.%d.bak", dbPath, now)
 	slog.Info("Backing up corrupted database", "src", dbPath, "dst", backupPath)
 
 	// Check if file exists before renaming
@@ -55,6 +61,14 @@ func Repair(dbPath string) error {
 
 	if err := os.Rename(dbPath, backupPath); err != nil {
 		return fmt.Errorf("failed to backup database: %w", err)
+	}
+
+	// Also move sidecar files if they exist to prevent them from being used with the new DB
+	for _, suffix := range []string{"-wal", "-shm"} {
+		sidecar := dbPath + suffix
+		if _, err := os.Stat(sidecar); err == nil {
+			os.Rename(sidecar, backupPath+suffix)
+		}
 	}
 
 	tempPath := dbPath + ".recovering"
@@ -107,11 +121,23 @@ func isHealthy(dbPath string) bool {
 	}
 	defer db.Close()
 
-	// Try a simple query to check header
+	// Try a more thorough integrity check. 
+	// We don't use (1) because we want to be sure it's really healthy if we're skipping a repair.
 	var s string
-	err = db.QueryRow("PRAGMA integrity_check(1)").Scan(&s)
+	err = db.QueryRow("PRAGMA integrity_check").Scan(&s)
 	if err != nil {
 		return false
 	}
-	return s == "ok"
+	if s != "ok" {
+		return false
+	}
+
+	// Try to read from sqlite_master to ensure the schema is readable
+	rows, err := db.Query("SELECT name FROM sqlite_master LIMIT 1")
+	if err != nil {
+		return false
+	}
+	rows.Close()
+
+	return true
 }
