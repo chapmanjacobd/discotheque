@@ -76,6 +76,12 @@ func (qb *QueryBuilder) Build() (string, []any) {
 		}
 	}
 
+	// Genre filter
+	if qb.Flags.Genre != "" {
+		whereClauses = append(whereClauses, "genre = ?")
+		args = append(args, qb.Flags.Genre)
+	}
+
 	// Search terms (FTS or LIKE)
 	allInclude := append([]string{}, qb.Flags.Search...)
 	allInclude = append(allInclude, qb.Flags.Include...)

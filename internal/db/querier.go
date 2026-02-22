@@ -14,6 +14,7 @@ type Querier interface {
 	DeletePlaylist(ctx context.Context, arg DeletePlaylistParams) error
 	GetAllMediaMetadata(ctx context.Context) ([]GetAllMediaMetadataRow, error)
 	GetCategoryStats(ctx context.Context) ([]GetCategoryStatsRow, error)
+	GetGenreStats(ctx context.Context) ([]GetGenreStatsRow, error)
 	GetHistoryCount(ctx context.Context, mediaPath string) (int64, error)
 	GetMedia(ctx context.Context, limit int64) ([]Media, error)
 	GetMediaByDuration(ctx context.Context, arg GetMediaByDurationParams) ([]Media, error)

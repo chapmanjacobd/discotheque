@@ -28,6 +28,7 @@ document.addEventListener('DOMContentLoaded', () => {
             types: ['video', 'audio'], // Default selection
             search: '',
             category: '',
+            genre: '',
             rating: '',
             playlist: null,
             sort: 'path',
@@ -48,6 +49,7 @@ document.addEventListener('DOMContentLoaded', () => {
         globalProgress: false,
         dev: false,
         categories: [],
+        genres: [],
         ratings: [],
         playlists: [],
         playback: {
@@ -94,6 +96,7 @@ document.addEventListener('DOMContentLoaded', () => {
             params.set('view', 'text');
         } else {
             if (state.filters.category) params.set('category', state.filters.category);
+            if (state.filters.genre) params.set('genre', state.filters.genre);
             if (state.filters.rating !== '') params.set('rating', state.filters.rating);
             if (state.filters.search) params.set('search', state.filters.search);
         }
@@ -131,6 +134,7 @@ document.addEventListener('DOMContentLoaded', () => {
             state.filters.rating = '';
         } else {
             state.page = 'search'; state.filters.category = params.get('category') || '';
+            state.filters.genre = params.get('genre') || '';
             state.filters.rating = params.get('rating') || '';
             state.filters.search = params.get('search') || '';
             if (searchInput) searchInput.value = state.filters.search;
@@ -149,6 +153,7 @@ document.addEventListener('DOMContentLoaded', () => {
             performSearch();
         }
         renderCategoryList();
+        renderGenreList();
         renderRatingList();
         renderPlaylistList();
     };
@@ -185,6 +190,49 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (err) {
             console.error('Failed to fetch categories', err);
         }
+    }
+
+    async function fetchGenres() {
+        try {
+            const resp = await fetch('/api/genres');
+            if (!resp.ok) throw new Error('Failed to fetch genres');
+            state.genres = await resp.json() || [];
+            renderGenreList();
+        } catch (err) {
+            console.error('Failed to fetch genres', err);
+        }
+    }
+
+    function renderGenreList() {
+        const genreList = document.getElementById('genre-list');
+        if (!genreList) return;
+
+        const trashBtn = document.getElementById('trash-btn');
+        const historyBtn = document.getElementById('history-btn');
+        if (trashBtn && state.page !== 'trash') trashBtn.classList.remove('active');
+        if (historyBtn && state.page !== 'history') historyBtn.classList.remove('active');
+
+        genreList.innerHTML = state.genres.map(g => `
+            <button class="category-btn ${state.filters.genre === g.genre ? 'active' : ''}" data-genre="${g.genre}">
+                ${g.genre} <small>(${g.count})</small>
+            </button>
+        `).join('');
+
+        genreList.querySelectorAll('.category-btn').forEach(btn => {
+            btn.onclick = (e) => {
+                const genre = e.target.dataset.genre;
+                state.filters.genre = genre;
+                state.filters.category = ''; // Clear category filter
+                state.filters.rating = ''; // Clear rating filter
+
+                document.querySelectorAll('.category-btn').forEach(b => b.classList.remove('active'));
+                if (trashBtn) trashBtn.classList.remove('active');
+                if (historyBtn) historyBtn.classList.remove('active');
+                e.target.classList.add('active');
+
+                performSearch();
+            };
+        });
     }
 
     async function fetchRatings() {
@@ -254,6 +302,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function fetchPlaylistItems(playlist) {
         state.page = 'playlist';
+        state.filters.genre = '';
         syncUrl();
         try {
             const resp = await fetch(`/api/playlists/items?id=${playlist.id}&db=${encodeURIComponent(playlist.db)}`);
@@ -381,6 +430,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const rating = e.target.dataset.rating;
                 state.filters.rating = rating;
                 state.filters.category = ''; // Clear category filter
+                state.filters.genre = ''; // Clear genre filter
 
                 document.querySelectorAll('.category-btn').forEach(b => b.classList.remove('active'));
                 if (trashBtn) trashBtn.classList.remove('active');
@@ -420,6 +470,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (state.filters.search) params.append('search', state.filters.search);
             if (state.filters.category) params.append('category', state.filters.category);
+            if (state.filters.genre) params.append('genre', state.filters.genre);
             if (state.filters.rating !== '') params.append('rating', state.filters.rating);
             params.append('sort', state.filters.sort);
 
@@ -487,6 +538,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function fetchHistory() {
         state.page = 'history';
+        state.filters.genre = '';
         syncUrl();
         try {
             const params = new URLSearchParams();
@@ -1268,6 +1320,7 @@ document.addEventListener('DOMContentLoaded', () => {
             btn.onclick = (e) => {
                 const cat = e.target.dataset.cat;
                 state.filters.category = cat;
+                state.filters.genre = ''; // Clear genre filter
                 state.filters.rating = ''; // Clear rating filter
 
                 document.querySelectorAll('.category-btn').forEach(b => b.classList.remove('active'));
@@ -1721,6 +1774,7 @@ document.addEventListener('DOMContentLoaded', () => {
     readUrl();
     fetchDatabases();
     fetchCategories();
+    fetchGenres();
     fetchRatings();
     fetchPlaylists();
     renderCategoryList();

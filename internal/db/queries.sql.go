@@ -143,6 +143,42 @@ func (q *Queries) GetCategoryStats(ctx context.Context) ([]GetCategoryStatsRow, 
 	return items, nil
 }
 
+const getGenreStats = `-- name: GetGenreStats :many
+SELECT genre, COUNT(*) as count
+FROM media
+WHERE time_deleted = 0 AND genre IS NOT NULL AND genre != ''
+GROUP BY genre
+ORDER BY count DESC
+`
+
+type GetGenreStatsRow struct {
+	Genre sql.NullString `json:"genre"`
+	Count int64          `json:"count"`
+}
+
+func (q *Queries) GetGenreStats(ctx context.Context) ([]GetGenreStatsRow, error) {
+	rows, err := q.db.QueryContext(ctx, getGenreStats)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetGenreStatsRow{}
+	for rows.Next() {
+		var i GetGenreStatsRow
+		if err := rows.Scan(&i.Genre, &i.Count); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getHistoryCount = `-- name: GetHistoryCount :one
 SELECT COUNT(*) FROM history WHERE media_path = ?
 `

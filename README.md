@@ -33,6 +33,8 @@ Flags:
         Search terms (space-separated for AND, | for OR)
   --category
         Filter by category
+  --genre
+        Filter by genre
   --regex
         Filter paths by regex pattern
   --path-contains
@@ -205,6 +207,8 @@ Flags:
         Search terms (space-separated for AND, | for OR)
   --category
         Filter by category
+  --genre
+        Filter by genre
   --regex
         Filter paths by regex pattern
   --path-contains
@@ -335,6 +339,8 @@ Flags:
         Search terms (space-separated for AND, | for OR)
   --category
         Filter by category
+  --genre
+        Filter by genre
   --regex
         Filter paths by regex pattern
   --path-contains
@@ -532,6 +538,8 @@ Flags:
         Search terms (space-separated for AND, | for OR)
   --category
         Filter by category
+  --genre
+        Filter by genre
   --regex
         Filter paths by regex pattern
   --path-contains
@@ -844,6 +852,8 @@ Flags:
         Search terms (space-separated for AND, | for OR)
   --category
         Filter by category
+  --genre
+        Filter by genre
   --regex
         Filter paths by regex pattern
   --path-contains
@@ -1064,6 +1074,8 @@ Flags:
         Search terms (space-separated for AND, | for OR)
   --category
         Filter by category
+  --genre
+        Filter by genre
   --regex
         Filter paths by regex pattern
   --path-contains
@@ -1188,6 +1200,8 @@ Flags:
         Search terms (space-separated for AND, | for OR)
   --category
         Filter by category
+  --genre
+        Filter by genre
   --regex
         Filter paths by regex pattern
   --path-contains
@@ -1343,6 +1357,8 @@ Flags:
         Search terms (space-separated for AND, | for OR)
   --category
         Filter by category
+  --genre
+        Filter by genre
   --regex
         Filter paths by regex pattern
   --path-contains
@@ -1521,6 +1537,8 @@ Flags:
         Search terms (space-separated for AND, | for OR)
   --category
         Filter by category
+  --genre
+        Filter by genre
   --regex
         Filter paths by regex pattern
   --path-contains
@@ -1633,6 +1651,8 @@ Flags:
         Search terms (space-separated for AND, | for OR)
   --category
         Filter by category
+  --genre
+        Filter by genre
   --regex
         Filter paths by regex pattern
   --path-contains
@@ -1799,6 +1819,8 @@ Flags:
         Search terms (space-separated for AND, | for OR)
   --category
         Filter by category
+  --genre
+        Filter by genre
   --regex
         Filter paths by regex pattern
   --path-contains
@@ -1971,6 +1993,8 @@ Flags:
         Search terms (space-separated for AND, | for OR)
   --category
         Filter by category
+  --genre
+        Filter by genre
   --regex
         Filter paths by regex pattern
   --path-contains
@@ -2163,6 +2187,8 @@ Flags:
         Search terms (space-separated for AND, | for OR)
   --category
         Filter by category
+  --genre
+        Filter by genre
   --regex
         Filter paths by regex pattern
   --path-contains
@@ -2371,6 +2397,8 @@ Flags:
         Search terms (space-separated for AND, | for OR)
   --category
         Filter by category
+  --genre
+        Filter by genre
   --regex
         Filter paths by regex pattern
   --path-contains
@@ -2650,6 +2678,8 @@ Flags:
         Search terms (space-separated for AND, | for OR)
   --category
         Filter by category
+  --genre
+        Filter by genre
   --regex
         Filter paths by regex pattern
   --path-contains
@@ -2914,6 +2944,8 @@ Flags:
         Search terms (space-separated for AND, | for OR)
   --category
         Filter by category
+  --genre
+        Filter by genre
   --regex
         Filter paths by regex pattern
   --path-contains
@@ -3069,6 +3101,8 @@ Flags:
         Search terms (space-separated for AND, | for OR)
   --category
         Filter by category
+  --genre
+        Filter by genre
   --regex
         Filter paths by regex pattern
   --path-contains
@@ -3412,6 +3446,8 @@ Flags:
         Search terms (space-separated for AND, | for OR)
   --category
         Filter by category
+  --genre
+        Filter by genre
   --regex
         Filter paths by regex pattern
   --path-contains
@@ -3718,6 +3754,8 @@ Flags:
         Search terms (space-separated for AND, | for OR)
   --category
         Filter by category
+  --genre
+        Filter by genre
   --regex
         Filter paths by regex pattern
   --path-contains
@@ -3898,6 +3936,8 @@ Flags:
         Search terms (space-separated for AND, | for OR)
   --category
         Filter by category
+  --genre
+        Filter by genre
   --regex
         Filter paths by regex pattern
   --path-contains

@@ -151,6 +151,13 @@ WHERE time_deleted = 0
 GROUP BY rating
 ORDER BY rating DESC;
 
+-- name: GetGenreStats :many
+SELECT genre, COUNT(*) as count
+FROM media
+WHERE time_deleted = 0 AND genre IS NOT NULL AND genre != ''
+GROUP BY genre
+ORDER BY count DESC;
+
 -- name: UpsertMedia :exec
 INSERT INTO media (
     path, title, duration, size, time_created, time_modified,

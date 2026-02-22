@@ -46,6 +46,7 @@ func (c *ServeCmd) Mux() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/databases", c.handleDatabases)
 	mux.HandleFunc("/api/categories", c.handleCategories)
+	mux.HandleFunc("/api/genres", c.handleGenres)
 	mux.HandleFunc("/api/ratings", c.handleRatings)
 	mux.HandleFunc("/api/query", c.handleQuery)
 	mux.HandleFunc("/api/play", c.handlePlay)
@@ -195,6 +196,9 @@ func (c *ServeCmd) handleQuery(w http.ResponseWriter, r *http.Request) {
 	}
 	if category := q.Get("category"); category != "" {
 		flags.Category = category
+	}
+	if genre := q.Get("genre"); genre != "" {
+		flags.Genre = genre
 	}
 	if rating := q.Get("rating"); rating != "" {
 		if r, err := strconv.Atoi(rating); err == nil {
@@ -1231,4 +1235,46 @@ func (c *ServeCmd) handlePlaylistItems(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		return
 	}
+}
+
+func (c *ServeCmd) handleGenres(w http.ResponseWriter, r *http.Request) {
+	counts := make(map[string]int64)
+
+	for _, dbPath := range c.Databases {
+		sqlDB, err := database.Connect(dbPath)
+		if err != nil {
+			continue
+		}
+		queries := database.New(sqlDB)
+		stats, err := queries.GetGenreStats(r.Context())
+		sqlDB.Close()
+		if err != nil {
+			continue
+		}
+
+		for _, s := range stats {
+			if s.Genre.Valid {
+				counts[s.Genre.String] = counts[s.Genre.String] + s.Count
+			}
+		}
+	}
+
+	type genreStat struct {
+		Genre string `json:"genre"`
+		Count int64  `json:"count"`
+	}
+	res := make([]genreStat, 0)
+	for k, v := range counts {
+		if v > 0 {
+			res = append(res, genreStat{Genre: k, Count: v})
+		}
+	}
+
+	sort.Slice(res, func(i, j int) bool {
+		return res[i].Count > res[j].Count
+	})
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+	json.NewEncoder(w).Encode(res)
 }
