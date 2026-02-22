@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
+	"strings"
 	"sync"
 	"testing"
 
@@ -81,6 +82,9 @@ func TestRepairRace(t *testing.T) {
 			defer wg.Done()
 			err := Repair(dbPath)
 			if err != nil {
+				// Some might fail if they catch it in a weird state, but the goal is at least one succeeds
+				// and others either wait and see health or fail gracefully.
+				// With the new lock, they should all wait and then see it as healthy.
 				t.Errorf("Goroutine %d failed: %v", id, err)
 			}
 		}(i)
@@ -93,11 +97,19 @@ func TestRepairRace(t *testing.T) {
 		t.Error("Database should be healthy after repairs")
 	}
 
-	// Verify sidecars are gone
+	// Verify sidecars are gone from the main path (they were moved to backupDir and backupDir was deleted)
 	if _, err := os.Stat(walPath); err == nil {
 		t.Error("WAL file should be gone after repair")
 	}
 	if _, err := os.Stat(shmPath); err == nil {
 		t.Error("SHM file should be gone after repair")
+	}
+
+	// Verify no backup directories are left
+	entries, _ := os.ReadDir(os.TempDir())
+	for _, entry := range entries {
+		if entry.IsDir() && strings.HasPrefix(entry.Name(), "race-test-") && strings.Contains(entry.Name(), ".corrupt.") {
+			t.Errorf("Found leftover backup directory: %s", entry.Name())
+		}
 	}
 }

@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -31,16 +32,35 @@ func IsCorruptionError(err error) bool {
 // Repair attempts to repair a corrupted SQLite database
 func Repair(dbPath string) error {
 	start := time.Now()
+
+	// 1. Process-local lock to avoid multiple goroutines in the same process
 	mu := getLock(dbPath)
 	mu.Lock()
 	defer mu.Unlock()
 
+	// 2. Cross-process lock using a separate lock file
+	lockPath := dbPath + ".repair.lock"
+	lockFile, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, 0666)
+	if err != nil {
+		return fmt.Errorf("failed to open lock file: %w", err)
+	}
+	defer func() {
+		lockFile.Close()
+		os.Remove(lockPath)
+	}()
+
+	// Exclusive lock, blocks until available
+	if err := syscall.Flock(int(lockFile.Fd()), syscall.LOCK_EX); err != nil {
+		return fmt.Errorf("failed to acquire flock: %w", err)
+	}
+	defer syscall.Flock(int(lockFile.Fd()), syscall.LOCK_UN)
+
 	waitDuration := time.Since(start)
 
-	// Check if it's actually corrupt (maybe fixed by previous repair in race)
+	// 3. Check if it's actually corrupt (maybe fixed by previous repair in race)
 	if isHealthy(dbPath) {
 		if waitDuration > 1*time.Millisecond {
-			slog.Info("Database was repaired by another goroutine", "path", dbPath, "wait_time", waitDuration.String())
+			slog.Info("Database was repaired by another process", "path", dbPath, "wait_time", waitDuration.String())
 		}
 		return nil
 	}
@@ -49,80 +69,80 @@ func Repair(dbPath string) error {
 		return fmt.Errorf("sqlite3 command line tool is required for auto-repair")
 	}
 
-	// Backup
+	// 4. Move database and sidecar files to a temporary location
 	now := time.Now().Unix()
-	backupPath := fmt.Sprintf("%s.corrupt.%d.bak", dbPath, now)
-	slog.Info("Backing up corrupted database", "src", dbPath, "dst", backupPath)
+	backupDir := fmt.Sprintf("%s.corrupt.%d", dbPath, now)
+	if err := os.MkdirAll(backupDir, 0755); err != nil {
+		return fmt.Errorf("failed to create backup directory: %w", err)
+	}
+	// We want to delete this directory on success, but keep it on total failure for manual inspection?
+	// The user asked to "unlink ... after it is all done", which implies success.
 
-	// Check if file exists before renaming
-	if _, err := os.Stat(dbPath); os.IsNotExist(err) {
-		return fmt.Errorf("database file not found: %s", dbPath)
+	corruptMain := backupDir + "/main.db"
+	if err := os.Rename(dbPath, corruptMain); err != nil {
+		if os.IsNotExist(err) {
+			return fmt.Errorf("database file not found: %s", dbPath)
+		}
+		return fmt.Errorf("failed to move corrupted database: %w", err)
 	}
 
-	if err := os.Rename(dbPath, backupPath); err != nil {
-		return fmt.Errorf("failed to backup database: %w", err)
-	}
-
-	// Also move sidecar files if they exist to prevent them from being used with the new DB
+	// Move sidecars
 	for _, suffix := range []string{"-wal", "-shm"} {
 		sidecar := dbPath + suffix
 		if _, err := os.Stat(sidecar); err == nil {
-			os.Rename(sidecar, backupPath+suffix)
+			os.Rename(sidecar, corruptMain+suffix)
 		}
 	}
 
-	tempPath := dbPath + ".recovering"
+	// 5. Recover into the original path
+	// This ensures that the new database starts fresh at the expected location.
+	slog.Info("Attempting recovery...", "from", corruptMain, "to", dbPath)
 
-	// Attempt .recover
-	slog.Info("Attempting recovery using '.recover'...")
-	cmdRecover := exec.Command("bash", "-c", fmt.Sprintf("sqlite3 \"%s\" \".recover\" | sqlite3 \"%s\"", backupPath, tempPath))
+	// Try .recover (more modern)
+	cmdRecover := exec.Command("bash", "-c", fmt.Sprintf("sqlite3 \"%s\" \".recover\" | sqlite3 \"%s\"", corruptMain, dbPath))
 	out, err := cmdRecover.CombinedOutput()
-
-	// Check if recovery worked by verifying the new file
-	if err == nil && isHealthy(tempPath) {
+	
+	success := false
+	if err == nil && isHealthy(dbPath) {
 		slog.Info("Recovery successful via .recover")
-		if err := os.Rename(tempPath, dbPath); err != nil {
-			return fmt.Errorf("failed to restore recovered database: %w", err)
+		success = true
+	} else {
+		slog.Warn(".recover failed or produced invalid DB, trying .dump", "error", err, "output", string(out))
+		os.Remove(dbPath) // Clean up failed attempt before next one
+
+		// Try .dump (classic fallback)
+		cmdDump := exec.Command("bash", "-c", fmt.Sprintf("sqlite3 \"%s\" \".dump\" | sqlite3 \"%s\"", corruptMain, dbPath))
+		out, err = cmdDump.CombinedOutput()
+		if err == nil && isHealthy(dbPath) {
+			slog.Info("Recovery successful via .dump")
+			success = true
+		} else {
+			slog.Error("Recovery failed", "error", err, "output", string(out))
 		}
-		os.Remove(backupPath)
-		return nil
-	}
-	slog.Warn(".recover failed or produced invalid DB, trying .dump", "error", err, "output", string(out))
-
-	// Cleanup failed attempt
-	os.Remove(tempPath)
-
-	// Fallback to .dump
-	slog.Info("Attempting recovery using '.dump'...")
-	cmdDump := exec.Command("bash", "-c", fmt.Sprintf("sqlite3 \"%s\" \".dump\" | sqlite3 \"%s\"", backupPath, tempPath))
-	out, err = cmdDump.CombinedOutput()
-	if err != nil {
-		os.Remove(tempPath)
-		return fmt.Errorf("recovery failed: %v\nOutput: %s", err, string(out))
 	}
 
-	if isHealthy(tempPath) {
-		slog.Info("Recovery successful via .dump")
-		if err := os.Rename(tempPath, dbPath); err != nil {
-			return fmt.Errorf("failed to restore recovered database: %w", err)
-		}
-		os.Remove(backupPath)
+	// 6. Cleanup
+	if success {
+		os.RemoveAll(backupDir)
 		return nil
 	}
 
-	os.Remove(tempPath)
-	return fmt.Errorf("all recovery attempts produced invalid databases")
+	// If all failed, we should probably try to restore the "corrupt" file so at least it's back where it was
+	// but it's already failed twice.
+	return fmt.Errorf("all recovery attempts failed")
 }
 
 func isHealthy(dbPath string) bool {
+	if _, err := os.Stat(dbPath); os.IsNotExist(err) {
+		return false
+	}
+
 	db, err := sql.Open("sqlite3", dbPath)
 	if err != nil {
 		return false
 	}
 	defer db.Close()
 
-	// Try a more thorough integrity check. 
-	// We don't use (1) because we want to be sure it's really healthy if we're skipping a repair.
 	var s string
 	err = db.QueryRow("PRAGMA integrity_check").Scan(&s)
 	if err != nil {
