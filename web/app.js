@@ -915,6 +915,15 @@ document.addEventListener('DOMContentLoaded', () => {
             streamBtn.title = `Currently using ${needsTranscode ? 'Transcoding (HLS)' : 'Direct Stream'}. Click to switch.`;
         }
 
+        const nativePipBtn = document.getElementById('pip-native');
+        if (nativePipBtn) {
+            if (type.includes('video') && document.pictureInPictureEnabled) {
+                nativePipBtn.classList.remove('hidden');
+            } else {
+                nativePipBtn.classList.add('hidden');
+            }
+        }
+
         let localPos = getLocalProgress(item);
         if (!localPos && state.globalProgress && item.playhead > 0) {
             localPos = item.playhead;
@@ -1908,6 +1917,24 @@ document.addEventListener('DOMContentLoaded', () => {
             };
         }
     };
+
+    const pipNativeBtn = document.getElementById('pip-native');
+    if (pipNativeBtn) {
+        pipNativeBtn.onclick = async () => {
+            const video = pipViewer.querySelector('video');
+            if (!video) return;
+            try {
+                if (video !== document.pictureInPictureElement) {
+                    await video.requestPictureInPicture();
+                } else {
+                    await document.exitPictureInPicture();
+                }
+            } catch (error) {
+                console.error('PiP Error:', error);
+                showToast('PiP failed: ' + error.message);
+            }
+        };
+    }
 
     const pipTheatreBtn = document.getElementById('pip-theatre');
     if (pipTheatreBtn) pipTheatreBtn.onclick = toggleTheatreMode;
