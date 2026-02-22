@@ -199,7 +199,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const paramString = params.toString();
         const newHash = paramString ? `#${paramString}` : '';
-        
+
         // Use replaceState to avoid spamming browser history during typing/filtering
         if (window.location.hash !== newHash) {
             window.history.replaceState(state.filters, '', window.location.pathname + newHash);
@@ -354,7 +354,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 } else {
                     searchInput.value = path;
                     searchSuggestions.classList.add('hidden');
-                    // Find item in currentMedia or fetch it? 
+                    // Find item in currentMedia or fetch it?
                     // For now let's just trigger a search for this exact path
                     performSearch();
                 }
@@ -969,7 +969,7 @@ document.addEventListener('DOMContentLoaded', () => {
         localStorage.setItem('disco-playback-rate', rate);
         const speedBtn = document.getElementById('pip-speed');
         if (speedBtn) speedBtn.textContent = `${rate}x`;
-        
+
         const media = pipViewer.querySelector('video, audio');
         if (media) {
             media.playbackRate = rate;
@@ -1043,11 +1043,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function handleMediaError(item) {
-        showToast('File not found, moved to trash', '🗑️');
+        showToast(`File not found, moved to trash\n${item.path}`, '🗑️');
         // Remove from current view if applicable
         currentMedia = currentMedia.filter(m => m.path !== item.path);
         renderResults();
-        
+
         // Auto-skip to next
         if (state.autoplay) {
             setTimeout(() => {
@@ -1137,7 +1137,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Check if item needs transcoding (provided by backend)
         let needsTranscode = item.transcode === true;
-        
+
         const streamBtn = document.getElementById('pip-stream-type');
         if (streamBtn) {
             streamBtn.textContent = needsTranscode ? '🔄 HLS' : '⚡ Direct';
@@ -1269,7 +1269,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const waveformContainer = document.getElementById('waveform-container');
             if (waveformContainer) {
                 waveformContainer.classList.remove('hidden');
-                
+
                 const ws = WaveSurfer.create({
                     container: '#waveform-container',
                     waveColor: '#77b3ff',
@@ -1311,7 +1311,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     handlePostPlayback(item);
                 });
 
-                // Mock element for lyrics compatibility if needed, 
+                // Mock element for lyrics compatibility if needed,
                 // or we can just use ws events for lyrics.
                 // For now, let's try to keep the track logic by creating a hidden audio element
                 el = document.createElement('audio');
@@ -1425,7 +1425,7 @@ document.addEventListener('DOMContentLoaded', () => {
         epubViewer.innerHTML = '';
         pdfCanvas.classList.add('hidden');
         epubViewer.classList.add('hidden');
-        
+
         const url = `/api/raw?path=${encodeURIComponent(item.path)}`;
         const type = item.type || '';
 
@@ -1442,7 +1442,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             document.getElementById('doc-prev').onclick = () => rendition.prev();
             document.getElementById('doc-next').onclick = () => rendition.next();
-            
+
             let zoom = 100;
             document.getElementById('doc-zoom-in').onclick = () => {
                 zoom += 10;
@@ -1509,7 +1509,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function startSlideshow() {
         if (state.playback.slideshowTimer) return;
-        
+
         const btn = document.getElementById('pip-slideshow');
         if (btn) {
             btn.textContent = '⏸️';
@@ -1519,7 +1519,7 @@ document.addEventListener('DOMContentLoaded', () => {
         state.playback.slideshowTimer = setInterval(() => {
             playSibling(1);
         }, state.slideshowDelay * 1000);
-        
+
         showToast(`Slideshow started (${state.slideshowDelay}s)`);
     }
 
@@ -1608,11 +1608,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     <h3>Metadata</h3>
                     <div class="metadata-grid">
                         ${Object.keys(item).sort().map(k => {
-                            const val = item[k];
-                            if (val === null || val === undefined || val === '') return '';
-                            const label = k.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-                            return `<div>${label}</div><div>${val}</div>`;
-                        }).join('')}
+            const val = item[k];
+            if (val === null || val === undefined || val === '') return '';
+            const label = k.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+            return `<div>${label}</div><div>${val}</div>`;
+        }).join('')}
                     </div>
                 </div>
             </div>
@@ -2457,7 +2457,7 @@ document.addEventListener('DOMContentLoaded', () => {
         state.playback.item.transcode = !state.playback.item.transcode;
         const currentPos = state.playback.wavesurfer ? state.playback.wavesurfer.getCurrentTime() : (pipViewer.querySelector('video, audio')?.currentTime || 0);
         openInPiP(state.playback.item);
-        
+
         if (state.playback.wavesurfer) {
             state.playback.wavesurfer.on('ready', () => {
                 state.playback.wavesurfer.setTime(currentPos);
@@ -2793,7 +2793,7 @@ function formatDuration(seconds) {
     const h = Math.floor(seconds / 3600);
     const m = Math.floor((seconds % 3600) / 60);
     const s = seconds % 60;
-    
+
     if (h > 0) {
         return `${h}:${m < 10 ? '0' + m : m}:${s < 10 ? '0' + s : s}`;
     }
