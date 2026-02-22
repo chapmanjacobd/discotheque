@@ -811,6 +811,13 @@ func (c *ServeCmd) handleSubtitles(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !utils.FileExists(path) {
+		slog.Warn("File not found on disk, marking as deleted in databases", "path", path)
+		c.markDeletedInAllDBs(r.Context(), path, true)
+		http.Error(w, "File not found", http.StatusNotFound)
+		return
+	}
+
 	ext := strings.ToLower(filepath.Ext(path))
 	streamIndex := r.URL.Query().Get("index")
 
@@ -1408,6 +1415,13 @@ func (c *ServeCmd) handleHLSSegment(w http.ResponseWriter, r *http.Request) {
 	index, err := strconv.Atoi(indexStr)
 	if err != nil {
 		http.Error(w, "Invalid index", http.StatusBadRequest)
+		return
+	}
+
+	if !utils.FileExists(path) {
+		slog.Warn("File not found on disk, marking as deleted in databases", "path", path)
+		c.markDeletedInAllDBs(r.Context(), path, true)
+		http.Error(w, "File not found", http.StatusNotFound)
 		return
 	}
 
