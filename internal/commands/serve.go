@@ -97,10 +97,12 @@ func (c *ServeCmd) handleDatabases(w http.ResponseWriter, r *http.Request) {
 		Databases      []string `json:"databases"`
 		Trashcan       bool     `json:"trashcan"`
 		GlobalProgress bool     `json:"global_progress"`
+		Dev            bool     `json:"dev"`
 	}{
 		Databases:      c.Databases,
 		Trashcan:       c.Trashcan,
 		GlobalProgress: c.GlobalProgress,
+		Dev:            c.Dev,
 	}
 	json.NewEncoder(w).Encode(resp)
 }
@@ -130,6 +132,7 @@ func (c *ServeCmd) handleCategories(w http.ResponseWriter, r *http.Request) {
 		Count    int64  `json:"count"`
 	}
 	var res []catStat
+	res = make([]catStat, 0)
 	for k, v := range counts {
 		if v > 0 {
 			res = append(res, catStat{Category: k, Count: v})
@@ -169,6 +172,7 @@ func (c *ServeCmd) handleRatings(w http.ResponseWriter, r *http.Request) {
 		Count  int64 `json:"count"`
 	}
 	var res []ratStat
+	res = make([]ratStat, 0)
 	for k, v := range counts {
 		res = append(res, ratStat{Rating: k, Count: v})
 	}
@@ -419,13 +423,27 @@ func (c *ServeCmd) handleEvents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Send initial comment to establish connection
+	fmt.Fprintf(w, ": keep-alive\n\n")
+	flusher.Flush()
+
 	if c.Dev {
 		fmt.Fprintf(w, "data: %d\n\n", c.ApplicationStartTime)
 		flusher.Flush()
 	}
 
-	// Keep connection open until client disconnects
-	<-r.Context().Done()
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			fmt.Fprintf(w, ": heartbeat\n\n")
+			flusher.Flush()
+		case <-r.Context().Done():
+			return
+		}
+	}
 }
 
 func (c *ServeCmd) handleRaw(w http.ResponseWriter, r *http.Request) {
@@ -992,7 +1010,7 @@ func (c *ServeCmd) handlePlaylists(w http.ResponseWriter, r *http.Request) {
 			database.Playlists
 			DB string `json:"db"`
 		}
-		var allPlaylists []PlaylistWithDB
+		allPlaylists := make([]PlaylistWithDB, 0)
 		for _, dbPath := range c.Databases {
 			sqlDB, err := database.Connect(dbPath)
 			if err != nil {

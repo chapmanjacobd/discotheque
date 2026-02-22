@@ -46,6 +46,7 @@ document.addEventListener('DOMContentLoaded', () => {
         localResume: localStorage.getItem('disco-local-resume') !== 'false',
         trashcan: false,
         globalProgress: false,
+        dev: false,
         categories: [],
         ratings: [],
         playlists: [],
@@ -161,10 +162,14 @@ document.addEventListener('DOMContentLoaded', () => {
             allDatabases = data.databases;
             state.trashcan = data.trashcan;
             state.globalProgress = data.global_progress;
+            state.dev = data.dev;
 
             renderDbSettingsList(allDatabases);
             if (state.trashcan) {
                 document.getElementById('trash-section').classList.remove('hidden');
+            }
+            if (state.dev) {
+                setupAutoReload();
             }
         } catch (err) {
             console.error('Failed to fetch databases', err);
@@ -175,7 +180,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const resp = await fetch('/api/categories');
             if (!resp.ok) throw new Error('Failed to fetch categories');
-            state.categories = await resp.json();
+            state.categories = await resp.json() || [];
             renderCategoryList();
         } catch (err) {
             console.error('Failed to fetch categories', err);
@@ -186,7 +191,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const resp = await fetch('/api/ratings');
             if (!resp.ok) throw new Error('Failed to fetch ratings');
-            state.ratings = await resp.json();
+            state.ratings = await resp.json() || [];
             renderRatingList();
         } catch (err) {
             console.error('Failed to fetch ratings', err);
@@ -197,7 +202,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const resp = await fetch('/api/playlists');
             if (!resp.ok) throw new Error('Failed to fetch playlists');
-            state.playlists = await resp.json();
+            state.playlists = await resp.json() || [];
             renderPlaylistList();
         } catch (err) {
             console.error('Failed to fetch playlists', err);
@@ -213,7 +218,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (trashBtn && state.page !== 'trash') trashBtn.classList.remove('active');
         if (historyBtn && state.page !== 'history') historyBtn.classList.remove('active');
 
-        playlistList.innerHTML = state.playlists.map(p => `
+        const playlists = state.playlists || [];
+        playlistList.innerHTML = playlists.map(p => `
             <div class="category-btn ${state.page === 'playlist' && state.filters.playlist?.id === p.id ? 'active' : ''}" style="display: flex; justify-content: space-between; align-items: center;">
                 <span class="playlist-name" data-id="${p.id}" style="flex: 1; cursor: pointer;">📁 ${p.title || p.path || 'Unnamed'}</span>
                 <button class="delete-playlist-btn" data-id="${p.id}" data-db="${p.db}" style="background: none; border: none; opacity: 0.5; cursor: pointer;">&times;</button>
@@ -1719,6 +1725,5 @@ document.addEventListener('DOMContentLoaded', () => {
     fetchPlaylists();
     renderCategoryList();
     performSearch();
-    setupAutoReload();
     applyTheme();
 });

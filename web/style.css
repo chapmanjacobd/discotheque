@@ -305,22 +305,18 @@ main {
 }
 
 #results-info {
-    position: absolute;
-    top: 100%;
-    left: 2.2rem;
-    margin-top: 0.5rem;
     color: var(--text-muted);
     font-size: 0.85rem;
     white-space: nowrap;
     display: flex;
     align-items: center;
+    align-self: flex-end;
+    margin-left: 0.6rem;
     pointer-events: auto;
 }
 
-#results-info .category-btn {
-    padding: 0.2rem 0.6rem;
-    font-size: 0.8rem;
-    margin-left: 0.8rem;
+#results-count > span {
+    vertical-align: bottom;
 }
 
 #results-container {
