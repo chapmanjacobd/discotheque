@@ -30,6 +30,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const pipTitle = document.getElementById('media-title');
     const lyricsDisplay = document.getElementById('lyrics-display');
     const searchSuggestions = document.getElementById('search-suggestions');
+    const advancedFilterToggle = document.getElementById('advanced-filter-toggle');
+    const advancedFilters = document.getElementById('advanced-filters');
+    const applyAdvancedFilters = document.getElementById('apply-advanced-filters');
+    const resetAdvancedFilters = document.getElementById('reset-advanced-filters');
+    const pipSpeedBtn = document.getElementById('pip-speed');
+    const pipSpeedMenu = document.getElementById('pip-speed-menu');
 
     let currentMedia = [];
     let allDatabases = [];
@@ -49,7 +55,7 @@ document.addEventListener('DOMContentLoaded', () => {
             genre: '',
             rating: '',
             playlist: null,
-            sort: localStorage.getItem('disco-sort') || 'path',
+            sort: localStorage.getItem('disco-sort') || 'default',
             reverse: localStorage.getItem('disco-reverse') === 'true',
             limit: parseInt(localStorage.getItem('disco-limit')) || 100,
             all: localStorage.getItem('disco-limit-all') === 'true',

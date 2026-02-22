@@ -365,6 +365,7 @@ func OverrideSort(s string) string {
 	s = strings.ReplaceAll(s, "date_modified", yearMonthDaySQL("time_modified"))
 	s = strings.ReplaceAll(s, "random()", "RANDOM()")
 	s = strings.ReplaceAll(s, "random", "RANDOM()")
+	s = strings.ReplaceAll(s, "default", "play_count, playhead DESC, time_last_played, duration DESC, size DESC, title IS NOT NULL DESC, path")
 	s = strings.ReplaceAll(s, "priorityfast", "ntile(1000) over (order by size) desc, duration")
 	s = strings.ReplaceAll(s, "priority", "ntile(1000) over (order by size/duration) desc")
 	s = strings.ReplaceAll(s, "bitrate", "size/duration")
