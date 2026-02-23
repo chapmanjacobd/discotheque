@@ -383,7 +383,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 } else {
                     const item = state.lastSuggestions.find(s => s.path === path);
                     if (item) {
-                        playMedia(item);
+                        if (state.player === 'browser') {
+                            openInPiP(item, true);
+                        } else {
+                            playMedia(item);
+                        }
                         // Set searchbar to parent
                         const parts = path.split('/');
                         parts.pop();
@@ -874,7 +878,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         if (state.player === 'browser') {
-            openInPiP(item);
+            openInPiP(item, true); // True means this was an explicit user request / new session
             return;
         }
 
@@ -889,7 +893,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (!resp.ok) {
                 if (resp.status === 404) {
-                    showToast('File not found, moved to trash', '🗑️');
+                    const basename = path.split('/').pop();
+                    showToast(`File not found, moved to trash\n\n${basename}`, '🗑️');
                     // Remove from current view if applicable
                     currentMedia = currentMedia.filter(m => m.path !== path);
                     renderResults();
@@ -1015,17 +1020,21 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function playSibling(offset) {
+    function playSibling(offset, isUser = false, isDelete = false) {
         if (currentMedia.length === 0) return;
 
-        // Prevent rapid skipping
+        if (isUser && !isDelete) {
+            stopSlideshow();
+        }
+
+        // Prevent rapid skipping for automated actions
         const now = Date.now();
-        if (state.playback.lastSkipTime && (now - state.playback.lastSkipTime < 400)) {
+        if (!isUser && state.playback.lastSkipTime && (now - state.playback.lastSkipTime < 400)) {
             return;
         }
         state.playback.lastSkipTime = now;
 
-        // Clear any pending auto-skips from errors
+        // Clear any pending auto-skips (errors, slideshow, etc.)
         if (state.playback.skipTimeout) {
             clearTimeout(state.playback.skipTimeout);
             state.playback.skipTimeout = null;
@@ -1056,14 +1065,24 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
+        const isNewSession = pipPlayer.classList.contains('hidden');
+
         if (nextIndex >= 0 && nextIndex < currentMedia.length) {
-            playMedia(currentMedia[nextIndex]);
+            if (state.player === 'browser') {
+                openInPiP(currentMedia[nextIndex], isNewSession);
+            } else {
+                playMedia(currentMedia[nextIndex]);
+            }
         } else if (nextIndex >= currentMedia.length && !state.filters.all && state.page === 'search') {
             // End of current page, fetch next
             state.currentPage++;
             performSearch().then(() => {
                 if (currentMedia.length > 0) {
-                    playMedia(currentMedia[0]);
+                    if (state.player === 'browser') {
+                        openInPiP(currentMedia[0], isNewSession);
+                    } else {
+                        playMedia(currentMedia[0]);
+                    }
                 }
             });
         } else if (nextIndex < 0 && state.currentPage > 1 && !state.filters.all && state.page === 'search') {
@@ -1071,7 +1090,11 @@ document.addEventListener('DOMContentLoaded', () => {
             state.currentPage--;
             performSearch().then(() => {
                 if (currentMedia.length > 0) {
-                    playMedia(currentMedia[currentMedia.length - 1]);
+                    if (state.player === 'browser') {
+                        openInPiP(currentMedia[currentMedia.length - 1], isNewSession);
+                    } else {
+                        playMedia(currentMedia[currentMedia.length - 1]);
+                    }
                 }
             });
         }
@@ -1092,17 +1115,20 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function handleMediaError(item) {
-        // Only handle error for the currently attempting playback item to avoid stale event issues
-        if (state.playback.item && state.playback.item.path !== item.path) return;
+        // Only handle error for the currently active item.
+        // If state.playback.item is null, the player was likely closed manually.
+        if (!state.playback.item || state.playback.item.path !== item.path) return;
 
         // Clear handlers to prevent other events (like onended) from firing after error
-        const media = pipViewer.querySelector('video, audio');
+        const media = pipViewer.querySelector('video, audio, img');
         if (media) {
             media.onerror = null;
             media.onended = null;
+            media.onload = null;
         }
 
-        showToast(`File not found, moved to trash\n${item.path}`, '🗑️');
+        const basename = item.path.split('/').pop();
+        showToast(`File not found, moved to trash\n\n${basename}`, '🗑️');
         // Remove from current view if applicable
         currentMedia = currentMedia.filter(m => m.path !== item.path);
         renderResults();
@@ -1113,16 +1139,26 @@ document.addEventListener('DOMContentLoaded', () => {
                 clearTimeout(state.playback.skipTimeout);
             }
             state.playback.skipTimeout = setTimeout(() => {
-                state.playback.skipTimeout = null;
-                playSibling(1);
+                if (state.playback.skipTimeout) { // Check if it was cleared in the meantime
+                    state.playback.skipTimeout = null;
+                    playSibling(1);
+                }
             }, 1200);
         } else {
             closePiP();
         }
     }
 
-    async function openInPiP(item) {
-        stopSlideshow();
+    async function openInPiP(item, isNewSession = false) {
+        if (state.playback.slideshowTimer) {
+            clearTimeout(state.playback.slideshowTimer);
+            state.playback.slideshowTimer = null;
+        }
+
+        if (isNewSession) {
+            // New explicit request: reset state.imageAutoplay to user preference
+            state.imageAutoplay = localStorage.getItem('disco-image-autoplay') !== 'false';
+        }
 
         const type = item.type || "";
         // Handle Documents separately
@@ -1172,14 +1208,18 @@ document.addEventListener('DOMContentLoaded', () => {
         if (state.playerMode === 'theatre') {
             pipPlayer.classList.add('theatre');
             pipPlayer.classList.remove('minimized');
-            theatreAnchor.appendChild(pipPlayer);
+            if (pipPlayer.parentElement !== theatreAnchor) {
+                theatreAnchor.appendChild(pipPlayer);
+            }
             if (btn) {
                 btn.textContent = '❐';
                 btn.title = 'Restore to PiP';
             }
         } else {
             pipPlayer.classList.remove('theatre');
-            document.body.appendChild(pipPlayer);
+            if (pipPlayer.parentElement !== document.body) {
+                document.body.appendChild(pipPlayer);
+            }
             if (btn) {
                 btn.textContent = '□';
                 btn.title = 'Theatre Mode';
@@ -1447,13 +1487,21 @@ document.addEventListener('DOMContentLoaded', () => {
                     startSlideshow();
                 }
             };
-            el.ondblclick = () => toggleFullscreen(pipViewer);
+            el.ondblclick = () => toggleFullscreen(pipViewer, pipViewer);
         } else {
             showToast('Unsupported media format');
             return;
         }
 
         pipViewer.appendChild(el);
+
+        // Maintain/Switch fullscreen state if active
+        if (document.fullscreenElement) {
+            const preferred = (type.includes('video')) ? el : pipViewer;
+            if (document.fullscreenElement !== preferred) {
+                preferred.requestFullscreen().catch(e => console.error("Fullscreen switch failed:", e));
+            }
+        }
     }
 
     function openInDocumentViewer(item) {
@@ -1563,6 +1611,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function startSlideshow() {
+        if (!state.playback.item) return;
+        state.imageAutoplay = true;
+
         if (state.playback.slideshowTimer) {
             clearTimeout(state.playback.slideshowTimer);
             clearInterval(state.playback.slideshowTimer);
@@ -1581,6 +1632,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function stopSlideshow() {
+        state.imageAutoplay = false;
         if (state.playback.slideshowTimer) {
             clearTimeout(state.playback.slideshowTimer);
             clearInterval(state.playback.slideshowTimer);
@@ -1593,10 +1645,19 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function toggleFullscreen(el) {
+    function toggleFullscreen(defaultEl, preferredEl) {
+        const el = preferredEl || defaultEl;
         if (!el) return;
+
         if (document.fullscreenElement) {
-            document.exitFullscreen();
+            // If already fullscreen on a different element, switch to preferred
+            if (document.fullscreenElement !== el) {
+                el.requestFullscreen().catch(err => {
+                    console.error(`Error attempting to switch full-screen mode: ${err.message}`);
+                });
+            } else {
+                document.exitFullscreen();
+            }
         } else {
             el.requestFullscreen().catch(err => {
                 console.error(`Error attempting to enable full-screen mode: ${err.message}`);
@@ -2172,10 +2233,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!e.ctrlKey && !e.metaKey && !e.altKey) {
             switch (e.key.toLowerCase()) {
                 case 'n':
-                    playSibling(1);
+                    playSibling(1, true);
                     return;
                 case 'p':
-                    playSibling(-1);
+                    playSibling(-1, true);
                     return;
                 case 'i':
                     if (state.playback.item) {
@@ -2233,7 +2294,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (e.shiftKey) {
                         closePiP();
                     } else {
-                        playSibling(1);
+                        playSibling(1, true, true);
                     }
                     deleteMedia(itemToDelete.path);
                     return;
@@ -2258,7 +2319,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
                 const isImage = media && media.tagName === 'IMG';
                 if (!isPipVisible || isImage) {
-                    playSibling(e.key === 'ArrowLeft' ? -1 : 1);
+                    playSibling(e.key === 'ArrowLeft' ? -1 : 1, true);
                     return;
                 }
             }
@@ -2279,7 +2340,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const playPause = () => {
             if (ws) ws.playPause();
-            else if (media.tagName !== 'IMG') {
+            else if (media.tagName === 'IMG') {
+                if (state.playback.slideshowTimer) stopSlideshow();
+                else startSlideshow();
+            }
+            else {
                 if (media.paused) media.play();
                 else media.pause();
             }
@@ -2298,7 +2363,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 playPause();
                 break;
             case 'f':
-                toggleFullscreen(pipViewer);
+                toggleFullscreen(pipViewer, media.tagName === 'VIDEO' ? media : pipViewer);
                 break;
             case 'm':
                 if (ws) ws.setMuted(!ws.getMuted());
@@ -2347,6 +2412,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function handlePostPlayback(item) {
+        // Only proceed if the player is still active and playing this item
+        if (!state.playback.item || state.playback.item.path !== item.path) return;
+
         // If we just had an error, don't trigger post-playback skip
         if (state.playback.skipTimeout) return;
 
@@ -2679,7 +2747,9 @@ document.addEventListener('DOMContentLoaded', () => {
             state.playerMode = 'theatre';
             pipPlayer.classList.add('theatre');
             pipPlayer.classList.remove('minimized'); // Ensure it's expanded
-            theatreAnchor.appendChild(pipPlayer);
+            if (pipPlayer.parentElement !== theatreAnchor) {
+                theatreAnchor.appendChild(pipPlayer);
+            }
             if (btn) {
                 btn.textContent = '❐';
                 btn.title = 'Restore to PiP';
@@ -2687,7 +2757,9 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             state.playerMode = 'pip';
             pipPlayer.classList.remove('theatre');
-            document.body.appendChild(pipPlayer);
+            if (pipPlayer.parentElement !== document.body) {
+                document.body.appendChild(pipPlayer);
+            }
             if (btn) {
                 btn.textContent = '□';
                 btn.title = 'Theatre Mode';
