@@ -8,40 +8,36 @@ import (
 	"github.com/chapmanjacobd/discotheque/internal/models"
 )
 
-func ptr[T any](v T) *T {
-	return &v
-}
-
 func main() {
-	mocks := make(map[string]interface{})
+	mocks := make(map[string]any)
 
 	// Media mock
 	mocks["media"] = []models.MediaWithDB{
 		{
 			Media: models.Media{
 				Path:     "video1.mp4",
-				Type:     ptr("video/mp4"),
-				Size:     ptr(int64(1024 * 1024 * 50)),
-				Duration: ptr(int64(120)),
-				Score:    ptr(float64(5)),
+				Type:     new("video/mp4"),
+				Size:     new(int64(1024 * 1024 * 50)),
+				Duration: new(int64(120)),
+				Score:    new(float64(5)),
 			},
 			DB: "test.db",
 		},
 		{
 			Media: models.Media{
 				Path:     "audio1.mp3",
-				Type:     ptr("audio/mpeg"),
-				Size:     ptr(int64(1024 * 1024 * 5)),
-				Duration: ptr(int64(180)),
-				Score:    ptr(float64(4)),
+				Type:     new("audio/mpeg"),
+				Size:     new(int64(1024 * 1024 * 5)),
+				Duration: new(int64(180)),
+				Score:    new(float64(4)),
 			},
 			DB: "test.db",
 		},
 		{
 			Media: models.Media{
 				Path: "image1.jpg",
-				Type: ptr("image/jpeg"),
-				Size: ptr(int64(1024 * 500)),
+				Type: new("image/jpeg"),
+				Size: new(int64(1024 * 500)),
 			},
 			DB: "test.db",
 		},
@@ -75,7 +71,7 @@ func main() {
 
 	// Playlists mock
 	mocks["playlists"] = []models.Playlist{
-		{ID: 1, Title: ptr("My Playlist"), DB: "test.db"},
+		{ID: 1, Title: new("My Playlist"), DB: "test.db"},
 	}
 
 	encoder := json.NewEncoder(os.Stdout)
