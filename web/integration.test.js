@@ -435,4 +435,220 @@ describe('Integration Test', () => {
         expect(sidebar.classList.contains('mobile-open')).toBe(false);
         expect(overlay.classList.contains('hidden')).toBe(true);
     });
+
+    it('filters by genre', async () => {
+        await vi.waitFor(() => {
+            const genreBtn = document.querySelector('.category-btn[data-genre="Rock"]');
+            expect(genreBtn).not.toBeNull();
+        });
+        
+        const genreBtn = document.querySelector('.category-btn[data-genre="Rock"]');
+        genreBtn.click();
+
+        await vi.waitFor(() => {
+            expect(global.fetch).toHaveBeenCalledWith(
+                expect.stringContaining('genre=Rock'),
+                expect.any(Object)
+            );
+        });
+    });
+
+    it('empties the bin', async () => {
+        const trashBtn = document.getElementById('trash-btn');
+        trashBtn.click();
+
+        await vi.waitFor(() => {
+            const emptyBtn = document.getElementById('empty-bin-btn');
+            expect(emptyBtn).not.toBeNull();
+        });
+
+        const emptyBtn = document.getElementById('empty-bin-btn');
+        window.confirm = vi.fn().mockReturnValue(true);
+        emptyBtn.click();
+
+        await vi.waitFor(() => {
+            expect(global.fetch).toHaveBeenCalledWith(
+                '/api/empty-bin',
+                expect.objectContaining({ method: 'POST' })
+            );
+        });
+    });
+
+    it('permanently deletes an item', async () => {
+        const trashBtn = document.getElementById('trash-btn');
+        trashBtn.click();
+        
+        await vi.waitFor(() => {
+            const permDeleteBtn = document.querySelector('.media-action-btn.delete-permanent');
+            expect(permDeleteBtn).not.toBeNull();
+        });
+        
+        const permDeleteBtn = document.querySelector('.media-action-btn.delete-permanent');
+        window.confirm = vi.fn().mockReturnValue(true);
+        permDeleteBtn.click();
+
+        await vi.waitFor(() => {
+            expect(global.fetch).toHaveBeenCalledWith(
+                '/api/empty-bin',
+                expect.objectContaining({ method: 'POST' })
+            );
+        });
+    });
+
+    it('rates a media item via keyboard', async () => {
+        await new Promise(r => setTimeout(r, 100));
+        const card = document.querySelector('.media-card');
+        card.click(); // Open PiP
+
+        await vi.waitFor(() => {
+            expect(window.disco.state.playback.item).not.toBeNull();
+        });
+
+        // Trigger Shift + 5
+        const event = new KeyboardEvent('keydown', {
+            key: '5',
+            code: 'Digit5',
+            shiftKey: true,
+            bubbles: true
+        });
+        document.dispatchEvent(event);
+
+        await vi.waitFor(() => {
+            expect(global.fetch).toHaveBeenCalledWith(
+                '/api/rate',
+                expect.objectContaining({
+                    method: 'POST',
+                    body: expect.stringContaining('"score":5')
+                })
+            );
+        });
+    });
+
+    it('handles media error by showing toast and skipping', async () => {
+        // Mock a media error scenario
+        const card = document.querySelector('.media-card');
+        card.click(); // Open PiP
+
+        await vi.waitFor(() => {
+            expect(window.disco.state.playback.item).not.toBeNull();
+        });
+
+        // Trigger error handler manually or via event if possible
+        // For simplicity and coverage of the logic, we can call it if it's exported or just trigger the event
+        const media = document.querySelector('#media-viewer video, #media-viewer audio, #media-viewer img');
+        
+        // Mock the HEAD check for 404
+        global.fetch.mockImplementation((url) => {
+            if (url.includes('/api/raw')) {
+                return Promise.resolve({ status: 404 });
+            }
+            return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve([]) });
+        });
+
+        media.dispatchEvent(new Event('error'));
+
+        await vi.waitFor(() => {
+            const toast = document.getElementById('toast');
+            expect(toast.textContent).toContain('File not found');
+        });
+    });
+
+    it('shows search suggestions and handles directory selection', async () => {
+        const searchInput = document.getElementById('search-input');
+        
+        // Mock suggestions response
+        global.fetch.mockImplementation((url) => {
+            if (url.includes('/api/ls')) {
+                return Promise.resolve({
+                    ok: true,
+                    status: 200,
+                    json: () => Promise.resolve([
+                        { path: '/sugg/dir', name: 'dir', is_dir: true, type: '' }
+                    ])
+                });
+            }
+            return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve([]) });
+        });
+
+        searchInput.value = '/sugg/';
+        searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+
+        await vi.waitFor(() => {
+            expect(document.querySelectorAll('.suggestion-item').length).toBe(1);
+        });
+
+        // Use ArrowDown + Enter since it's more reliable in this env
+        searchInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+        searchInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+
+        await vi.waitFor(() => {
+            expect(searchInput.value).toBe('/sugg/dir/');
+        });
+    });
+
+    it('navigates search suggestions with keyboard', async () => {
+        const searchInput = document.getElementById('search-input');
+        
+        global.fetch.mockImplementation((url) => {
+            if (url.includes('/api/ls')) {
+                return Promise.resolve({
+                    ok: true,
+                    status: 200,
+                    json: () => Promise.resolve([
+                        { path: '/sugg/file1.mp4', name: 'file1.mp4', is_dir: false, type: 'video/mp4' },
+                        { path: '/sugg/file2.mp4', name: 'file2.mp4', is_dir: false, type: 'video/mp4' }
+                    ])
+                });
+            }
+            return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve([]) });
+        });
+
+        searchInput.value = '/sugg/';
+        searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+
+        await vi.waitFor(() => {
+            expect(document.querySelectorAll('.suggestion-item').length).toBe(2);
+        });
+
+        // Press ArrowDown
+        searchInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+        
+        await vi.waitFor(() => {
+            const items = document.querySelectorAll('.suggestion-item');
+            expect(items[0].classList.contains('selected')).toBe(true);
+        });
+
+        // Press Enter
+        searchInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+
+        await vi.waitFor(() => {
+            expect(searchInput.value).toBe('/sugg/file1.mp4');
+        });
+    });
+
+    it('changes playback rate', async () => {
+        const card = document.querySelector('.media-card');
+        card.click(); // Open PiP
+
+        await vi.waitFor(() => {
+            expect(window.disco.state.playback.item).not.toBeNull();
+        });
+
+        const speedBtn = document.getElementById('pip-speed');
+        speedBtn.click();
+
+        const speedMenu = document.getElementById('pip-speed-menu');
+        expect(speedMenu.classList.contains('hidden')).toBe(false);
+
+        const speed2x = document.querySelector('.speed-opt[data-speed="2.0"]');
+        expect(speed2x).not.toBeNull();
+        speed2x.click();
+
+        expect(window.disco.state.playbackRate).toBe(2);
+        const media = document.querySelector('#media-viewer video, #media-viewer audio');
+        if (media) {
+            expect(media.playbackRate).toBe(2);
+        }
+        expect(speedMenu.classList.contains('hidden')).toBe(true);
+    });
 });

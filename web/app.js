@@ -3020,6 +3020,63 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // --- Gesture Support ---
+    if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
+        let touchStartX = 0;
+        let touchStartY = 0;
+        let touchStartTime = 0;
+
+        pipPlayer.addEventListener('touchstart', (e) => {
+            if (e.target.closest('.pip-controls') || e.target.closest('button') || e.target.closest('select')) return;
+            touchStartX = e.changedTouches[0].screenX;
+            touchStartY = e.changedTouches[0].screenY;
+            touchStartTime = Date.now();
+        }, { passive: true });
+
+        pipPlayer.addEventListener('touchend', (e) => {
+            if (e.target.closest('.pip-controls') || e.target.closest('button') || e.target.closest('select')) return;
+
+            const touchEndX = e.changedTouches[0].screenX;
+            const touchEndY = e.changedTouches[0].screenY;
+            const touchEndTime = Date.now();
+
+            const diffX = touchEndX - touchStartX;
+            const diffY = touchEndY - touchStartY;
+            const duration = touchEndTime - touchStartTime;
+
+            // Thresholds: < 500ms duration
+            if (duration < 500) {
+                if (Math.abs(diffX) > 60 && Math.abs(diffY) < 80) {
+                    if (diffX > 60) {
+                        // Swipe Right -> Previous
+                        playSibling(-1, true);
+                    } else if (diffX < -60) {
+                        // Swipe Left -> Next
+                        playSibling(1, true);
+                    }
+                } else if (diffY > 80 && Math.abs(diffX) < 60) {
+                    // Swipe Down -> Minimize/Close
+                    if (pipPlayer.classList.contains('minimized')) {
+                        closePiP();
+                    } else {
+                        pipPlayer.classList.add('minimized');
+                        const waveformContainer = document.getElementById('waveform-container');
+                        if (waveformContainer) waveformContainer.classList.add('hidden');
+                    }
+                } else if (diffY < -80 && Math.abs(diffX) < 60) {
+                    // Swipe Up -> Expand
+                    if (pipPlayer.classList.contains('minimized')) {
+                        pipPlayer.classList.remove('minimized');
+                        const waveformContainer = document.getElementById('waveform-container');
+                        if (waveformContainer && state.playback.item && state.playback.item.type.includes('audio')) {
+                            waveformContainer.classList.remove('hidden');
+                        }
+                    }
+                }
+            }
+        }, { passive: true });
+    }
+
     const settingPlayer = document.getElementById('setting-player');
     if (settingPlayer) settingPlayer.onchange = (e) => {
         state.player = e.target.value;

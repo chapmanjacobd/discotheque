@@ -56,6 +56,7 @@ export async function setupTestEnvironment() {
     // Mock APIs
     document.pictureInPictureEnabled = true;
     HTMLElement.prototype.scrollTo = vi.fn();
+    HTMLElement.prototype.scrollIntoView = vi.fn();
     global.IntersectionObserver = class { constructor() {} observe() {} unobserve() {} disconnect() {} };
     global.Hls = class { static isSupported() { return true; } loadSource() {} attachMedia() {} on() {} destroy() {} };
     global.WaveSurfer = { create: vi.fn().mockReturnValue({ on: vi.fn(), destroy: vi.fn(), load: vi.fn() }) };
