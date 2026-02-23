@@ -651,4 +651,139 @@ describe('Integration Test', () => {
         }
         expect(speedMenu.classList.contains('hidden')).toBe(true);
     });
+
+    it('changes language setting', async () => {
+        const settingsBtn = document.getElementById('settings-button');
+        settingsBtn.click();
+
+        const langSelect = document.getElementById('setting-language');
+        langSelect.value = 'de';
+        langSelect.dispatchEvent(new Event('input'));
+        
+        expect(window.disco.state.language).toBe('de');
+        expect(localStorage.getItem('disco-language')).toBe('de');
+    });
+
+    it('changes theme setting', async () => {
+        const settingsBtn = document.getElementById('settings-button');
+        settingsBtn.click();
+
+        const themeSelect = document.getElementById('setting-theme');
+        themeSelect.value = 'dark';
+        themeSelect.dispatchEvent(new Event('change'));
+        
+        expect(window.disco.state.theme).toBe('dark');
+        expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
+    });
+
+    it('clears storage except essential keys', async () => {
+        localStorage.setItem('disco-test-key', 'value');
+        localStorage.setItem('disco-theme', 'light');
+        
+        const settingsBtn = document.getElementById('settings-button');
+        settingsBtn.click();
+
+        const clearBtn = document.getElementById('clear-storage-btn');
+        clearBtn.click();
+
+        expect(localStorage.getItem('disco-test-key')).toBeNull();
+        expect(localStorage.getItem('disco-theme')).toBe('light');
+    });
+
+    it('resets state on logo click', async () => {
+        const searchInput = document.getElementById('search-input');
+        searchInput.value = 'some query';
+        window.disco.state.filters.category = 'comedy';
+
+        const logo = document.querySelector('.logo');
+        logo.click();
+
+        expect(searchInput.value).toBe('');
+        expect(window.disco.state.filters.category).toBe('');
+        expect(window.disco.state.currentPage).toBe(1);
+    });
+
+    it('triggers inactivity shimmer', async () => {
+        const logoText = document.querySelector('.logo-text');
+        // Mock state to be "inactive"
+        window.disco.state.lastActivity = Date.now() - (4 * 60 * 1000);
+
+        window.dispatchEvent(new Event('mousemove'));
+
+        expect(logoText.classList.contains('shimmering')).toBe(true);
+        
+        // Manually trigger the callback since JSDOM might not link onanimationend to dispatchEvent(new Event('animationend'))
+        if (logoText.onanimationend) {
+            logoText.onanimationend();
+        } else {
+            logoText.dispatchEvent(new Event('animationend'));
+        }
+        
+        expect(logoText.classList.contains('shimmering')).toBe(false);
+    });
+
+    it('closes mobile sidebar on item click', async () => {
+        global.innerWidth = 500;
+        const sidebar = document.querySelector('.sidebar');
+        const overlay = document.getElementById('sidebar-overlay');
+        const menuToggle = document.getElementById('menu-toggle');
+
+        menuToggle.click();
+        expect(sidebar.classList.contains('mobile-open')).toBe(true);
+
+        await vi.waitFor(() => {
+            const comedyBtn = document.querySelector('.category-btn[data-cat="comedy"]');
+            expect(comedyBtn).not.toBeNull();
+        });
+
+        const comedyBtn = document.querySelector('.category-btn[data-cat="comedy"]');
+        comedyBtn.click();
+
+        expect(sidebar.classList.contains('mobile-open')).toBe(false);
+        expect(overlay.classList.contains('hidden')).toBe(true);
+    });
+
+    it('minimizes and expands PiP player', async () => {
+        const card = document.querySelector('.media-card');
+        card.click();
+
+        const pipPlayer = document.getElementById('pip-player');
+        const minimizeBtn = document.getElementById('pip-minimize');
+
+        minimizeBtn.click();
+        expect(pipPlayer.classList.contains('minimized')).toBe(true);
+
+        minimizeBtn.click();
+        expect(pipPlayer.classList.contains('minimized')).toBe(false);
+    });
+
+    it('toggles stream type (transcode)', async () => {
+        const card = document.querySelector('.media-card');
+        card.click();
+
+        await vi.waitFor(() => {
+            expect(window.disco.state.playback.item).not.toBeNull();
+        });
+
+        const originalTranscode = window.disco.state.playback.item.transcode;
+        const streamTypeBtn = document.getElementById('pip-stream-type');
+        
+        streamTypeBtn.click();
+        expect(window.disco.state.playback.item.transcode).toBe(!originalTranscode);
+    });
+
+    it('handles post-playback settings', async () => {
+        const settingsBtn = document.getElementById('settings-button');
+        settingsBtn.click();
+
+        const postPlaybackSelect = document.getElementById('setting-post-playback');
+        postPlaybackSelect.value = 'delete';
+        postPlaybackSelect.dispatchEvent(new Event('change'));
+        expect(window.disco.state.postPlaybackAction).toBe('delete');
+
+        const autoplayCheckbox = document.getElementById('setting-autoplay');
+        autoplayCheckbox.checked = true;
+        autoplayCheckbox.dispatchEvent(new Event('change'));
+        expect(window.disco.state.autoplay).toBe(true);
+    });
 });

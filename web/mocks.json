@@ -1,0 +1,74 @@
+{
+  "categories": [
+    {
+      "category": "comedy",
+      "count": 5
+    },
+    {
+      "category": "music",
+      "count": 3
+    }
+  ],
+  "databases": {
+    "databases": [
+      "test.db"
+    ],
+    "trashcan": true,
+    "global_progress": true,
+    "dev": false
+  },
+  "genres": [
+    {
+      "genre": "Rock",
+      "count": 10
+    },
+    {
+      "genre": "Jazz",
+      "count": 2
+    }
+  ],
+  "media": [
+    {
+      "path": "video1.mp4",
+      "duration": 120,
+      "size": 52428800,
+      "type": "video/mp4",
+      "score": 5,
+      "db": "test.db",
+      "transcode": false
+    },
+    {
+      "path": "audio1.mp3",
+      "duration": 180,
+      "size": 5242880,
+      "type": "audio/mpeg",
+      "score": 4,
+      "db": "test.db",
+      "transcode": false
+    },
+    {
+      "path": "image1.jpg",
+      "size": 512000,
+      "type": "image/jpeg",
+      "db": "test.db",
+      "transcode": false
+    }
+  ],
+  "playlists": [
+    {
+      "id": 1,
+      "title": "My Playlist",
+      "db": "test.db"
+    }
+  ],
+  "ratings": [
+    {
+      "rating": 5,
+      "count": 1
+    },
+    {
+      "rating": 0,
+      "count": 10
+    }
+  ]
+}

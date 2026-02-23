@@ -177,12 +177,7 @@ func (c *ServeCmd) Run(ctx *kong.Context) error {
 
 func (c *ServeCmd) handleDatabases(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	resp := struct {
-		Databases      []string `json:"databases"`
-		Trashcan       bool     `json:"trashcan"`
-		GlobalProgress bool     `json:"global_progress"`
-		Dev            bool     `json:"dev"`
-	}{
+	resp := models.DatabaseInfo{
 		Databases:      c.Databases,
 		Trashcan:       c.Trashcan,
 		GlobalProgress: c.GlobalProgress,
@@ -211,15 +206,11 @@ func (c *ServeCmd) handleCategories(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	type catStat struct {
-		Category string `json:"category"`
-		Count    int64  `json:"count"`
-	}
-	var res []catStat
-	res = make([]catStat, 0)
+	var res []models.CatStat
+	res = make([]models.CatStat, 0)
 	for k, v := range counts {
 		if v > 0 {
-			res = append(res, catStat{Category: k, Count: v})
+			res = append(res, models.CatStat{Category: k, Count: v})
 		}
 	}
 
@@ -251,14 +242,10 @@ func (c *ServeCmd) handleRatings(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	type ratStat struct {
-		Rating int64 `json:"rating"`
-		Count  int64 `json:"count"`
-	}
-	var res []ratStat
-	res = make([]ratStat, 0)
+	var res []models.RatStat
+	res = make([]models.RatStat, 0)
 	for k, v := range counts {
-		res = append(res, ratStat{Rating: k, Count: v})
+		res = append(res, models.RatStat{Rating: k, Count: v})
 	}
 
 	sort.Slice(res, func(i, j int) bool {
@@ -394,9 +381,7 @@ func (c *ServeCmd) handlePlay(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req struct {
-		Path string `json:"path"`
-	}
+	var req models.PlayResponse
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -447,10 +432,7 @@ func (c *ServeCmd) handleDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req struct {
-		Path    string `json:"path"`
-		Restore bool   `json:"restore"`
-	}
+	var req models.DeleteRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -466,12 +448,7 @@ func (c *ServeCmd) handleProgress(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req struct {
-		Path      string `json:"path"`
-		Playhead  int64  `json:"playhead"`
-		Duration  int64  `json:"duration"`
-		Completed bool   `json:"completed"`
-	}
+	var req models.ProgressRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return

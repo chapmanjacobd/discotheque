@@ -21,11 +21,14 @@ test:
 cover: test
 	go tool cover -func=coverage.out | awk '{n=split($$NF,a,"%%"); if (a[1] < 85) print $$0}' | sort -k3 -n
 
-webtest:
+webtest: gen-mocks
 	npm test --prefix web
 
-webcover:
+webcover: gen-mocks
 	npm run cover --prefix web
+
+gen-mocks:
+	go run cmd/gen_js_mocks/main.go > web/mocks.json
 
 fmt:
 	gofmt -s -w -e .
