@@ -428,12 +428,12 @@ main {
     transition: all 0.2s;
 }
 
-.type-btn.active,
-.view-toggle button.active,
-#sort-reverse-btn.active {
+.type-btn.active, .view-toggle button.active, #sort-reverse-btn.active, #advanced-filter-toggle.active {
     background: var(--card-bg);
     color: var(--accent-color);
     box-shadow: var(--shadow);
+    text-decoration: underline;
+    text-underline-offset: 4px;
 }
 
 #sort-by {
@@ -1279,8 +1279,8 @@ main {
         width: auto;
         left: 1rem;
         right: 1rem;
-        bottom: 1.5rem;
-        top: auto;
+        top: 1rem;
+        bottom: auto;
     }
 }
 

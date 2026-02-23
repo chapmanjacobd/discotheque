@@ -329,6 +329,9 @@ func (c *ServeCmd) handleQuery(w http.ResponseWriter, r *http.Request) {
 	if maxScore := q.Get("max_score"); maxScore != "" {
 		flags.Where = append(flags.Where, "score <= "+maxScore)
 	}
+	if unplayed := q.Get("unplayed"); unplayed == "true" {
+		flags.Where = append(flags.Where, "COALESCE(play_count, 0) = 0")
+	}
 	if all := q.Get("all"); all == "true" {
 		flags.All = true
 	}

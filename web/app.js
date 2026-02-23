@@ -65,7 +65,8 @@ document.addEventListener('DOMContentLoaded', () => {
             min_duration: '',
             max_duration: '',
             min_score: '',
-            max_score: ''
+            max_score: '',
+            unplayed: localStorage.getItem('disco-unplayed') === 'true'
         },
         draggedItem: null,
         applicationStartTime: null,
@@ -122,6 +123,8 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('setting-slideshow-delay').value = state.slideshowDelay;
     if (limitInput) limitInput.value = state.filters.limit;
     if (limitAll) limitAll.checked = state.filters.all;
+    const initialUnplayedEl = document.getElementById('filter-unplayed');
+    if (initialUnplayedEl) initialUnplayedEl.checked = state.filters.unplayed;
 
     const settingDefaultVideoRate = document.getElementById('setting-default-video-rate');
     if (settingDefaultVideoRate) {
@@ -201,6 +204,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (state.filters.max_duration) params.set('max_duration', state.filters.max_duration);
             if (state.filters.min_score) params.set('min_score', state.filters.min_score);
             if (state.filters.max_score) params.set('max_score', state.filters.max_score);
+            if (state.filters.unplayed) params.set('unplayed', 'true');
         }
 
         const paramString = params.toString();
@@ -250,6 +254,7 @@ document.addEventListener('DOMContentLoaded', () => {
             state.filters.max_duration = params.get('max_duration') || '';
             state.filters.min_score = params.get('min_score') || '';
             state.filters.max_score = params.get('max_score') || '';
+            state.filters.unplayed = params.get('unplayed') === 'true';
 
             if (searchInput) searchInput.value = state.filters.search;
             const minSizeEl = document.getElementById('filter-min-size');
@@ -264,6 +269,8 @@ document.addEventListener('DOMContentLoaded', () => {
             if (minScoreEl) minScoreEl.value = state.filters.min_score;
             const maxScoreEl = document.getElementById('filter-max-score');
             if (maxScoreEl) maxScoreEl.value = state.filters.max_score;
+            const unplayedEl = document.getElementById('filter-unplayed');
+            if (unplayedEl) unplayedEl.checked = state.filters.unplayed;
         }
     }
 
@@ -348,13 +355,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     displayName = `<b>${item.name.substring(0, query.length)}</b>${item.name.substring(query.length)}`;
                 }
             }
+            displayName = truncateString(displayName);
+            const displayPath = formatDisplayPath(item.path);
 
             return `
                 <div class="suggestion-item" data-path="${item.path}" data-is-dir="${item.is_dir}" data-index="${idx}">
                     <div class="suggestion-icon">${item.is_dir ? '📁' : getIcon(item.type)}</div>
                     <div class="suggestion-info">
                         <div class="suggestion-name">${displayName}</div>
-                        <div class="suggestion-path">${item.path}</div>
+                        <div class="suggestion-path" title="${item.path}">${displayPath}</div>
                     </div>
                 </div>
             `;
@@ -738,6 +747,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (state.filters.max_duration) params.append('max_duration', state.filters.max_duration);
             if (state.filters.min_score) params.append('min_score', state.filters.min_score);
             if (state.filters.max_score) params.append('max_score', state.filters.max_score);
+            if (state.filters.unplayed) params.append('unplayed', 'true');
 
             state.filters.types.forEach(t => {
                 if (t === 'video') params.append('video', 'true');
@@ -1194,7 +1204,8 @@ document.addEventListener('DOMContentLoaded', () => {
         state.playback.lastPlayedIndex = currentMedia.findIndex(m => m.path === item.path);
 
         const path = item.path;
-        pipTitle.textContent = path.split('/').pop();
+        pipTitle.textContent = truncateString(path.split('/').pop());
+        pipTitle.title = path;
         pipViewer.innerHTML = '';
         const waveformContainer = document.getElementById('waveform-container');
         if (waveformContainer) {
@@ -1520,7 +1531,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const pageInfo = document.getElementById('doc-page-info');
         const zoomInfo = document.getElementById('doc-zoom-info');
 
-        title.textContent = item.path.split('/').pop();
+        title.textContent = truncateString(item.path.split('/').pop());
+        title.title = item.path;
         epubViewer.innerHTML = '';
         epubViewer.tabIndex = 0; // Make focusable for keyboard shortcuts
         pdfCanvas.classList.add('hidden');
@@ -1746,7 +1758,8 @@ document.addEventListener('DOMContentLoaded', () => {
         searchView.classList.add('hidden');
         detailView.classList.remove('hidden');
 
-        const title = item.title || item.path.split('/').pop();
+        const title = truncateString(item.title || item.path.split('/').pop());
+        const displayPath = formatDisplayPath(item.path);
         const thumbUrl = `/api/thumbnail?path=${encodeURIComponent(item.path)}`;
         const size = formatSize(item.size);
         const duration = formatDuration(item.duration);
@@ -1758,7 +1771,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <img src="${thumbUrl}" class="detail-hero-thumb">
                     <div class="detail-main-info">
                         <h1>${title}</h1>
-                        <p class="detail-path">${item.path}</p>
+                        <p class="detail-path" title="${item.path}">${displayPath}</p>
                         <div class="detail-stats">
                             <span>${size}</span>
                             <span>${duration}</span>
@@ -1880,7 +1893,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 showDetailView(item);
             };
 
-            const title = item.title || item.path.split('/').pop();
+            const title = truncateString(item.title || item.path.split('/').pop());
+            const displayPath = formatDisplayPath(item.path);
             const size = formatSize(item.size);
             const duration = formatDuration(item.duration);
             const plays = getPlayCount(item);
@@ -1918,7 +1932,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div class="media-title" title="${item.path}">${title}</div>
                     <div class="media-meta">
                         <span>${size}</span>
-                        <span>${item.type || ''}</span>
+                        <span title="${item.path}">${displayPath}</span>
                         ${plays > 0 ? `<span title="Play count">▶️ ${plays}</span>` : ''}
                     </div>
                 </div>
@@ -2046,7 +2060,7 @@ document.addEventListener('DOMContentLoaded', () => {
             tr.onclick = () => playMedia(item);
             tr.dataset.path = item.path;
 
-            const title = item.title || item.path.split('/').pop();
+            const title = truncateString(item.title || item.path.split('/').pop());
 
             let actions = '';
             if (isTrash) {
@@ -2650,10 +2664,13 @@ document.addEventListener('DOMContentLoaded', () => {
     if (closePipBtn) closePipBtn.onclick = closePiP;
 
     if (advancedFilterToggle) {
-        advancedFilterToggle.onclick = () => {
-            advancedFilters.classList.toggle('hidden');
-            advancedFilterToggle.textContent = advancedFilters.classList.contains('hidden') ? 'Filters ▽' : 'Filters △';
-        };
+        advancedFilterToggle.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const isHidden = advancedFilters.classList.toggle('hidden');
+            advancedFilterToggle.textContent = isHidden ? 'Filters ▽' : 'Filters △';
+            advancedFilterToggle.classList.toggle('active', !isHidden);
+        });
     }
 
     if (applyAdvancedFilters) {
@@ -2664,6 +2681,8 @@ document.addEventListener('DOMContentLoaded', () => {
             state.filters.max_duration = document.getElementById('filter-max-duration').value;
             state.filters.min_score = document.getElementById('filter-min-score').value;
             state.filters.max_score = document.getElementById('filter-max-score').value;
+            state.filters.unplayed = document.getElementById('filter-unplayed').checked;
+            localStorage.setItem('disco-unplayed', state.filters.unplayed);
             state.currentPage = 1;
             performSearch();
         };
@@ -2677,12 +2696,15 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('filter-max-duration').value = '';
             document.getElementById('filter-min-score').value = '';
             document.getElementById('filter-max-score').value = '';
+            document.getElementById('filter-unplayed').checked = false;
             state.filters.min_size = '';
             state.filters.max_size = '';
             state.filters.min_duration = '';
             state.filters.max_duration = '';
             state.filters.min_score = '';
             state.filters.max_score = '';
+            state.filters.unplayed = false;
+            localStorage.setItem('disco-unplayed', false);
             state.currentPage = 1;
             performSearch();
         };
@@ -3130,4 +3152,22 @@ function getIcon(type) {
     if (type.includes('image')) return '🖼️';
     if (type.includes('epub') || type.includes('pdf') || type.includes('mobi')) return '📚';
     return '📄';
+}
+
+function truncateString(str) {
+    if (!str) return '';
+    const limit = window.innerWidth <= 768 ? 35 : 55;
+    if (str.length <= limit) return str;
+    return str.substring(0, limit - 3) + '...';
+}
+
+function formatDisplayPath(path) {
+    if (!path) return '';
+    const parts = path.split('/');
+    if (parts.length > 2) {
+        // Show only parent folder and filename
+        const display = parts.slice(-2).join('/');
+        return truncateString(display);
+    }
+    return truncateString(path);
 }
