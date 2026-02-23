@@ -104,7 +104,8 @@ document.addEventListener('DOMContentLoaded', () => {
             skipTimeout: null,
             lastSkipTime: 0,
             hlsInstance: null,
-            wavesurfer: null
+            wavesurfer: null,
+            toastTimer: null
         }
     };
 
@@ -421,6 +422,18 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    async function fetchMediaByPaths(paths) {
+        if (!paths || paths.length === 0) return [];
+        try {
+            const resp = await fetch(`/api/query?all=true&paths=${encodeURIComponent(paths.join(','))}`);
+            if (!resp.ok) throw new Error('Failed to fetch media by paths');
+            return await resp.json() || [];
+        } catch (err) {
+            console.error('fetchMediaByPaths failed:', err);
+            return [];
+        }
+    }
+
     async function fetchGenres() {
         try {
             const resp = await fetch('/api/genres');
@@ -551,12 +564,19 @@ document.addEventListener('DOMContentLoaded', () => {
         state.page = 'playlist';
         state.filters.genre = '';
         syncUrl();
+
+        const skeletonTimeout = setTimeout(() => {
+            if (state.view === 'grid') showSkeletons();
+        }, 150);
+
         try {
             const resp = await fetch(`/api/playlists/items?id=${playlist.id}&db=${encodeURIComponent(playlist.db)}`);
+            clearTimeout(skeletonTimeout);
             if (!resp.ok) throw new Error('Failed to fetch playlist items');
             currentMedia = await resp.json() || [];
             renderResults();
         } catch (err) {
+            clearTimeout(skeletonTimeout);
             console.error('Playlist items fetch failed:', err);
             showToast('Failed to load playlist');
         }
@@ -723,6 +743,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (limitInput) limitInput.disabled = state.filters.all;
 
+        const skeletonTimeout = setTimeout(() => {
+            if (state.page === 'search' || state.page === 'trash' || state.page === 'history' || state.page === 'playlist') {
+                if (state.view === 'grid') showSkeletons();
+            }
+        }, 150);
+
         try {
             const params = new URLSearchParams();
 
@@ -766,6 +792,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 signal: searchAbortController.signal
             });
 
+            clearTimeout(skeletonTimeout);
+
             if (!resp.ok) {
                 const text = await resp.text();
                 throw new Error(text || `Server returned ${resp.status}`);
@@ -773,6 +801,37 @@ document.addEventListener('DOMContentLoaded', () => {
 
             let data = await resp.json();
             if (!data) data = [];
+
+            // Merge local progress if viewing history
+            if (state.page === 'history' && state.localResume) {
+                const localProgress = JSON.parse(localStorage.getItem('disco-progress') || '{}');
+                const localPaths = Object.keys(localProgress);
+
+                // Find paths that are in localStorage but not in the server results
+                const serverPaths = new Set(data.map(item => item.path));
+                const missingPaths = localPaths.filter(p => !serverPaths.has(p));
+
+                if (missingPaths.length > 0) {
+                    const extraMedia = await fetchMediaByPaths(missingPaths);
+                    data = [...data, ...extraMedia];
+                }
+
+                // Update playhead and time_last_played from localStorage for all items
+                data.forEach(item => {
+                    const local = localProgress[item.path];
+                    if (local) {
+                        const localPlayhead = typeof local === 'object' ? local.pos : local;
+                        const localTime = typeof local === 'object' ? local.last / 1000 : 0;
+
+                        if (localPlayhead > (item.playhead || 0)) {
+                            item.playhead = localPlayhead;
+                        }
+                        if (localTime > (item.time_last_played || 0)) {
+                            item.time_last_played = localTime;
+                        }
+                    }
+                });
+            }
 
             // Client-side DB filtering
             currentMedia = data.filter(item => !state.filters.excludedDbs.includes(item.db));
@@ -785,6 +844,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (state.filters.reverse) return countA - countB;
                     return countB - countA;
                 });
+            } else if (state.filters.sort === 'progress') {
+                currentMedia.sort((a, b) => {
+                    const progA = (a.duration && a.playhead) ? a.playhead / a.duration : 0;
+                    const progB = (b.duration && b.playhead) ? b.playhead / b.duration : 0;
+                    if (state.filters.reverse) return progA - progB;
+                    return progB - progA;
+                });
             } else if (state.filters.sort === 'extension') {
                 currentMedia.sort((a, b) => {
                     const extA = a.path.split('.').pop().toLowerCase();
@@ -796,6 +862,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             renderResults();
         } catch (err) {
+            clearTimeout(skeletonTimeout);
             if (err.name === 'AbortError') return;
             console.error('Search failed:', err);
             resultsContainer.innerHTML = `<div class="error">Search failed: ${err.message}</div>`;
@@ -839,6 +906,25 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (err) {
             console.error('Empty bin failed:', err);
             showToast('Failed to empty bin');
+        }
+    }
+
+    async function permanentlyDeleteMedia(path) {
+        if (!confirm('Are you sure you want to permanently delete this file?')) return;
+
+        try {
+            const resp = await fetch('/api/empty-bin', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ paths: [path] })
+            });
+            if (!resp.ok) throw new Error('Failed to delete');
+            const msg = await resp.text();
+            showToast(msg, '🔥');
+            fetchTrash();
+        } catch (err) {
+            console.error('Permanent delete failed:', err);
+            showToast('Failed to delete');
         }
     }
 
@@ -909,12 +995,22 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             if (!resp.ok) {
-                if (resp.status === 404) {
+                if (resp.status === 404 || resp.status === 415) {
                     const basename = path.split('/').pop();
-                    showToast(`File not found, moved to trash\n\n${basename}`, '🗑️');
-                    // Remove from current view if applicable
-                    currentMedia = currentMedia.filter(m => m.path !== path);
-                    renderResults();
+                    const msg = resp.status === 404 ? `File not found: ${basename}` : `Unplayable (Unsupported): ${basename}`;
+                    const emoji = resp.status === 404 ? '🗑️' : '⚠️';
+                    
+                    if (state.page === 'trash') {
+                        showToast(msg, '⚠️');
+                    } else {
+                        showToast(msg, emoji);
+                        // Remove from current view if applicable
+                        currentMedia = currentMedia.filter(m => m.path !== path);
+                        renderResults();
+                    }
+                    if (state.autoplay) {
+                        playSibling(1);
+                    }
                 } else {
                     showToast('Playback failed');
                 }
@@ -1131,7 +1227,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function handleMediaError(item) {
+    async function handleMediaError(item) {
         // Only handle error for the currently active item.
         // If state.playback.item is null, the player was likely closed manually.
         if (!state.playback.item || state.playback.item.path !== item.path) return;
@@ -1145,10 +1241,25 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const basename = item.path.split('/').pop();
-        showToast(`File not found, moved to trash\n\n${basename}`, '🗑️');
-        // Remove from current view if applicable
-        currentMedia = currentMedia.filter(m => m.path !== item.path);
-        renderResults();
+        let is404 = false;
+        try {
+            const resp = await fetch(`/api/raw?path=${encodeURIComponent(item.path)}`, { method: 'HEAD' });
+            is404 = resp.status === 404;
+        } catch (err) {
+            console.error('Failed to check media status:', err);
+        }
+
+        const msg = is404 ? `File not found: ${basename}` : `Unplayable: ${basename}`;
+        const emoji = is404 ? '🗑️' : '⚠️';
+
+        if (state.page === 'trash') {
+            showToast(msg, '⚠️');
+        } else {
+            showToast(msg, emoji);
+            // Remove from current view if applicable
+            currentMedia = currentMedia.filter(m => m.path !== item.path);
+            renderResults();
+        }
 
         // Auto-skip to next
         if (state.autoplay) {
@@ -1839,9 +1950,37 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
+    function showSkeletons() {
+        const count = state.filters.all ? 20 : Math.min(state.filters.limit, 20);
+        resultsContainer.innerHTML = '';
+        resultsContainer.className = 'grid';
+        for (let i = 0; i < count; i++) {
+            const skeleton = document.createElement('div');
+            skeleton.className = 'media-card skeleton';
+            skeleton.innerHTML = `
+                <div class="media-thumb"></div>
+                <div class="media-info">
+                    <div class="media-title">&nbsp;</div>
+                    <div class="media-meta">
+                        <span>&nbsp;</span>
+                        <span>&nbsp;</span>
+                    </div>
+                </div>
+            `;
+            resultsContainer.appendChild(skeleton);
+        }
+    }
+
     // --- Rendering ---
     function renderResults() {
         if (!currentMedia) currentMedia = [];
+        
+        // Prevent scroll jump by keeping current height temporarily
+        const currentHeight = resultsContainer.offsetHeight;
+        if (currentHeight > 0) {
+            resultsContainer.style.minHeight = `${currentHeight}px`;
+        }
+
         if (state.page === 'trash') {
             const unit = currentMedia.length === 1 ? 'file' : 'files';
             resultsCount.innerHTML = `<span>${currentMedia.length} ${unit} in trash</span> <button id="empty-bin-btn" class="category-btn" style="margin-left: 1rem; background: #e74c3c; color: white;">Empty Bin</button>`;
@@ -1862,25 +2001,28 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        resultsContainer.innerHTML = '';
-
         if (currentMedia.length === 0) {
             resultsContainer.innerHTML = '<div class="no-results">No media found</div>';
+            resultsContainer.style.minHeight = '';
             return;
         }
 
         if (state.view === 'details') {
             renderDetailsTable();
             renderPagination();
+            resultsContainer.style.minHeight = '';
             return;
         }
 
+        const fragment = document.createDocumentFragment();
         resultsContainer.className = 'grid';
+
         currentMedia.forEach(item => {
             const card = document.createElement('div');
             card.className = 'media-card';
             card.dataset.path = item.path;
             card.draggable = state.page === 'playlist'; // Enable drag for playlists
+            
 
             card.onclick = (e) => {
                 if (e.target.closest('.media-actions') || e.target.closest('.media-action-btn')) return;
@@ -1900,12 +2042,22 @@ document.addEventListener('DOMContentLoaded', () => {
             const plays = getPlayCount(item);
             const thumbUrl = `/api/thumbnail?path=${encodeURIComponent(item.path)}`;
 
+            const progress = (item.duration && item.playhead) ? Math.round((item.playhead / item.duration) * 100) : 0;
+            const progressHtml = progress > 0 ? `
+                <div class="progress-container" title="${progress}% completed">
+                    <div class="progress-bar" style="width: ${progress}%"></div>
+                </div>
+            ` : '';
+
             const isTrash = state.page === 'trash';
             const isPlaylist = state.page === 'playlist';
 
             let actionBtns = '';
             if (isTrash) {
-                actionBtns = `<button class="media-action-btn restore" title="Restore">↺</button>`;
+                actionBtns = `
+                    <button class="media-action-btn restore" title="Restore">↺</button>
+                    <button class="media-action-btn delete-permanent" title="Permanently Delete">🔥</button>
+                `;
             } else if (isPlaylist) {
                 actionBtns = `
                     <button class="media-action-btn remove-playlist" title="Remove from Playlist">&times;</button>
@@ -1935,6 +2087,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <span title="${item.path}">${displayPath}</span>
                         ${plays > 0 ? `<span title="Play count">▶️ ${plays}</span>` : ''}
                     </div>
+                    ${progressHtml}
                 </div>
             `;
 
@@ -1982,6 +2135,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 deleteMedia(item.path, true);
             };
 
+            const btnDeletePermanent = card.querySelector('.media-action-btn.delete-permanent');
+            if (btnDeletePermanent) btnDeletePermanent.onclick = (e) => {
+                e.stopPropagation();
+                permanentlyDeleteMedia(item.path);
+            };
+
             const btnInfo = card.querySelector('.media-action-btn.info');
             if (btnInfo) btnInfo.onclick = (e) => {
                 e.stopPropagation();
@@ -2014,13 +2173,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 removeFromPlaylist(state.filters.playlist, item);
             };
 
-            resultsContainer.appendChild(card);
+            fragment.appendChild(card);
         });
+
+        resultsContainer.innerHTML = '';
+        resultsContainer.appendChild(fragment);
         renderPagination();
+        
+        // Reset min-height after content is loaded
+        resultsContainer.style.minHeight = '';
     }
 
     function renderDetailsTable() {
-        resultsContainer.className = 'details-view';
         const table = document.createElement('table');
         table.className = 'details-table';
 
@@ -2036,6 +2200,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <th data-sort="path">Name ${sortIcon('path')}</th>
             <th data-sort="size">Size ${sortIcon('size')}</th>
             <th data-sort="duration">Duration ${sortIcon('duration')}</th>
+            <th data-sort="progress">Progress ${sortIcon('progress')}</th>
             <th data-sort="type">Type ${sortIcon('type')}</th>
             ${isTrash ? `<th data-sort="time_deleted">Deleted ${sortIcon('time_deleted')}</th>` : `<th data-sort="play_count">Plays ${sortIcon('play_count')}</th>`}
         `;
@@ -2064,7 +2229,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
             let actions = '';
             if (isTrash) {
-                actions = `<button class="table-action-btn restore-btn" title="Restore">↺</button>`;
+                actions = `
+                    <button class="table-action-btn restore-btn" title="Restore">↺</button>
+                    <button class="table-action-btn delete-permanent-btn" title="Permanently Delete">🔥</button>
+                `;
             } else if (isPlaylist) {
                 actions = `<button class="table-action-btn remove-btn" title="Remove from Playlist">&times;</button>`;
             } else {
@@ -2076,6 +2244,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 `;
             }
 
+            const progress = (item.duration && item.playhead) ? Math.round((item.playhead / item.duration) * 100) : 0;
+            const progressHtml = `
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <div class="progress-container" style="margin-top: 0; flex: 1; background: rgba(0,0,0,0.2);">
+                        <div class="progress-bar" style="width: ${progress}%"></div>
+                    </div>
+                    <span style="font-size: 0.75rem; min-width: 30px;">${progress}%</span>
+                </div>
+            `;
+
             let cells = `
                 <td>
                     <div class="table-cell-title" title="${item.path}">
@@ -2085,6 +2263,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 </td>
                 <td>${formatSize(item.size)}</td>
                 <td>${formatDuration(item.duration)}</td>
+                <td>${progressHtml}</td>
                 <td>${item.type || ''}</td>
                 <td>${isTrash ? formatRelativeDate(item.time_deleted) : (getPlayCount(item) || '')}</td>
             `;
@@ -2108,6 +2287,12 @@ document.addEventListener('DOMContentLoaded', () => {
             if (btnRestore) btnRestore.onclick = (e) => {
                 e.stopPropagation();
                 deleteMedia(item.path, true);
+            };
+
+            const btnDeletePermanent = tr.querySelector('.delete-permanent-btn');
+            if (btnDeletePermanent) btnDeletePermanent.onclick = (e) => {
+                e.stopPropagation();
+                permanentlyDeleteMedia(item.path);
             };
 
             const btnAdd = tr.querySelector('.add-btn');
@@ -2166,6 +2351,8 @@ document.addEventListener('DOMContentLoaded', () => {
             };
         });
 
+        resultsContainer.innerHTML = '';
+        resultsContainer.className = 'details-view';
         resultsContainer.appendChild(table);
     }
 
@@ -2242,6 +2429,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Helpers ---
     function showToast(msg, customEmoji) {
+        if (state.playback.toastTimer) {
+            clearTimeout(state.playback.toastTimer);
+        }
+
         let icon = customEmoji;
         if (!icon) {
             icon = msg.toLowerCase().includes('fail') || msg.toLowerCase().includes('error') ? '❌' : 'ℹ️';
@@ -2249,7 +2440,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         toast.innerHTML = `<span>${icon}</span> <span>${msg}</span>`;
         toast.classList.remove('hidden');
-        setTimeout(() => toast.classList.add('hidden'), 3000);
+        
+        state.playback.toastTimer = setTimeout(() => {
+            toast.classList.add('hidden');
+            state.playback.toastTimer = null;
+        }, 3000);
     }
 
     // --- Helpers ---
@@ -3106,6 +3301,17 @@ document.addEventListener('DOMContentLoaded', () => {
     renderCategoryList();
     performSearch();
     applyTheme();
+
+    // Expose for testing
+    window.disco = {
+        formatSize,
+        formatDuration,
+        getIcon,
+        truncateString,
+        formatRelativeDate,
+        formatDisplayPath,
+        state
+    };
 });
 
 // --- Helpers (Exported for testing) ---

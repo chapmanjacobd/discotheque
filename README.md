@@ -39,6 +39,8 @@ Flags:
         Filter paths by regex pattern
   --path-contains
         Path must contain all these strings
+  --paths
+        Exact paths to include
   -S, --size
         Size range (e.g., >100MB, 1GB%10)
   -d, --duration
@@ -213,6 +215,8 @@ Flags:
         Filter paths by regex pattern
   --path-contains
         Path must contain all these strings
+  --paths
+        Exact paths to include
   -S, --size
         Size range (e.g., >100MB, 1GB%10)
   -d, --duration
@@ -345,6 +349,8 @@ Flags:
         Filter paths by regex pattern
   --path-contains
         Path must contain all these strings
+  --paths
+        Exact paths to include
   -S, --size
         Size range (e.g., >100MB, 1GB%10)
   -d, --duration
@@ -544,6 +550,8 @@ Flags:
         Filter paths by regex pattern
   --path-contains
         Path must contain all these strings
+  --paths
+        Exact paths to include
   -S, --size
         Size range (e.g., >100MB, 1GB%10)
   -d, --duration
@@ -858,6 +866,8 @@ Flags:
         Filter paths by regex pattern
   --path-contains
         Path must contain all these strings
+  --paths
+        Exact paths to include
   -S, --size
         Size range (e.g., >100MB, 1GB%10)
   -d, --duration
@@ -1080,6 +1090,8 @@ Flags:
         Filter paths by regex pattern
   --path-contains
         Path must contain all these strings
+  --paths
+        Exact paths to include
   -S, --size
         Size range (e.g., >100MB, 1GB%10)
   -d, --duration
@@ -1206,6 +1218,8 @@ Flags:
         Filter paths by regex pattern
   --path-contains
         Path must contain all these strings
+  --paths
+        Exact paths to include
   -S, --size
         Size range (e.g., >100MB, 1GB%10)
   -d, --duration
@@ -1363,6 +1377,8 @@ Flags:
         Filter paths by regex pattern
   --path-contains
         Path must contain all these strings
+  --paths
+        Exact paths to include
   -S, --size
         Size range (e.g., >100MB, 1GB%10)
   -d, --duration
@@ -1543,6 +1559,8 @@ Flags:
         Filter paths by regex pattern
   --path-contains
         Path must contain all these strings
+  --paths
+        Exact paths to include
   -S, --size
         Size range (e.g., >100MB, 1GB%10)
   -d, --duration
@@ -1657,6 +1675,8 @@ Flags:
         Filter paths by regex pattern
   --path-contains
         Path must contain all these strings
+  --paths
+        Exact paths to include
   -S, --size
         Size range (e.g., >100MB, 1GB%10)
   -d, --duration
@@ -1825,6 +1845,8 @@ Flags:
         Filter paths by regex pattern
   --path-contains
         Path must contain all these strings
+  --paths
+        Exact paths to include
   -S, --size
         Size range (e.g., >100MB, 1GB%10)
   -d, --duration
@@ -1999,6 +2021,8 @@ Flags:
         Filter paths by regex pattern
   --path-contains
         Path must contain all these strings
+  --paths
+        Exact paths to include
   -S, --size
         Size range (e.g., >100MB, 1GB%10)
   -d, --duration
@@ -2193,6 +2217,8 @@ Flags:
         Filter paths by regex pattern
   --path-contains
         Path must contain all these strings
+  --paths
+        Exact paths to include
   -S, --size
         Size range (e.g., >100MB, 1GB%10)
   -d, --duration
@@ -2403,6 +2429,8 @@ Flags:
         Filter paths by regex pattern
   --path-contains
         Path must contain all these strings
+  --paths
+        Exact paths to include
   -S, --size
         Size range (e.g., >100MB, 1GB%10)
   -d, --duration
@@ -2684,6 +2712,8 @@ Flags:
         Filter paths by regex pattern
   --path-contains
         Path must contain all these strings
+  --paths
+        Exact paths to include
   -S, --size
         Size range (e.g., >100MB, 1GB%10)
   -d, --duration
@@ -2950,6 +2980,8 @@ Flags:
         Filter paths by regex pattern
   --path-contains
         Path must contain all these strings
+  --paths
+        Exact paths to include
   -S, --size
         Size range (e.g., >100MB, 1GB%10)
   -d, --duration
@@ -3107,6 +3139,8 @@ Flags:
         Filter paths by regex pattern
   --path-contains
         Path must contain all these strings
+  --paths
+        Exact paths to include
   -S, --size
         Size range (e.g., >100MB, 1GB%10)
   -d, --duration
@@ -3478,6 +3512,8 @@ Flags:
         Filter paths by regex pattern
   --path-contains
         Path must contain all these strings
+  --paths
+        Exact paths to include
   -S, --size
         Size range (e.g., >100MB, 1GB%10)
   -d, --duration
@@ -3786,6 +3822,8 @@ Flags:
         Filter paths by regex pattern
   --path-contains
         Path must contain all these strings
+  --paths
+        Exact paths to include
   -S, --size
         Size range (e.g., >100MB, 1GB%10)
   -d, --duration
@@ -3968,6 +4006,8 @@ Flags:
         Filter paths by regex pattern
   --path-contains
         Path must contain all these strings
+  --paths
+        Exact paths to include
   -S, --size
         Size range (e.g., >100MB, 1GB%10)
   -d, --duration

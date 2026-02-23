@@ -583,6 +583,51 @@ main {
     pointer-events: none;
 }
 
+.media-card.skeleton {
+    pointer-events: none;
+    user-select: none;
+}
+
+.media-card.skeleton .media-thumb {
+    background: var(--hover-color);
+    position: relative;
+    overflow: hidden;
+}
+
+.media-card.skeleton .media-thumb::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+    animation: skeleton-shimmer 1.5s infinite;
+}
+
+@keyframes skeleton-shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+
+.media-card.skeleton .media-title,
+.media-card.skeleton .media-meta span {
+    background: var(--hover-color);
+    border-radius: 4px;
+    height: 1em;
+    display: block;
+    color: transparent !important;
+}
+
+.media-card.skeleton .media-title {
+    width: 80%;
+    margin-bottom: 0.5rem;
+}
+
+.media-card.skeleton .media-meta span {
+    width: 40%;
+}
+
 @keyframes fade-out {
     from {
         opacity: 1;
@@ -621,6 +666,22 @@ main {
     color: var(--text-muted);
     display: flex;
     justify-content: space-between;
+}
+
+.progress-container {
+    height: 4px;
+    background: rgba(255, 255, 255, 0.1);
+    width: 100%;
+    margin-top: 6px;
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.progress-bar {
+    height: 100%;
+    background: var(--accent-color);
+    width: 0%;
+    transition: width 0.3s;
 }
 
 /* Details table view */
@@ -730,6 +791,7 @@ main {
     position: fixed;
     top: 1.5rem;
     left: 1.5rem;
+    max-width: 400px;
     background: color-mix(in srgb, var(--card-bg), transparent 20%);
     border: 1px solid var(--border-color);
     border-left: 4px solid var(--accent-color);
@@ -745,6 +807,7 @@ main {
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
     white-space: pre-wrap;
+    word-break: break-all;
 
     /* Animation state when visible */
     opacity: 1;

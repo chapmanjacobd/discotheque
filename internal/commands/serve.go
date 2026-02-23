@@ -283,6 +283,9 @@ func (c *ServeCmd) handleQuery(w http.ResponseWriter, r *http.Request) {
 	if genre := q.Get("genre"); genre != "" {
 		flags.Genre = genre
 	}
+	if paths := q.Get("paths"); paths != "" {
+		flags.Paths = strings.Split(paths, ",")
+	}
 	if rating := q.Get("rating"); rating != "" {
 		if r, err := strconv.Atoi(rating); err == nil {
 			if r == 0 {
@@ -837,7 +840,7 @@ func (c *ServeCmd) handleTranscode(w http.ResponseWriter, r *http.Request, path 
 
 	if err := cmd.Start(); err != nil {
 		slog.Error("Failed to start ffmpeg", "path", path, "error", err)
-		http.Error(w, "Transcoding failed", http.StatusInternalServerError)
+		http.Error(w, "Unplayable: transcoding failed", http.StatusUnsupportedMediaType)
 		return
 	}
 
@@ -946,9 +949,6 @@ func (c *ServeCmd) handleSubtitles(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Convert to VTT using ffmpeg
-	w.Header().Set("Content-Type", "text/vtt")
-
 	var args []string
 	isImageSub := ext == ".idx" || ext == ".sub" || ext == ".sup"
 
@@ -964,18 +964,23 @@ func (c *ServeCmd) handleSubtitles(w http.ResponseWriter, r *http.Request) {
 	slog.Debug("subtitle ffmpeg command", "args", strings.Join(ffmpegArgs, " "))
 
 	cmd := exec.CommandContext(r.Context(), "ffmpeg", ffmpegArgs...)
-	cmd.Stdout = w
-	if err := cmd.Run(); err != nil {
+
+	// We don't set Content-Type yet to allow http.Error if ffmpeg fails immediately
+	output, err := cmd.CombinedOutput()
+	if err != nil {
 		if r.Context().Err() == nil {
 			msg := "Failed to convert subtitles"
 			if isImageSub || streamIndex != "" {
 				msg = "Failed to convert subtitles (image-based formats require OCR which is not yet supported for direct VTT streaming)"
 			}
-			slog.Error(msg, "path", path, "error", err)
-		} else {
-			slog.Debug("Subtitle conversion interrupted (client disconnect)", "path", path)
+			slog.Error(msg, "path", path, "error", err, "output", string(output))
+			http.Error(w, "Unplayable: subtitle conversion failed", http.StatusUnsupportedMediaType)
 		}
+		return
 	}
+
+	w.Header().Set("Content-Type", "text/vtt")
+	w.Write(output)
 }
 
 func (c *ServeCmd) handleThumbnail(w http.ResponseWriter, r *http.Request) {

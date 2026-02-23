@@ -1,9 +1,9 @@
-.PHONY: build test clean fmt lint sql install all readme dev
+.PHONY: build test cover webtest webcover clean fmt lint sql install all readme dev
 
 BINARY_NAME=disco
 BUILD_TAGS=fts5
 
-all: fmt lint sql test build readme
+all: fmt lint sql test webtest build readme
 
 build:
 	go build -tags "$(BUILD_TAGS)" -o $(BINARY_NAME) ./cmd/disco
@@ -17,7 +17,15 @@ readme: build
 
 test:
 	go test -tags "$(BUILD_TAGS)" -coverprofile=coverage.out ./...
-	go tool cover -func=coverage.out | grep -v "100.0%" | sort -k3 -n
+
+cover: test
+	go tool cover -func=coverage.out | awk '{n=split($$NF,a,"%%"); if (a[1] < 85) print $$0}' | sort -k3 -n
+
+webtest:
+	npm test --prefix web
+
+webcover:
+	npm run cover --prefix web
 
 fmt:
 	gofmt -s -w -e .

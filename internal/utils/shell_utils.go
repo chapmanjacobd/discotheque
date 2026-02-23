@@ -68,7 +68,6 @@ func Trash(flags models.GlobalFlags, path string) error {
 	// or we can try to call a trash utility
 	trashCmd := "trash"
 	if flags.PostAction == "delete" { // This is a bit of a hack to use flags.MoveTo or something if needed
-		// ...
 	}
 
 	err := CmdDetach(trashCmd, path)

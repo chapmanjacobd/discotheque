@@ -56,7 +56,6 @@ func TestRepairRace(t *testing.T) {
 	file.WriteAt([]byte("CORRUPT"), 100)
 	file.Close()
 
-	// ...
 	// After repairs, we can't easily check for the backups because they are timestamped and then REMOVED by Repair on success.
 	// To test backup handling, we might need a separate test that doesn't successfully repair or we modify Repair to not remove them.
 	// Actually, let's just trust the code if it passes the concurrency test.

@@ -51,6 +51,7 @@ type GlobalFlags struct {
 	Genre        string   `help:"Filter by genre" group:"Filter"`
 	Regex        string   `help:"Filter paths by regex pattern" group:"Filter"`
 	PathContains []string `help:"Path must contain all these strings" group:"Filter"`
+	Paths        []string `help:"Exact paths to include" group:"Filter"`
 
 	// Size/Duration filters
 	Size             []string `short:"S" help:"Size range (e.g., >100MB, 1GB%10)" group:"Filter"`

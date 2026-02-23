@@ -128,6 +128,16 @@ func (qb *QueryBuilder) Build() (string, []any) {
 		args = append(args, "%"+contain+"%")
 	}
 
+	// Exact path filters
+	if len(qb.Flags.Paths) > 0 {
+		placeholders := make([]string, len(qb.Flags.Paths))
+		for i := range qb.Flags.Paths {
+			placeholders[i] = "?"
+			args = append(args, qb.Flags.Paths[i])
+		}
+		whereClauses = append(whereClauses, fmt.Sprintf("path IN (%s)", strings.Join(placeholders, ", ")))
+	}
+
 	// Size filters
 	for _, s := range qb.Flags.Size {
 		if r, err := utils.ParseRange(s, utils.HumanToBytes); err == nil {
@@ -364,6 +374,7 @@ func OverrideSort(s string) string {
 	s = strings.ReplaceAll(s, "date_created", yearMonthDaySQL("time_created"))
 	s = strings.ReplaceAll(s, "date_modified", yearMonthDaySQL("time_modified"))
 	s = strings.ReplaceAll(s, "time_deleted", "COALESCE(time_deleted, 0)")
+	s = strings.ReplaceAll(s, "progress", "CAST(COALESCE(playhead, 0) AS FLOAT) / CAST(COALESCE(duration, 1) AS FLOAT)")
 	s = strings.ReplaceAll(s, "type", "LOWER(type)")
 	s = strings.ReplaceAll(s, "random()", "RANDOM()")
 	s = strings.ReplaceAll(s, "random", "RANDOM()")

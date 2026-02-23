@@ -1,3 +1,4 @@
+/web/coverage/
 /web/node_modules/
 /*.repair.lock
 /tmp
