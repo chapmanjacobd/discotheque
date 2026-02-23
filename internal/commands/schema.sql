@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS playlist_items (
     playlist_id INTEGER NOT NULL,
     media_path TEXT NOT NULL,
     track_number INTEGER,
+    time_added INTEGER DEFAULT (strftime('%s', 'now')),
     PRIMARY KEY (playlist_id, media_path),
     FOREIGN KEY (playlist_id) REFERENCES playlists(id) ON DELETE CASCADE,
     FOREIGN KEY (media_path) REFERENCES media(path) ON DELETE CASCADE

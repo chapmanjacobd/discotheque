@@ -374,7 +374,13 @@ func OverrideSort(s string) string {
 	s = strings.ReplaceAll(s, "date_created", yearMonthDaySQL("time_created"))
 	s = strings.ReplaceAll(s, "date_modified", yearMonthDaySQL("time_modified"))
 	s = strings.ReplaceAll(s, "time_deleted", "COALESCE(time_deleted, 0)")
-	s = strings.ReplaceAll(s, "progress", "CAST(COALESCE(playhead, 0) AS FLOAT) / CAST(COALESCE(duration, 1) AS FLOAT)")
+
+	progressExpr := "CAST(COALESCE(playhead, 0) AS FLOAT) / CAST(COALESCE(duration, 1) AS FLOAT)"
+	s = strings.ReplaceAll(s, "progress", fmt.Sprintf("(%s = 0), %s", progressExpr, progressExpr))
+
+	s = strings.ReplaceAll(s, "play_count", "(COALESCE(play_count, 0) = 0), play_count")
+	s = strings.ReplaceAll(s, "time_last_played", "(COALESCE(time_last_played, 0) = 0), time_last_played")
+
 	s = strings.ReplaceAll(s, "type", "LOWER(type)")
 	s = strings.ReplaceAll(s, "random()", "RANDOM()")
 	s = strings.ReplaceAll(s, "random", "RANDOM()")
@@ -771,6 +777,49 @@ func SortMedia(media []models.MediaWithDB, flags models.GlobalFlags) {
 }
 
 func sortMediaBasic(media []models.MediaWithDB, sortBy string, reverse bool, natSort bool) {
+	// Special handling for sparse fields where we want 0/nulls at the bottom always
+	if sortBy == "play_count" || sortBy == "time_last_played" || sortBy == "progress" {
+		sort.Slice(media, func(i, j int) bool {
+			var vI, vJ float64
+
+			switch sortBy {
+			case "play_count":
+				vI = float64(utils.Int64Value(media[i].PlayCount))
+				vJ = float64(utils.Int64Value(media[j].PlayCount))
+			case "time_last_played":
+				vI = float64(utils.Int64Value(media[i].TimeLastPlayed))
+				vJ = float64(utils.Int64Value(media[j].TimeLastPlayed))
+			case "progress":
+				dI := float64(utils.Int64Value(media[i].Duration))
+				if dI > 0 {
+					vI = float64(utils.Int64Value(media[i].Playhead)) / dI
+				}
+				dJ := float64(utils.Int64Value(media[j].Duration))
+				if dJ > 0 {
+					vJ = float64(utils.Int64Value(media[j].Playhead)) / dJ
+				}
+			}
+
+			// Zero check: zeros always last (greater index)
+			// In ascending sort (less(i,j)), if i should come after j, return false.
+			if vI == 0 && vJ != 0 {
+				return false
+			}
+			if vI != 0 && vJ == 0 {
+				return true
+			}
+			if vI == 0 && vJ == 0 {
+				return false
+			}
+
+			if reverse {
+				return vI > vJ
+			}
+			return vI < vJ
+		})
+		return
+	}
+
 	less := func(i, j int) bool {
 		switch sortBy {
 		case "path":

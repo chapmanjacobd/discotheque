@@ -3414,16 +3414,80 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     if (sortBy) sortBy.onchange = () => {
-        localStorage.setItem('disco-sort', sortBy.value);
-        performSearch();
+        state.filters.sort = sortBy.value;
+        localStorage.setItem('disco-sort', state.filters.sort);
+        if (state.page === 'playlist') {
+            sortPlaylistItems();
+            renderResults();
+        } else {
+            performSearch();
+        }
     };
 
     if (sortReverseBtn) sortReverseBtn.onclick = () => {
         state.filters.reverse = !state.filters.reverse;
         localStorage.setItem('disco-reverse', state.filters.reverse);
         sortReverseBtn.classList.toggle('active');
-        performSearch();
+        if (state.page === 'playlist') {
+            sortPlaylistItems();
+            renderResults();
+        } else {
+            performSearch();
+        }
     };
+
+    function sortPlaylistItems() {
+        const field = state.filters.sort;
+        const reverse = state.filters.reverse;
+
+        if (field === 'default') {
+            // Default sort is by track_number (asc), then time_added (asc) which is not available in frontend yet, so we use original order or path
+            // Since backend sends it sorted, we might just want to re-fetch or rely on current order if we haven't messed it up.
+            // But if we want to be safe, we can sort by track_number.
+            currentMedia.sort((a, b) => {
+                const trackA = a.track_number || Number.MAX_SAFE_INTEGER;
+                const trackB = b.track_number || Number.MAX_SAFE_INTEGER;
+                if (trackA !== trackB) return trackA - trackB;
+                return a.path.localeCompare(b.path);
+            });
+            if (reverse) currentMedia.reverse();
+            return;
+        }
+
+        currentMedia.sort((a, b) => {
+            let valA, valB;
+            
+            switch (field) {
+                case 'path': valA = a.path; valB = b.path; break;
+                case 'size': valA = a.size || 0; valB = b.size || 0; break;
+                case 'duration': valA = a.duration || 0; valB = b.duration || 0; break;
+                case 'play_count': valA = getPlayCount(a); valB = getPlayCount(b); break;
+                case 'time_last_played': valA = a.time_last_played || 0; valB = b.time_last_played || 0; break;
+                case 'progress': 
+                    valA = (a.duration && a.playhead) ? a.playhead / a.duration : 0;
+                    valB = (b.duration && b.playhead) ? b.playhead / b.duration : 0;
+                    break;
+                case 'time_created': valA = a.time_created || 0; valB = b.time_created || 0; break;
+                case 'time_modified': valA = a.time_modified || 0; valB = b.time_modified || 0; break;
+                case 'bitrate': 
+                    // Estimate bitrate
+                    valA = (a.size && a.duration) ? a.size / a.duration : 0;
+                    valB = (b.size && b.duration) ? b.size / b.duration : 0;
+                    break;
+                case 'extension': 
+                    valA = a.path.split('.').pop().toLowerCase();
+                    valB = b.path.split('.').pop().toLowerCase();
+                    break;
+                case 'random': return Math.random() - 0.5;
+                default: return 0;
+            }
+
+            if (typeof valA === 'string') {
+                return reverse ? valB.localeCompare(valA) : valA.localeCompare(valB);
+            }
+            return reverse ? valB - valA : valA - valB;
+        });
+    }
 
     if (limitInput) limitInput.oninput = debounce(performSearch, 500);
     if (limitAll) limitAll.onchange = performSearch;

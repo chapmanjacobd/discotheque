@@ -237,8 +237,8 @@ UPDATE playlists SET time_deleted = ? WHERE id = ?;
 SELECT * FROM playlists WHERE time_deleted = 0 ORDER BY title, path;
 
 -- name: AddPlaylistItem :exec
-INSERT INTO playlist_items (playlist_id, media_path, track_number)
-VALUES (?, ?, ?)
+INSERT INTO playlist_items (playlist_id, media_path, track_number, time_added)
+VALUES (?, ?, ?, strftime('%s', 'now'))
 ON CONFLICT(playlist_id, media_path) DO UPDATE SET
     track_number = excluded.track_number;
 
@@ -246,10 +246,10 @@ ON CONFLICT(playlist_id, media_path) DO UPDATE SET
 DELETE FROM playlist_items WHERE playlist_id = ? AND media_path = ?;
 
 -- name: GetPlaylistItems :many
-SELECT m.*, pi.track_number FROM media m
+SELECT m.*, pi.track_number, pi.time_added FROM media m
 JOIN playlist_items pi ON m.path = pi.media_path
 WHERE pi.playlist_id = ? AND m.time_deleted = 0
-ORDER BY pi.track_number, m.path;
+ORDER BY pi.track_number, pi.time_added, m.path;
 
 -- name: ClearPlaylist :exec
 DELETE FROM playlist_items WHERE playlist_id = ?;

@@ -11,8 +11,8 @@ import (
 )
 
 const addPlaylistItem = `-- name: AddPlaylistItem :exec
-INSERT INTO playlist_items (playlist_id, media_path, track_number)
-VALUES (?, ?, ?)
+INSERT INTO playlist_items (playlist_id, media_path, track_number, time_added)
+VALUES (?, ?, ?, strftime('%s', 'now'))
 ON CONFLICT(playlist_id, media_path) DO UPDATE SET
     track_number = excluded.track_number
 `
@@ -746,10 +746,10 @@ func (q *Queries) GetMediaByType(ctx context.Context, arg GetMediaByTypeParams) 
 }
 
 const getPlaylistItems = `-- name: GetPlaylistItems :many
-SELECT m.path, m.title, m.duration, m.size, m.time_created, m.time_modified, m.time_deleted, m.time_first_played, m.time_last_played, m.play_count, m.playhead, m.type, m.width, m.height, m.fps, m.video_codecs, m.audio_codecs, m.subtitle_codecs, m.video_count, m.audio_count, m.subtitle_count, m.album, m.artist, m.genre, m.mood, m.bpm, m."key", m.decade, m.categories, m.city, m.country, m.description, m.language, m.webpath, m.uploader, m.time_uploaded, m.time_downloaded, m.view_count, m.num_comments, m.favorite_count, m.score, m.upvote_ratio, m.latitude, m.longitude, pi.track_number FROM media m
+SELECT m.path, m.title, m.duration, m.size, m.time_created, m.time_modified, m.time_deleted, m.time_first_played, m.time_last_played, m.play_count, m.playhead, m.type, m.width, m.height, m.fps, m.video_codecs, m.audio_codecs, m.subtitle_codecs, m.video_count, m.audio_count, m.subtitle_count, m.album, m.artist, m.genre, m.mood, m.bpm, m."key", m.decade, m.categories, m.city, m.country, m.description, m.language, m.webpath, m.uploader, m.time_uploaded, m.time_downloaded, m.view_count, m.num_comments, m.favorite_count, m.score, m.upvote_ratio, m.latitude, m.longitude, pi.track_number, pi.time_added FROM media m
 JOIN playlist_items pi ON m.path = pi.media_path
 WHERE pi.playlist_id = ? AND m.time_deleted = 0
-ORDER BY pi.track_number, m.path
+ORDER BY pi.track_number, pi.time_added, m.path
 `
 
 type GetPlaylistItemsRow struct {
@@ -798,6 +798,7 @@ type GetPlaylistItemsRow struct {
 	Latitude        sql.NullFloat64 `json:"latitude"`
 	Longitude       sql.NullFloat64 `json:"longitude"`
 	TrackNumber     sql.NullInt64   `json:"track_number"`
+	TimeAdded       sql.NullInt64   `json:"time_added"`
 }
 
 func (q *Queries) GetPlaylistItems(ctx context.Context, playlistID int64) ([]GetPlaylistItemsRow, error) {
@@ -855,6 +856,7 @@ func (q *Queries) GetPlaylistItems(ctx context.Context, playlistID int64) ([]Get
 			&i.Latitude,
 			&i.Longitude,
 			&i.TrackNumber,
+			&i.TimeAdded,
 		); err != nil {
 			return nil, err
 		}

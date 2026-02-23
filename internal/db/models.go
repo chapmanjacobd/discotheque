@@ -83,6 +83,7 @@ type PlaylistItems struct {
 	PlaylistID  int64         `json:"playlist_id"`
 	MediaPath   string        `json:"media_path"`
 	TrackNumber sql.NullInt64 `json:"track_number"`
+	TimeAdded   sql.NullInt64 `json:"time_added"`
 }
 
 type Playlists struct {
