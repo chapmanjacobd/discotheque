@@ -9,6 +9,11 @@ import (
 	"strings"
 )
 
+var (
+	Stdin  io.Reader = os.Stdin
+	Stdout io.Writer = os.Stdout
+)
+
 func FileExists(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil
@@ -62,7 +67,7 @@ func ExpandStdin(paths []string) []string {
 	var out []string
 	for _, p := range paths {
 		if p == "-" {
-			out = append(out, ReadLines(os.Stdin)...)
+			out = append(out, ReadLines(Stdin)...)
 		} else {
 			out = append(out, p)
 		}
@@ -71,16 +76,20 @@ func ExpandStdin(paths []string) []string {
 }
 
 func Confirm(message string) bool {
-	fmt.Printf("%s [y/N]: ", message)
-	var response string
-	fmt.Scanln(&response)
-	response = strings.ToLower(strings.TrimSpace(response))
-	return response == "y" || response == "yes"
+	fmt.Fprintf(Stdout, "%s [y/N]: ", message)
+	scanner := bufio.NewScanner(Stdin)
+	if scanner.Scan() {
+		response := strings.ToLower(strings.TrimSpace(scanner.Text()))
+		return response == "y" || response == "yes"
+	}
+	return false
 }
 
 func Prompt(message string) string {
-	fmt.Printf("%s: ", message)
-	var response string
-	fmt.Scanln(&response)
-	return strings.TrimSpace(response)
+	fmt.Fprintf(Stdout, "%s: ", message)
+	scanner := bufio.NewScanner(Stdin)
+	if scanner.Scan() {
+		return strings.TrimSpace(scanner.Text())
+	}
+	return ""
 }

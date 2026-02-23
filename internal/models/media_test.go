@@ -41,9 +41,157 @@ func TestFromDB(t *testing.T) {
 	}
 }
 
+func TestPlaylistFromDB(t *testing.T) {
+	dbPlaylist := db.Playlists{
+		ID:           1,
+		Path:         sql.NullString{String: "/test/playlist", Valid: true},
+		Title:        sql.NullString{String: "Test Playlist", Valid: true},
+		ExtractorKey: sql.NullString{Valid: false},
+	}
+	dbPath := "/path/to/db"
+
+	p := PlaylistFromDB(dbPlaylist, dbPath)
+
+	if p.ID != 1 {
+		t.Errorf("Expected ID 1, got %d", p.ID)
+	}
+	if p.Path == nil || *p.Path != "/test/playlist" {
+		t.Errorf("Expected path /test/playlist, got %v", p.Path)
+	}
+	if p.Title == nil || *p.Title != "Test Playlist" {
+		t.Errorf("Expected title Test Playlist, got %v", p.Title)
+	}
+	if p.ExtractorKey != nil {
+		t.Errorf("Expected extractor key nil, got %v", p.ExtractorKey)
+	}
+	if p.DB != dbPath {
+		t.Errorf("Expected DB %s, got %s", dbPath, p.DB)
+	}
+}
+
 func TestMedia_Parent(t *testing.T) {
 	m := Media{Path: "/dir/sub/file.mp4"}
 	if got := m.Parent(); got != "/dir/sub" {
 		t.Errorf("Parent() = %v, want /dir/sub", got)
+	}
+}
+
+func TestMedia_Stem(t *testing.T) {
+	tests := []struct {
+		path string
+		want string
+	}{
+		{"/dir/file.mp4", "file"},
+		{"file.mp4", "file"},
+		{"/dir/.hidden", ".hidden"},
+		{"/dir/file.tar.gz", "file.tar"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.path, func(t *testing.T) {
+			m := &Media{Path: tt.path}
+			if got := m.Stem(); got != tt.want {
+				t.Errorf("Media.Stem() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestMedia_ParentAtDepth(t *testing.T) {
+	tests := []struct {
+		path  string
+		depth int
+		want  string
+	}{
+		{"/dir1/dir2/dir3/file.mp4", 0, "/"},
+		{"/dir1/dir2/dir3/file.mp4", 1, "/dir1"},
+		{"/dir1/dir2/dir3/file.mp4", 2, "/dir1/dir2"},
+		{"/dir1/dir2/dir3/file.mp4", 3, "/dir1/dir2/dir3"},
+		{"/dir1/dir2/dir3/file.mp4", 4, "/dir1/dir2/dir3"},
+		{"/dir1/dir2/dir3/file.mp4", 10, "/dir1/dir2/dir3"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.path, func(t *testing.T) {
+			m := &Media{Path: tt.path}
+			if got := m.ParentAtDepth(tt.depth); got != tt.want {
+				t.Errorf("Media.ParentAtDepth(%v) = %v, want %v", tt.depth, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestFromDBWithDB(t *testing.T) {
+	dbMedia := db.Media{
+		Path: "/test/movie.mp4",
+	}
+	dbPath := "/path/to/db"
+
+	mWithDB := FromDBWithDB(dbMedia, dbPath)
+
+	if mWithDB.Path != "/test/movie.mp4" {
+		t.Errorf("Expected path /test/movie.mp4, got %s", mWithDB.Path)
+	}
+	if mWithDB.DB != dbPath {
+		t.Errorf("Expected DB %s, got %s", dbPath, mWithDB.DB)
+	}
+}
+
+func TestToDBUpsert(t *testing.T) {
+	title := "Test Movie"
+	duration := int64(120)
+	fps := 23.976
+
+	m := Media{
+		Path:     "/test/movie.mp4",
+		Title:    &title,
+		Duration: &duration,
+		Fps:      &fps,
+	}
+
+	params := ToDBUpsert(m)
+
+	if params.Path != m.Path {
+		t.Errorf("Expected path %s, got %s", m.Path, params.Path)
+	}
+	if !params.Title.Valid || params.Title.String != title {
+		t.Errorf("Expected title %s, got %v", title, params.Title)
+	}
+	if !params.Duration.Valid || params.Duration.Int64 != duration {
+		t.Errorf("Expected duration %d, got %v", duration, params.Duration)
+	}
+	if !params.Fps.Valid || params.Fps.Float64 != fps {
+		t.Errorf("Expected fps %f, got %v", fps, params.Fps)
+	}
+
+	// Test nil values
+	m2 := Media{Path: "/test/m2.mp4"}
+	params2 := ToDBUpsert(m2)
+	if params2.Title.Valid {
+		t.Errorf("Expected title invalid for nil input")
+	}
+}
+
+func TestToNullHelpers(t *testing.T) {
+	s := "test"
+	if ns := ToNullString(&s); !ns.Valid || ns.String != s {
+		t.Errorf("ToNullString failed")
+	}
+	if ns := ToNullString(nil); ns.Valid {
+		t.Errorf("ToNullString(nil) should be invalid")
+	}
+
+	i := int64(123)
+	if ni := ToNullInt64(&i); !ni.Valid || ni.Int64 != i {
+		t.Errorf("ToNullInt64 failed")
+	}
+	if ni := ToNullInt64(nil); ni.Valid {
+		t.Errorf("ToNullInt64(nil) should be invalid")
+	}
+
+	f := 1.23
+	if nf := ToNullFloat64(&f); !nf.Valid || nf.Float64 != f {
+		t.Errorf("ToNullFloat64 failed")
+	}
+	if nf := ToNullFloat64(nil); nf.Valid {
+		t.Errorf("ToNullFloat64(nil) should be invalid")
 	}
 }

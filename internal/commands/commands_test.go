@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/alecthomas/kong"
 	"github.com/chapmanjacobd/discotheque/internal/models"
 	"github.com/chapmanjacobd/discotheque/internal/testutils"
 )
@@ -611,6 +612,56 @@ func TestDeleteMediaItem(t *testing.T) {
 
 	if _, err := os.Stat(f.Name()); !os.IsNotExist(err) {
 		t.Error("File still exists after DeleteMediaItem")
+	}
+}
+
+func TestHistoryAddCmd_Run(t *testing.T) {
+	fixture := testutils.Setup(t)
+	defer fixture.Cleanup()
+
+	f1 := fixture.CreateDummyFile("media1.mp4")
+
+	cmd := &HistoryAddCmd{
+		Args: []string{fixture.DBPath, f1},
+	}
+	if err := cmd.AfterApply(); err != nil {
+		t.Fatalf("AfterApply failed: %v", err)
+	}
+
+	if err := cmd.Run(nil); err != nil {
+		t.Fatalf("HistoryAddCmd failed: %v", err)
+	}
+}
+
+func TestReadmeCmd_Run(t *testing.T) {
+	parser, err := kong.New(&struct {
+		Print PrintCmd `cmd:""`
+	}{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, err := parser.Parse([]string{"print", "db.db"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cmd := &ReadmeCmd{}
+	if err := cmd.Run(ctx); err != nil {
+		t.Fatalf("ReadmeCmd failed: %v", err)
+	}
+}
+
+func TestSampleHashCmd_Run(t *testing.T) {
+	fixture := testutils.Setup(t)
+	defer fixture.Cleanup()
+
+	f1 := fixture.CreateDummyFile("video1.mp4")
+
+	cmd := &SampleHashCmd{
+		Paths: []string{f1},
+	}
+	if err := cmd.Run(nil); err != nil {
+		t.Fatalf("SampleHashCmd failed: %v", err)
 	}
 }
 

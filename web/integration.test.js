@@ -314,4 +314,125 @@ describe('Integration Test', () => {
             expect(toast.textContent).toContain('Unplayable (Unsupported)');
         });
     });
+
+    it('paginates results', async () => {
+        const nextBtn = document.getElementById('next-page');
+        const prevBtn = document.getElementById('prev-page');
+        const limitInput = document.getElementById('limit');
+        
+        // Mock current media to ensure "Next" is enabled (must be >= limit)
+        limitInput.value = '1';
+        limitInput.dispatchEvent(new Event('change'));
+        
+        const searchInput = document.getElementById('search-input');
+        searchInput.value = 'test';
+        searchInput.dispatchEvent(new KeyboardEvent('keypress', { key: 'Enter', bubbles: true }));
+
+        await vi.waitFor(() => {
+            expect(nextBtn.disabled).toBe(false);
+        }, { timeout: 2000 });
+        expect(prevBtn.disabled).toBe(true);
+
+        nextBtn.click();
+        expect(window.disco.state.currentPage).toBe(2);
+        
+        await vi.waitFor(() => {
+            expect(global.fetch).toHaveBeenCalledWith(
+                expect.stringContaining('offset=1'),
+                expect.any(Object)
+            );
+        });
+
+        // Wait for pagination to re-render and enable prevBtn
+        await vi.waitFor(() => {
+            expect(prevBtn.disabled).toBe(false);
+        });
+
+        prevBtn.click();
+        expect(window.disco.state.currentPage).toBe(1);
+    });
+
+    it('applies advanced filters', async () => {
+        const toggle = document.getElementById('advanced-filter-toggle');
+        toggle.click();
+
+        document.getElementById('filter-min-size').value = '100';
+        document.getElementById('filter-max-size').value = '200';
+        document.getElementById('filter-min-duration').value = '60';
+        document.getElementById('filter-max-duration').value = '120';
+        document.getElementById('filter-min-score').value = '5';
+        document.getElementById('filter-max-score').value = '10';
+        document.getElementById('filter-unplayed').checked = true;
+
+        const applyBtn = document.getElementById('apply-advanced-filters');
+        applyBtn.click();
+
+        await vi.waitFor(() => {
+            expect(global.fetch).toHaveBeenCalledWith(
+                expect.stringContaining('min_size=100'),
+                expect.any(Object)
+            );
+            expect(global.fetch).toHaveBeenCalledWith(
+                expect.stringContaining('max_size=200'),
+                expect.any(Object)
+            );
+            expect(global.fetch).toHaveBeenCalledWith(
+                expect.stringContaining('unplayed=true'),
+                expect.any(Object)
+            );
+        });
+    });
+
+    it('resets advanced filters', async () => {
+        document.getElementById('filter-min-size').value = '100';
+        const resetBtn = document.getElementById('reset-advanced-filters');
+        resetBtn.click();
+
+        expect(document.getElementById('filter-min-size').value).toBe('');
+    });
+
+    it('toggles settings options', async () => {
+        const settingsBtn = document.getElementById('settings-button');
+        settingsBtn.click();
+
+        const themeSelect = document.getElementById('setting-theme');
+        themeSelect.value = 'dark';
+        themeSelect.dispatchEvent(new Event('change'));
+        expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
+
+        const autoplayCheckbox = document.getElementById('setting-autoplay');
+        const originalAutoplay = window.disco.state.autoplay;
+        autoplayCheckbox.click();
+        expect(window.disco.state.autoplay).toBe(!originalAutoplay);
+    });
+
+    it('shows detail view', async () => {
+        await new Promise(r => setTimeout(r, 200));
+        const card = document.querySelector('.media-card');
+        const infoBtn = card.querySelector('.media-action-btn.info');
+        infoBtn.click();
+
+        const detailView = document.getElementById('detail-view');
+        expect(detailView.classList.contains('hidden')).toBe(false);
+        expect(document.getElementById('detail-content').textContent).toContain('video1.mp4');
+        
+        const backBtn = document.getElementById('back-to-results');
+        backBtn.click();
+        expect(detailView.classList.contains('hidden')).toBe(true);
+    });
+
+    it('toggles sidebar', async () => {
+        const menuToggle = document.getElementById('menu-toggle');
+        const sidebar = document.querySelector('.sidebar');
+        const overlay = document.getElementById('sidebar-overlay');
+        
+        expect(sidebar.classList.contains('mobile-open')).toBe(false);
+        menuToggle.click();
+        expect(sidebar.classList.contains('mobile-open')).toBe(true);
+        expect(overlay.classList.contains('hidden')).toBe(false);
+        
+        overlay.click();
+        expect(sidebar.classList.contains('mobile-open')).toBe(false);
+        expect(overlay.classList.contains('hidden')).toBe(true);
+    });
 });

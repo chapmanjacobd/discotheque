@@ -82,6 +82,51 @@ line3
 }
 
 func TestExpandStdin(t *testing.T) {
-	// This is hard to test because it uses os.Stdin
-	// We can skip it or mock os.Stdin
+	origStdin := Stdin
+	defer func() { Stdin = origStdin }()
+
+	input := `line1
+line2`
+	Stdin = strings.NewReader(input)
+	got := ExpandStdin([]string{"-", "direct"})
+	expected := []string{"line1", "line2", "direct"}
+	if !reflect.DeepEqual(got, expected) {
+		t.Errorf("ExpandStdin failed: got %v, want %v", got, expected)
+	}
+}
+
+func TestConfirm(t *testing.T) {
+	origStdin := Stdin
+	defer func() { Stdin = origStdin }()
+
+	tests := []struct {
+		input string
+		want  bool
+	}{
+		{"y\n", true},
+		{"yes\n", true},
+		{"Y\n", true},
+		{"n\n", false},
+		{"no\n", false},
+		{"maybe\n", false},
+		{"\n", false},
+	}
+
+	for _, tt := range tests {
+		Stdin = strings.NewReader(tt.input)
+		if got := Confirm("Is this a test?"); got != tt.want {
+			t.Errorf("Confirm(%q) = %v, want %v", tt.input, got, tt.want)
+		}
+	}
+}
+
+func TestPrompt(t *testing.T) {
+	origStdin := Stdin
+	defer func() { Stdin = origStdin }()
+
+	input := "test response\n"
+	Stdin = strings.NewReader(input)
+	if got := Prompt("Enter something"); got != "test response" {
+		t.Errorf("Prompt() = %q, want %q", got, "test response")
+	}
 }

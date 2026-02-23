@@ -27,6 +27,7 @@ func TestGetInt(t *testing.T) {
 		expected int
 	}{
 		{int64(123), 123},
+		{123, 123},
 		{"123", 0},
 		{nil, 0},
 	}
@@ -43,7 +44,7 @@ func TestGetInt64(t *testing.T) {
 		expected int64
 	}{
 		{int64(123), 123},
-		{123, 0},
+		{123, 123},
 		{nil, 0},
 	}
 	for _, tt := range tests {

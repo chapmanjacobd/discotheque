@@ -86,15 +86,19 @@ func (m *Media) Parent() string {
 
 func (m *Media) Stem() string {
 	ext := filepath.Ext(m.Path)
-	return strings.TrimSuffix(filepath.Base(m.Path), ext)
+	base := filepath.Base(m.Path)
+	if base == ext {
+		return base
+	}
+	return strings.TrimSuffix(base, ext)
 }
 
 func (m *Media) ParentAtDepth(depth int) string {
+	parts := strings.Split(filepath.Clean(m.Path), string(filepath.Separator))
 	if depth <= 0 {
 		return "/"
 	}
-	parts := strings.Split(filepath.Clean(m.Path), string(filepath.Separator))
-	if len(parts) <= depth {
+	if depth >= len(parts)-1 {
 		return filepath.Dir(m.Path)
 	}
 	return strings.Join(parts[:depth+1], string(filepath.Separator))

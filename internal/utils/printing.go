@@ -10,9 +10,14 @@ import (
 // PrintOverwrite overwrites the current line in the terminal with the given text
 func PrintOverwrite(text string) {
 	// If not a terminal, just print normally
-	fileInfo, _ := os.Stdout.Stat()
+	file, ok := Stdout.(*os.File)
+	if !ok {
+		fmt.Fprintln(Stdout, text)
+		return
+	}
+	fileInfo, _ := file.Stat()
 	if (fileInfo.Mode() & os.ModeCharDevice) == 0 {
-		fmt.Println(text)
+		fmt.Fprintln(Stdout, text)
 		return
 	}
 
@@ -26,11 +31,11 @@ func PrintOverwrite(text string) {
 	}
 
 	if IsLinux || IsMac {
-		fmt.Printf("\r%s\033[K", text)
+		fmt.Fprintf(Stdout, "\r%s\033[K", text)
 	} else if IsWindows {
-		fmt.Printf("\r%s", text)
+		fmt.Fprintf(Stdout, "\r%s", text)
 	} else {
-		fmt.Println(text)
+		fmt.Fprintln(Stdout, text)
 	}
 }
 

@@ -50,4 +50,21 @@ describe('Utility Functions', () => {
       expect(formatRelativeDate(now - 90000)).toBe('1d ago');
     });
   });
+
+  describe('truncateString', () => {
+    it('truncates long strings', () => {
+      const { truncateString } = window.disco;
+      expect(truncateString('Short string')).toBe('Short string');
+      const longString = 'A'.repeat(60);
+      expect(truncateString(longString)).toBe('A'.repeat(52) + '...');
+    });
+  });
+
+  describe('formatDisplayPath', () => {
+    it('formats paths correctly', () => {
+      const { formatDisplayPath } = window.disco;
+      expect(formatDisplayPath('/home/user/media/video.mp4')).toBe('media/video.mp4');
+      expect(formatDisplayPath('video.mp4')).toBe('video.mp4');
+    });
+  });
 });

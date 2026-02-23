@@ -15,14 +15,24 @@ func GetString(v any) string {
 }
 
 func GetInt(v any) int {
-	if i, ok := v.(int64); ok {
+	switch i := v.(type) {
+	case int:
+		return i
+	case int32:
+		return int(i)
+	case int64:
 		return int(i)
 	}
 	return 0
 }
 
 func GetInt64(v any) int64 {
-	if i, ok := v.(int64); ok {
+	switch i := v.(type) {
+	case int:
+		return int64(i)
+	case int32:
+		return int64(i)
+	case int64:
 		return i
 	}
 	return 0
