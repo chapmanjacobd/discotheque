@@ -35,7 +35,7 @@ func (c *TuiCmd) Run(ctx *kong.Context) error {
 
 	query.SortMedia(media, c.GlobalFlags)
 
-	m := tui.NewModel(media)
+	m := tui.NewModel(media, c.Databases, c.GlobalFlags)
 	p := tea.NewProgram(m, tea.WithAltScreen())
 
 	finalModel, err := p.Run()
@@ -43,7 +43,7 @@ func (c *TuiCmd) Run(ctx *kong.Context) error {
 		return err
 	}
 
-	choice := finalModel.(tui.Model).GetChoice()
+	choice := finalModel.(*tui.Model).GetChoice()
 	if choice != nil {
 		// Play the chosen media
 		fmt.Printf("Playing: %s\n", choice.Path)

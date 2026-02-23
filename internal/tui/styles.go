@@ -49,4 +49,18 @@ var (
 			BorderBottom(true).
 			BorderForeground(ColorBorder).
 			MarginBottom(1)
+
+	StyleSidebar = lipgloss.NewStyle().
+			Border(lipgloss.NormalBorder(), false, true, false, false).
+			BorderForeground(ColorBorder).
+			Padding(0, 1).
+			MarginRight(1)
+
+	StyleActivePane = lipgloss.NewStyle().
+			Border(lipgloss.NormalBorder()).
+			BorderForeground(ColorAccent)
+
+	StyleInactivePane = lipgloss.NewStyle().
+				Border(lipgloss.NormalBorder()).
+				BorderForeground(ColorBorder)
 )
