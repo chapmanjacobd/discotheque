@@ -3033,8 +3033,22 @@ document.addEventListener('DOMContentLoaded', () => {
             touchStartTime = Date.now();
         }, { passive: true });
 
+        pipPlayer.addEventListener('touchmove', (e) => {
+            if (touchStartTime === 0) return;
+            const diffX = e.changedTouches[0].screenX - touchStartX;
+            const diffY = e.changedTouches[0].screenY - touchStartY;
+            
+            // If it's clearly a gesture for the player, prevent page scroll
+            if (Math.abs(diffX) > 10 || Math.abs(diffY) > 10) {
+                if (e.cancelable) e.preventDefault();
+            }
+        }, { passive: false });
+
         pipPlayer.addEventListener('touchend', (e) => {
-            if (e.target.closest('.pip-controls') || e.target.closest('button') || e.target.closest('select')) return;
+            if (e.target.closest('.pip-controls') || e.target.closest('button') || e.target.closest('select')) {
+                touchStartTime = 0;
+                return;
+            }
 
             const touchEndX = e.changedTouches[0].screenX;
             const touchEndY = e.changedTouches[0].screenY;
@@ -3045,7 +3059,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const duration = touchEndTime - touchStartTime;
 
             // Thresholds: < 500ms duration
-            if (duration < 500) {
+            if (touchStartTime !== 0 && duration < 500) {
                 if (Math.abs(diffX) > 60 && Math.abs(diffY) < 80) {
                     if (diffX > 60) {
                         // Swipe Right -> Previous
@@ -3074,6 +3088,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 }
             }
+            touchStartTime = 0;
         }, { passive: true });
     }
 
