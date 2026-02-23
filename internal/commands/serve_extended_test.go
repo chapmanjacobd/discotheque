@@ -2,7 +2,6 @@ package commands
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -123,16 +122,8 @@ func TestServeCmd_ExtendedHandlers(t *testing.T) {
 		w := httptest.NewRecorder()
 		handler.ServeHTTP(w, req)
 
-		if w.Code != http.StatusOK {
-			t.Errorf("Expected 200, got %d", w.Code)
-		}
-
-		var createResp struct {
-			ID int64  `json:"id"`
-			DB string `json:"db"`
-		}
-		if err := json.NewDecoder(w.Body).Decode(&createResp); err != nil {
-			t.Fatal(err)
+		if w.Code != http.StatusCreated {
+			t.Errorf("Expected 201, got %d", w.Code)
 		}
 
 		// GET playlists
@@ -140,19 +131,16 @@ func TestServeCmd_ExtendedHandlers(t *testing.T) {
 		w = httptest.NewRecorder()
 		handler.ServeHTTP(w, req)
 
-		var listResp []struct {
-			ID    int64  `json:"id"`
-			Title string `json:"title"`
-		}
+		var listResp []string
 		if err := json.NewDecoder(w.Body).Decode(&listResp); err != nil {
 			t.Fatal(err)
 		}
-		if len(listResp) != 1 || listResp[0].Title != "My Playlist" {
+		if len(listResp) != 1 || listResp[0] != "My Playlist" {
 			t.Errorf("Unexpected playlist list: %v", listResp)
 		}
 
 		// POST add item to playlist
-		addItemPayload := fmt.Sprintf(`{"playlist_id": %d, "db": "%s", "media_path": "video1.mp4"}`, createResp.ID, createResp.DB)
+		addItemPayload := `{"playlist_title": "My Playlist", "media_path": "video1.mp4"}`
 		req = httptest.NewRequest(http.MethodPost, "/api/playlists/items", strings.NewReader(addItemPayload))
 		w = httptest.NewRecorder()
 		handler.ServeHTTP(w, req)
@@ -161,7 +149,7 @@ func TestServeCmd_ExtendedHandlers(t *testing.T) {
 		}
 
 		// GET playlist items
-		req = httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/playlists/items?id=%d&db=%s", createResp.ID, createResp.DB), nil)
+		req = httptest.NewRequest(http.MethodGet, "/api/playlists/items?title=My%20Playlist", nil)
 		w = httptest.NewRecorder()
 		handler.ServeHTTP(w, req)
 		var itemsResp []any
@@ -173,7 +161,7 @@ func TestServeCmd_ExtendedHandlers(t *testing.T) {
 		}
 
 		// DELETE playlist item
-		deleteItemPayload := fmt.Sprintf(`{"playlist_id": %d, "db": "%s", "media_path": "video1.mp4"}`, createResp.ID, createResp.DB)
+		deleteItemPayload := `{"playlist_title": "My Playlist", "media_path": "video1.mp4"}`
 		req = httptest.NewRequest(http.MethodDelete, "/api/playlists/items", strings.NewReader(deleteItemPayload))
 		w = httptest.NewRecorder()
 		handler.ServeHTTP(w, req)
@@ -182,7 +170,7 @@ func TestServeCmd_ExtendedHandlers(t *testing.T) {
 		}
 
 		// DELETE playlist
-		req = httptest.NewRequest(http.MethodDelete, fmt.Sprintf("/api/playlists?id=%d&db=%s", createResp.ID, createResp.DB), nil)
+		req = httptest.NewRequest(http.MethodDelete, "/api/playlists?title=My%20Playlist", nil)
 		w = httptest.NewRecorder()
 		handler.ServeHTTP(w, req)
 		if w.Code != http.StatusOK {

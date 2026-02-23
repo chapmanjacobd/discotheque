@@ -37,18 +37,20 @@
         <div id="sidebar-overlay" class="hidden"></div>
         <aside class="sidebar">
             <div id="nav-list">
+                <button id="all-media-btn" class="category-btn active" style="width: 100%; margin-bottom: 0.2rem;">🗂️
+                    All Media</button>
                 <button id="history-btn" class="category-btn" style="width: 100%; margin-bottom: 0.5rem;">🕒
                     History</button>
             </div>
 
-            <details open>
+            <details id="details-categories" open>
                 <summary>Categories</summary>
                 <div id="category-list">
                     <!-- Categories will be injected here -->
                 </div>
             </details>
 
-            <details>
+            <details id="details-playlists">
                 <summary>Playlists</summary>
                 <div id="playlist-list">
                     <!-- Playlists will be injected here -->
@@ -58,14 +60,14 @@
                     Playlist</button>
             </details>
 
-            <details>
+            <details id="details-genres">
                 <summary>Genres</summary>
                 <div id="genre-list">
                     <!-- Genres will be injected here -->
                 </div>
             </details>
 
-            <details>
+            <details id="details-ratings">
                 <summary>Ratings</summary>
                 <div id="rating-list">
                     <!-- Ratings will be injected here -->

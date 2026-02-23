@@ -164,6 +164,9 @@ describe('Integration Test', () => {
         });
     });
     it('filters by category', async () => {
+        const allMediaBtn = document.getElementById('all-media-btn');
+        expect(allMediaBtn.classList.contains('active')).toBe(true);
+
         await vi.waitFor(() => {
             const comedyBtn = document.querySelector('.category-btn[data-cat="comedy"]');
             expect(comedyBtn).not.toBeNull();
@@ -178,6 +181,7 @@ describe('Integration Test', () => {
                 expect.any(Object)
             );
         });
+        expect(allMediaBtn.classList.contains('active')).toBe(false);
     });
 
     it('filters by rating', async () => {
@@ -207,7 +211,7 @@ describe('Integration Test', () => {
                 '/api/playlists',
                 expect.objectContaining({
                     method: 'POST',
-                    body: expect.stringContaining('New Cool List')
+                    body: expect.stringContaining('"title":"New Cool List"')
                 })
             );
         });
@@ -228,7 +232,7 @@ describe('Integration Test', () => {
                 '/api/playlists/items',
                 expect.objectContaining({
                     method: 'POST',
-                    body: expect.stringContaining('video1.mp4')
+                    body: expect.stringContaining('"playlist_title":"My Playlist"')
                 })
             );
         });
@@ -248,6 +252,15 @@ describe('Integration Test', () => {
         expect(window.disco.state.draggedItem).not.toBeNull();
         expect(window.disco.state.draggedItem.path).toBe('video1.mp4');
 
+        // Simulate dragenter
+        const dragEnterEvent = new DragEvent('dragenter', { bubbles: true });
+        playlistZone.dispatchEvent(dragEnterEvent);
+        expect(playlistZone.classList.contains('drag-over')).toBe(true);
+
+        // Simulate dragover
+        const dragOverEvent = new DragEvent('dragover', { bubbles: true });
+        playlistZone.dispatchEvent(dragOverEvent);
+
         // Simulate drop
         const dropEvent = new DragEvent('drop', { bubbles: true });
         playlistZone.dispatchEvent(dropEvent);
@@ -257,10 +270,11 @@ describe('Integration Test', () => {
                 '/api/playlists/items',
                 expect.objectContaining({
                     method: 'POST',
-                    body: expect.stringContaining('video1.mp4')
+                    body: expect.stringContaining('"playlist_title":"My Playlist"')
                 })
             );
         });
+        expect(playlistZone.classList.contains('drag-over')).toBe(false);
     });
 
     it('merges local progress into history', async () => {
@@ -279,6 +293,30 @@ describe('Integration Test', () => {
                 expect.stringContaining('paths=local-video.mp4')
             );
         });
+    });
+
+    it('persists sidebar state and resets on logo click', async () => {
+        const catDetails = document.getElementById('details-categories');
+        const playlistDetails = document.getElementById('details-playlists');
+
+        // Initially categories is open, playlists is closed
+        expect(catDetails.open).toBe(true);
+        expect(playlistDetails.open).toBe(false);
+
+        // Toggle playlists
+        playlistDetails.open = true;
+        playlistDetails.dispatchEvent(new Event('toggle'));
+        expect(window.disco.state.sidebarState['details-playlists']).toBe(true);
+
+        // Click logo
+        const logo = document.querySelector('.logo');
+        const allMediaBtn = document.getElementById('all-media-btn');
+        logo.click();
+
+        expect(catDetails.open).toBe(true);
+        expect(playlistDetails.open).toBe(false);
+        expect(window.disco.state.sidebarState['details-playlists']).toBe(false);
+        expect(allMediaBtn.classList.contains('active')).toBe(true);
     });
 
     it('shows unplayable toast on 404', async () => {

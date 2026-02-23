@@ -21,7 +21,7 @@ export async function setupTestEnvironment() {
 
         let data = [];
         if (url.includes('/api/databases')) {
-            data = mocks.databases || { databases: ['test.db'], trashcan: true, global_progress: true, dev: false };
+            data = mocks.databases || { databases: ['test.db'], trashcan: true, read_only: false, dev: false };
         } else if (url.includes('/api/categories')) {
             data = mocks.categories || [{ category: 'comedy', count: 5 }, { category: 'music', count: 3 }];
         } else if (url.includes('/api/genres')) {
@@ -29,7 +29,7 @@ export async function setupTestEnvironment() {
         } else if (url.includes('/api/ratings')) {
             data = mocks.ratings || [{ rating: 5, count: 1 }, { rating: 0, count: 10 }];
         } else if (url.includes('/api/playlists')) {
-            data = mocks.playlists || [{ id: 1, title: 'My Playlist', db: 'test.db' }];
+            data = mocks.playlists || ['My Playlist'];
         } else if (url.includes('/api/query')) {
             data = mocks.media || [
                 { path: 'video1.mp4', type: 'video/mp4', size: 1024, duration: 60, db: 'test.db' },
@@ -61,12 +61,13 @@ export async function setupTestEnvironment() {
     }));
 
     if (typeof global.DragEvent === 'undefined') {
+        let sharedData = {};
         global.DragEvent = class DragEvent extends Event {
             constructor(type, options = {}) {
                 super(type, options);
                 this.dataTransfer = options.dataTransfer || {
-                    setData: vi.fn(),
-                    getData: vi.fn(),
+                    setData: vi.fn((format, data) => { sharedData[format] = data; }),
+                    getData: vi.fn((format) => sharedData[format] || ''),
                     effectAllowed: 'none',
                     dropEffect: 'none'
                 };

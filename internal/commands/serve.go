@@ -33,7 +33,7 @@ type ServeCmd struct {
 	PublicDir            string   `help:"Override embedded web assets with local directory"`
 	Dev                  bool     `help:"Enable development mode (auto-reload)"`
 	Trashcan             bool     `help:"Enable trash/recycle page and empty bin functionality"`
-	GlobalProgress       bool     `help:"Enable server-side playback progress tracking"`
+	ReadOnly             bool     `help:"Disable server-side progress tracking and playlist modifications"`
 	ApplicationStartTime int64    `kong:"-"`
 	thumbnailCache       sync.Map `kong:"-"`
 	dbCache              sync.Map `kong:"-"`
@@ -178,10 +178,10 @@ func (c *ServeCmd) Run(ctx *kong.Context) error {
 func (c *ServeCmd) handleDatabases(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	resp := models.DatabaseInfo{
-		Databases:      c.Databases,
-		Trashcan:       c.Trashcan,
-		GlobalProgress: c.GlobalProgress,
-		Dev:            c.Dev,
+		Databases: c.Databases,
+		Trashcan:  c.Trashcan,
+		ReadOnly:  c.ReadOnly,
+		Dev:       c.Dev,
 	}
 	json.NewEncoder(w).Encode(resp)
 }
@@ -407,6 +407,9 @@ func (c *ServeCmd) handlePlay(w http.ResponseWriter, r *http.Request) {
 }
 
 func (c *ServeCmd) markDeletedInAllDBs(ctx context.Context, path string, deleted bool) {
+	if c.ReadOnly {
+		return
+	}
 	var deleteTime int64 = 0
 	if deleted {
 		deleteTime = time.Now().Unix()
@@ -427,6 +430,10 @@ func (c *ServeCmd) markDeletedInAllDBs(ctx context.Context, path string, deleted
 }
 
 func (c *ServeCmd) handleDelete(w http.ResponseWriter, r *http.Request) {
+	if c.ReadOnly {
+		http.Error(w, "Read-only mode", http.StatusForbidden)
+		return
+	}
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -443,6 +450,10 @@ func (c *ServeCmd) handleDelete(w http.ResponseWriter, r *http.Request) {
 }
 
 func (c *ServeCmd) handleProgress(w http.ResponseWriter, r *http.Request) {
+	if c.ReadOnly {
+		http.Error(w, "Read-only mode", http.StatusForbidden)
+		return
+	}
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -485,6 +496,10 @@ func (c *ServeCmd) handleProgress(w http.ResponseWriter, r *http.Request) {
 }
 
 func (c *ServeCmd) handleRate(w http.ResponseWriter, r *http.Request) {
+	if c.ReadOnly {
+		http.Error(w, "Read-only mode", http.StatusForbidden)
+		return
+	}
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -1056,6 +1071,10 @@ func (c *ServeCmd) handleTrash(w http.ResponseWriter, r *http.Request) {
 }
 
 func (c *ServeCmd) handleEmptyBin(w http.ResponseWriter, r *http.Request) {
+	if c.ReadOnly {
+		http.Error(w, "Read-only mode", http.StatusForbidden)
+		return
+	}
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -1190,7 +1209,7 @@ func (c *ServeCmd) handleOPDS(w http.ResponseWriter, r *http.Request) {
 
 func (c *ServeCmd) handlePlaylists(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodGet {
-		allPlaylists := make([]models.Playlist, 0)
+		titles := make(map[string]bool)
 		for _, dbPath := range c.Databases {
 			err := c.execDB(r.Context(), dbPath, func(sqlDB *sql.DB) error {
 				queries := database.New(sqlDB)
@@ -1199,7 +1218,9 @@ func (c *ServeCmd) handlePlaylists(w http.ResponseWriter, r *http.Request) {
 					return err
 				}
 				for _, p := range pls {
-					allPlaylists = append(allPlaylists, models.PlaylistFromDB(p, dbPath))
+					if p.Title.Valid {
+						titles[p.Title.String] = true
+					}
 				}
 				return nil
 			})
@@ -1207,64 +1228,87 @@ func (c *ServeCmd) handlePlaylists(w http.ResponseWriter, r *http.Request) {
 				slog.Error("Failed to fetch playlists", "db", dbPath, "error", err)
 			}
 		}
+
+		uniqueTitles := make(models.PlaylistResponse, 0, len(titles))
+		for t := range titles {
+			uniqueTitles = append(uniqueTitles, t)
+		}
+		sort.Strings(uniqueTitles)
+
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(allPlaylists)
+		json.NewEncoder(w).Encode(uniqueTitles)
+		return
+	}
+
+	if c.ReadOnly {
+		http.Error(w, "Read-only mode", http.StatusForbidden)
 		return
 	}
 
 	if r.Method == http.MethodPost {
 		var req struct {
 			Title string `json:"title"`
-			Path  string `json:"path"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
-		playlistPath := req.Path
-		if playlistPath == "" {
-			playlistPath = "custom:" + utils.RandomString(12)
-		}
-
-		dbPath := c.Databases[0]
-		var id int64
-		err := c.execDB(r.Context(), dbPath, func(sqlDB *sql.DB) error {
-			queries := database.New(sqlDB)
-			var err error
-			id, err = queries.InsertPlaylist(r.Context(), database.InsertPlaylistParams{
-				Title: sql.NullString{String: req.Title, Valid: true},
-				Path:  sql.NullString{String: playlistPath, Valid: true},
-			})
-			return err
-		})
-		if err != nil {
-			slog.Error("Failed to insert playlist", "title", req.Title, "path", playlistPath, "error", err)
-			http.Error(w, fmt.Sprintf("Failed to insert playlist: %v", err), http.StatusInternalServerError)
+		if req.Title == "" {
+			http.Error(w, "Title required", http.StatusBadRequest)
 			return
 		}
-		json.NewEncoder(w).Encode(map[string]any{"id": id, "db": dbPath})
+
+		playlistPath := "custom:" + utils.RandomString(12)
+
+		for _, dbPath := range c.Databases {
+			err := c.execDB(r.Context(), dbPath, func(sqlDB *sql.DB) error {
+				queries := database.New(sqlDB)
+				_, err := queries.InsertPlaylist(r.Context(), database.InsertPlaylistParams{
+					Title: sql.NullString{String: req.Title, Valid: true},
+					Path:  sql.NullString{String: playlistPath, Valid: true},
+				})
+				return err
+			})
+			if err != nil {
+				slog.Error("Failed to insert playlist", "db", dbPath, "title", req.Title, "error", err)
+			}
+		}
+		w.WriteHeader(http.StatusCreated)
 		return
 	}
 
 	if r.Method == http.MethodDelete {
-		idStr := r.URL.Query().Get("id")
-		id, _ := strconv.ParseInt(idStr, 10, 64)
-		dbPath := r.URL.Query().Get("db")
-		if dbPath == "" {
-			dbPath = c.Databases[0]
+		title := r.URL.Query().Get("title")
+		if title == "" {
+			http.Error(w, "Title required", http.StatusBadRequest)
+			return
 		}
 
-		err := c.execDB(r.Context(), dbPath, func(sqlDB *sql.DB) error {
-			queries := database.New(sqlDB)
-			return queries.DeletePlaylist(r.Context(), database.DeletePlaylistParams{
-				ID:          id,
-				TimeDeleted: sql.NullInt64{Int64: time.Now().Unix(), Valid: true},
+		for _, dbPath := range c.Databases {
+			err := c.execDB(r.Context(), dbPath, func(sqlDB *sql.DB) error {
+				queries := database.New(sqlDB)
+				// We need to find the ID by title first because DeletePlaylist takes ID
+				pls, err := queries.GetPlaylists(r.Context())
+				if err != nil {
+					return err
+				}
+				for _, p := range pls {
+					if p.Title.Valid && p.Title.String == title {
+						err = queries.DeletePlaylist(r.Context(), database.DeletePlaylistParams{
+							ID:          p.ID,
+							TimeDeleted: sql.NullInt64{Int64: time.Now().Unix(), Valid: true},
+						})
+						if err != nil {
+							return err
+						}
+					}
+				}
+				return nil
 			})
-		})
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
+			if err != nil {
+				slog.Error("Failed to delete playlist", "db", dbPath, "title", title, "error", err)
+			}
 		}
 		w.WriteHeader(http.StatusOK)
 		return
@@ -1273,109 +1317,132 @@ func (c *ServeCmd) handlePlaylists(w http.ResponseWriter, r *http.Request) {
 
 func (c *ServeCmd) handlePlaylistItems(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodGet {
-		idStr := r.URL.Query().Get("id")
-		id, _ := strconv.ParseInt(idStr, 10, 64)
-		dbPath := r.URL.Query().Get("db")
-		var items []database.GetPlaylistItemsRow
-
-		err := c.execDB(r.Context(), dbPath, func(sqlDB *sql.DB) error {
-			queries := database.New(sqlDB)
-			var err error
-			items, err = queries.GetPlaylistItems(r.Context(), id)
-			return err
-		})
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+		title := r.URL.Query().Get("title")
+		if title == "" {
+			http.Error(w, "Title required", http.StatusBadRequest)
 			return
 		}
 
-		media := make([]models.MediaWithDB, 0)
-		for _, item := range items {
-			m := models.FromDB(database.Media{
-				Path:            item.Path,
-				Title:           item.Title,
-				Duration:        item.Duration,
-				Size:            item.Size,
-				TimeCreated:     item.TimeCreated,
-				TimeModified:    item.TimeModified,
-				TimeDeleted:     item.TimeDeleted,
-				TimeFirstPlayed: item.TimeFirstPlayed,
-				TimeLastPlayed:  item.TimeLastPlayed,
-				PlayCount:       item.PlayCount,
-				Playhead:        item.Playhead,
-				Type:            item.Type,
-				Width:           item.Width,
-				Height:          item.Height,
-				Fps:             item.Fps,
-				VideoCodecs:     item.VideoCodecs,
-				AudioCodecs:     item.AudioCodecs,
-				SubtitleCodecs:  item.SubtitleCodecs,
-				VideoCount:      item.VideoCount,
-				AudioCount:      item.AudioCount,
-				SubtitleCount:   item.SubtitleCount,
-				Album:           item.Album,
-				Artist:          item.Artist,
-				Genre:           item.Genre,
-				Mood:            item.Mood,
-				Bpm:             item.Bpm,
-				Key:             item.Key,
-				Decade:          item.Decade,
-				Categories:      item.Categories,
-				City:            item.City,
-				Country:         item.Country,
-				Description:     item.Description,
-				Language:        item.Language,
-				Webpath:         item.Webpath,
-				Uploader:        item.Uploader,
-				TimeUploaded:    item.TimeUploaded,
-				TimeDownloaded:  item.TimeDownloaded,
-				ViewCount:       item.ViewCount,
-				NumComments:     item.NumComments,
-				FavoriteCount:   item.FavoriteCount,
-				Score:           item.Score,
-				UpvoteRatio:     item.UpvoteRatio,
-				Latitude:        item.Latitude,
-				Longitude:       item.Longitude,
+		allMedia := make([]models.MediaWithDB, 0)
+		for _, dbPath := range c.Databases {
+			err := c.execDB(r.Context(), dbPath, func(sqlDB *sql.DB) error {
+				queries := database.New(sqlDB)
+				pls, err := queries.GetPlaylists(r.Context())
+				if err != nil {
+					return err
+				}
+
+				var playlistID int64 = -1
+				for _, p := range pls {
+					if p.Title.Valid && p.Title.String == title {
+						playlistID = p.ID
+						break
+					}
+				}
+
+				if playlistID == -1 {
+					return nil
+				}
+
+				items, err := queries.GetPlaylistItems(r.Context(), playlistID)
+				if err != nil {
+					return err
+				}
+
+				for _, item := range items {
+					m := models.FromDB(database.Media{
+						Path:            item.Path,
+						Title:           item.Title,
+						Duration:        item.Duration,
+						Size:            item.Size,
+						TimeCreated:     item.TimeCreated,
+						TimeModified:    item.TimeModified,
+						TimeDeleted:     item.TimeDeleted,
+						TimeFirstPlayed: item.TimeFirstPlayed,
+						TimeLastPlayed:  item.TimeLastPlayed,
+						PlayCount:       item.PlayCount,
+						Playhead:        item.Playhead,
+						Type:            item.Type,
+						Width:           item.Width,
+						Height:          item.Height,
+						Fps:             item.Fps,
+						VideoCodecs:     item.VideoCodecs,
+						AudioCodecs:     item.AudioCodecs,
+						SubtitleCodecs:  item.SubtitleCodecs,
+						VideoCount:      item.VideoCount,
+						AudioCount:      item.AudioCount,
+						SubtitleCount:   item.SubtitleCount,
+						Album:           item.Album,
+						Artist:          item.Artist,
+						Genre:           item.Genre,
+						Mood:            item.Mood,
+						Bpm:             item.Bpm,
+						Key:             item.Key,
+						Decade:          item.Decade,
+						Categories:      item.Categories,
+						City:            item.City,
+						Country:         item.Country,
+						Description:     item.Description,
+						Language:        item.Language,
+						Webpath:         item.Webpath,
+						Uploader:        item.Uploader,
+						TimeUploaded:    item.TimeUploaded,
+						TimeDownloaded:  item.TimeDownloaded,
+						ViewCount:       item.ViewCount,
+						NumComments:     item.NumComments,
+						FavoriteCount:   item.FavoriteCount,
+						Score:           item.Score,
+						UpvoteRatio:     item.UpvoteRatio,
+						Latitude:        item.Latitude,
+						Longitude:       item.Longitude,
+					})
+					m.TrackNumber = models.NullInt64Ptr(item.TrackNumber)
+					mw := models.MediaWithDB{
+						Media: m,
+						DB:    dbPath,
+					}
+					if c.hasFfmpeg {
+						mw.Transcode = utils.GetTranscodeStrategy(m).NeedsTranscode
+					}
+					allMedia = append(allMedia, mw)
+				}
+				return nil
 			})
-			m.TrackNumber = models.NullInt64Ptr(item.TrackNumber)
-			mw := models.MediaWithDB{
-				Media: m,
-				DB:    dbPath,
+			if err != nil {
+				slog.Error("Failed to fetch playlist items", "db", dbPath, "title", title, "error", err)
 			}
-			if c.hasFfmpeg {
-				mw.Transcode = utils.GetTranscodeStrategy(m).NeedsTranscode
-			}
-			media = append(media, mw)
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(media)
+		json.NewEncoder(w).Encode(allMedia)
+		return
+	}
+
+	if c.ReadOnly {
+		http.Error(w, "Read-only mode", http.StatusForbidden)
 		return
 	}
 
 	if r.Method == http.MethodPost {
 		var req struct {
-			PlaylistID  int64  `json:"playlist_id"`
-			DB          string `json:"db"`
-			MediaPath   string `json:"media_path"`
-			TrackNumber int64  `json:"track_number"`
+			PlaylistTitle string `json:"playlist_title"`
+			MediaPath     string `json:"media_path"`
+			TrackNumber   int64  `json:"track_number"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
-		// Ensure media exists in the target DB first (for FOREIGN KEY)
-		var media models.Media
+		// 1. Find which DB the media belongs to
+		var mediaDB string
 		found := false
-
-		// 1. Try to find media in ANY DB
 		for _, dbPath := range c.Databases {
-			err := c.execDB(r.Context(), dbPath, func(sqlDB *sql.DB) error {
+			_ = c.execDB(r.Context(), dbPath, func(sqlDB *sql.DB) error {
 				queries := database.New(sqlDB)
-				dbMedia, err := queries.GetMediaByPathExact(r.Context(), req.MediaPath)
+				_, err := queries.GetMediaByPathExact(r.Context(), req.MediaPath)
 				if err == nil {
-					media = models.FromDB(dbMedia)
+					mediaDB = dbPath
 					found = true
 				}
 				return err
@@ -1383,33 +1450,50 @@ func (c *ServeCmd) handlePlaylistItems(w http.ResponseWriter, r *http.Request) {
 			if found {
 				break
 			}
-			if err != nil && err != sql.ErrNoRows {
-				slog.Error("Database error searching media", "db", dbPath, "error", err)
-			}
 		}
 
 		if !found {
-			http.Error(w, "Media not found in any database", http.StatusNotFound)
+			http.Error(w, "Media not found", http.StatusNotFound)
 			return
 		}
 
-		// 2. Upsert media into the target DB and add to playlist
-		err := c.execDB(r.Context(), req.DB, func(sqlDB *sql.DB) error {
+		// 2. Ensure playlist exists in that DB and add item
+		err := c.execDB(r.Context(), mediaDB, func(sqlDB *sql.DB) error {
 			queries := database.New(sqlDB)
-			err := queries.UpsertMedia(r.Context(), models.ToDBUpsert(media))
+			pls, err := queries.GetPlaylists(r.Context())
 			if err != nil {
-				return fmt.Errorf("failed to upsert media to target db: %w", err)
+				return err
+			}
+
+			var playlistID int64 = -1
+			for _, p := range pls {
+				if p.Title.Valid && p.Title.String == req.PlaylistTitle {
+					playlistID = p.ID
+					break
+				}
+			}
+
+			if playlistID == -1 {
+				// Create it if missing in this DB
+				playlistPath := "custom:" + utils.RandomString(12)
+				playlistID, err = queries.InsertPlaylist(r.Context(), database.InsertPlaylistParams{
+					Title: sql.NullString{String: req.PlaylistTitle, Valid: true},
+					Path:  sql.NullString{String: playlistPath, Valid: true},
+				})
+				if err != nil {
+					return err
+				}
 			}
 
 			return queries.AddPlaylistItem(r.Context(), database.AddPlaylistItemParams{
-				PlaylistID:  req.PlaylistID,
+				PlaylistID:  playlistID,
 				MediaPath:   req.MediaPath,
 				TrackNumber: sql.NullInt64{Int64: req.TrackNumber, Valid: req.TrackNumber != 0},
 			})
 		})
 		if err != nil {
-			slog.Error("Failed to add playlist item", "playlist_id", req.PlaylistID, "media_path", req.MediaPath, "error", err)
-			http.Error(w, fmt.Sprintf("Failed to add playlist item: %v", err), http.StatusInternalServerError)
+			slog.Error("Failed to add playlist item", "title", req.PlaylistTitle, "path", req.MediaPath, "error", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		w.WriteHeader(http.StatusOK)
@@ -1418,25 +1502,42 @@ func (c *ServeCmd) handlePlaylistItems(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method == http.MethodDelete {
 		var req struct {
-			PlaylistID int64  `json:"playlist_id"`
-			DB         string `json:"db"`
-			MediaPath  string `json:"media_path"`
+			PlaylistTitle string `json:"playlist_title"`
+			MediaPath     string `json:"media_path"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
-		err := c.execDB(r.Context(), req.DB, func(sqlDB *sql.DB) error {
-			queries := database.New(sqlDB)
-			return queries.RemovePlaylistItem(r.Context(), database.RemovePlaylistItemParams{
-				PlaylistID: req.PlaylistID,
-				MediaPath:  req.MediaPath,
+		for _, dbPath := range c.Databases {
+			err := c.execDB(r.Context(), dbPath, func(sqlDB *sql.DB) error {
+				queries := database.New(sqlDB)
+				pls, err := queries.GetPlaylists(r.Context())
+				if err != nil {
+					return err
+				}
+
+				var playlistID int64 = -1
+				for _, p := range pls {
+					if p.Title.Valid && p.Title.String == req.PlaylistTitle {
+						playlistID = p.ID
+						break
+					}
+				}
+
+				if playlistID == -1 {
+					return nil
+				}
+
+				return queries.RemovePlaylistItem(r.Context(), database.RemovePlaylistItemParams{
+					PlaylistID: playlistID,
+					MediaPath:  req.MediaPath,
+				})
 			})
-		})
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
+			if err != nil {
+				slog.Error("Failed to remove playlist item", "db", dbPath, "title", req.PlaylistTitle, "error", err)
+			}
 		}
 		w.WriteHeader(http.StatusOK)
 		return

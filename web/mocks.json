@@ -1,32 +1,4 @@
 {
-  "categories": [
-    {
-      "category": "comedy",
-      "count": 5
-    },
-    {
-      "category": "music",
-      "count": 3
-    }
-  ],
-  "databases": {
-    "databases": [
-      "test.db"
-    ],
-    "trashcan": true,
-    "global_progress": true,
-    "dev": false
-  },
-  "genres": [
-    {
-      "genre": "Rock",
-      "count": 10
-    },
-    {
-      "genre": "Jazz",
-      "count": 2
-    }
-  ],
   "media": [
     {
       "path": "video1.mp4",
@@ -54,11 +26,32 @@
       "transcode": false
     }
   ],
-  "playlists": [
+  "databases": {
+    "databases": [
+      "test.db"
+    ],
+    "trashcan": true,
+    "read_only": false,
+    "dev": false
+  },
+  "categories": [
     {
-      "id": 1,
-      "title": "My Playlist",
-      "db": "test.db"
+      "category": "comedy",
+      "count": 5
+    },
+    {
+      "category": "music",
+      "count": 3
+    }
+  ],
+  "genres": [
+    {
+      "genre": "Rock",
+      "count": 10
+    },
+    {
+      "genre": "Jazz",
+      "count": 2
     }
   ],
   "ratings": [
@@ -70,5 +63,8 @@
       "rating": 0,
       "count": 10
     }
+  ],
+  "playlists": [
+    "My Playlist"
   ]
 }
