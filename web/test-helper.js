@@ -18,7 +18,7 @@ export async function setupTestEnvironment() {
     // Mock fetch
     global.fetch = vi.fn().mockImplementation((url) => {
         if (typeof url !== 'string') url = url.toString();
-        
+
         let data = [];
         if (url.includes('/api/databases')) {
             data = mocks.databases || { databases: ['test.db'], trashcan: true, global_progress: true, dev: false };
@@ -64,13 +64,13 @@ export async function setupTestEnvironment() {
     document.pictureInPictureEnabled = true;
     HTMLElement.prototype.scrollTo = vi.fn();
     HTMLElement.prototype.scrollIntoView = vi.fn();
-    global.IntersectionObserver = class { constructor() {} observe() {} unobserve() {} disconnect() {} };
-    global.Hls = class { 
-        static isSupported() { return true; } 
-        loadSource() {} 
-        attachMedia() {} 
-        on() {} 
-        destroy() {} 
+    global.IntersectionObserver = class { constructor() { } observe() { } unobserve() { } disconnect() { } };
+    global.Hls = class {
+        static isSupported() { return true; }
+        loadSource() { }
+        attachMedia() { }
+        on() { }
+        destroy() { }
         static get Events() { return { MANIFEST_PARSED: 'hlsManifestParsed' }; }
     };
     global.WaveSurfer = { create: vi.fn().mockReturnValue({ on: vi.fn(), destroy: vi.fn(), load: vi.fn() }) };
@@ -86,7 +86,7 @@ export async function setupTestEnvironment() {
 
     await import('./app.js');
     document.dispatchEvent(new Event('DOMContentLoaded'));
-    
+
     // Wait for async init and multiple renders
-    await new Promise(resolve => setTimeout(resolve, 500));
+    await new Promise(resolve => setTimeout(resolve, 300));
 }

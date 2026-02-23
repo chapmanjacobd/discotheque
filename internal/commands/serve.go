@@ -767,8 +767,14 @@ func (c *ServeCmd) handleTranscode(w http.ResponseWriter, r *http.Request, path 
 	w.Header().Set("Accept-Ranges", "bytes")
 	w.Header().Set("Content-Disposition", fmt.Sprintf("inline; filename=%q", filepath.Base(path)))
 
+	start := r.URL.Query().Get("start")
+
 	// Add flags to help with piped streaming duration and timestamp issues
 	var args []string
+
+	if start != "" {
+		args = append(args, "-ss", start)
+	}
 
 	args = append(args, "-fflags", "+genpts", "-i", path)
 
@@ -1572,8 +1578,26 @@ func (c *ServeCmd) handleHLSSegment(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "video/MP2T")
 
-	vcopy := r.URL.Query().Get("vcopy") == "true"
-	slog.Debug("HLS Segment request", "index", index, "start", startTime, "vcopy", vcopy, "path", path)
+	// Fetch media to get codec info
+	var m models.Media
+	found := false
+	for _, dbPath := range c.Databases {
+		c.execDB(r.Context(), dbPath, func(sqlDB *sql.DB) error {
+			queries := database.New(sqlDB)
+			dbMedia, err := queries.GetMediaByPathExact(r.Context(), path)
+			if err == nil {
+				m = models.FromDB(dbMedia)
+				found = true
+			}
+			return err
+		})
+		if found {
+			break
+		}
+	}
+
+	strategy := utils.GetTranscodeStrategy(m)
+	slog.Debug("HLS Segment request", "index", index, "start", startTime, "strategy", strategy, "path", path)
 
 	args := []string{
 		"-ss", fmt.Sprintf("%f", startTime),
@@ -1581,7 +1605,7 @@ func (c *ServeCmd) handleHLSSegment(w http.ResponseWriter, r *http.Request) {
 		"-t", fmt.Sprintf("%d", HLS_SEGMENT_DURATION),
 	}
 
-	if vcopy {
+	if strategy.VideoCopy {
 		args = append(args, "-c:v", "copy")
 	} else {
 		args = append(args,
@@ -1592,6 +1616,7 @@ func (c *ServeCmd) handleHLSSegment(w http.ResponseWriter, r *http.Request) {
 		)
 	}
 
+	// For HLS (MPEG-TS), AAC is the safest and most compatible choice.
 	args = append(args,
 		"-c:a", "aac",
 		"-b:a", "128k",
