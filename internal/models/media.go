@@ -182,6 +182,71 @@ func FromDBWithDB(m db.Media, dbPath string) MediaWithDB {
 	}
 }
 
+func ToDBUpsert(m Media) db.UpsertMediaParams {
+	return db.UpsertMediaParams{
+		Path:           m.Path,
+		Title:          ToNullString(m.Title),
+		Duration:       ToNullInt64(m.Duration),
+		Size:           ToNullInt64(m.Size),
+		TimeCreated:    ToNullInt64(m.TimeCreated),
+		TimeModified:   ToNullInt64(m.TimeModified),
+		Type:           ToNullString(m.Type),
+		Width:          ToNullInt64(m.Width),
+		Height:         ToNullInt64(m.Height),
+		Fps:            ToNullFloat64(m.Fps),
+		VideoCodecs:    ToNullString(m.VideoCodecs),
+		AudioCodecs:    ToNullString(m.AudioCodecs),
+		SubtitleCodecs: ToNullString(m.SubtitleCodecs),
+		VideoCount:     ToNullInt64(m.VideoCount),
+		AudioCount:     ToNullInt64(m.AudioCount),
+		SubtitleCount:  ToNullInt64(m.SubtitleCount),
+		Album:          ToNullString(m.Album),
+		Artist:         ToNullString(m.Artist),
+		Genre:          ToNullString(m.Genre),
+		Mood:           ToNullString(m.Mood),
+		Bpm:            ToNullInt64(m.Bpm),
+		Key:            ToNullString(m.Key),
+		Decade:         ToNullString(m.Decade),
+		Categories:     ToNullString(m.Categories),
+		City:           ToNullString(m.City),
+		Country:        ToNullString(m.Country),
+		Description:    ToNullString(m.Description),
+		Language:       ToNullString(m.Language),
+		Webpath:        ToNullString(m.Webpath),
+		Uploader:       ToNullString(m.Uploader),
+		TimeUploaded:   ToNullInt64(m.TimeUploaded),
+		TimeDownloaded: ToNullInt64(m.TimeDownloaded),
+		ViewCount:      ToNullInt64(m.ViewCount),
+		NumComments:    ToNullInt64(m.NumComments),
+		FavoriteCount:  ToNullInt64(m.FavoriteCount),
+		Score:          ToNullFloat64(m.Score),
+		UpvoteRatio:    ToNullFloat64(m.UpvoteRatio),
+		Latitude:       ToNullFloat64(m.Latitude),
+		Longitude:      ToNullFloat64(m.Longitude),
+	}
+}
+
+func ToNullString(s *string) sql.NullString {
+	if s == nil {
+		return sql.NullString{}
+	}
+	return sql.NullString{String: *s, Valid: true}
+}
+
+func ToNullInt64(i *int64) sql.NullInt64 {
+	if i == nil {
+		return sql.NullInt64{}
+	}
+	return sql.NullInt64{Int64: *i, Valid: true}
+}
+
+func ToNullFloat64(f *float64) sql.NullFloat64 {
+	if f == nil {
+		return sql.NullFloat64{}
+	}
+	return sql.NullFloat64{Float64: *f, Valid: true}
+}
+
 func NullStringPtr(ns sql.NullString) *string {
 	if !ns.Valid {
 		return nil

@@ -4,7 +4,7 @@ tmp_dir = "tmp"
 
 [build]
   cmd = "go build -tags fts5 -o ./tmp/main ./cmd/disco"
-  entrypoint = ["./tmp/main", "serve", "-v", "--dev", "--trashcan", "video.db", "audio.db"]
+  entrypoint = ["./tmp/main", "serve", "-v", "--dev", "--trashcan", "video.db", "audio.db", "images.db", "books.db"]
   delay = 1000
   exclude_dir = ["web/node_modules", "tmp", ".git", ".github"]
   exclude_file = []

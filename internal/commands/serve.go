@@ -345,6 +345,10 @@ func (c *ServeCmd) handleQuery(w http.ResponseWriter, r *http.Request) {
 	if completed := q.Get("completed"); completed == "true" {
 		flags.Completed = true
 	}
+	if q.Get("trash") == "true" {
+		flags.OnlyDeleted = true
+		flags.HideDeleted = false
+	}
 
 	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
 	defer cancel()
@@ -564,16 +568,11 @@ func (c *ServeCmd) handleLs(w http.ResponseWriter, r *http.Request) {
 		path = strings.TrimPrefix(path, "./")
 	}
 
-	if !strings.HasSuffix(path, "/") {
-		path += "/"
-	}
-
 	type LsEntry struct {
 		Name  string `json:"name"`
 		Path  string `json:"path"`
 		IsDir bool   `json:"is_dir"`
 		Type  string `json:"type,omitempty"`
-		InDB  bool   `json:"in_db"`
 	}
 
 	resultsMap := make(map[string]LsEntry)
@@ -587,8 +586,11 @@ func (c *ServeCmd) handleLs(w http.ResponseWriter, r *http.Request) {
 				rows, err = sqlDB.QueryContext(r.Context(), `
 					SELECT path, type FROM media
 					WHERE time_deleted = 0
-					  AND path LIKE '%/' || ? || '%'`, path)
+					  AND path LIKE '%' || ? || '%'`, path)
 			} else {
+				if !strings.HasSuffix(path, "/") {
+					path += "/"
+				}
 				rows, err = sqlDB.QueryContext(r.Context(), `
 					SELECT path, type FROM media
 					WHERE time_deleted = 0
@@ -613,19 +615,35 @@ func (c *ServeCmd) handleLs(w http.ResponseWriter, r *http.Request) {
 						if idx == -1 {
 							continue
 						}
-						suffix := fullPath[idx+len(path):]
-						if suffix == "" {
+
+						// We found 'path' in 'fullPath'.
+						// We want to extract the segment that starts with 'path'.
+						// If path ends in a slash, we want the segment AFTER that slash.
+
+						var remaining string
+						var prefix string
+						if strings.HasSuffix(path, "/") {
+							remaining = fullPath[idx+len(path):]
+							prefix = fullPath[:idx+len(path)]
+						} else {
+							// Find the start of the current segment
+							lastSlash := strings.LastIndex(fullPath[:idx+1], "/")
+							remaining = fullPath[lastSlash+1:]
+							prefix = fullPath[:lastSlash+1]
+						}
+
+						if remaining == "" {
 							continue
 						}
 
-						if slashIdx := strings.Index(suffix, "/"); slashIdx != -1 {
-							entryName = suffix[:slashIdx]
+						if before, _, ok := strings.Cut(remaining, "/"); ok {
+							entryName = before
 							isDir = true
-							entryPath = fullPath[:idx+len(path)] + entryName + "/"
+							entryPath = prefix + entryName + "/"
 						} else {
-							entryName = suffix
+							entryName = remaining
 							isDir = false
-							entryPath = fullPath[:idx+len(path)] + entryName
+							entryPath = prefix + entryName
 						}
 					} else {
 						suffix := strings.TrimPrefix(fullPath, path)
@@ -633,8 +651,8 @@ func (c *ServeCmd) handleLs(w http.ResponseWriter, r *http.Request) {
 							continue
 						}
 
-						if slashIdx := strings.Index(suffix, "/"); slashIdx != -1 {
-							entryName = suffix[:slashIdx]
+						if before, _, ok := strings.Cut(suffix, "/"); ok {
+							entryName = before
 							isDir = true
 							entryPath = path + entryName + "/"
 						} else {
@@ -644,11 +662,7 @@ func (c *ServeCmd) handleLs(w http.ResponseWriter, r *http.Request) {
 						}
 					}
 
-					// For files, we only want "immediate" children.
-					// For partial matches, we've already extracted the first segment.
-					// If it's a directory, entryPath has a trailing slash.
-					// If it's a file, entryPath matches fullPath exactly if it's immediate.
-					if !isDir && entryPath != fullPath {
+					if entryName == "" {
 						continue
 					}
 
@@ -656,12 +670,10 @@ func (c *ServeCmd) handleLs(w http.ResponseWriter, r *http.Request) {
 					key := entryPath
 					if existing, ok := resultsMap[key]; ok {
 						if !existing.IsDir && isDir {
-							// Should not happen if paths are consistent, but favor IsDir
 							resultsMap[key] = LsEntry{
 								Name:  entryName,
 								Path:  entryPath,
 								IsDir: true,
-								InDB:  true,
 							}
 						}
 					} else {
@@ -670,7 +682,6 @@ func (c *ServeCmd) handleLs(w http.ResponseWriter, r *http.Request) {
 							Path:  entryPath,
 							IsDir: isDir,
 							Type:  t.String,
-							InDB:  true,
 						}
 					}
 				}
@@ -1027,6 +1038,8 @@ func (c *ServeCmd) handleTrash(w http.ResponseWriter, r *http.Request) {
 	flags.OnlyDeleted = true
 	flags.HideDeleted = false
 	flags.All = true
+	flags.SortBy = "time_deleted"
+	flags.Reverse = true
 
 	media, err := query.MediaQuery(context.Background(), c.Databases, flags)
 	if err != nil {
@@ -1045,16 +1058,34 @@ func (c *ServeCmd) handleEmptyBin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	flags := c.GlobalFlags
-	flags.OnlyDeleted = true
-	flags.HideDeleted = false
-	flags.All = true
-
-	media, err := query.MediaQuery(context.Background(), c.Databases, flags)
-	if err != nil {
-		slog.Error("Trash query failed", "error", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+	var req struct {
+		Paths []string `json:"paths"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
+	}
+
+	var media []models.MediaWithDB
+	if len(req.Paths) > 0 {
+		// Only delete the requested paths
+		for _, p := range req.Paths {
+			media = append(media, models.MediaWithDB{Media: models.Media{Path: p}})
+		}
+	} else {
+		// Fallback: Delete everything in trash if no paths provided
+		flags := c.GlobalFlags
+		flags.OnlyDeleted = true
+		flags.HideDeleted = false
+		flags.All = true
+
+		var err error
+		media, err = query.MediaQuery(context.Background(), c.Databases, flags)
+		if err != nil {
+			slog.Error("Trash query failed", "error", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}
 
 	count := 0
@@ -1331,8 +1362,42 @@ func (c *ServeCmd) handlePlaylistItems(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		// Ensure media exists in the target DB first (for FOREIGN KEY)
+		var media models.Media
+		found := false
+
+		// 1. Try to find media in ANY DB
+		for _, dbPath := range c.Databases {
+			err := c.execDB(r.Context(), dbPath, func(sqlDB *sql.DB) error {
+				queries := database.New(sqlDB)
+				dbMedia, err := queries.GetMediaByPathExact(r.Context(), req.MediaPath)
+				if err == nil {
+					media = models.FromDB(dbMedia)
+					found = true
+				}
+				return err
+			})
+			if found {
+				break
+			}
+			if err != nil && err != sql.ErrNoRows {
+				slog.Error("Database error searching media", "db", dbPath, "error", err)
+			}
+		}
+
+		if !found {
+			http.Error(w, "Media not found in any database", http.StatusNotFound)
+			return
+		}
+
+		// 2. Upsert media into the target DB and add to playlist
 		err := c.execDB(r.Context(), req.DB, func(sqlDB *sql.DB) error {
 			queries := database.New(sqlDB)
+			err := queries.UpsertMedia(r.Context(), models.ToDBUpsert(media))
+			if err != nil {
+				return fmt.Errorf("failed to upsert media to target db: %w", err)
+			}
+
 			return queries.AddPlaylistItem(r.Context(), database.AddPlaylistItemParams{
 				PlaylistID:  req.PlaylistID,
 				MediaPath:   req.MediaPath,

@@ -160,8 +160,8 @@ func Extract(ctx context.Context, path string, scanSubtitles bool) (*MediaMetada
 	for _, s := range data.Streams {
 		switch s.CodecType {
 		case "video":
-			// Check if it's album art
-			if s.Disposition["attached_pic"] == 1 {
+			// Check if it's album art or image-based "video" codec
+			if s.Disposition["attached_pic"] == 1 || s.CodecName == "mjpeg" || s.CodecName == "png" {
 				continue
 			}
 			vCount++
@@ -200,6 +200,10 @@ func Extract(ctx context.Context, path string, scanSubtitles bool) (*MediaMetada
 	// Refine Type Detection with stream info
 	if vCount > 0 {
 		mediaType = "video"
+		// If it's a single video track with no duration and no audio, it's actually an image
+		if vCount == 1 && aCount == 0 && duration == 0 {
+			mediaType = "image"
+		}
 	} else if aCount > 0 {
 		mediaType = "audio"
 		// Distinguish audiobooks: duration > 1 hour OR "audiobook" in path

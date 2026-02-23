@@ -336,7 +336,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const inputVal = searchInput.value;
-        const isRelative = inputVal.startsWith('./') || inputVal.startsWith('../');
+        const isRelative = inputVal.startsWith('./');
 
         searchSuggestions.innerHTML = items.map((item, idx) => {
             let displayName = item.name;
@@ -356,7 +356,6 @@ document.addEventListener('DOMContentLoaded', () => {
                         <div class="suggestion-name">${displayName}</div>
                         <div class="suggestion-path">${item.path}</div>
                     </div>
-                    ${item.in_db ? '<span class="suggestion-tag">In DB</span>' : ''}
                 </div>
             `;
         }).join('');
@@ -369,10 +368,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 const path = el.dataset.path;
                 const isDir = el.dataset.isDir === 'true';
                 if (isDir) {
-                    const newPath = path.endsWith('/') ? path : path + '/';
-                    searchInput.value = newPath;
+                    if (searchInput.value.startsWith('./')) {
+                        const newName = el.querySelector('.suggestion-name').textContent;
+                        const lastSlash = searchInput.value.lastIndexOf('/');
+                        const newPath = searchInput.value.substring(0, lastSlash + 1) + newName + '/';
+                        searchInput.value = newPath;
+                    } else {
+                        const newPath = path.endsWith('/') ? path : path + '/';
+                        searchInput.value = newPath;
+                    }
                     searchInput.focus();
-                    fetchSuggestions(newPath);
+                    fetchSuggestions(searchInput.value);
                     performSearch();
                 } else {
                     const item = state.lastSuggestions.find(s => s.path === path);
@@ -679,7 +685,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function performSearch() {
-        state.page = 'search';
+        if (state.page !== 'trash' && state.page !== 'history' && state.page !== 'playlist') {
+            state.page = 'search';
+        }
         state.filters.search = searchInput.value;
         state.filters.sort = sortBy.value;
         state.filters.limit = parseInt(limitInput.value) || 100;
@@ -689,8 +697,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const trashBtn = document.getElementById('trash-btn');
         const historyBtn = document.getElementById('history-btn');
-        if (trashBtn) trashBtn.classList.remove('active');
-        if (historyBtn) historyBtn.classList.remove('active');
+        if (trashBtn && state.page !== 'trash') trashBtn.classList.remove('active');
+        if (historyBtn && state.page !== 'history') historyBtn.classList.remove('active');
 
         if (searchAbortController) {
             searchAbortController.abort();
@@ -734,6 +742,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (t === 'text') params.append('text', 'true');
             });
 
+            if (state.page === 'trash') {
+                params.append('trash', 'true');
+            } else if (state.page === 'history') {
+                params.append('watched', 'true');
+            }
+
             const resp = await fetch(`/api/query?${params.toString()}`, {
                 signal: searchAbortController.signal
             });
@@ -769,46 +783,34 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function fetchTrash() {
         state.page = 'trash';
-        syncUrl();
-        try {
-            const resp = await fetch('/api/trash');
-            if (!resp.ok) throw new Error('Failed to fetch trash');
-            currentMedia = await resp.json();
-            renderResults();
-        } catch (err) {
-            console.error('Trash fetch failed:', err);
-            showToast('Failed to load trash');
-        }
+        state.filters.sort = 'time_deleted';
+        state.filters.reverse = true;
+        if (sortBy) sortBy.value = 'time_deleted';
+        performSearch();
     }
 
     async function fetchHistory() {
         state.page = 'history';
         state.filters.genre = '';
-        syncUrl();
-        try {
-            const params = new URLSearchParams();
-            params.set('watched', 'true');
-            params.set('sort', 'time_last_played');
-            params.set('reverse', 'true');
-            if (state.filters.limit && !state.filters.all) {
-                params.set('limit', state.filters.limit);
-            }
-
-            const resp = await fetch(`/api/query?${params.toString()}`);
-            if (!resp.ok) throw new Error('Failed to fetch history');
-            currentMedia = await resp.json();
-            renderResults();
-        } catch (err) {
-            console.error('History fetch failed:', err);
-            showToast('Failed to load history');
-        }
+        state.filters.sort = 'time_last_played';
+        state.filters.reverse = true;
+        if (sortBy) sortBy.value = 'time_last_played';
+        performSearch();
     }
 
     async function emptyBin() {
-        if (!confirm('Are you sure you want to permanently delete all files in the trash?')) return;
+        if (currentMedia.length === 0) return;
+        const count = currentMedia.length;
+        const unit = count === 1 ? 'file' : 'files';
+        if (!confirm(`Are you sure you want to permanently delete these ${count} ${unit}?`)) return;
 
         try {
-            const resp = await fetch('/api/empty-bin', { method: 'POST' });
+            const paths = currentMedia.map(m => m.path);
+            const resp = await fetch('/api/empty-bin', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ paths })
+            });
             if (!resp.ok) throw new Error('Failed to empty bin');
             const msg = await resp.text();
             showToast(msg, '🔥');
@@ -1120,6 +1122,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function openInPiP(item) {
+        stopSlideshow();
+
         // Reset playback rate to default for new media if not currently playing something
         if (!state.playback.item) {
             const type = item.type || "";
@@ -1439,9 +1443,11 @@ document.addEventListener('DOMContentLoaded', () => {
             el = document.createElement('img');
             el.src = url;
             el.onerror = () => handleMediaError(item);
-            if (state.imageAutoplay) {
-                setTimeout(startSlideshow, 100);
-            }
+            el.onload = () => {
+                if (state.imageAutoplay) {
+                    startSlideshow();
+                }
+            };
         } else if (type.includes('pdf') || type.includes('epub') || type.includes('mobi')) {
             el = document.createElement('iframe');
             el.src = url;
@@ -1572,7 +1578,18 @@ document.addEventListener('DOMContentLoaded', () => {
             return val;
         };
 
-        const keys = Object.keys(item).sort();
+        const keys = Object.keys(item).sort().filter(k => {
+            const val = item[k];
+            if (val === null || val === undefined || val === '') return false;
+            if (k === 'db' || k === 'transcode' || k === 'track_number') return false;
+
+            // Hide 0 values for timestamps and other numeric fields where 0 means "unset"
+            if (val === 0 || val === 0.0 || val === '0') {
+                if (k.startsWith('time_') || k === 'playhead' || k === 'play_count' || k === 'score' || k === 'upvote_ratio') return false;
+            }
+            return true;
+        });
+
         content.innerHTML = keys.map(k => {
             const label = k.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
             return `<div>${label}</div><div>${formatValue(k, item[k])}</div>`;
@@ -1582,7 +1599,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function startSlideshow() {
-        if (state.playback.slideshowTimer) return;
+        if (state.playback.slideshowTimer) {
+            clearTimeout(state.playback.slideshowTimer);
+            clearInterval(state.playback.slideshowTimer);
+        }
 
         const btn = document.getElementById('pip-slideshow');
         if (btn) {
@@ -1590,7 +1610,8 @@ document.addEventListener('DOMContentLoaded', () => {
             btn.classList.add('active');
         }
 
-        state.playback.slideshowTimer = setInterval(() => {
+        state.playback.slideshowTimer = setTimeout(() => {
+            state.playback.slideshowTimer = null;
             playSibling(1);
         }, state.slideshowDelay * 1000);
 
@@ -1599,6 +1620,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function stopSlideshow() {
         if (state.playback.slideshowTimer) {
+            clearTimeout(state.playback.slideshowTimer);
             clearInterval(state.playback.slideshowTimer);
             state.playback.slideshowTimer = null;
         }
@@ -1688,11 +1710,29 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="detail-metadata">
                     <h3>Metadata</h3>
                     <div class="metadata-grid">
-                        ${Object.keys(item).sort().map(k => {
+                        ${Object.keys(item).sort().filter(k => {
             const val = item[k];
-            if (val === null || val === undefined || val === '') return '';
+            if (val === null || val === undefined || val === '') return false;
+            if (k === 'db' || k === 'transcode' || k === 'track_number') return false;
+
+            // Hide 0 values for timestamps and other numeric fields where 0 means "unset"
+            if (val === 0 || val === 0.0 || val === '0') {
+                if (k.startsWith('time_') || k === 'playhead' || k === 'play_count' || k === 'score' || k === 'upvote_ratio') return false;
+            }
+            return true;
+        }).map(k => {
             const label = k.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-            return `<div>${label}</div><div>${val}</div>`;
+            const formatValue = (key, val) => {
+                if (val === null || val === undefined || val === '') return '-';
+                if (key.startsWith('time_') || key.endsWith('_played') || key.includes('_uploaded') || key.includes('_downloaded')) {
+                    return new Date(val * 1000).toLocaleString();
+                }
+                if (key === 'size') return formatSize(val);
+                if (key === 'duration') return formatDuration(val);
+                if (typeof val === 'number') return val.toLocaleString();
+                return val;
+            };
+            return `<div>${label}</div><div>${formatValue(k, item[k])}</div>`;
         }).join('')}
                     </div>
                 </div>
@@ -1918,7 +1958,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <th data-sort="size">Size ${sortIcon('size')}</th>
             <th data-sort="duration">Duration ${sortIcon('duration')}</th>
             <th data-sort="type">Type ${sortIcon('type')}</th>
-            <th data-sort="play_count">Plays ${sortIcon('play_count')}</th>
+            ${isTrash ? `<th data-sort="time_deleted">Deleted ${sortIcon('time_deleted')}</th>` : `<th data-sort="play_count">Plays ${sortIcon('play_count')}</th>`}
         `;
 
         if (isPlaylist) {
@@ -1967,7 +2007,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <td>${formatSize(item.size)}</td>
                 <td>${formatDuration(item.duration)}</td>
                 <td>${item.type || ''}</td>
-                <td>${getPlayCount(item) || ''}</td>
+                <td>${isTrash ? formatRelativeDate(item.time_deleted) : (getPlayCount(item) || '')}</td>
             `;
 
             if (isPlaylist) {
@@ -2101,13 +2141,17 @@ document.addEventListener('DOMContentLoaded', () => {
         categoryList.querySelectorAll('.category-btn').forEach(btn => {
             btn.onclick = (e) => {
                 const cat = e.target.dataset.cat;
+                if (cat === '') {
+                    state.page = 'search'; // 'All Media' always exits special modes
+                }
                 state.filters.category = cat;
                 state.filters.genre = ''; // Clear genre filter
                 state.filters.rating = ''; // Clear rating filter
                 state.currentPage = 1; // Reset pagination
 
                 document.querySelectorAll('.category-btn').forEach(b => b.classList.remove('active'));
-                if (trashBtn) trashBtn.classList.remove('active');
+                if (trashBtn && state.page !== 'trash') trashBtn.classList.remove('active');
+                if (historyBtn && state.page !== 'history') historyBtn.classList.remove('active');
                 e.target.classList.add('active');
 
                 performSearch();
@@ -2403,19 +2447,53 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     searchInput.onkeydown = (e) => {
+        if (e.key === 'Tab' && e.shiftKey) {
+            e.preventDefault();
+            const val = searchInput.value;
+            if (val.startsWith('/') || val.startsWith('./')) {
+                const parts = val.split('/');
+                if (val.endsWith('/')) {
+                    parts.pop(); // remove empty trailing
+                    parts.pop(); // remove last folder
+                } else {
+                    parts.pop(); // remove partial segment
+                }
+                const newVal = parts.join('/') + (parts.length > 0 ? '/' : '');
+                searchInput.value = newVal || (val.startsWith('/') ? '/' : './');
+                fetchSuggestions(searchInput.value);
+                performSearch();
+            }
+            return;
+        }
+
         const items = searchSuggestions.querySelectorAll('.suggestion-item');
         if (searchSuggestions.classList.contains('hidden') || items.length === 0) return;
 
         if (e.key === 'Tab') {
             e.preventDefault();
-            if (selectedSuggestionIndex === -1) selectedSuggestionIndex = 0;
+            if (selectedSuggestionIndex === -1) {
+                if (items.length === 1) {
+                    selectedSuggestionIndex = 0;
+                } else {
+                    selectedSuggestionIndex = 0;
+                    updateSelectedSuggestion(items);
+                    return;
+                }
+            }
             const el = items[selectedSuggestionIndex];
             const path = el.dataset.path;
             const isDir = el.dataset.isDir === 'true';
             if (isDir) {
-                const newPath = path.endsWith('/') ? path : path + '/';
-                searchInput.value = newPath;
-                fetchSuggestions(newPath);
+                if (searchInput.value.startsWith('./')) {
+                    const newName = el.querySelector('.suggestion-name').textContent;
+                    const lastSlash = searchInput.value.lastIndexOf('/');
+                    const newPath = searchInput.value.substring(0, lastSlash + 1) + newName + '/';
+                    searchInput.value = newPath;
+                } else {
+                    const newPath = path.endsWith('/') ? path : path + '/';
+                    searchInput.value = newPath;
+                }
+                fetchSuggestions(searchInput.value);
                 performSearch();
             } else {
                 searchInput.value = path;
@@ -2436,9 +2514,16 @@ document.addEventListener('DOMContentLoaded', () => {
             const path = el.dataset.path;
             const isDir = el.dataset.isDir === 'true';
             if (isDir) {
-                const newPath = path.endsWith('/') ? path : path + '/';
-                searchInput.value = newPath;
-                fetchSuggestions(newPath);
+                if (searchInput.value.startsWith('./')) {
+                    const newName = el.querySelector('.suggestion-name').textContent;
+                    const lastSlash = searchInput.value.lastIndexOf('/');
+                    const newPath = searchInput.value.substring(0, lastSlash + 1) + newName + '/';
+                    searchInput.value = newPath;
+                } else {
+                    const newPath = path.endsWith('/') ? path : path + '/';
+                    searchInput.value = newPath;
+                }
+                fetchSuggestions(searchInput.value);
                 performSearch();
             } else {
                 searchInput.value = path;
@@ -2831,7 +2916,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // --- Inactivity Tracking ---
-    const logo = document.querySelector('.logo-text');
+    const logoText = document.querySelector('.logo-text');
     const activityEvents = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart'];
 
     activityEvents.forEach(name => {
@@ -2840,14 +2925,14 @@ document.addEventListener('DOMContentLoaded', () => {
             const inactiveTime = now - state.lastActivity;
 
             if (inactiveTime > 3 * 60 * 1000) { // 3 minutes
-                if (logo) {
-                    logo.classList.remove('shimmering');
-                    void logo.offsetWidth; // Trigger reflow
-                    logo.classList.add('shimmering');
+                if (logoText) {
+                    logoText.classList.remove('shimmering');
+                    void logoText.offsetWidth; // Trigger reflow
+                    logoText.classList.add('shimmering');
 
                     // Remove class when done so it's clean
-                    logo.onanimationend = () => {
-                        logo.classList.remove('shimmering');
+                    logoText.onanimationend = () => {
+                        logoText.classList.remove('shimmering');
                     };
                 }
             }
@@ -2855,6 +2940,24 @@ document.addEventListener('DOMContentLoaded', () => {
             state.lastActivity = now;
         }, { passive: true });
     });
+
+    const logoReset = document.querySelector('.logo');
+    if (logoReset) {
+        logoReset.style.cursor = 'pointer';
+        logoReset.onclick = () => {
+            searchInput.value = '';
+            state.page = 'search';
+            state.filters.category = '';
+            state.filters.genre = '';
+            state.filters.rating = '';
+            state.filters.search = '';
+            state.filters.sort = 'default';
+            state.filters.reverse = false;
+            if (sortBy) sortBy.value = 'default';
+            state.currentPage = 1;
+            performSearch();
+        };
+    }
 
     // --- Mobile Sidebar Controls ---
     function toggleMobileSidebar() {
@@ -2893,6 +2996,19 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // --- Helpers (Exported for testing) ---
+function formatRelativeDate(timestamp) {
+    if (!timestamp || timestamp === 0) return '-';
+    const now = Math.floor(Date.now() / 1000);
+    const diff = now - timestamp;
+
+    if (diff < 60) return 'just now';
+    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+    if (diff < 2592000) return `${Math.floor(diff / 86400)}d ago`;
+    if (diff < 31536000) return `${Math.floor(diff / 2592000)}mo ago`;
+    return `${Math.floor(diff / 31536000)}y ago`;
+}
+
 function formatSize(bytes) {
     if (!bytes) return '-';
     const units = ['B', 'KB', 'MB', 'GB', 'TB'];
