@@ -98,6 +98,8 @@ document.addEventListener('DOMContentLoaded', () => {
             lastLocalUpdate: 0,
             lastPlayedIndex: -1,
             hasMarkedComplete: false,
+            skipTimeout: null,
+            lastSkipTime: 0,
             hlsInstance: null,
             wavesurfer: null
         }
@@ -837,6 +839,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function playMedia(item) {
+        if (state.playback.skipTimeout) {
+            clearTimeout(state.playback.skipTimeout);
+            state.playback.skipTimeout = null;
+        }
+
         if (state.player === 'browser') {
             openInPiP(item);
             return;
@@ -982,6 +989,19 @@ document.addEventListener('DOMContentLoaded', () => {
     function playSibling(offset) {
         if (currentMedia.length === 0) return;
 
+        // Prevent rapid skipping
+        const now = Date.now();
+        if (state.playback.lastSkipTime && (now - state.playback.lastSkipTime < 400)) {
+            return;
+        }
+        state.playback.lastSkipTime = now;
+
+        // Clear any pending auto-skips from errors
+        if (state.playback.skipTimeout) {
+            clearTimeout(state.playback.skipTimeout);
+            state.playback.skipTimeout = null;
+        }
+
         let currentIndex = -1;
         let itemGone = false;
         if (state.playback.item) {
@@ -1043,6 +1063,16 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function handleMediaError(item) {
+        // Only handle error for the currently attempting playback item to avoid stale event issues
+        if (state.playback.item && state.playback.item.path !== item.path) return;
+
+        // Clear handlers to prevent other events (like onended) from firing after error
+        const media = pipViewer.querySelector('video, audio');
+        if (media) {
+            media.onerror = null;
+            media.onended = null;
+        }
+
         showToast(`File not found, moved to trash\n${item.path}`, '🗑️');
         // Remove from current view if applicable
         currentMedia = currentMedia.filter(m => m.path !== item.path);
@@ -1050,7 +1080,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Auto-skip to next
         if (state.autoplay) {
-            setTimeout(() => {
+            if (state.playback.skipTimeout) {
+                clearTimeout(state.playback.skipTimeout);
+            }
+            state.playback.skipTimeout = setTimeout(() => {
+                state.playback.skipTimeout = null;
                 playSibling(1);
             }, 1200);
         } else {
@@ -2239,6 +2273,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function handlePostPlayback(item) {
+        // If we just had an error, don't trigger post-playback skip
+        if (state.playback.skipTimeout) return;
+
         if (state.postPlaybackAction === 'delete') {
             deleteMedia(item.path);
             if (state.autoplay) playSibling(1);
