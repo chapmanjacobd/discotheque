@@ -251,6 +251,7 @@ describe('Integration Test', () => {
         card.dispatchEvent(dragStartEvent);
         expect(window.disco.state.draggedItem).not.toBeNull();
         expect(window.disco.state.draggedItem.path).toBe('video1.mp4');
+        expect(document.body.classList.contains('is-dragging')).toBe(true);
 
         // Simulate dragenter
         const dragEnterEvent = new DragEvent('dragenter', { bubbles: true });
@@ -263,7 +264,13 @@ describe('Integration Test', () => {
 
         // Simulate drop
         const dropEvent = new DragEvent('drop', { bubbles: true });
+        // Manually set data since we improved the mock
+        dropEvent.dataTransfer.setData('text/plain', 'video1.mp4');
         playlistZone.dispatchEvent(dropEvent);
+
+        // Simulate dragend on source
+        const dragEndEvent = new DragEvent('dragend', { bubbles: true });
+        card.dispatchEvent(dragEndEvent);
 
         await vi.waitFor(() => {
             expect(global.fetch).toHaveBeenCalledWith(
@@ -275,6 +282,7 @@ describe('Integration Test', () => {
             );
         });
         expect(playlistZone.classList.contains('drag-over')).toBe(false);
+        expect(document.body.classList.contains('is-dragging')).toBe(false);
     });
 
     it('merges local progress into history', async () => {

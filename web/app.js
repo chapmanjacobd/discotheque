@@ -558,6 +558,24 @@ document.addEventListener('DOMContentLoaded', () => {
         `).join('');
 
         playlistList.querySelectorAll('.playlist-drop-zone').forEach(zone => {
+            zone.onclick = (e) => {
+                // Ignore clicks on the delete button
+                if (e.target.closest('.delete-playlist-btn')) return;
+
+                const title = zone.dataset.title;
+                state.page = 'playlist';
+                state.filters.playlist = title;
+                state.filters.category = '';
+                state.filters.genre = '';
+                state.filters.rating = '';
+
+                document.querySelectorAll('.category-btn').forEach(b => b.classList.remove('active'));
+                zone.classList.add('active');
+                updateNavActiveStates();
+
+                fetchPlaylistItems(title);
+            };
+
             zone.addEventListener('dragenter', (e) => {
                 e.preventDefault();
                 zone.classList.add('drag-over');
@@ -569,7 +587,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             zone.addEventListener('dragleave', (e) => {
-                // Only remove if we're actually leaving the zone (not just moving into a child)
+                // Only remove if we're actually leaving the zone
                 if (!zone.contains(e.relatedTarget)) {
                     zone.classList.remove('drag-over');
                 }
@@ -583,10 +601,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 const title = zone.dataset.title;
                 const path = e.dataTransfer.getData('text/plain');
+                console.log('Drop detected:', { title, path });
                 
-                if (path) {
-                    // Try to find the item in currentMedia if possible, otherwise use a mock
-                    const item = state.draggedItem && state.draggedItem.path === path ? 
+                if (path && title) {
+                    // Find the item if possible
+                    const item = (state.draggedItem && state.draggedItem.path === path) ? 
                                  state.draggedItem : { path };
                     
                     await addToPlaylist(title, item);
@@ -595,23 +614,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 }
                 state.draggedItem = null;
+                document.body.classList.remove('is-dragging');
             });
-        });
-
-        playlistList.querySelectorAll('.playlist-name').forEach(el => {
-            el.onclick = () => {
-                const title = el.dataset.title;
-                state.page = 'playlist';
-                state.filters.playlist = title;
-                state.filters.category = '';
-                state.filters.rating = '';
-
-                document.querySelectorAll('.category-btn').forEach(b => b.classList.remove('active'));
-                el.parentElement.classList.add('active');
-                updateNavActiveStates();
-
-                fetchPlaylistItems(title);
-            };
         });
 
         playlistList.querySelectorAll('.delete-playlist-btn').forEach(btn => {
@@ -2109,14 +2113,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
             card.addEventListener('dragstart', (e) => {
                 state.draggedItem = item;
-                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.effectAllowed = 'all';
                 e.dataTransfer.setData('text/plain', item.path);
                 card.classList.add('dragging');
+                document.body.classList.add('is-dragging');
             });
 
             card.addEventListener('dragend', () => {
                 card.classList.remove('dragging');
+                document.body.classList.remove('is-dragging');
                 state.draggedItem = null;
+                clearAllDragOver();
             });
 
             card.onclick = (e) => {
@@ -2312,14 +2319,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
             tr.addEventListener('dragstart', (e) => {
                 state.draggedItem = item;
-                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.effectAllowed = 'all';
                 e.dataTransfer.setData('text/plain', item.path);
                 tr.classList.add('dragging');
+                document.body.classList.add('is-dragging');
             });
 
             tr.addEventListener('dragend', () => {
                 tr.classList.remove('dragging');
+                document.body.classList.remove('is-dragging');
                 state.draggedItem = null;
+                clearAllDragOver();
             });
 
             if (isPlaylist) {
@@ -3335,6 +3345,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
             btn.classList.toggle('active', isActive);
         });
+    }
+
+    function clearAllDragOver() {
+        document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
     }
 
     if (allMediaBtn) {

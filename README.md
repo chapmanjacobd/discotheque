@@ -3424,8 +3424,8 @@ Flags:
         Enable development mode (auto-reload)
   --trashcan
         Enable trash/recycle page and empty bin functionality
-  --global-progress
-        Enable server-side playback progress tracking
+  --read-only
+        Disable server-side progress tracking and playlist modifications
 ```
 
 </details>
