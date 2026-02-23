@@ -112,7 +112,7 @@ func GetTranscodeStrategy(m models.Media) TranscodeStrategy {
 			strategy = TranscodeStrategy{
 				NeedsTranscode: true,
 				AudioCopy:      isSupportedAudioCodec(aCodecs),
-				TargetMime:     "audio/mpeg",
+				TargetMime:     "audio/webm",
 			}
 		} else {
 			strategy = TranscodeStrategy{NeedsTranscode: false}

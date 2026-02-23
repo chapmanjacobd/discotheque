@@ -91,6 +91,7 @@ document.addEventListener('DOMContentLoaded', () => {
         genres: [],
         ratings: [],
         playlists: [], // String array of titles
+        playlistItems: [], // Cache for client-side filtering
         sidebarState: JSON.parse(localStorage.getItem('disco-sidebar-state') || '{"details-categories": true}'),
         lastSuggestions: [],
         playback: {
@@ -200,7 +201,7 @@ document.addEventListener('DOMContentLoaded', () => {
         state.filters.genre = '';
         state.filters.rating = '';
         state.filters.playlist = null;
-        
+
         details.forEach(det => {
             const id = det.id;
             if (!id) return;
@@ -549,7 +550,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const playlists = state.playlists || [];
         playlistList.innerHTML = playlists.map(title => `
-            <div class="category-btn playlist-drop-zone ${state.page === 'playlist' && state.filters.playlist === title ? 'active' : ''}" 
+            <div class="category-btn playlist-drop-zone ${state.page === 'playlist' && state.filters.playlist === title ? 'active' : ''}"
                  data-title="${title}"
                  style="display: flex; justify-content: space-between; align-items: center;">
                 <span class="playlist-name" data-title="${title}" style="flex: 1; cursor: pointer;">📁 ${title}</span>
@@ -596,18 +597,18 @@ document.addEventListener('DOMContentLoaded', () => {
             zone.addEventListener('drop', async (e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                
+
                 zone.classList.remove('drag-over');
-                
+
                 const title = zone.dataset.title;
                 const path = e.dataTransfer.getData('text/plain');
                 console.log('Drop detected:', { title, path });
-                
+
                 if (path && title) {
                     // Find the item if possible
-                    const item = (state.draggedItem && state.draggedItem.path === path) ? 
+                    const item = (state.draggedItem && state.draggedItem.path === path) ?
                                  state.draggedItem : { path };
-                    
+
                     await addToPlaylist(title, item);
                     if (state.page === 'playlist' && state.filters.playlist === title) {
                         fetchPlaylistItems(title);
@@ -628,22 +629,65 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    async function handlePlaylistReorder(draggedItem, targetItem) {
+    async function handlePlaylistReorder(draggedItem, newIndex) {
         if (!state.filters.playlist) return;
 
-        const draggedTrackNum = draggedItem.track_number || 0;
-        const targetTrackNum = targetItem.track_number || 0;
-
-        // Simply swap track numbers for now as a basic reorder
         try {
-            await updateTrackNumber(state.filters.playlist, draggedItem, targetTrackNum);
-            await updateTrackNumber(state.filters.playlist, targetItem, draggedTrackNum);
+            const resp = await fetch('/api/playlists/reorder', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    playlist_title: state.filters.playlist,
+                    media_path: draggedItem.path,
+                    new_index: newIndex
+                })
+            });
+            if (!resp.ok) throw new Error('Reorder failed');
             showToast('Playlist reordered');
             fetchPlaylistItems(state.filters.playlist);
         } catch (err) {
             console.error('Reorder failed:', err);
             showToast('Reorder failed');
         }
+    }
+
+    function filterPlaylistItems() {
+        if (!state.playlistItems) return;
+
+        let filtered = [...state.playlistItems];
+
+        // Filter by type
+        const types = state.filters.types || [];
+        const hasVideo = types.includes('video');
+        const hasAudio = types.includes('audio');
+        const hasImage = types.includes('image');
+        const hasText = types.includes('text');
+
+        if (hasVideo || hasAudio || hasImage || hasText) {
+            filtered = filtered.filter(item => {
+                const mime = item.type || '';
+                if (hasVideo && mime.startsWith('video')) return true;
+                if (hasAudio && mime.startsWith('audio')) return true;
+                if (hasImage && mime.startsWith('image')) return true;
+                if (hasText && (mime.startsWith('text') || mime === '')) return true;
+                return false;
+            });
+        }
+
+        // Filter by search text (client-side)
+        if (state.filters.search) {
+            const query = state.filters.search.toLowerCase();
+            filtered = filtered.filter(item => {
+                const title = (item.title || '').toLowerCase();
+                const path = (item.path || '').toLowerCase();
+                return title.includes(query) || path.includes(query);
+            });
+        }
+
+        currentMedia = filtered;
+        sortPlaylistItems();
+        renderResults();
+        syncUrl();
     }
 
     async function fetchPlaylistItems(title) {
@@ -660,8 +704,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const resp = await fetch(`/api/playlists/items?title=${encodeURIComponent(title)}`);
             clearTimeout(skeletonTimeout);
             if (!resp.ok) throw new Error('Failed to fetch playlist items');
-            currentMedia = await resp.json() || [];
-            renderResults();
+            state.playlistItems = await resp.json() || [];
+            filterPlaylistItems();
         } catch (err) {
             clearTimeout(skeletonTimeout);
             console.error('Playlist items fetch failed:', err);
@@ -802,6 +846,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function performSearch() {
+        if (state.page === 'playlist' && state.filters.playlist) {
+            filterPlaylistItems();
+            return;
+        }
+
         if (state.page !== 'trash' && state.page !== 'history' && state.page !== 'playlist') {
             state.page = 'search';
         }
@@ -1084,7 +1133,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const basename = path.split('/').pop();
                     const msg = resp.status === 404 ? `File not found: ${basename}` : `Unplayable (Unsupported): ${basename}`;
                     const emoji = resp.status === 404 ? '🗑️' : '⚠️';
-                    
+
                     if (state.page === 'trash') {
                         showToast(msg, '⚠️');
                     } else {
@@ -2062,7 +2111,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Rendering ---
     function renderResults() {
         if (!currentMedia) currentMedia = [];
-        
+
         // Prevent scroll jump by keeping current height temporarily
         const currentHeight = resultsContainer.offsetHeight;
         if (currentHeight > 0) {
@@ -2092,6 +2141,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (currentMedia.length === 0) {
             resultsContainer.innerHTML = '<div class="no-results">No media found</div>';
             resultsContainer.style.minHeight = '';
+            paginationContainer.classList.add('hidden');
             return;
         }
 
@@ -2105,7 +2155,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const fragment = document.createDocumentFragment();
         resultsContainer.className = 'grid';
 
-        currentMedia.forEach(item => {
+        currentMedia.forEach((item, index) => {
             const card = document.createElement('div');
             card.className = 'media-card';
             card.dataset.path = item.path;
@@ -2198,18 +2248,45 @@ document.addEventListener('DOMContentLoaded', () => {
                 card.addEventListener('dragover', (e) => {
                     e.preventDefault();
                     e.dataTransfer.dropEffect = 'move';
-                    card.classList.add('drag-over');
+
+                    const rect = card.getBoundingClientRect();
+                    const x = e.clientX - rect.left;
+                    if (x < rect.width / 2) {
+                        card.style.borderLeft = '4px solid var(--accent-color)';
+                        card.style.borderRight = '';
+                    } else {
+                        card.style.borderLeft = '';
+                        card.style.borderRight = '4px solid var(--accent-color)';
+                    }
                 });
 
                 card.addEventListener('dragleave', () => {
-                    card.classList.remove('drag-over');
+                    card.style.borderLeft = '';
+                    card.style.borderRight = '';
                 });
 
                 card.addEventListener('drop', (e) => {
                     e.preventDefault();
-                    card.classList.remove('drag-over');
+                    card.style.borderLeft = '';
+                    card.style.borderRight = '';
+
                     if (state.draggedItem && state.draggedItem !== item) {
-                        handlePlaylistReorder(state.draggedItem, item);
+                        const rect = card.getBoundingClientRect();
+                        const x = e.clientX - rect.left;
+                        let dropIndex = index;
+
+                        // Calculate if we drop before (left) or after (right)
+                        if (x > rect.width / 2) {
+                            dropIndex = index + 1;
+                        }
+
+                        // Calculate dragged index
+                        const draggedIndex = currentMedia.findIndex(m => m.path === state.draggedItem.path);
+                        if (draggedIndex !== -1 && draggedIndex < dropIndex) {
+                            dropIndex--;
+                        }
+
+                        handlePlaylistReorder(state.draggedItem, dropIndex);
                     }
                 });
             }
@@ -2270,7 +2347,7 @@ document.addEventListener('DOMContentLoaded', () => {
         resultsContainer.innerHTML = '';
         resultsContainer.appendChild(fragment);
         renderPagination();
-        
+
         // Reset min-height after content is loaded
         resultsContainer.style.minHeight = '';
     }
@@ -2336,18 +2413,45 @@ document.addEventListener('DOMContentLoaded', () => {
                 tr.addEventListener('dragover', (e) => {
                     e.preventDefault();
                     e.dataTransfer.dropEffect = 'move';
-                    tr.classList.add('drag-over');
+
+                    const rect = tr.getBoundingClientRect();
+                    const y = e.clientY - rect.top;
+                    if (y < rect.height / 2) {
+                        tr.style.borderTop = '2px solid var(--accent-color)';
+                        tr.style.borderBottom = '';
+                    } else {
+                        tr.style.borderTop = '';
+                        tr.style.borderBottom = '2px solid var(--accent-color)';
+                    }
                 });
 
                 tr.addEventListener('dragleave', () => {
-                    tr.classList.remove('drag-over');
+                    tr.style.borderTop = '';
+                    tr.style.borderBottom = '';
                 });
 
                 tr.addEventListener('drop', (e) => {
                     e.preventDefault();
-                    tr.classList.remove('drag-over');
+                    tr.style.borderTop = '';
+                    tr.style.borderBottom = '';
+
                     if (state.draggedItem && state.draggedItem !== item) {
-                        handlePlaylistReorder(state.draggedItem, item);
+                        const rect = tr.getBoundingClientRect();
+                        const y = e.clientY - rect.top;
+                        let dropIndex = index;
+
+                        // Calculate if we drop before (top) or after (bottom)
+                        if (y > rect.height / 2) {
+                            dropIndex = index + 1;
+                        }
+
+                        // Calculate dragged index
+                        const draggedIndex = currentMedia.findIndex(m => m.path === state.draggedItem.path);
+                        if (draggedIndex !== -1 && draggedIndex < dropIndex) {
+                            dropIndex--;
+                        }
+
+                        handlePlaylistReorder(state.draggedItem, dropIndex);
                     }
                 });
             }
@@ -2559,7 +2663,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         toast.innerHTML = `<span>${icon}</span> <span>${msg}</span>`;
         toast.classList.remove('hidden');
-        
+
         state.playback.toastTimer = setTimeout(() => {
             toast.classList.add('hidden');
             state.playback.toastTimer = null;
@@ -3156,7 +3260,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (touchStartTime === 0) return;
             const diffX = e.changedTouches[0].screenX - touchStartX;
             const diffY = e.changedTouches[0].screenY - touchStartY;
-            
+
             // If it's clearly a gesture for the player, prevent page scroll
             if (Math.abs(diffX) > 10 || Math.abs(diffY) > 10) {
                 if (e.cancelable) e.preventDefault();
@@ -3456,25 +3560,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
         currentMedia.sort((a, b) => {
             let valA, valB;
-            
+
             switch (field) {
                 case 'path': valA = a.path; valB = b.path; break;
                 case 'size': valA = a.size || 0; valB = b.size || 0; break;
                 case 'duration': valA = a.duration || 0; valB = b.duration || 0; break;
                 case 'play_count': valA = getPlayCount(a); valB = getPlayCount(b); break;
                 case 'time_last_played': valA = a.time_last_played || 0; valB = b.time_last_played || 0; break;
-                case 'progress': 
+                case 'progress':
                     valA = (a.duration && a.playhead) ? a.playhead / a.duration : 0;
                     valB = (b.duration && b.playhead) ? b.playhead / b.duration : 0;
                     break;
                 case 'time_created': valA = a.time_created || 0; valB = b.time_created || 0; break;
                 case 'time_modified': valA = a.time_modified || 0; valB = b.time_modified || 0; break;
-                case 'bitrate': 
+                case 'bitrate':
                     // Estimate bitrate
                     valA = (a.size && a.duration) ? a.size / a.duration : 0;
                     valB = (b.size && b.duration) ? b.size / b.duration : 0;
                     break;
-                case 'extension': 
+                case 'extension':
                     valA = a.path.split('.').pop().toLowerCase();
                     valB = b.path.split('.').pop().toLowerCase();
                     break;
@@ -3597,7 +3701,7 @@ document.addEventListener('DOMContentLoaded', () => {
     fetchPlaylists();
     renderCategoryList();
     initSidebarPersistence();
-    performSearch();
+    onUrlChange();
     applyTheme();
 
     // Expose for testing

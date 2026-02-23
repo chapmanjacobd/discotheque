@@ -58,6 +58,7 @@ func (c *ServeCmd) Mux() http.Handler {
 	mux.HandleFunc("/api/rate", c.handleRate)
 	mux.HandleFunc("/api/playlists", c.handlePlaylists)
 	mux.HandleFunc("/api/playlists/items", c.handlePlaylistItems)
+	mux.HandleFunc("/api/playlists/reorder", c.handlePlaylistReorder)
 	mux.HandleFunc("/api/events", c.handleEvents)
 	mux.HandleFunc("/api/ls", c.handleLs)
 	mux.HandleFunc("/api/raw", c.handleRaw)
@@ -1294,7 +1295,7 @@ func (c *ServeCmd) handlePlaylists(w http.ResponseWriter, r *http.Request) {
 					return err
 				}
 				for _, p := range pls {
-					if p.Title.Valid && p.Title.String == title {
+					if p.Title.Valid && strings.EqualFold(p.Title.String, title) {
 						err = queries.DeletePlaylist(r.Context(), database.DeletePlaylistParams{
 							ID:          p.ID,
 							TimeDeleted: sql.NullInt64{Int64: time.Now().Unix(), Valid: true},
@@ -1334,7 +1335,7 @@ func (c *ServeCmd) handlePlaylistItems(w http.ResponseWriter, r *http.Request) {
 
 				var playlistID int64 = -1
 				for _, p := range pls {
-					if p.Title.Valid && p.Title.String == title {
+					if p.Title.Valid && strings.EqualFold(p.Title.String, title) {
 						playlistID = p.ID
 						break
 					}
@@ -1413,6 +1414,23 @@ func (c *ServeCmd) handlePlaylistItems(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
+		// Sort to match reordering logic: TrackNumber, then Path
+		sort.Slice(allMedia, func(i, j int) bool {
+			tnA := int64(0)
+			if allMedia[i].Media.TrackNumber != nil {
+				tnA = *allMedia[i].Media.TrackNumber
+			}
+			tnB := int64(0)
+			if allMedia[j].Media.TrackNumber != nil {
+				tnB = *allMedia[j].Media.TrackNumber
+			}
+
+			if tnA != tnB {
+				return tnA < tnB
+			}
+			return allMedia[i].Media.Path < allMedia[j].Media.Path
+		})
+
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(allMedia)
 		return
@@ -1467,7 +1485,7 @@ func (c *ServeCmd) handlePlaylistItems(w http.ResponseWriter, r *http.Request) {
 
 			var playlistID int64 = -1
 			for _, p := range pls {
-				if p.Title.Valid && p.Title.String == req.PlaylistTitle {
+				if p.Title.Valid && strings.EqualFold(p.Title.String, req.PlaylistTitle) {
 					playlistID = p.ID
 					break
 				}
@@ -1520,7 +1538,7 @@ func (c *ServeCmd) handlePlaylistItems(w http.ResponseWriter, r *http.Request) {
 
 				var playlistID int64 = -1
 				for _, p := range pls {
-					if p.Title.Valid && p.Title.String == req.PlaylistTitle {
+					if p.Title.Valid && strings.EqualFold(p.Title.String, req.PlaylistTitle) {
 						playlistID = p.ID
 						break
 					}
