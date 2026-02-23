@@ -76,6 +76,7 @@ document.addEventListener('DOMContentLoaded', () => {
         postPlaybackAction: localStorage.getItem('disco-post-playback') || 'nothing',
         defaultView: localStorage.getItem('disco-default-view') || 'pip',
         autoplay: localStorage.getItem('disco-autoplay') !== 'false',
+        imageAutoplay: localStorage.getItem('disco-image-autoplay') !== 'false',
         localResume: localStorage.getItem('disco-local-resume') !== 'false',
         defaultVideoRate: parseFloat(localStorage.getItem('disco-default-video-rate')) || 1.0,
         defaultAudioRate: parseFloat(localStorage.getItem('disco-default-audio-rate')) || 1.0,
@@ -89,6 +90,7 @@ document.addEventListener('DOMContentLoaded', () => {
         genres: [],
         ratings: [],
         playlists: [],
+        lastSuggestions: [],
         playback: {
             item: null,
             timer: null,
@@ -112,6 +114,8 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('setting-post-playback').value = state.postPlaybackAction;
     document.getElementById('setting-default-view').value = state.defaultView;
     document.getElementById('setting-autoplay').checked = state.autoplay;
+    const settingImageAutoplay = document.getElementById('setting-image-autoplay');
+    if (settingImageAutoplay) settingImageAutoplay.checked = state.imageAutoplay;
     document.getElementById('setting-local-resume').checked = state.localResume;
     document.getElementById('setting-default-video-rate').value = state.defaultVideoRate;
     document.getElementById('setting-default-audio-rate').value = state.defaultAudioRate;
@@ -316,6 +320,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             if (!resp.ok) throw new Error('Failed to fetch suggestions');
             const data = await resp.json();
+            state.lastSuggestions = data;
             renderSuggestions(data);
         } catch (err) {
             if (err.name === 'AbortError') return;
@@ -330,16 +335,31 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        searchSuggestions.innerHTML = items.map((item, idx) => `
-            <div class="suggestion-item" data-path="${item.path}" data-is-dir="${item.is_dir}" data-index="${idx}">
-                <div class="suggestion-icon">${item.is_dir ? '📁' : getIcon(item.type)}</div>
-                <div class="suggestion-info">
-                    <div class="suggestion-name">${item.name}</div>
-                    <div class="suggestion-path">${item.path}</div>
+        const inputVal = searchInput.value;
+        const isRelative = inputVal.startsWith('./') || inputVal.startsWith('../');
+
+        searchSuggestions.innerHTML = items.map((item, idx) => {
+            let displayName = item.name;
+            if (isRelative) {
+                // If browsing relative paths, bold the part that matches what's after the last slash
+                const lastSlash = inputVal.lastIndexOf('/');
+                const query = inputVal.substring(lastSlash + 1).toLowerCase();
+                if (query && item.name.toLowerCase().startsWith(query)) {
+                    displayName = `<b>${item.name.substring(0, query.length)}</b>${item.name.substring(query.length)}`;
+                }
+            }
+
+            return `
+                <div class="suggestion-item" data-path="${item.path}" data-is-dir="${item.is_dir}" data-index="${idx}">
+                    <div class="suggestion-icon">${item.is_dir ? '📁' : getIcon(item.type)}</div>
+                    <div class="suggestion-info">
+                        <div class="suggestion-name">${displayName}</div>
+                        <div class="suggestion-path">${item.path}</div>
+                    </div>
+                    ${item.in_db ? '<span class="suggestion-tag">In DB</span>' : ''}
                 </div>
-                ${item.in_db ? '<span class="suggestion-tag">In DB</span>' : ''}
-            </div>
-        `).join('');
+            `;
+        }).join('');
 
         searchSuggestions.classList.remove('hidden');
         selectedSuggestionIndex = -1;
@@ -353,12 +373,19 @@ document.addEventListener('DOMContentLoaded', () => {
                     searchInput.value = newPath;
                     searchInput.focus();
                     fetchSuggestions(newPath);
-                } else {
-                    searchInput.value = path;
-                    searchSuggestions.classList.add('hidden');
-                    // Find item in currentMedia or fetch it?
-                    // For now let's just trigger a search for this exact path
                     performSearch();
+                } else {
+                    const item = state.lastSuggestions.find(s => s.path === path);
+                    if (item) {
+                        playMedia(item);
+                        // Set searchbar to parent
+                        const parts = path.split('/');
+                        parts.pop();
+                        const parent = parts.join('/') + '/';
+                        searchInput.value = parent;
+                        searchSuggestions.classList.add('hidden');
+                        performSearch();
+                    }
                 }
             };
         });
@@ -1297,7 +1324,9 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             // 2. Always check for external subtitle file (sibling with same name)
-            addTrack(`/api/subtitles?path=${encodeURIComponent(path)}`, 'External/Auto', 'auto');
+            if (!type.includes('image')) {
+                addTrack(`/api/subtitles?path=${encodeURIComponent(path)}`, 'External/Auto', 'auto');
+            }
 
         } else if (type.includes('audio')) {
             const waveformContainer = document.getElementById('waveform-container');
@@ -1354,28 +1383,31 @@ document.addEventListener('DOMContentLoaded', () => {
                 el.classList.add('hidden');
 
                 // Try to fetch lyrics (server will look for siblings)
-                const track = document.createElement('track');
-                track.kind = 'subtitles';
-                track.src = `/api/subtitles?path=${encodeURIComponent(path)}`;
-                track.srclang = state.language || 'en';
-                el.appendChild(track);
+                // Don't try to fetch subtitles for images (e.g. covers) to avoid server errors
+                if (!type.includes('image')) {
+                    const track = document.createElement('track');
+                    track.kind = 'subtitles';
+                    track.src = `/api/subtitles?path=${encodeURIComponent(path)}`;
+                    track.srclang = state.language || 'en';
+                    el.appendChild(track);
 
-                track.onload = () => {
-                    const textTrack = el.textTracks[0];
-                    if (textTrack.cues && textTrack.cues.length > 0) {
-                        lyricsDisplay.classList.remove('hidden');
-                        textTrack.mode = 'hidden';
+                    track.onload = () => {
+                        const textTrack = el.textTracks[0];
+                        if (textTrack.cues && textTrack.cues.length > 0) {
+                            lyricsDisplay.classList.remove('hidden');
+                            textTrack.mode = 'hidden';
 
-                        ws.on('timeupdate', (currentTime) => {
-                            // Sync hidden audio for cues
-                            el.currentTime = currentTime;
-                            const cue = Array.from(textTrack.activeCues || []).pop();
-                            if (cue) {
-                                lyricsDisplay.textContent = cue.text;
-                            }
-                        });
-                    }
-                };
+                            ws.on('timeupdate', (currentTime) => {
+                                // Sync hidden audio for cues
+                                el.currentTime = currentTime;
+                                const cue = Array.from(textTrack.activeCues || []).pop();
+                                if (cue) {
+                                    lyricsDisplay.textContent = cue.text;
+                                }
+                            });
+                        }
+                    };
+                }
             } else {
                 // Fallback to standard audio if container missing
                 el = document.createElement('audio');
@@ -1406,6 +1438,10 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (type.includes('image')) {
             el = document.createElement('img');
             el.src = url;
+            el.onerror = () => handleMediaError(item);
+            if (state.imageAutoplay) {
+                setTimeout(startSlideshow, 100);
+            }
         } else if (type.includes('pdf') || type.includes('epub') || type.includes('mobi')) {
             el = document.createElement('iframe');
             el.src = url;
@@ -1430,6 +1466,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 el.autoplay = true;
             } else if (imageExts.includes(ext)) {
                 el = document.createElement('img');
+                el.onerror = () => handleMediaError(item);
+                if (state.imageAutoplay) {
+                    setTimeout(startSlideshow, 100);
+                }
             } else if (textExts.includes(ext)) {
                 el = document.createElement('iframe');
                 el.style.width = '100%';
@@ -1554,7 +1594,7 @@ document.addEventListener('DOMContentLoaded', () => {
             playSibling(1);
         }, state.slideshowDelay * 1000);
 
-        showToast(`Slideshow started (${state.slideshowDelay}s)`);
+        showToast(`Image Autoplay started (${state.slideshowDelay}s)`);
     }
 
     function stopSlideshow() {
@@ -1571,6 +1611,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function closePiP() {
         stopSlideshow();
+
+        if (state.playback.skipTimeout) {
+            clearTimeout(state.playback.skipTimeout);
+            state.playback.skipTimeout = null;
+        }
+
         if (state.playback.hlsInstance) {
             state.playback.hlsInstance.destroy();
             state.playback.hlsInstance = null;
@@ -1591,6 +1637,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Reset mode to default preference
         state.playerMode = state.defaultView;
+        state.playback.item = null;
     }
 
     function renderPagination() {
@@ -2313,8 +2360,19 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Event Listeners ---
     const debouncedSearch = debounce(performSearch, 300);
 
+    document.addEventListener('click', (e) => {
+        if (!searchInput.contains(e.target) && !searchSuggestions.contains(e.target)) {
+            searchSuggestions.classList.add('hidden');
+        }
+    });
+
     searchInput.oninput = (e) => {
-        const val = e.target.value;
+        let val = e.target.value;
+        if (val.includes('\\')) {
+            val = val.replace(/\\/g, '/');
+            e.target.value = val;
+        }
+
         if (val.startsWith('/') || val.startsWith('./')) {
             // Path browsing
             const lastSlash = val.lastIndexOf('/');
@@ -2322,11 +2380,25 @@ document.addEventListener('DOMContentLoaded', () => {
             if (dirPath) {
                 fetchSuggestions(dirPath);
             } else {
-                fetchSuggestions('/');
+                fetchSuggestions(val.startsWith('/') ? '/' : './');
             }
         } else {
             searchSuggestions.classList.add('hidden');
             debouncedSearch();
+        }
+    };
+
+    searchInput.onfocus = () => {
+        let val = searchInput.value;
+        if (val.includes('\\')) {
+            val = val.replace(/\\/g, '/');
+            searchInput.value = val;
+        }
+
+        if (val.startsWith('/') || val.startsWith('./')) {
+            const lastSlash = val.lastIndexOf('/');
+            const dirPath = val.substring(0, lastSlash + 1);
+            fetchSuggestions(dirPath || (val.startsWith('/') ? '/' : './'));
         }
     };
 
@@ -2344,6 +2416,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const newPath = path.endsWith('/') ? path : path + '/';
                 searchInput.value = newPath;
                 fetchSuggestions(newPath);
+                performSearch();
             } else {
                 searchInput.value = path;
                 searchSuggestions.classList.add('hidden');
@@ -2366,6 +2439,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const newPath = path.endsWith('/') ? path : path + '/';
                 searchInput.value = newPath;
                 fetchSuggestions(newPath);
+                performSearch();
             } else {
                 searchInput.value = path;
                 searchSuggestions.classList.add('hidden');
@@ -2600,6 +2674,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if (settingAutoplay) settingAutoplay.onchange = (e) => {
         state.autoplay = e.target.checked;
         localStorage.setItem('disco-autoplay', state.autoplay);
+    };
+
+    if (settingImageAutoplay) settingImageAutoplay.onchange = (e) => {
+        state.imageAutoplay = e.target.checked;
+        localStorage.setItem('disco-image-autoplay', state.imageAutoplay);
     };
 
     const settingLocalResume = document.getElementById('setting-local-resume');

@@ -558,6 +558,12 @@ func (c *ServeCmd) handleLs(w http.ResponseWriter, r *http.Request) {
 		path = "/"
 	}
 
+	isPartial := false
+	if strings.HasPrefix(path, "./") {
+		isPartial = true
+		path = strings.TrimPrefix(path, "./")
+	}
+
 	if !strings.HasSuffix(path, "/") {
 		path += "/"
 	}
@@ -574,54 +580,98 @@ func (c *ServeCmd) handleLs(w http.ResponseWriter, r *http.Request) {
 
 	for _, dbPath := range c.Databases {
 		err := c.execDB(r.Context(), dbPath, func(sqlDB *sql.DB) error {
-			// Find immediate files
-			// Using LIKE 'path/%' AND path NOT LIKE 'path/%/%'
-			// In SQLite, we can check if there's another slash after the path
-			rows, err := sqlDB.QueryContext(r.Context(), `
-				SELECT path, type FROM media 
-				WHERE time_deleted = 0 
-				  AND path LIKE ? || '%'
-				  AND INSTR(SUBSTR(path, LENGTH(?) + 1), '/') = 0`, path, path)
+			var rows *sql.Rows
+			var err error
+
+			if isPartial {
+				rows, err = sqlDB.QueryContext(r.Context(), `
+					SELECT path, type FROM media
+					WHERE time_deleted = 0
+					  AND path LIKE '%/' || ? || '%'`, path)
+			} else {
+				rows, err = sqlDB.QueryContext(r.Context(), `
+					SELECT path, type FROM media
+					WHERE time_deleted = 0
+					  AND path LIKE ? || '%'`, path)
+			}
+
 			if err != nil {
 				return err
 			}
 			defer rows.Close()
+
 			for rows.Next() {
 				var p, t sql.NullString
 				if err := rows.Scan(&p, &t); err == nil && p.Valid {
-					name := filepath.Base(p.String)
-					resultsMap[p.String] = LsEntry{
-						Name:  name,
-						Path:  p.String,
-						IsDir: false,
-						Type:  t.String,
-						InDB:  true,
-					}
-				}
-			}
+					fullPath := p.String
+					var entryName string
+					var entryPath string
+					var isDir bool
 
-			// Find immediate subfolders
-			// Subfolders are prefixes that have at least one more slash
-			rows, err = sqlDB.QueryContext(r.Context(), `
-				SELECT DISTINCT 
-					SUBSTR(path, 1, LENGTH(?) + INSTR(SUBSTR(path, LENGTH(?) + 1), '/')) as folder
-				FROM media 
-				WHERE time_deleted = 0 
-				  AND path LIKE ? || '%'
-				  AND INSTR(SUBSTR(path, LENGTH(?) + 1), '/') > 0`, path, path, path, path)
-			if err != nil {
-				return err
-			}
-			defer rows.Close()
-			for rows.Next() {
-				var f string
-				if err := rows.Scan(&f); err == nil && f != "" {
-					name := filepath.Base(f)
-					resultsMap[f] = LsEntry{
-						Name:  name,
-						Path:  f,
-						IsDir: true,
-						InDB:  true,
+					if isPartial {
+						idx := strings.Index(fullPath, path)
+						if idx == -1 {
+							continue
+						}
+						suffix := fullPath[idx+len(path):]
+						if suffix == "" {
+							continue
+						}
+
+						if slashIdx := strings.Index(suffix, "/"); slashIdx != -1 {
+							entryName = suffix[:slashIdx]
+							isDir = true
+							entryPath = fullPath[:idx+len(path)] + entryName + "/"
+						} else {
+							entryName = suffix
+							isDir = false
+							entryPath = fullPath[:idx+len(path)] + entryName
+						}
+					} else {
+						suffix := strings.TrimPrefix(fullPath, path)
+						if suffix == "" {
+							continue
+						}
+
+						if slashIdx := strings.Index(suffix, "/"); slashIdx != -1 {
+							entryName = suffix[:slashIdx]
+							isDir = true
+							entryPath = path + entryName + "/"
+						} else {
+							entryName = suffix
+							isDir = false
+							entryPath = path + entryName
+						}
+					}
+
+					// For files, we only want "immediate" children.
+					// For partial matches, we've already extracted the first segment.
+					// If it's a directory, entryPath has a trailing slash.
+					// If it's a file, entryPath matches fullPath exactly if it's immediate.
+					if !isDir && entryPath != fullPath {
+						continue
+					}
+
+					// Add or update entry in map
+					key := entryPath
+					if existing, ok := resultsMap[key]; ok {
+						if !existing.IsDir && isDir {
+							// Should not happen if paths are consistent, but favor IsDir
+							resultsMap[key] = LsEntry{
+								Name:  entryName,
+								Path:  entryPath,
+								IsDir: true,
+								InDB:  true,
+							}
+						}
+					} else {
+						resultsMap[key] = LsEntry{
+							Name:  entryName,
+							Path:  entryPath,
+							IsDir: isDir,
+							Type:  t.String,
+							InDB:  true,
+						}
 					}
 				}
 			}
