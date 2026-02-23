@@ -36,6 +36,7 @@ type ServeCmd struct {
 	GlobalProgress       bool     `help:"Enable server-side playback progress tracking"`
 	ApplicationStartTime int64    `kong:"-"`
 	thumbnailCache       sync.Map `kong:"-"`
+	dbCache              sync.Map `kong:"-"`
 	hasFfmpeg            bool     `kong:"-"`
 }
 
@@ -91,25 +92,34 @@ func (c *ServeCmd) execDB(ctx context.Context, dbPath string, fn func(*sql.DB) e
 	var lastErr error
 
 	for i := 0; i <= maxRetries; i++ {
-		sqlDB, err := database.Connect(dbPath)
-		if err != nil {
-			// Connect error might be corruption too (e.g. invalid header)
-			if database.IsCorruptionError(err) && i < maxRetries {
-				slog.Warn("Database corruption detected on connect, attempting repair", "db", dbPath)
-				if repErr := database.Repair(dbPath); repErr != nil {
-					return fmt.Errorf("repair failed: %w (original error: %v)", repErr, err)
+		var sqlDB *sql.DB
+		if val, ok := c.dbCache.Load(dbPath); ok {
+			sqlDB = val.(*sql.DB)
+		} else {
+			var err error
+			sqlDB, err = database.Connect(dbPath)
+			if err != nil {
+				// Connect error might be corruption too (e.g. invalid header)
+				if database.IsCorruptionError(err) && i < maxRetries {
+					slog.Warn("Database corruption detected on connect, attempting repair", "db", dbPath)
+					if repErr := database.Repair(dbPath); repErr != nil {
+						return fmt.Errorf("repair failed: %w (original error: %v)", repErr, err)
+					}
+					slog.Info("Database repaired, retrying connect", "db", dbPath)
+					continue
 				}
-				slog.Info("Database repaired, retrying connect", "db", dbPath)
-				continue
+				return err
 			}
-			return err
+			c.dbCache.Store(dbPath, sqlDB)
 		}
 
-		err = fn(sqlDB)
-		sqlDB.Close() // Close immediately after use to allow repair tools to lock file if needed
+		err := fn(sqlDB)
 
 		if err != nil {
 			if database.IsCorruptionError(err) && i < maxRetries {
+				c.dbCache.Delete(dbPath)
+				sqlDB.Close()
+
 				slog.Warn("Database corruption detected on query, attempting repair", "db", dbPath)
 				if repErr := database.Repair(dbPath); repErr != nil {
 					slog.Error("Database repair failed", "db", dbPath, "error", repErr)
@@ -141,7 +151,7 @@ func (c *ServeCmd) Run(ctx *kong.Context) error {
 		if err := InitDB(sqlDB); err != nil {
 			slog.Error("Failed to initialize database", "db", dbPath, "error", err)
 		}
-		sqlDB.Close()
+		c.dbCache.Store(dbPath, sqlDB)
 	}
 
 	if _, err := exec.LookPath("ffmpeg"); err != nil {

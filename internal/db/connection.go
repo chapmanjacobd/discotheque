@@ -9,7 +9,9 @@ import (
 
 // Connect opens a SQLite database and applies performance tuning PRAGMAs
 func Connect(dbPath string) (*sql.DB, error) {
-	db, err := sql.Open("sqlite3", dbPath)
+	// Add busy timeout and immediate locking to handle concurrent writes better
+	dsn := fmt.Sprintf("%s?_busy_timeout=30000&_txlock=immediate", dbPath)
+	db, err := sql.Open("sqlite3", dsn)
 	if err != nil {
 		return nil, err
 	}
@@ -21,7 +23,6 @@ func Connect(dbPath string) (*sql.DB, error) {
 		"PRAGMA cache_size=-64000",
 		"PRAGMA temp_store=MEMORY",
 		"PRAGMA foreign_keys=ON",
-		"PRAGMA threads=4",
 	}
 
 	for _, pragma := range tuning {
@@ -30,12 +31,6 @@ func Connect(dbPath string) (*sql.DB, error) {
 			return nil, fmt.Errorf("failed to apply pragma %q: %w", pragma, err)
 		}
 	}
-
-	// Connection Pool Limits
-	// SQLite handles concurrent reads well in WAL mode, but concurrent writes
-	// can lead to "database is locked" errors. Limiting to 1 open connection
-	// ensures serialization and avoids many common SQLite concurrency issues.
-	db.SetMaxOpenConns(1)
 
 	return db, nil
 }
