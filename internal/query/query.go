@@ -241,16 +241,16 @@ func (qb *QueryBuilder) Build() (string, []any) {
 	// Content type filters
 	var typeClauses []string
 	if qb.Flags.VideoOnly {
-		typeClauses = append(typeClauses, utils.ExtensionsToLike(utils.VideoExtensions))
+		typeClauses = append(typeClauses, "type = 'video'")
 	}
 	if qb.Flags.AudioOnly {
-		typeClauses = append(typeClauses, utils.ExtensionsToLike(utils.AudioExtensions))
+		typeClauses = append(typeClauses, "type = 'audio'", "type = 'audiobook'")
 	}
 	if qb.Flags.ImageOnly {
-		typeClauses = append(typeClauses, utils.ExtensionsToLike(utils.ImageExtensions))
+		typeClauses = append(typeClauses, "type = 'image'")
 	}
 	if qb.Flags.TextOnly {
-		typeClauses = append(typeClauses, utils.ExtensionsToLike(utils.TextExtensions))
+		typeClauses = append(typeClauses, "type = 'text'")
 	}
 	if len(typeClauses) > 0 {
 		whereClauses = append(whereClauses, "("+strings.Join(typeClauses, " OR ")+")")
@@ -801,6 +801,10 @@ func sortMediaBasic(media []models.MediaWithDB, sortBy string, reverse bool, nat
 			return utils.Int64Value(media[i].TimeLastPlayed) < utils.Int64Value(media[j].TimeLastPlayed)
 		case "play_count":
 			return utils.Int64Value(media[i].PlayCount) < utils.Int64Value(media[j].PlayCount)
+		case "time_deleted":
+			return utils.Int64Value(media[i].TimeDeleted) < utils.Int64Value(media[j].TimeDeleted)
+		case "type":
+			return utils.StringValue(media[i].Type) < utils.StringValue(media[j].Type)
 		default:
 			return media[i].Path < media[j].Path
 		}

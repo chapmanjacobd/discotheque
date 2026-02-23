@@ -129,13 +129,13 @@ func TestQueries(t *testing.T) {
 	t.Run("MediaFiltering", func(t *testing.T) {
 		q.UpsertMedia(ctx, UpsertMediaParams{
 			Path:     "video.mp4",
-			Type:     sql.NullString{String: "video/mp4", Valid: true},
+			Type:     sql.NullString{String: "video", Valid: true},
 			Duration: sql.NullInt64{Int64: 100, Valid: true},
 			Size:     sql.NullInt64{Int64: 5000, Valid: true},
 		})
 		q.UpsertMedia(ctx, UpsertMediaParams{
 			Path:     "audio.mp3",
-			Type:     sql.NullString{String: "audio/mpeg", Valid: true},
+			Type:     sql.NullString{String: "audio", Valid: true},
 			Duration: sql.NullInt64{Int64: 200, Valid: true},
 			Size:     sql.NullInt64{Int64: 2000, Valid: true},
 		})
@@ -292,7 +292,7 @@ func TestQueries(t *testing.T) {
 	t.Run("MiscQueries", func(t *testing.T) {
 		q.UpsertMedia(ctx, UpsertMediaParams{
 			Path:  "random.mp4",
-			Type:  sql.NullString{String: "video/mp4", Valid: true},
+			Type:  sql.NullString{String: "video", Valid: true},
 			Score: sql.NullFloat64{Float64: 5.0, Valid: true},
 		})
 

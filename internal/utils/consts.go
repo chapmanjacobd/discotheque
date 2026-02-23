@@ -4,7 +4,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"time"
 )
 
@@ -123,14 +122,6 @@ func init() {
 		TextExtensionMap["."+ext] = true
 		MediaExtensionMap["."+ext] = true
 	}
-}
-
-func ExtensionsToLike(exts []string) string {
-	var parts []string
-	for _, ext := range exts {
-		parts = append(parts, "path LIKE '%."+ext+"'")
-	}
-	return "(" + strings.Join(parts, " OR ") + ")"
 }
 
 var SubtitleExtensions = []string{

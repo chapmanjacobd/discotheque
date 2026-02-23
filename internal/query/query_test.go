@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/chapmanjacobd/discotheque/internal/models"
-	"github.com/chapmanjacobd/discotheque/internal/utils"
 	_ "github.com/mattn/go-sqlite3"
 )
 
@@ -44,7 +43,7 @@ func TestQueryBuilder_Build(t *testing.T) {
 		{
 			"Video Only",
 			models.GlobalFlags{VideoOnly: true, SortBy: "path", Limit: 100, HideDeleted: true},
-			"SELECT * FROM media WHERE COALESCE(time_deleted, 0) = 0 AND (" + utils.ExtensionsToLike(utils.VideoExtensions) + ") ORDER BY path ASC LIMIT 100",
+			"SELECT * FROM media WHERE COALESCE(time_deleted, 0) = 0 AND (type = 'video') ORDER BY path ASC LIMIT 100",
 		},
 		{
 			"Reverse Sort",
@@ -109,17 +108,17 @@ func TestQueryBuilder_Build(t *testing.T) {
 		{
 			"Audio Only",
 			models.GlobalFlags{AudioOnly: true, Limit: 10, HideDeleted: true},
-			"SELECT * FROM media WHERE COALESCE(time_deleted, 0) = 0 AND (" + utils.ExtensionsToLike(utils.AudioExtensions) + ") LIMIT 10",
+			"SELECT * FROM media WHERE COALESCE(time_deleted, 0) = 0 AND (type = 'audio' OR type = 'audiobook') LIMIT 10",
 		},
 		{
 			"Text Only",
 			models.GlobalFlags{TextOnly: true, Limit: 10, HideDeleted: true},
-			"SELECT * FROM media WHERE COALESCE(time_deleted, 0) = 0 AND (" + utils.ExtensionsToLike(utils.TextExtensions) + ") LIMIT 10",
+			"SELECT * FROM media WHERE COALESCE(time_deleted, 0) = 0 AND (type = 'text') LIMIT 10",
 		},
 		{
 			"Image Only",
 			models.GlobalFlags{ImageOnly: true, Limit: 10, HideDeleted: true},
-			"SELECT * FROM media WHERE COALESCE(time_deleted, 0) = 0 AND (" + utils.ExtensionsToLike(utils.ImageExtensions) + ") LIMIT 10",
+			"SELECT * FROM media WHERE COALESCE(time_deleted, 0) = 0 AND (type = 'image') LIMIT 10",
 		},
 	}
 

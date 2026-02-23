@@ -927,6 +927,7 @@ main {
 .pip-container.theatre #media-viewer img,
 .pip-container.theatre #media-viewer video {
     max-height: 70vh;
+    object-fit: contain;
 }
 
 .pip-header {
@@ -1003,6 +1004,7 @@ main {
     width: 100%;
     max-height: 60vh;
     display: block;
+    object-fit: contain;
 }
 
 #media-viewer audio {

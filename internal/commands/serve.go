@@ -754,6 +754,8 @@ func (c *ServeCmd) handleRaw(w http.ResponseWriter, r *http.Request) {
 	strategy := utils.GetTranscodeStrategy(m)
 	slog.Debug("handleRaw strategy", "path", path, "needs_transcode", strategy.NeedsTranscode, "vcopy", strategy.VideoCopy, "acopy", strategy.AudioCopy)
 
+	w.Header().Set("Content-Disposition", fmt.Sprintf("inline; filename=%q", filepath.Base(path)))
+
 	if strategy.NeedsTranscode {
 		if c.hasFfmpeg {
 			c.handleTranscode(w, r, path, m, strategy)
@@ -771,6 +773,7 @@ func (c *ServeCmd) handleRaw(w http.ResponseWriter, r *http.Request) {
 func (c *ServeCmd) handleTranscode(w http.ResponseWriter, r *http.Request, path string, m models.Media, strategy utils.TranscodeStrategy) {
 	w.Header().Set("Content-Type", strategy.TargetMime)
 	w.Header().Set("Accept-Ranges", "bytes")
+	w.Header().Set("Content-Disposition", fmt.Sprintf("inline; filename=%q", filepath.Base(path)))
 
 	// Add flags to help with piped streaming duration and timestamp issues
 	var args []string

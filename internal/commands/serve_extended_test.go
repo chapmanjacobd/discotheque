@@ -210,7 +210,7 @@ func TestServeCmd_ExtendedHandlers(t *testing.T) {
 
 	t.Run("HandleHLSPlaylist", func(t *testing.T) {
 		db := fixture.GetDB()
-		db.Exec("INSERT INTO media (path, type, duration, time_deleted) VALUES (?, 'video/mp4', 120, 0)", "hls_video.mp4")
+		db.Exec("INSERT INTO media (path, type, duration, time_deleted) VALUES (?, 'video', 120, 0)", "hls_video.mp4")
 		db.Close()
 
 		req := httptest.NewRequest(http.MethodGet, "/api/hls/playlist?path=hls_video.mp4", nil)
@@ -229,10 +229,10 @@ func TestServeCmd_ExtendedHandlers(t *testing.T) {
 		// Create a file, mark it deleted, then empty bin
 		dummyPath := fixture.CreateDummyFile("to_be_permanently_deleted.mp4")
 		db := fixture.GetDB()
-		db.Exec("INSERT INTO media (path, type, time_deleted) VALUES (?, 'video/mp4', 12345)", dummyPath)
+		db.Exec("INSERT INTO media (path, type, time_deleted) VALUES (?, 'video', 12345)", dummyPath)
 		db.Close()
 
-		req := httptest.NewRequest(http.MethodPost, "/api/empty-bin", nil)
+		req := httptest.NewRequest(http.MethodPost, "/api/empty-bin", strings.NewReader("{}"))
 		w := httptest.NewRecorder()
 		handler.ServeHTTP(w, req)
 

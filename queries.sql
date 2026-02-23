@@ -8,9 +8,9 @@ LIMIT ?;
 SELECT * FROM media
 WHERE time_deleted = 0
   AND (
-    (? AND type LIKE 'video/%')
-    OR (? AND type LIKE 'audio/%' AND video_count = 0)
-    OR (? AND type LIKE 'image/%')
+    (? AND type = 'video')
+    OR (? AND (type = 'audio' OR type = 'audiobook'))
+    OR (? AND type = 'image')
   )
 ORDER BY path
 LIMIT ?;

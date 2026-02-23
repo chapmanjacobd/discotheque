@@ -1124,9 +1124,15 @@ document.addEventListener('DOMContentLoaded', () => {
     async function openInPiP(item) {
         stopSlideshow();
 
+        const type = item.type || "";
+        // Handle Documents separately
+        if (type === 'text' || type.includes('pdf') || type.includes('epub') || type.includes('mobi')) {
+            openInDocumentViewer(item);
+            return;
+        }
+
         // Reset playback rate to default for new media if not currently playing something
         if (!state.playback.item) {
-            const type = item.type || "";
             if (type.includes('video')) {
                 state.playbackRate = state.defaultVideoRate;
             } else if (type.includes('audio')) {
@@ -1136,13 +1142,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             const speedBtn = document.getElementById('pip-speed');
             if (speedBtn) speedBtn.textContent = `${state.playbackRate}x`;
-        }
-
-        const type = item.type || "";
-        // Handle Documents separately
-        if (type.includes('epub') || type.includes('pdf') || type.includes('mobi')) {
-            openInDocumentViewer(item);
-            return;
         }
 
         state.playback.item = item;
@@ -1448,45 +1447,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     startSlideshow();
                 }
             };
-        } else if (type.includes('pdf') || type.includes('epub') || type.includes('mobi')) {
-            el = document.createElement('iframe');
-            el.src = url;
-            el.style.width = '100%';
-            el.style.height = '80vh';
-            el.style.border = 'none';
+            el.ondblclick = () => toggleFullscreen(pipViewer);
         } else {
-            // Fallback for cases where type is missing or ambiguous
-            const ext = path.split('.').pop().toLowerCase();
-            const videoExts = ['mp4', 'mkv', 'webm', 'mov', 'avi', 'wmv', 'flv', 'm4v', 'mpg', 'mpeg', 'ts', 'm2ts', '3gp'];
-            const audioExts = ['mp3', 'flac', 'm4a', 'opus', 'ogg', 'wav', 'aac', 'wma', 'mka', 'm4b'];
-            const imageExts = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp', 'tiff'];
-            const textExts = ['pdf', 'epub', 'mobi', 'azw', 'azw3', 'fb2', 'cbz', 'cbr'];
-
-            if (videoExts.includes(ext)) {
-                el = document.createElement('video');
-                el.controls = true;
-                el.autoplay = true;
-            } else if (audioExts.includes(ext)) {
-                el = document.createElement('audio');
-                el.controls = true;
-                el.autoplay = true;
-            } else if (imageExts.includes(ext)) {
-                el = document.createElement('img');
-                el.onerror = () => handleMediaError(item);
-                if (state.imageAutoplay) {
-                    setTimeout(startSlideshow, 100);
-                }
-            } else if (textExts.includes(ext)) {
-                el = document.createElement('iframe');
-                el.style.width = '100%';
-                el.style.height = '80vh';
-                el.style.border = 'none';
-            } else {
-                showToast('Unsupported browser format');
-                return;
-            }
-            el.src = url;
-            if (el.playbackRate !== undefined) el.playbackRate = state.playbackRate;
+            showToast('Unsupported media format');
+            return;
         }
 
         pipViewer.appendChild(el);
@@ -1614,8 +1578,6 @@ document.addEventListener('DOMContentLoaded', () => {
             state.playback.slideshowTimer = null;
             playSibling(1);
         }, state.slideshowDelay * 1000);
-
-        showToast(`Image Autoplay started (${state.slideshowDelay}s)`);
     }
 
     function stopSlideshow() {
@@ -1628,6 +1590,17 @@ document.addEventListener('DOMContentLoaded', () => {
         if (btn) {
             btn.textContent = '▶️';
             btn.classList.remove('active');
+        }
+    }
+
+    function toggleFullscreen(el) {
+        if (!el) return;
+        if (document.fullscreenElement) {
+            document.exitFullscreen();
+        } else {
+            el.requestFullscreen().catch(err => {
+                console.error(`Error attempting to enable full-screen mode: ${err.message}`);
+            });
         }
     }
 
@@ -2143,6 +2116,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 const cat = e.target.dataset.cat;
                 if (cat === '') {
                     state.page = 'search'; // 'All Media' always exits special modes
+                    state.filters.search = '';
+                    searchInput.value = '';
                 }
                 state.filters.category = cat;
                 state.filters.genre = ''; // Clear genre filter
@@ -2276,24 +2251,38 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // 3. Playback shortcuts (require active & visible PiP)
-        const media = pipViewer.querySelector('video, audio');
-        if ((!media && !ws) || pipPlayer.classList.contains('hidden')) {
+        const media = pipViewer.querySelector('video, audio, img');
+        const isPipVisible = !pipPlayer.classList.contains('hidden');
+
+        if (!e.ctrlKey && !e.metaKey && !e.altKey) {
+            if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+                const isImage = media && media.tagName === 'IMG';
+                if (!isPipVisible || isImage) {
+                    playSibling(e.key === 'ArrowLeft' ? -1 : 1);
+                    return;
+                }
+            }
+        }
+
+        if ((!media && !ws) || !isPipVisible) {
             return;
         }
 
-        const isPlaying = ws ? ws.isPlaying() : !media.paused;
+        const isPlaying = ws ? ws.isPlaying() : (media.paused === false);
         const duration = ws ? ws.getDuration() : media.duration;
         const currentTime = ws ? ws.getCurrentTime() : media.currentTime;
 
         const setTime = (t) => {
             if (ws) ws.setTime(t);
-            else media.currentTime = t;
+            else if (media.currentTime !== undefined) media.currentTime = t;
         };
 
         const playPause = () => {
             if (ws) ws.playPause();
-            else if (media.paused) media.play();
-            else media.pause();
+            else if (media.tagName !== 'IMG') {
+                if (media.paused) media.play();
+                else media.pause();
+            }
         };
 
         switch (e.key.toLowerCase()) {
@@ -2309,13 +2298,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 playPause();
                 break;
             case 'f':
-                if (media && media.tagName === 'VIDEO') {
-                    if (document.fullscreenElement) {
-                        document.exitFullscreen();
-                    } else {
-                        media.requestFullscreen();
-                    }
-                }
+                toggleFullscreen(pipViewer);
                 break;
             case 'm':
                 if (ws) ws.setMuted(!ws.getMuted());

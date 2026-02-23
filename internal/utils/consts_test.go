@@ -29,14 +29,6 @@ func TestGetMpvWatchLaterDir(t *testing.T) {
 	}
 }
 
-func TestExtensionsToLike(t *testing.T) {
-	exts := []string{"mp4", "mkv"}
-	got := ExtensionsToLike(exts)
-	if !strings.Contains(got, "path LIKE '%.mp4'") || !strings.Contains(got, "path LIKE '%.mkv'") {
-		t.Errorf("ExtensionsToLike failed: %s", got)
-	}
-}
-
 func TestGetDirs(t *testing.T) {
 	if GetTempDir() == "" {
 		t.Error("GetTempDir empty")

@@ -657,9 +657,9 @@ const getMediaByType = `-- name: GetMediaByType :many
 SELECT path, title, duration, size, time_created, time_modified, time_deleted, time_first_played, time_last_played, play_count, playhead, type, width, height, fps, video_codecs, audio_codecs, subtitle_codecs, video_count, audio_count, subtitle_count, album, artist, genre, mood, bpm, "key", decade, categories, city, country, description, language, webpath, uploader, time_uploaded, time_downloaded, view_count, num_comments, favorite_count, score, upvote_ratio, latitude, longitude FROM media
 WHERE time_deleted = 0
   AND (
-    (? AND type LIKE 'video/%')
-    OR (? AND type LIKE 'audio/%' AND video_count = 0)
-    OR (? AND type LIKE 'image/%')
+    (? AND type = 'video')
+    OR (? AND (type = 'audio' OR type = 'audiobook'))
+    OR (? AND type = 'image')
   )
 ORDER BY path
 LIMIT ?
