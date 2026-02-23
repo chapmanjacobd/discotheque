@@ -775,6 +775,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (state.filters.reverse) return countA - countB;
                     return countB - countA;
                 });
+            } else if (state.filters.sort === 'extension') {
+                currentMedia.sort((a, b) => {
+                    const extA = a.path.split('.').pop().toLowerCase();
+                    const extB = b.path.split('.').pop().toLowerCase();
+                    if (state.filters.reverse) return extB.localeCompare(extA);
+                    return extA.localeCompare(extB);
+                });
             }
 
             renderResults();
@@ -1515,13 +1522,27 @@ document.addEventListener('DOMContentLoaded', () => {
 
         title.textContent = item.path.split('/').pop();
         epubViewer.innerHTML = '';
+        epubViewer.tabIndex = 0; // Make focusable for keyboard shortcuts
         pdfCanvas.classList.add('hidden');
         epubViewer.classList.add('hidden');
 
         const url = `/api/raw?path=${encodeURIComponent(item.path)}`;
         const type = item.type || '';
 
+        // Helper to show/hide EPUB-only controls
+        const toggleEpubControls = (show) => {
+            const controls = ['doc-prev', 'doc-next', 'doc-zoom-in', 'doc-zoom-out', 'doc-zoom-info'];
+            controls.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) {
+                    if (show) el.classList.remove('hidden');
+                    else el.classList.add('hidden');
+                }
+            });
+        };
+
         if (type.includes('epub')) {
+            toggleEpubControls(true);
             epubViewer.classList.remove('hidden');
             const book = ePub(url);
             const rendition = book.renderTo("epub-viewer", {
@@ -1536,6 +1557,7 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('doc-next').onclick = () => rendition.next();
 
             let zoom = 100;
+            const zoomInfo = document.getElementById('doc-zoom-info');
             document.getElementById('doc-zoom-in').onclick = () => {
                 zoom += 10;
                 epubViewer.style.fontSize = `${zoom}%`;
@@ -1548,6 +1570,7 @@ document.addEventListener('DOMContentLoaded', () => {
             };
             pageInfo.textContent = "EPUB Mode";
         } else if (type.includes('pdf')) {
+            toggleEpubControls(false);
             // Browsers have great built-in PDF viewers, let's use iframe but in the large modal
             const iframe = document.createElement('iframe');
             iframe.src = url;
@@ -1560,6 +1583,7 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('doc-prev').onclick = null;
             document.getElementById('doc-next').onclick = null;
         } else {
+            toggleEpubControls(false);
             // Fallback for other text
             const iframe = document.createElement('iframe');
             iframe.src = url;
@@ -1571,7 +1595,14 @@ document.addEventListener('DOMContentLoaded', () => {
             pageInfo.textContent = "Text Mode";
         }
 
+        epubViewer.ondblclick = (e) => {
+            e.stopPropagation();
+            toggleFullscreen(epubViewer);
+        };
+        container.ondblclick = () => toggleFullscreen(epubViewer);
+
         openModal('document-modal');
+        epubViewer.focus();
     }
 
     function showMetadata(item) {
@@ -2363,7 +2394,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 playPause();
                 break;
             case 'f':
-                toggleFullscreen(pipViewer, media.tagName === 'VIDEO' ? media : pipViewer);
+                const docModal = document.getElementById('document-modal');
+                if (!docModal.classList.contains('hidden')) {
+                    toggleFullscreen(document.getElementById('document-container'));
+                } else {
+                    toggleFullscreen(pipViewer, media.tagName === 'VIDEO' ? media : pipViewer);
+                }
                 break;
             case 'm':
                 if (ws) ws.setMuted(!ws.getMuted());

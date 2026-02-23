@@ -114,7 +114,6 @@ func (c *ServeCmd) execDB(ctx context.Context, dbPath string, fn func(*sql.DB) e
 		}
 
 		err := fn(sqlDB)
-
 		if err != nil {
 			if database.IsCorruptionError(err) && i < maxRetries {
 				c.dbCache.Delete(dbPath)
