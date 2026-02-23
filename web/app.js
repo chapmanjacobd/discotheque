@@ -510,11 +510,41 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const playlists = state.playlists || [];
         playlistList.innerHTML = playlists.map(p => `
-            <div class="category-btn ${state.page === 'playlist' && state.filters.playlist?.id === p.id ? 'active' : ''}" style="display: flex; justify-content: space-between; align-items: center;">
+            <div class="category-btn playlist-drop-zone ${state.page === 'playlist' && state.filters.playlist?.id === p.id ? 'active' : ''}" 
+                 data-id="${p.id}" data-db="${p.db}"
+                 style="display: flex; justify-content: space-between; align-items: center;">
                 <span class="playlist-name" data-id="${p.id}" style="flex: 1; cursor: pointer;">📁 ${p.title || p.path || 'Unnamed'}</span>
                 <button class="delete-playlist-btn" data-id="${p.id}" data-db="${p.db}" style="background: none; border: none; opacity: 0.5; cursor: pointer;">&times;</button>
             </div>
         `).join('');
+
+        playlistList.querySelectorAll('.playlist-drop-zone').forEach(zone => {
+            zone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'copy';
+                zone.classList.add('drag-over');
+            });
+
+            zone.addEventListener('dragleave', () => {
+                zone.classList.remove('drag-over');
+            });
+
+            zone.addEventListener('drop', async (e) => {
+                e.preventDefault();
+                zone.classList.remove('drag-over');
+                
+                if (state.draggedItem) {
+                    const id = parseInt(zone.dataset.id);
+                    const playlist = state.playlists.find(p => p.id === id);
+                    if (playlist) {
+                        await addToPlaylist(playlist, state.draggedItem);
+                        if (state.page === 'playlist' && state.filters.playlist?.id === id) {
+                            fetchPlaylistItems(playlist);
+                        }
+                    }
+                }
+            });
+        });
 
         playlistList.querySelectorAll('.playlist-name').forEach(el => {
             el.onclick = () => {
@@ -2021,8 +2051,19 @@ document.addEventListener('DOMContentLoaded', () => {
             const card = document.createElement('div');
             card.className = 'media-card';
             card.dataset.path = item.path;
-            card.draggable = state.page === 'playlist'; // Enable drag for playlists
-            
+            card.draggable = true;
+
+            card.addEventListener('dragstart', (e) => {
+                state.draggedItem = item;
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', item.path);
+                card.classList.add('dragging');
+            });
+
+            card.addEventListener('dragend', () => {
+                card.classList.remove('dragging');
+                state.draggedItem = null;
+            });
 
             card.onclick = (e) => {
                 if (e.target.closest('.media-actions') || e.target.closest('.media-action-btn')) return;
@@ -2091,19 +2132,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
             `;
 
-            // Drag and drop event listeners
+            // Reordering logic within a playlist
             if (isPlaylist) {
-                card.addEventListener('dragstart', (e) => {
-                    state.draggedItem = item;
-                    e.dataTransfer.effectAllowed = 'move';
-                    card.classList.add('dragging');
-                });
-
-                card.addEventListener('dragend', () => {
-                    card.classList.remove('dragging');
-                    state.draggedItem = null;
-                });
-
                 card.addEventListener('dragover', (e) => {
                     e.preventDefault();
                     e.dataTransfer.dropEffect = 'move';
@@ -2224,6 +2254,39 @@ document.addEventListener('DOMContentLoaded', () => {
             const tr = document.createElement('tr');
             tr.onclick = () => playMedia(item);
             tr.dataset.path = item.path;
+            tr.draggable = true;
+
+            tr.addEventListener('dragstart', (e) => {
+                state.draggedItem = item;
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', item.path);
+                tr.classList.add('dragging');
+            });
+
+            tr.addEventListener('dragend', () => {
+                tr.classList.remove('dragging');
+                state.draggedItem = null;
+            });
+
+            if (isPlaylist) {
+                tr.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+                    tr.classList.add('drag-over');
+                });
+
+                tr.addEventListener('dragleave', () => {
+                    tr.classList.remove('drag-over');
+                });
+
+                tr.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    tr.classList.remove('drag-over');
+                    if (state.draggedItem && state.draggedItem !== item) {
+                        handlePlaylistReorder(state.draggedItem, item);
+                    }
+                });
+            }
 
             const title = truncateString(item.title || item.path.split('/').pop());
 

@@ -1464,6 +1464,13 @@ main {
     transform: scale(1.02);
 }
 
+.category-btn.drag-over {
+    background: var(--accent-color) !important;
+    color: white !important;
+    transform: scale(1.05);
+    border-style: dashed;
+}
+
 @media (max-width: 768px) {
     .detail-header {
         flex-direction: column;

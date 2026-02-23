@@ -234,6 +234,35 @@ describe('Integration Test', () => {
         });
     });
 
+    it('drags an item into a playlist', async () => {
+        await new Promise(r => setTimeout(r, 100));
+        const card = document.querySelector('.media-card');
+        expect(card).not.toBeNull();
+
+        const playlistZone = document.querySelector('.playlist-drop-zone');
+        expect(playlistZone).not.toBeNull();
+
+        // Simulate dragstart
+        const dragStartEvent = new DragEvent('dragstart', { bubbles: true });
+        card.dispatchEvent(dragStartEvent);
+        expect(window.disco.state.draggedItem).not.toBeNull();
+        expect(window.disco.state.draggedItem.path).toBe('video1.mp4');
+
+        // Simulate drop
+        const dropEvent = new DragEvent('drop', { bubbles: true });
+        playlistZone.dispatchEvent(dropEvent);
+
+        await vi.waitFor(() => {
+            expect(global.fetch).toHaveBeenCalledWith(
+                '/api/playlists/items',
+                expect.objectContaining({
+                    method: 'POST',
+                    body: expect.stringContaining('video1.mp4')
+                })
+            );
+        });
+    });
+
     it('merges local progress into history', async () => {
         // Mock local progress
         const localProgress = {

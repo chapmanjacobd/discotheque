@@ -60,6 +60,20 @@ export async function setupTestEnvironment() {
         dispatchEvent: vi.fn(),
     }));
 
+    if (typeof global.DragEvent === 'undefined') {
+        global.DragEvent = class DragEvent extends Event {
+            constructor(type, options = {}) {
+                super(type, options);
+                this.dataTransfer = options.dataTransfer || {
+                    setData: vi.fn(),
+                    getData: vi.fn(),
+                    effectAllowed: 'none',
+                    dropEffect: 'none'
+                };
+            }
+        };
+    }
+
     // Mock APIs
     document.pictureInPictureEnabled = true;
     HTMLElement.prototype.scrollTo = vi.fn();
