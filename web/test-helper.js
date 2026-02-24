@@ -94,7 +94,6 @@ export async function setupTestEnvironment() {
         destroy() { }
         static get Events() { return { MANIFEST_PARSED: 'hlsManifestParsed' }; }
     };
-    global.WaveSurfer = { create: vi.fn().mockReturnValue({ on: vi.fn(), destroy: vi.fn(), load: vi.fn() }) };
 
     // Load index.html
     const htmlPath = path.resolve(__dirname, 'index.html');

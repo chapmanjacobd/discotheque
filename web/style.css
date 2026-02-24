@@ -1506,20 +1506,3 @@ body.is-dragging .sidebar .category-btn * {
         min-width: 120px;
     }
 }
-
-/* Waveform */
-#waveform-container {
-    background: #000;
-    padding: 1rem;
-    border-top: 1px solid var(--border-color);
-    cursor: pointer;
-    border-radius: 0 0 12px 12px;
-}
-
-#waveform-container.hidden {
-    display: none;
-}
-
-.pip-container.minimized #waveform-container {
-    display: none;
-}

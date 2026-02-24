@@ -107,7 +107,6 @@ document.addEventListener('DOMContentLoaded', () => {
             skipTimeout: null,
             lastSkipTime: 0,
             hlsInstance: null,
-            wavesurfer: null,
             toastTimer: null
         }
     };
@@ -1268,9 +1267,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (media) {
             media.playbackRate = rate;
         }
-        if (state.playback.wavesurfer) {
-            state.playback.wavesurfer.setPlaybackRate(rate);
-        }
     }
 
     function playSibling(offset, isUser = false, isDelete = false) {
@@ -1491,15 +1487,6 @@ document.addEventListener('DOMContentLoaded', () => {
         pipTitle.textContent = truncateString(path.split('/').pop());
         pipTitle.title = path;
         pipViewer.innerHTML = '';
-        const waveformContainer = document.getElementById('waveform-container');
-        if (waveformContainer) {
-            waveformContainer.classList.add('hidden');
-            waveformContainer.innerHTML = '';
-        }
-        if (state.playback.wavesurfer) {
-            state.playback.wavesurfer.destroy();
-            state.playback.wavesurfer = null;
-        }
         lyricsDisplay.classList.add('hidden');
         lyricsDisplay.textContent = '';
 
@@ -1674,122 +1661,54 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
         } else if (type.includes('audio')) {
-            const waveformContainer = document.getElementById('waveform-container');
-            if (waveformContainer) {
-                waveformContainer.classList.remove('hidden');
+            el = document.createElement('audio');
+            el.controls = true;
+            el.autoplay = true;
+            el.src = url;
+            el.playbackRate = state.playbackRate;
 
-                // Fetch peaks from server for faster rendering and to avoid downloading whole file
-                let peaks = [];
-                try {
-                    const peaksResp = await fetch(`/api/peaks?path=${encodeURIComponent(path)}`);
-                    if (peaksResp.ok) {
-                        peaks = await peaksResp.json();
+            el.onerror = () => handleMediaError(item);
+
+            const localPos = getLocalProgress(item);
+            if (localPos) {
+                el.currentTime = localPos;
+            } else if (!state.readOnly && item.playhead > 0) {
+                el.currentTime = item.playhead;
+            }
+
+            el.ontimeupdate = () => {
+                const isComplete = (el.duration > 90) && (el.duration - el.currentTime < 90) && (el.currentTime / el.duration > 0.95);
+                updateProgress(item, el.currentTime, el.duration, isComplete);
+
+                // Handle lyrics
+                const textTrack = el.textTracks[0];
+                if (textTrack && textTrack.activeCues && textTrack.activeCues.length > 0) {
+                    const cue = Array.from(textTrack.activeCues).pop();
+                    if (cue) {
+                        lyricsDisplay.classList.remove('hidden');
+                        lyricsDisplay.textContent = cue.text;
                     }
-                } catch (err) {
-                    console.error('Failed to fetch peaks', err);
                 }
+            };
 
-                const ws = WaveSurfer.create({
-                    container: '#waveform-container',
-                    waveColor: '#77b3ff',
-                    progressColor: '#0051b8',
-                    cursorColor: '#2d3436',
-                    barWidth: 2,
-                    barRadius: 3,
-                    cursorWidth: 1,
-                    height: 80,
-                    hideScrollbar: true,
-                    normalize: true,
-                    url: url,
-                    peaks: peaks.length > 0 ? [peaks] : undefined,
-                    audioRate: state.playbackRate,
-                });
+            el.onended = () => {
+                updateProgress(item, el.duration, el.duration, true);
+                handlePostPlayback(item);
+            };
 
-                state.playback.wavesurfer = ws;
+            // Try to fetch lyrics (server will look for siblings)
+            if (!type.includes('image')) {
+                const track = document.createElement('track');
+                track.kind = 'subtitles';
+                track.src = `/api/subtitles?path=${encodeURIComponent(path)}`;
+                track.srclang = state.language || 'en';
+                el.appendChild(track);
 
-                ws.on('error', () => handleMediaError(item));
-
-                ws.on('ready', () => {
-                    const localPos = getLocalProgress(item);
-                    if (localPos) {
-                        ws.setTime(localPos);
-                    } else if (!state.readOnly && item.playhead > 0) {
-                        ws.setTime(item.playhead);
+                track.onload = () => {
+                    const textTrack = el.textTracks[0];
+                    if (textTrack && textTrack.cues && textTrack.cues.length > 0) {
+                        textTrack.mode = 'hidden';
                     }
-                    ws.play().catch(e => console.log("Auto-play blocked:", e));
-                });
-
-                ws.on('timeupdate', (currentTime) => {
-                    const duration = ws.getDuration();
-                    const isComplete = (duration > 90) && (duration - currentTime < 90) && (currentTime / duration > 0.95);
-                    updateProgress(item, currentTime, duration, isComplete);
-                });
-
-                ws.on('finish', () => {
-                    const duration = ws.getDuration();
-                    updateProgress(item, duration, duration, true);
-                    handlePostPlayback(item);
-                });
-
-                // Mock element for lyrics compatibility if needed,
-                // or we can just use ws events for lyrics.
-                // For now, let's try to keep the track logic by creating a hidden audio element
-                el = document.createElement('audio');
-                el.src = url;
-                el.playbackRate = state.playbackRate;
-                el.classList.add('hidden');
-
-                // Try to fetch lyrics (server will look for siblings)
-                // Don't try to fetch subtitles for images (e.g. covers) to avoid server errors
-                if (!type.includes('image')) {
-                    const track = document.createElement('track');
-                    track.kind = 'subtitles';
-                    track.src = `/api/subtitles?path=${encodeURIComponent(path)}`;
-                    track.srclang = state.language || 'en';
-                    el.appendChild(track);
-
-                    track.onload = () => {
-                        const textTrack = el.textTracks[0];
-                        if (textTrack.cues && textTrack.cues.length > 0) {
-                            lyricsDisplay.classList.remove('hidden');
-                            textTrack.mode = 'hidden';
-
-                            ws.on('timeupdate', (currentTime) => {
-                                // Sync hidden audio for cues
-                                el.currentTime = currentTime;
-                                const cue = Array.from(textTrack.activeCues || []).pop();
-                                if (cue) {
-                                    lyricsDisplay.textContent = cue.text;
-                                }
-                            });
-                        }
-                    };
-                }
-            } else {
-                // Fallback to standard audio if container missing
-                el = document.createElement('audio');
-                el.controls = true;
-                el.autoplay = true;
-                el.src = url;
-                el.playbackRate = state.playbackRate;
-
-                el.onerror = () => handleMediaError(item);
-
-                const localPos = getLocalProgress(item);
-                if (localPos) {
-                    el.currentTime = localPos;
-                } else if (!state.readOnly && item.playhead > 0) {
-                    el.currentTime = item.playhead;
-                }
-
-                el.ontimeupdate = () => {
-                    const isComplete = (el.duration > 90) && (el.duration - el.currentTime < 90) && (el.currentTime / el.duration > 0.95);
-                    updateProgress(item, el.currentTime, el.duration, isComplete);
-                };
-
-                el.onended = () => {
-                    updateProgress(item, el.duration, el.duration, true);
-                    handlePostPlayback(item);
                 };
             }
         } else if (type.includes('image')) {
@@ -2015,10 +1934,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (state.playback.hlsInstance) {
             state.playback.hlsInstance.destroy();
             state.playback.hlsInstance = null;
-        }
-        if (state.playback.wavesurfer) {
-            state.playback.wavesurfer.destroy();
-            state.playback.wavesurfer = null;
         }
         const media = pipViewer.querySelector('video, audio');
         if (media) {
@@ -2754,8 +2669,6 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        const ws = state.playback.wavesurfer;
-
         // 1. Independent shortcuts (don't require active PiP)
         if (!e.ctrlKey && !e.metaKey && !e.altKey) {
             switch (e.key.toLowerCase()) {
@@ -2852,22 +2765,20 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        if ((!media && !ws) || !isPipVisible) {
+        if (!media || !isPipVisible) {
             return;
         }
 
-        const isPlaying = ws ? ws.isPlaying() : (media.paused === false);
-        const duration = ws ? ws.getDuration() : media.duration;
-        const currentTime = ws ? ws.getCurrentTime() : media.currentTime;
+        const isPlaying = (media.paused === false);
+        const duration = media.duration;
+        const currentTime = media.currentTime;
 
         const setTime = (t) => {
-            if (ws) ws.setTime(t);
-            else if (media.currentTime !== undefined) media.currentTime = t;
+            if (media.currentTime !== undefined) media.currentTime = t;
         };
 
         const playPause = () => {
-            if (ws) ws.playPause();
-            else if (media.tagName === 'IMG') {
+            if (media.tagName === 'IMG') {
                 if (state.playback.slideshowTimer) stopSlideshow();
                 else startSlideshow();
             }
@@ -3228,34 +3139,20 @@ document.addEventListener('DOMContentLoaded', () => {
     const pipMinimizeBtn = document.getElementById('pip-minimize');
     if (pipMinimizeBtn) pipMinimizeBtn.onclick = () => {
         pipPlayer.classList.toggle('minimized');
-        const waveformContainer = document.getElementById('waveform-container');
-        if (waveformContainer && state.playback.item && state.playback.item.type.includes('audio')) {
-            if (pipPlayer.classList.contains('minimized')) {
-                waveformContainer.classList.add('hidden');
-            } else {
-                waveformContainer.classList.remove('hidden');
-            }
-        }
     };
 
     const pipStreamTypeBtn = document.getElementById('pip-stream-type');
     if (pipStreamTypeBtn) pipStreamTypeBtn.onclick = () => {
         if (!state.playback.item) return;
         state.playback.item.transcode = !state.playback.item.transcode;
-        const currentPos = state.playback.wavesurfer ? state.playback.wavesurfer.getCurrentTime() : (pipViewer.querySelector('video, audio')?.currentTime || 0);
+        const currentPos = pipViewer.querySelector('video, audio')?.currentTime || 0;
         openInPiP(state.playback.item);
 
-        if (state.playback.wavesurfer) {
-            state.playback.wavesurfer.on('ready', () => {
-                state.playback.wavesurfer.setTime(currentPos);
-            });
-        } else {
-            const media = pipViewer.querySelector('video, audio');
-            if (media) {
-                media.onloadedmetadata = () => {
-                    media.currentTime = currentPos;
-                };
-            }
+        const media = pipViewer.querySelector('video, audio');
+        if (media) {
+            media.onloadedmetadata = () => {
+                media.currentTime = currentPos;
+            };
         }
     };
 
@@ -3361,17 +3258,11 @@ document.addEventListener('DOMContentLoaded', () => {
                         closePiP();
                     } else {
                         pipPlayer.classList.add('minimized');
-                        const waveformContainer = document.getElementById('waveform-container');
-                        if (waveformContainer) waveformContainer.classList.add('hidden');
                     }
                 } else if (diffY < -80 && Math.abs(diffX) < 60) {
                     // Swipe Up -> Expand
                     if (pipPlayer.classList.contains('minimized')) {
                         pipPlayer.classList.remove('minimized');
-                        const waveformContainer = document.getElementById('waveform-container');
-                        if (waveformContainer && state.playback.item && state.playback.item.type.includes('audio')) {
-                            waveformContainer.classList.remove('hidden');
-                        }
                     }
                 }
             }
@@ -3545,6 +3436,35 @@ document.addEventListener('DOMContentLoaded', () => {
             updateNavActiveStates();
             fetchTrash();
         };
+
+        trashBtn.addEventListener('dragenter', (e) => {
+            e.preventDefault();
+            trashBtn.classList.add('drag-over');
+        });
+
+        trashBtn.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+        });
+
+        trashBtn.addEventListener('dragleave', (e) => {
+            if (!trashBtn.contains(e.relatedTarget)) {
+                trashBtn.classList.remove('drag-over');
+            }
+        });
+
+        trashBtn.addEventListener('drop', async (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            trashBtn.classList.remove('drag-over');
+
+            const path = e.dataTransfer.getData('text/plain');
+            if (path) {
+                deleteMedia(path);
+            }
+            state.draggedItem = null;
+            document.body.classList.remove('is-dragging');
+        });
     }
 
     if (historyBtn) {

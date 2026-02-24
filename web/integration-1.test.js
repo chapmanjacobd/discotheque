@@ -477,4 +477,44 @@ describe('Integration Test', () => {
         themeSelect.value = 'dark';
         themeSelect.dispatchEvent(new Event('change'));
     });
+
+    it('drags an item into trash', async () => {
+        const trashBtn = document.getElementById('trash-btn');
+        const card = document.querySelector('.media-card');
+        const path = card.dataset.path;
+
+        // Simulate dragenter
+        trashBtn.dispatchEvent(new DragEvent('dragenter', {
+            dataTransfer: {
+                setData: vi.fn(),
+                getData: vi.fn(),
+                effectAllowed: 'move',
+                dropEffect: 'none'
+            }
+        }));
+        expect(trashBtn.classList.contains('drag-over')).toBe(true);
+
+        // Simulate drop
+        const dropEvent = new DragEvent('drop', {
+            dataTransfer: {
+                getData: vi.fn((type) => type === 'text/plain' ? path : ''),
+                effectAllowed: 'move',
+                dropEffect: 'move'
+            }
+        });
+        Object.defineProperty(dropEvent, 'target', { value: trashBtn });
+
+        trashBtn.dispatchEvent(dropEvent);
+
+        expect(trashBtn.classList.contains('drag-over')).toBe(false);
+        await vi.waitFor(() => {
+            expect(global.fetch).toHaveBeenCalledWith(
+                '/api/delete',
+                expect.objectContaining({
+                    method: 'POST',
+                    body: JSON.stringify({ path, restore: false })
+                })
+            );
+        }, { timeout: 2000 });
+    });
 });
