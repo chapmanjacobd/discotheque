@@ -745,7 +745,7 @@ func (c *ServeCmd) handleLs(w http.ResponseWriter, r *http.Request) {
 						if searchDir != "" {
 							matchStr = searchDir
 						}
-						
+
 						idx := strings.Index(fullPath, matchStr)
 						if idx == -1 {
 							continue

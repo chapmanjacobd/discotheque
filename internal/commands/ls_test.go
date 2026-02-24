@@ -54,7 +54,7 @@ func TestServeCmd_HandleLs(t *testing.T) {
 		w := httptest.NewRecorder()
 		cmd.handleLs(w, req)
 
-		var resp []interface{}
+		var resp []any
 		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 			t.Fatalf("Failed to decode response: %v", err)
 		}
@@ -72,7 +72,7 @@ func TestServeCmd_HandleLs(t *testing.T) {
 			t.Errorf("Expected 1 result for root, got %d. Paths in DB: %v", len(resp), allPaths)
 			return
 		}
-		entry := resp[0].(map[string]interface{})
+		entry := resp[0].(map[string]any)
 		if entry["name"] != "home" || entry["is_dir"] != true {
 			t.Errorf("Unexpected root entry: %+v", entry)
 		}
@@ -83,7 +83,7 @@ func TestServeCmd_HandleLs(t *testing.T) {
 		w := httptest.NewRecorder()
 		cmd.handleLs(w, req)
 
-		var resp []interface{}
+		var resp []any
 		json.NewDecoder(w.Body).Decode(&resp)
 
 		// Should show "pop/" and "rock/"
@@ -98,13 +98,13 @@ func TestServeCmd_HandleLs(t *testing.T) {
 		w := httptest.NewRecorder()
 		cmd.handleLs(w, req)
 
-		var resp []interface{}
+		var resp []any
 		json.NewDecoder(w.Body).Decode(&resp)
 
 		// Should show "user/"
 		found := false
 		for _, r := range resp {
-			entry := r.(map[string]interface{})
+			entry := r.(map[string]any)
 			if entry["name"] == "user" {
 				found = true
 				break
@@ -121,12 +121,12 @@ func TestServeCmd_HandleLs(t *testing.T) {
 		w := httptest.NewRecorder()
 		cmd.handleLs(w, req)
 
-		var resp []interface{}
+		var resp []any
 		json.NewDecoder(w.Body).Decode(&resp)
 
 		found := false
 		for _, r := range resp {
-			entry := r.(map[string]interface{})
+			entry := r.(map[string]any)
 			if entry["name"] == "audio" {
 				found = true
 				if entry["path"] != "/home/user/xk/sync/audio/" {
@@ -147,15 +147,15 @@ func TestServeCmd_HandleLs(t *testing.T) {
 		w := httptest.NewRecorder()
 		cmd.handleLs(w, req)
 
-		var resp []interface{}
+		var resp []any
 		json.NewDecoder(w.Body).Decode(&resp)
 
 		if len(resp) < 2 {
 			t.Fatalf("Expected at least 2 results, got %d", len(resp))
 		}
-		
+
 		// rock should be first because it has more matches (2)
-		first := resp[0].(map[string]interface{})
+		first := resp[0].(map[string]any)
 		if first["name"] != "rock" {
 			t.Errorf("Expected 'rock' to be first due to frequency, got '%v'", first["name"])
 		}

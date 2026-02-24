@@ -1338,11 +1338,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const localCounts = JSON.parse(localStorage.getItem('disco-play-counts') || '{}');
         const localCount = localCounts[item.path] || 0;
         const serverCount = item.play_count || 0;
-
-        if (state.readOnly) {
-            return serverCount + localCount;
-        }
-        return serverCount;
+        return serverCount + localCount;
     }
 
     function setPlaybackRate(rate) {
