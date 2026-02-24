@@ -40,6 +40,12 @@ export async function setupTestEnvironment() {
         return Promise.resolve({
             ok: true,
             status: 200,
+            headers: {
+                get: (name) => {
+                    if (name === 'X-Total-Count') return '2';
+                    return null;
+                }
+            },
             json: () => Promise.resolve(data),
             text: () => Promise.resolve(typeof data === 'string' ? data : JSON.stringify(data))
         });

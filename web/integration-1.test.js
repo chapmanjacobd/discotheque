@@ -335,12 +335,14 @@ describe('Integration Test', () => {
                 return Promise.resolve({
                     ok: false,
                     status: 404,
+                    headers: { get: () => null },
                     text: () => Promise.resolve('Not found')
                 });
             }
             return Promise.resolve({
                 ok: true,
                 status: 200,
+                headers: { get: () => '0' },
                 json: () => Promise.resolve([])
             });
         });
@@ -366,12 +368,14 @@ describe('Integration Test', () => {
                 return Promise.resolve({
                     ok: false,
                     status: 415,
+                    headers: { get: () => null },
                     text: () => Promise.resolve('Unsupported Media Type')
                 });
             }
             return Promise.resolve({
                 ok: true,
                 status: 200,
+                headers: { get: () => '0' },
                 json: () => Promise.resolve([])
             });
         });

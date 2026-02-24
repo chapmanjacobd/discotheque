@@ -140,9 +140,17 @@ describe('Integration Test 2', () => {
         // Mock the HEAD check for 404
         global.fetch.mockImplementation((url) => {
             if (url.includes('/api/raw')) {
-                return Promise.resolve({ status: 404 });
+                return Promise.resolve({ 
+                    status: 404,
+                    headers: { get: () => null }
+                });
             }
-            return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve([]) });
+            return Promise.resolve({ 
+                ok: true, 
+                status: 200, 
+                headers: { get: () => '0' },
+                json: () => Promise.resolve([]) 
+            });
         });
 
         media.dispatchEvent(new Event('error'));
@@ -162,12 +170,18 @@ describe('Integration Test 2', () => {
                 return Promise.resolve({
                     ok: true,
                     status: 200,
+                    headers: { get: () => null },
                     json: () => Promise.resolve([
                         { path: '/sugg/dir', name: 'dir', is_dir: true, type: '' }
                     ])
                 });
             }
-            return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve([]) });
+            return Promise.resolve({ 
+                ok: true, 
+                status: 200, 
+                headers: { get: () => '0' },
+                json: () => Promise.resolve([]) 
+            });
         });
 
         searchInput.value = '/sugg/';
@@ -194,13 +208,19 @@ describe('Integration Test 2', () => {
                 return Promise.resolve({
                     ok: true,
                     status: 200,
+                    headers: { get: () => null },
                     json: () => Promise.resolve([
                         { path: '/sugg/file1.mp4', name: 'file1.mp4', is_dir: false, type: 'video/mp4' },
                         { path: '/sugg/file2.mp4', name: 'file2.mp4', is_dir: false, type: 'video/mp4' }
                     ])
                 });
             }
-            return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve([]) });
+            return Promise.resolve({ 
+                ok: true, 
+                status: 200, 
+                headers: { get: () => '0' },
+                json: () => Promise.resolve([]) 
+            });
         });
 
         searchInput.value = '/sugg/';

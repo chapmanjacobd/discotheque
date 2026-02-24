@@ -1367,6 +1367,39 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    async function markMediaPlayed(item) {
+        if (state.readOnly) {
+            showToast('Read-only mode');
+            return;
+        }
+        try {
+            const resp = await fetch('/api/mark-played', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ path: item.path })
+            });
+            if (!resp.ok) throw new Error('Action failed');
+            showToast('Marked as played', '✅');
+            
+            // Update local state if it's in history or search results
+            const updated = (m) => {
+                if (m.path === item.path) {
+                    m.play_count = (m.play_count || 0) + 1;
+                    m.playhead = 0;
+                    m.time_last_played = Math.floor(Date.now() / 1000);
+                }
+                return m;
+            };
+            currentMedia = currentMedia.map(updated);
+            if (state.playlistItems) state.playlistItems = state.playlistItems.map(updated);
+            
+            renderResults();
+        } catch (err) {
+            console.error('Failed to mark as played:', err);
+            showToast('Action failed');
+        }
+    }
+
     async function handleMediaError(item) {
         // Only handle error for the currently active item.
         // If state.playback.item is null, the player was likely closed manually.
@@ -1645,6 +1678,17 @@ document.addEventListener('DOMContentLoaded', () => {
             if (waveformContainer) {
                 waveformContainer.classList.remove('hidden');
 
+                // Fetch peaks from server for faster rendering and to avoid downloading whole file
+                let peaks = [];
+                try {
+                    const peaksResp = await fetch(`/api/peaks?path=${encodeURIComponent(path)}`);
+                    if (peaksResp.ok) {
+                        peaks = await peaksResp.json();
+                    }
+                } catch (err) {
+                    console.error('Failed to fetch peaks', err);
+                }
+
                 const ws = WaveSurfer.create({
                     container: '#waveform-container',
                     waveColor: '#77b3ff',
@@ -1657,6 +1701,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     hideScrollbar: true,
                     normalize: true,
                     url: url,
+                    peaks: peaks.length > 0 ? [peaks] : undefined,
                     audioRate: state.playbackRate,
                 });
 
@@ -2036,6 +2081,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         </div>
                         <div class="detail-actions">
                             <button class="category-btn play-now-btn">▶ Play</button>
+                            ${!state.readOnly ? `<button class="category-btn mark-viewed-btn">✅ Mark Viewed</button>` : ''}
                             ${!state.readOnly ? `<button class="category-btn add-playlist-btn">+ Add to Playlist</button>` : ''}
                             <button class="category-btn delete-item-btn">🗑 Trash</button>
                         </div>
@@ -2074,6 +2120,10 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
 
         detailContent.querySelector('.play-now-btn').onclick = () => playMedia(item);
+        const markViewedBtn = detailContent.querySelector('.mark-viewed-btn');
+        if (markViewedBtn) {
+            markViewedBtn.onclick = () => markMediaPlayed(item);
+        }
         const addPlaylistBtn = detailContent.querySelector('.add-playlist-btn');
         if (addPlaylistBtn) {
             addPlaylistBtn.onclick = () => {
@@ -2226,6 +2276,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 actionBtns = `
                     <button class="media-action-btn info" title="Details">ℹ️</button>
                     ${!state.readOnly ? `<button class="media-action-btn add-playlist" title="Add to Playlist">+</button>` : ''}
+                    ${!state.readOnly ? `<button class="media-action-btn mark-played" title="Mark as Played">✅</button>` : ''}
                     <button class="media-action-btn delete" title="Move to Trash">🗑️</button>
                 `;
             }
@@ -2340,6 +2391,12 @@ document.addEventListener('DOMContentLoaded', () => {
                         addToPlaylist(state.playlists[idx], item);
                     }
                 }
+            };
+
+            const btnMarkPlayed = card.querySelector('.media-action-btn.mark-played');
+            if (btnMarkPlayed) btnMarkPlayed.onclick = (e) => {
+                e.stopPropagation();
+                markMediaPlayed(item);
             };
 
             const btnRemovePlaylist = card.querySelector('.media-action-btn.remove-playlist');

@@ -55,6 +55,7 @@ func (c *ServeCmd) Mux() http.Handler {
 	mux.HandleFunc("/api/play", c.handlePlay)
 	mux.HandleFunc("/api/delete", c.handleDelete)
 	mux.HandleFunc("/api/progress", c.handleProgress)
+	mux.HandleFunc("/api/mark-played", c.handleMarkPlayed)
 	mux.HandleFunc("/api/rate", c.handleRate)
 	mux.HandleFunc("/api/playlists", c.handlePlaylists)
 	mux.HandleFunc("/api/playlists/items", c.handlePlaylistItems)
@@ -66,6 +67,7 @@ func (c *ServeCmd) Mux() http.Handler {
 	mux.HandleFunc("/api/hls/segment", c.handleHLSSegment)
 	mux.HandleFunc("/api/subtitles", c.handleSubtitles)
 	mux.HandleFunc("/api/thumbnail", c.handleThumbnail)
+	mux.HandleFunc("/api/peaks", c.handlePeaks)
 	mux.HandleFunc("/opds", c.handleOPDS)
 
 	if c.Trashcan {
@@ -498,6 +500,47 @@ func (c *ServeCmd) handleProgress(w http.ResponseWriter, r *http.Request) {
 		})
 		if err != nil {
 			slog.Error("Failed to update progress", "db", dbPath, "error", err)
+		}
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
+func (c *ServeCmd) handleMarkPlayed(w http.ResponseWriter, r *http.Request) {
+	if c.ReadOnly {
+		http.Error(w, "Read-only mode", http.StatusForbidden)
+		return
+	}
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		Path string `json:"path"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	now := time.Now().Unix()
+	for _, dbPath := range c.Databases {
+		err := c.execDB(r.Context(), dbPath, func(sqlDB *sql.DB) error {
+			if _, err := sqlDB.ExecContext(r.Context(), `
+			UPDATE media
+			SET time_last_played = ?,
+			    time_first_played = COALESCE(time_first_played, ?),
+			    play_count = COALESCE(play_count, 0) + 1,
+			    playhead = 0
+			WHERE path = ?`,
+				now, now, req.Path); err != nil {
+				return err
+			}
+			return nil
+		})
+		if err != nil {
+			slog.Error("Failed to mark as played", "db", dbPath, "error", err)
 		}
 	}
 
@@ -1058,6 +1101,62 @@ func (c *ServeCmd) handleThumbnail(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "image/jpeg")
 	w.Header().Set("Cache-Control", "public, max-age=31536000")
 	w.Write(thumb)
+}
+
+func (c *ServeCmd) handlePeaks(w http.ResponseWriter, r *http.Request) {
+	path := r.URL.Query().Get("path")
+	if path == "" {
+		http.Error(w, "Path required", http.StatusBadRequest)
+		return
+	}
+
+	// Verify path exists in database
+	found := false
+	for _, dbPath := range c.Databases {
+		err := c.execDB(r.Context(), dbPath, func(sqlDB *sql.DB) error {
+			queries := database.New(sqlDB)
+			_, err := queries.GetMediaByPathExact(r.Context(), path)
+			if err == nil {
+				found = true
+			}
+			return err
+		})
+		if found {
+			break
+		}
+		if err != nil && err != sql.ErrNoRows {
+			slog.Debug("Database error in handlePeaks", "db", dbPath, "error", err)
+		}
+	}
+
+	if !found {
+		http.Error(w, "Access denied", http.StatusForbidden)
+		return
+	}
+
+	// Use ffmpeg to generate peaks
+	// We downsample to a very low rate and read raw s16le
+	// -ac 1 (mono), -ar 100 (100 samples per second)
+	args := []string{"-i", path, "-ac", "1", "-filter:a", "aresample=100", "-f", "s16le", "-"}
+
+	cmd := exec.CommandContext(r.Context(), "ffmpeg", append([]string{"-hide_banner", "-loglevel", "error"}, args...)...)
+	out, err := cmd.Output()
+	if err != nil {
+		slog.Error("Failed to generate peaks", "path", path, "error", err)
+		http.Error(w, "Failed to generate peaks", http.StatusInternalServerError)
+		return
+	}
+
+	// Convert s16le to float32 peaks in range [-1, 1]
+	peaks := make([]float32, len(out)/2)
+	for i := range peaks {
+		val := int16(out[i*2]) | int16(out[i*2+1])<<8
+		peaks[i] = float32(val) / 32768.0
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "public, max-age=31536000")
+	json.NewEncoder(w).Encode(peaks)
 }
 
 func (c *ServeCmd) handleTrash(w http.ResponseWriter, r *http.Request) {

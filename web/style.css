@@ -644,6 +644,10 @@ main {
     background: rgba(231, 76, 60, 0.9);
 }
 
+.media-action-btn.mark-played:hover {
+    background: rgba(46, 204, 113, 0.9);
+}
+
 .media-action-btn.restore:hover {
     background: rgba(46, 204, 113, 0.9);
 }

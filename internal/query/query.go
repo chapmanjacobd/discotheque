@@ -515,7 +515,6 @@ func MediaQueryCount(ctx context.Context, dbs []string, flags models.GlobalFlags
 	return total, nil
 }
 
-
 func FetchSiblings(ctx context.Context, media []models.MediaWithDB, flags models.GlobalFlags) ([]models.MediaWithDB, error) {
 	if len(media) == 0 {
 		return media, nil
