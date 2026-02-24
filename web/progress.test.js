@@ -213,4 +213,46 @@ describe('Progress Resuming', () => {
         const count = window.disco.getPlayCount(item);
         expect(count).toBe(6); // 5 server + 1 local
     });
+
+    it('sorts zero progress items last', () => {
+        const media = [
+            { path: 'a.mp4', duration: 100, playhead: 50 }, // 0.5
+            { path: 'b.mp4', duration: 100, playhead: 0 },  // 0
+            { path: 'c.mp4', duration: 100, playhead: 80 }, // 0.8
+            { path: 'd.mp4', duration: 100, playhead: 10 }  // 0.1
+        ];
+
+        window.disco.state.filters.sort = 'progress';
+        window.disco.state.filters.reverse = false; // Descending (default)
+
+        // Simulate the sorting logic inside performSearch (simplified)
+        media.sort((a, b) => {
+            const progA = (a.duration && a.playhead) ? a.playhead / a.duration : 0;
+            const progB = (b.duration && b.playhead) ? b.playhead / b.duration : 0;
+            if (progA === 0 && progB === 0) return 0;
+            if (progA === 0) return 1;
+            if (progB === 0) return -1;
+            return progB - progA;
+        });
+
+        expect(media[0].path).toBe('c.mp4'); // 0.8
+        expect(media[1].path).toBe('a.mp4'); // 0.5
+        expect(media[2].path).toBe('d.mp4'); // 0.1
+        expect(media[3].path).toBe('b.mp4'); // 0
+
+        // Test reverse
+        media.sort((a, b) => {
+            const progA = (a.duration && a.playhead) ? a.playhead / a.duration : 0;
+            const progB = (b.duration && b.playhead) ? b.playhead / b.duration : 0;
+            if (progA === 0 && progB === 0) return 0;
+            if (progA === 0) return 1;
+            if (progB === 0) return -1;
+            return progA - progB; // Ascending
+        });
+
+        expect(media[0].path).toBe('d.mp4'); // 0.1
+        expect(media[1].path).toBe('a.mp4'); // 0.5
+        expect(media[2].path).toBe('c.mp4'); // 0.8
+        expect(media[3].path).toBe('b.mp4'); // 0 (still last!)
+    });
 });

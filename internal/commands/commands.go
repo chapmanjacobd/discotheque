@@ -1153,6 +1153,7 @@ func (c *AddCmd) Run(ctx *kong.Context) error {
 	dbPath := c.Database
 	c.ScanPaths = utils.ExpandStdin(c.ScanPaths)
 
+	dbExists := utils.FileExists(dbPath)
 	sqlDB, err := db.Connect(dbPath)
 	if err != nil {
 		return err
@@ -1169,7 +1170,6 @@ func (c *AddCmd) Run(ctx *kong.Context) error {
 	existingPlaylists, _ := queries.GetPlaylists(context.Background())
 
 	// Step 1: Load all existing metadata into memory for O(1) checks
-	slog.Info("Loading existing metadata from database...")
 	existingMedia, err := queries.GetAllMediaMetadata(context.Background())
 	if err != nil {
 		return fmt.Errorf("failed to load existing metadata: %w", err)
@@ -1188,7 +1188,9 @@ func (c *AddCmd) Run(ctx *kong.Context) error {
 			deleted: m.TimeDeleted.Int64 > 0,
 		}
 	}
-	slog.Info("Loaded metadata cache", "count", len(metaCache))
+	if dbExists {
+		slog.Info("Loaded metadata cache from database", "count", len(metaCache))
+	}
 
 	for _, root := range c.ScanPaths {
 		absRoot, err := filepath.Abs(root)
@@ -1233,7 +1235,9 @@ func (c *AddCmd) Run(ctx *kong.Context) error {
 			return err
 		}
 
-		slog.Info("Checking for updates", "count", len(foundFiles))
+		if dbExists {
+			slog.Info("Checking for updates", "count", len(foundFiles))
+		}
 
 		// Step 2: Identify which files actually need probing using the cache
 		var toProbe []string
@@ -2006,8 +2010,8 @@ func (c *DedupeCmd) getMusicDuplicates(dbPath string) ([]DedupeDuplicate, error)
 	query := `
 		SELECT m1.path as keep_path, m2.path as duplicate_path, m2.size as duplicate_size
 		FROM media m1
-		JOIN media m2 ON m1.title = m2.title 
-			AND m1.artist = m2.artist 
+		JOIN media m2 ON m1.title = m2.title
+			AND m1.artist = m2.artist
 			AND m1.album = m2.album
 			AND ABS(m1.duration - m2.duration) <= 8
 			AND m1.path != m2.path

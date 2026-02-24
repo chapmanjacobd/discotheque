@@ -842,6 +842,40 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 performSearch();
             };
+
+            btn.addEventListener('dragenter', (e) => {
+                e.preventDefault();
+                btn.classList.add('drag-over');
+            });
+
+            btn.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'copy';
+            });
+
+            btn.addEventListener('dragleave', (e) => {
+                if (!btn.contains(e.relatedTarget)) {
+                    btn.classList.remove('drag-over');
+                }
+            });
+
+            btn.addEventListener('drop', async (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                btn.classList.remove('drag-over');
+
+                const rating = parseInt(btn.dataset.rating);
+                const path = e.dataTransfer.getData('text/plain');
+
+                if (path) {
+                    const item = (state.draggedItem && state.draggedItem.path === path) ?
+                        state.draggedItem : { path };
+                    await rateMedia(item, rating);
+                    performSearch();
+                }
+                state.draggedItem = null;
+                document.body.classList.remove('is-dragging');
+            });
         });
     }
 
@@ -990,6 +1024,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 currentMedia.sort((a, b) => {
                     const progA = (a.duration && a.playhead) ? a.playhead / a.duration : 0;
                     const progB = (b.duration && b.playhead) ? b.playhead / b.duration : 0;
+                    
+                    if (progA === 0 && progB === 0) return 0;
+                    if (progA === 0) return 1;
+                    if (progB === 0) return -1;
+
                     if (state.filters.reverse) return progA - progB;
                     return progB - progA;
                 });
@@ -1420,6 +1459,26 @@ document.addEventListener('DOMContentLoaded', () => {
         renderResults();
     }
 
+    function seekToProgress(el, targetPos, retryCount = 0) {
+        if (!el || !targetPos || targetPos <= 0) return;
+        if (retryCount > 60) return; // 20 seconds limit
+
+        const duration = el.duration;
+
+        if (!isNaN(duration) && duration >= targetPos) {
+            el.currentTime = targetPos;
+            return;
+        }
+
+        if (!isNaN(duration) && duration > 0) {
+            el.currentTime = duration;
+        } else if (retryCount === 0) {
+            el.currentTime = targetPos;
+        }
+
+        setTimeout(() => seekToProgress(el, targetPos, retryCount + 1), 333);
+    }
+
     async function handleMediaError(item) {
         // Only handle error for the currently active item.
         // If state.playback.item is null, the player was likely closed manually.
@@ -1600,7 +1659,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     el.src = hlsUrl;
                     el.playbackRate = state.playbackRate;
                     el.addEventListener('loadedmetadata', () => {
-                        if (localPos > 0) el.currentTime = localPos;
+                        seekToProgress(el, localPos);
                     }, { once: true });
                 } else if (Hls.isSupported()) {
                     // hls.js
@@ -1608,7 +1667,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     hls.loadSource(hlsUrl);
                     hls.attachMedia(el);
                     hls.on(Hls.Events.MANIFEST_PARSED, () => {
-                        if (localPos > 0) el.currentTime = localPos;
+                        seekToProgress(el, localPos);
                         el.playbackRate = state.playbackRate;
                         el.play().catch(e => console.log("Auto-play blocked:", e));
                     });
@@ -1620,9 +1679,7 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 el.src = url;
                 el.playbackRate = state.playbackRate;
-                if (localPos) {
-                    el.currentTime = localPos;
-                }
+                seekToProgress(el, localPos);
             }
 
             el.ontimeupdate = () => {
@@ -1693,9 +1750,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             el.onerror = () => handleMediaError(item);
 
-            if (localPos) {
-                el.currentTime = localPos;
-            }
+            seekToProgress(el, localPos);
 
             el.ontimeupdate = () => {
                 const isComplete = (el.duration > 90) && (el.duration - el.currentTime < 90) && (el.currentTime / el.duration > 0.95);
@@ -3712,6 +3767,7 @@ document.addEventListener('DOMContentLoaded', () => {
         formatDisplayPath,
         openInPiP,
         updateProgress,
+        seekToProgress,
         closePiP,
         getPlayCount,
         markMediaPlayed,
