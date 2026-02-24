@@ -38,16 +38,13 @@
             <div id="nav-list">
                 <button id="all-media-btn" class="category-btn active" style="width: 100%; margin-bottom: 0.2rem;">🗂️
                     All Media</button>
-                <button id="history-btn" class="category-btn" style="width: 100%; margin-bottom: 0.5rem;">🕒
+                <button id="history-btn" class="category-btn" style="width: 100%; margin-bottom: 0.2rem;">🕒
                     History</button>
+                <button id="trash-btn" class="category-btn hidden" style="width: 100%; margin-bottom: 0.5rem;">🗑️
+                    Trash</button>
             </div>
 
-            <details id="details-categories" open>
-                <summary>Categories</summary>
-                <div id="category-list">
-                    <!-- Categories will be injected here -->
-                </div>
-            </details>
+            <div class="sidebar-separator"></div>
 
             <details id="details-playlists">
                 <summary>Playlists</summary>
@@ -59,10 +56,10 @@
                     Playlist</button>
             </details>
 
-            <details id="details-genres">
-                <summary>Genres</summary>
-                <div id="genre-list">
-                    <!-- Genres will be injected here -->
+            <details id="details-categories" open>
+                <summary>Categories</summary>
+                <div id="category-list">
+                    <!-- Categories will be injected here -->
                 </div>
             </details>
 
@@ -70,13 +67,6 @@
                 <summary>Ratings</summary>
                 <div id="rating-list">
                     <!-- Ratings will be injected here -->
-                </div>
-            </details>
-
-            <details id="trash-section" class="hidden">
-                <summary>Maintenance</summary>
-                <div id="maintenance-list">
-                    <button id="trash-btn" class="category-btn">🗑️ Trash</button>
                 </div>
             </details>
         </aside>
@@ -148,20 +138,35 @@
                     </div>
                     <div class="filter-item">
                         <label>Max Score:</label>
-                                                <select id="filter-max-score">
-                                                    <option value="">Any</option>
-                                                    <option value="1">1 Star</option>
-                                                    <option value="2">2 Stars</option>
-                                                    <option value="3">3 Stars</option>
-                                                    <option value="4">4 Stars</option>
-                                                    <option value="5">5 Stars</option>
-                                                </select>
-                                            </div>
-                                            <div class="filter-item" style="justify-content: center;">
-                                                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin-top: 1.2rem;">
-                                                    <input type="checkbox" id="filter-unplayed"> Unplayed
-                                                </label>
-                                            </div>
+                        <select id="filter-max-score">
+                            <option value="">Any</option>
+                            <option value="1">1 Star</option>
+                            <option value="2">2 Stars</option>
+                            <option value="3">3 Stars</option>
+                            <option value="4">4 Stars</option>
+                            <option value="5">5 Stars</option>
+                        </select>
+                    </div>
+                    <div class="filter-item">
+                        <label>Browse By:</label>
+                        <select id="filter-browse-col">
+                            <option value="">None</option>
+                            <option value="genre">Genre</option>
+                            <option value="category">Category</option>
+                            <option value="db">Database</option>
+                        </select>
+                    </div>
+                    <div class="filter-item hidden" id="filter-browse-val-container">
+                        <label>Value:</label>
+                        <select id="filter-browse-val">
+                            <option value="">All</option>
+                        </select>
+                    </div>
+                    <div class="filter-item" style="justify-content: center;">
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin-top: 1.2rem;">
+                            <input type="checkbox" id="filter-unplayed"> Unplayed
+                        </label>
+                    </div>
                                             <button id="apply-advanced-filters" class="category-btn" style="background: var(--accent-color); color: white;">Apply</button>
                     <button id="reset-advanced-filters" class="category-btn">Reset</button>
                 </div>

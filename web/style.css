@@ -248,14 +248,13 @@ main {
 }
 
 .sidebar details {
-    margin-bottom: 1rem;
+    margin-bottom: 0.4rem;
 }
 
 .sidebar summary {
     font-size: 0.8rem;
     text-transform: uppercase;
     color: var(--text-muted);
-    margin-bottom: 0.5rem;
     padding: 0.5rem;
     cursor: pointer;
     user-select: none;
@@ -279,6 +278,12 @@ main {
     margin-right: 0.8rem;
     transition: transform 0.2s;
     opacity: 0.5;
+}
+
+.sidebar-separator {
+    height: 1px;
+    background-color: var(--border-color);
+    margin: 0rem 0.1rem 0.8rem;
 }
 
 .sidebar details[open]>summary::before {

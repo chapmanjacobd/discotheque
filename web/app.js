@@ -36,6 +36,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const resetAdvancedFilters = document.getElementById('reset-advanced-filters');
     const pipSpeedBtn = document.getElementById('pip-speed');
     const pipSpeedMenu = document.getElementById('pip-speed-menu');
+    const filterBrowseCol = document.getElementById('filter-browse-col');
+    const filterBrowseVal = document.getElementById('filter-browse-val');
+    const filterBrowseValContainer = document.getElementById('filter-browse-val-container');
 
     let currentMedia = [];
     let allDatabases = [];
@@ -45,7 +48,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- State Management ---
     const state = {
-        view: 'grid',
+        view: localStorage.getItem('disco-view') || 'grid',
         page: 'search', // 'search', 'trash', 'history', or 'playlist'
         currentPage: 1,
         totalCount: 0,
@@ -67,7 +70,9 @@ document.addEventListener('DOMContentLoaded', () => {
             max_duration: '',
             min_score: '',
             max_score: '',
-            unplayed: localStorage.getItem('disco-unplayed') === 'true'
+            unplayed: localStorage.getItem('disco-unplayed') === 'true',
+            browseCol: '',
+            browseVal: ''
         },
         draggedItem: null,
         applicationStartTime: null,
@@ -166,6 +171,16 @@ document.addEventListener('DOMContentLoaded', () => {
     if (sortBy) sortBy.value = state.filters.sort;
     if (sortReverseBtn && state.filters.reverse) sortReverseBtn.classList.add('active');
 
+    if (viewGrid && viewDetails) {
+        if (state.view === 'details') {
+            viewDetails.classList.add('active');
+            viewGrid.classList.remove('active');
+        } else {
+            viewGrid.classList.add('active');
+            viewDetails.classList.remove('active');
+        }
+    }
+
     document.querySelectorAll('.type-btn').forEach(btn => {
         if (state.filters.types.includes(btn.dataset.type)) {
             btn.classList.add('active');
@@ -252,6 +267,10 @@ document.addEventListener('DOMContentLoaded', () => {
             if (state.filters.unplayed) params.set('unplayed', 'true');
         }
 
+        if (state.currentPage > 1) {
+            params.set('p', state.currentPage);
+        }
+
         const paramString = params.toString();
         const newHash = paramString ? `#${paramString}` : '';
 
@@ -266,6 +285,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const hash = window.location.hash.substring(1);
         const params = hash ? new URLSearchParams(hash) : new URLSearchParams(window.location.search);
         const view = params.get('view');
+
+        const pageParam = params.get('p');
+        state.currentPage = pageParam ? parseInt(pageParam) : 1;
 
         if (view === 'trash') {
             state.page = 'trash';
@@ -313,6 +335,17 @@ document.addEventListener('DOMContentLoaded', () => {
             if (maxScoreEl) maxScoreEl.value = state.filters.max_score;
             const unplayedEl = document.getElementById('filter-unplayed');
             if (unplayedEl) unplayedEl.checked = state.filters.unplayed;
+
+            if (state.filters.genre && filterBrowseCol) {
+                filterBrowseCol.value = 'genre';
+                filterBrowseCol.onchange();
+            } else if (state.filters.category && filterBrowseCol) {
+                filterBrowseCol.value = 'category';
+                filterBrowseCol.onchange();
+            } else if (filterBrowseCol) {
+                filterBrowseCol.value = '';
+                filterBrowseValContainer.classList.add('hidden');
+            }
         }
     }
 
@@ -328,7 +361,6 @@ document.addEventListener('DOMContentLoaded', () => {
             performSearch();
         }
         renderCategoryList();
-        renderGenreList();
         renderRatingList();
         renderPlaylistList();
     };
@@ -349,7 +381,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
             renderDbSettingsList(allDatabases);
             if (state.trashcan) {
-                document.getElementById('trash-section').classList.remove('hidden');
+                const trashBtn = document.getElementById('trash-btn');
+                if (trashBtn) trashBtn.classList.remove('hidden');
             }
             if (state.dev) {
                 setupAutoReload();
@@ -484,40 +517,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const resp = await fetch('/api/genres');
             if (!resp.ok) throw new Error('Failed to fetch genres');
             state.genres = await resp.json() || [];
-            renderGenreList();
         } catch (err) {
             console.error('Failed to fetch genres', err);
         }
-    }
-
-    function renderGenreList() {
-        const genreList = document.getElementById('genre-list');
-        if (!genreList) return;
-
-        updateNavActiveStates();
-
-        genreList.innerHTML = state.genres.map(g => `
-            <button class="category-btn ${state.filters.genre === g.genre ? 'active' : ''}" data-genre="${g.genre}">
-                ${g.genre} <small>(${g.count})</small>
-            </button>
-        `).join('');
-
-        genreList.querySelectorAll('.category-btn').forEach(btn => {
-            btn.onclick = (e) => {
-                const genre = e.target.dataset.genre;
-                state.page = 'search';
-                state.filters.genre = genre;
-                state.filters.category = ''; // Clear category filter
-                state.filters.rating = ''; // Clear rating filter
-                state.filters.playlist = null;
-
-                document.querySelectorAll('.category-btn').forEach(b => b.classList.remove('active'));
-                e.target.classList.add('active');
-                updateNavActiveStates();
-
-                performSearch();
-            };
-        });
     }
 
     async function fetchRatings() {
@@ -811,15 +813,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         updateNavActiveStates();
 
-        const sortedRatings = [...state.ratings].sort((a, b) => {
-            if (a.rating === 0) return 1;
-            if (b.rating === 0) return -1;
-            return b.rating - a.rating; // Keep 5 stars at top
-        });
+        // Always show 5, 4, 3, 2, 1, 0 stars
+        const ratingsToShow = [5, 4, 3, 2, 1, 0];
 
-        ratingList.innerHTML = sortedRatings.map(r => {
+        ratingList.innerHTML = ratingsToShow.map(val => {
+            const r = state.ratings.find(x => x.rating === val) || { rating: val, count: 0 };
             const stars = r.rating === 0 ? '☆☆☆☆☆' : '⭐'.repeat(r.rating);
-            const label = r.rating === 0 ? 'Unrated' : `${r.rating} Stars`;
             return `
                 <button class="category-btn ${state.filters.rating === r.rating.toString() ? 'active' : ''}" data-rating="${r.rating}">
                     ${stars} <small>(${r.count})</small>
@@ -1648,6 +1647,11 @@ document.addEventListener('DOMContentLoaded', () => {
             el = document.createElement('video');
             el.controls = true;
             el.autoplay = true;
+
+            // Loop short videos/GIFs (under 8s)
+            if (item.duration > 0 && item.duration < 8) {
+                el.loop = true;
+            }
 
             el.onerror = () => handleMediaError(item);
 
@@ -3145,6 +3149,17 @@ document.addEventListener('DOMContentLoaded', () => {
             state.filters.max_score = document.getElementById('filter-max-score').value;
             state.filters.unplayed = document.getElementById('filter-unplayed').checked;
             localStorage.setItem('disco-unplayed', state.filters.unplayed);
+
+            const browseCol = filterBrowseCol.value;
+            const browseVal = filterBrowseVal.value;
+            if (browseCol === 'genre') {
+                state.filters.genre = browseVal;
+                state.filters.category = '';
+            } else if (browseCol === 'category') {
+                state.filters.category = browseVal;
+                state.filters.genre = '';
+            }
+
             state.currentPage = 1;
             performSearch();
         };
@@ -3159,6 +3174,10 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('filter-min-score').value = '';
             document.getElementById('filter-max-score').value = '';
             document.getElementById('filter-unplayed').checked = false;
+            filterBrowseCol.value = '';
+            filterBrowseVal.value = '';
+            filterBrowseValContainer.classList.add('hidden');
+
             state.filters.min_size = '';
             state.filters.max_size = '';
             state.filters.min_duration = '';
@@ -3166,9 +3185,42 @@ document.addEventListener('DOMContentLoaded', () => {
             state.filters.min_score = '';
             state.filters.max_score = '';
             state.filters.unplayed = false;
+            state.filters.genre = '';
+            state.filters.category = '';
             localStorage.setItem('disco-unplayed', false);
             state.currentPage = 1;
             performSearch();
+        };
+    }
+
+    if (filterBrowseCol) {
+        filterBrowseCol.onchange = async () => {
+            const col = filterBrowseCol.value;
+            if (!col) {
+                filterBrowseValContainer.classList.add('hidden');
+                return;
+            }
+
+            filterBrowseValContainer.classList.remove('hidden');
+            filterBrowseVal.innerHTML = '<option value="">Loading...</option>';
+
+            let options = [];
+            if (col === 'genre') {
+                if (state.genres.length === 0) await fetchGenres();
+                options = state.genres.map(g => ({ val: g.genre, label: `${g.genre} (${g.count})` }));
+            } else if (col === 'category') {
+                if (state.categories.length === 0) await fetchCategories();
+                options = state.categories.map(c => ({ val: c.category, label: `${c.category} (${c.count})` }));
+            } else if (col === 'db') {
+                options = allDatabases.map(db => ({ val: db, label: db }));
+            }
+
+            filterBrowseVal.innerHTML = '<option value="">All</option>' +
+                options.map(o => `<option value="${o.val}">${o.label}</option>`).join('');
+
+            // Try to restore selection from state
+            if (col === 'genre') filterBrowseVal.value = state.filters.genre;
+            else if (col === 'category') filterBrowseVal.value = state.filters.category;
         };
     }
 
@@ -3651,6 +3703,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (viewGrid) viewGrid.onclick = () => {
         state.view = 'grid';
+        localStorage.setItem('disco-view', 'grid');
         viewGrid.classList.add('active');
         viewDetails.classList.remove('active');
         renderResults();
@@ -3658,6 +3711,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (viewDetails) viewDetails.onclick = () => {
         state.view = 'details';
+        localStorage.setItem('disco-view', 'details');
         viewDetails.classList.add('active');
         viewGrid.classList.remove('active');
         renderResults();
