@@ -607,7 +607,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (path && title) {
                     // Find the item if possible
                     const item = (state.draggedItem && state.draggedItem.path === path) ?
-                                 state.draggedItem : { path };
+                        state.draggedItem : { path };
 
                     await addToPlaylist(title, item);
                     if (state.page === 'playlist' && state.filters.playlist === title) {
@@ -940,18 +940,20 @@ document.addEventListener('DOMContentLoaded', () => {
             let data = await resp.json();
             if (!data) data = [];
 
-            // Merge local progress if viewing history
-            if (state.page === 'history' && state.localResume) {
+            // Merge local progress if enabled
+            if (state.localResume) {
                 const localProgress = JSON.parse(localStorage.getItem('disco-progress') || '{}');
-                const localPaths = Object.keys(localProgress);
 
-                // Find paths that are in localStorage but not in the server results
-                const serverPaths = new Set(data.map(item => item.path));
-                const missingPaths = localPaths.filter(p => !serverPaths.has(p));
+                if (state.page === 'history') {
+                    // Find paths that are in localStorage but not in the server results
+                    const localPaths = Object.keys(localProgress);
+                    const serverPaths = new Set(data.map(item => item.path));
+                    const missingPaths = localPaths.filter(p => !serverPaths.has(p));
 
-                if (missingPaths.length > 0) {
-                    const extraMedia = await fetchMediaByPaths(missingPaths);
-                    data = [...data, ...extraMedia];
+                    if (missingPaths.length > 0) {
+                        const extraMedia = await fetchMediaByPaths(missingPaths);
+                        data = [...data, ...extraMedia];
+                    }
                 }
 
                 // Update playhead and time_last_played from localStorage for all items
@@ -961,11 +963,13 @@ document.addEventListener('DOMContentLoaded', () => {
                         const localPlayhead = typeof local === 'object' ? local.pos : local;
                         const localTime = typeof local === 'object' ? local.last / 1000 : 0;
 
-                        if (localPlayhead > (item.playhead || 0)) {
-                            item.playhead = localPlayhead;
-                        }
+                        // If local progress is newer, trust it even if it is 0
                         if (localTime > (item.time_last_played || 0)) {
+                            item.playhead = localPlayhead;
                             item.time_last_played = localTime;
+                        } else if (localPlayhead > (item.playhead || 0)) {
+                            // Fallback for older localStorage entries that might not have timestamps
+                            item.playhead = localPlayhead;
                         }
                     }
                 });
@@ -1174,7 +1178,14 @@ document.addEventListener('DOMContentLoaded', () => {
             if (isComplete || (now - state.playback.lastLocalUpdate) >= 1000) {
                 const progress = JSON.parse(localStorage.getItem('disco-progress') || '{}');
                 if (isComplete) {
-                    delete progress[item.path];
+                    if (!!state.readOnly) {
+                        progress[item.path] = {
+                            pos: 0,
+                            last: now
+                        };
+                    } else {
+                        delete progress[item.path];
+                    }
 
                     // Increment play count locally if global progress is disabled
                     if (!!state.readOnly) {
@@ -1250,11 +1261,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function getPlayCount(item) {
-        if (!state.readOnly && item.play_count !== undefined) {
-            return item.play_count || 0;
+        const localCounts = JSON.parse(localStorage.getItem('disco-play-counts') || '{}');
+        const localCount = localCounts[item.path] || 0;
+        const serverCount = item.play_count || 0;
+
+        if (state.readOnly) {
+            return serverCount + localCount;
         }
-        const counts = JSON.parse(localStorage.getItem('disco-play-counts') || '{}');
-        return counts[item.path] || 0;
+        return serverCount;
     }
 
     function setPlaybackRate(rate) {
@@ -1365,35 +1379,45 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function markMediaPlayed(item) {
         if (state.readOnly) {
-            showToast('Read-only mode');
-            return;
+            // Local update for read-only mode
+            const progress = JSON.parse(localStorage.getItem('disco-progress') || '{}');
+            progress[item.path] = { pos: 0, last: Date.now() };
+            localStorage.setItem('disco-progress', JSON.stringify(progress));
+
+            const counts = JSON.parse(localStorage.getItem('disco-play-counts') || '{}');
+            counts[item.path] = (counts[item.path] || 0) + 1;
+            localStorage.setItem('disco-play-counts', JSON.stringify(counts));
+
+            showToast('Marked as played (Local)', '✅');
+        } else {
+            try {
+                const resp = await fetch('/api/mark-played', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ path: item.path })
+                });
+                if (!resp.ok) throw new Error('Action failed');
+                showToast('Marked as played', '✅');
+            } catch (err) {
+                console.error('Failed to mark as played:', err);
+                showToast('Action failed');
+                return;
+            }
         }
-        try {
-            const resp = await fetch('/api/mark-played', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ path: item.path })
-            });
-            if (!resp.ok) throw new Error('Action failed');
-            showToast('Marked as played', '✅');
-            
-            // Update local state if it's in history or search results
-            const updated = (m) => {
-                if (m.path === item.path) {
-                    m.play_count = (m.play_count || 0) + 1;
-                    m.playhead = 0;
-                    m.time_last_played = Math.floor(Date.now() / 1000);
-                }
-                return m;
-            };
-            currentMedia = currentMedia.map(updated);
-            if (state.playlistItems) state.playlistItems = state.playlistItems.map(updated);
-            
-            renderResults();
-        } catch (err) {
-            console.error('Failed to mark as played:', err);
-            showToast('Action failed');
-        }
+
+        // Update current state and re-render
+        const updated = (m) => {
+            if (m.path === item.path) {
+                m.play_count = getPlayCount(m);
+                m.playhead = 0;
+                m.time_last_played = Math.floor(Date.now() / 1000);
+            }
+            return m;
+        };
+        currentMedia = currentMedia.map(updated);
+        if (state.playlistItems) state.playlistItems = state.playlistItems.map(updated);
+
+        renderResults();
     }
 
     async function handleMediaError(item) {
@@ -1547,7 +1571,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         let localPos = getLocalProgress(item);
-        if (!localPos && !state.readOnly && item.playhead > 0) {
+        if (!localPos && item.playhead > 0) {
             localPos = item.playhead;
         }
 
@@ -1669,11 +1693,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
             el.onerror = () => handleMediaError(item);
 
-            const localPos = getLocalProgress(item);
             if (localPos) {
                 el.currentTime = localPos;
-            } else if (!state.readOnly && item.playhead > 0) {
-                el.currentTime = item.playhead;
             }
 
             el.ontimeupdate = () => {
@@ -1996,7 +2017,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         </div>
                         <div class="detail-actions">
                             <button class="category-btn play-now-btn">▶ Play</button>
-                            ${!state.readOnly ? `<button class="category-btn mark-viewed-btn">✅ Mark Viewed</button>` : ''}
+                            <button class="category-btn mark-viewed-btn">✅ Mark Viewed</button>
                             ${!state.readOnly ? `<button class="category-btn add-playlist-btn">+ Add to Playlist</button>` : ''}
                             <button class="category-btn delete-item-btn">🗑 Trash</button>
                         </div>
@@ -2153,12 +2174,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 playMedia(item);
             };
 
-            // Double click for details on desktop, or maybe a dedicated button
-            card.ondblclick = (e) => {
-                e.stopPropagation();
-                showDetailView(item);
-            };
-
             const title = truncateString(item.title || item.path.split('/').pop());
             const displayPath = formatDisplayPath(item.path);
             const size = formatSize(item.size);
@@ -2185,14 +2200,12 @@ document.addEventListener('DOMContentLoaded', () => {
             } else if (isPlaylist) {
                 actionBtns = `
                     ${!state.readOnly ? `<button class="media-action-btn remove-playlist" title="Remove from Playlist">&times;</button>` : ''}
-                    <button class="media-action-btn info" title="Details">ℹ️</button>
                 `;
             } else {
                 actionBtns = `
-                    <button class="media-action-btn info" title="Details">ℹ️</button>
                     ${!state.readOnly ? `<button class="media-action-btn add-playlist" title="Add to Playlist">+</button>` : ''}
-                    ${!state.readOnly ? `<button class="media-action-btn mark-played" title="Mark as Played">✅</button>` : ''}
-                    <button class="media-action-btn delete" title="Move to Trash">🗑️</button>
+                    <button class="media-action-btn mark-played" title="Mark as Played">✅</button>
+                    ${!state.readOnly ? `<button class="media-action-btn delete" title="Move to Trash">🗑️</button>` : ''}
                 `;
             }
 
@@ -2280,12 +2293,6 @@ document.addEventListener('DOMContentLoaded', () => {
             if (btnDeletePermanent) btnDeletePermanent.onclick = (e) => {
                 e.stopPropagation();
                 permanentlyDeleteMedia(item.path);
-            };
-
-            const btnInfo = card.querySelector('.media-action-btn.info');
-            if (btnInfo) btnInfo.onclick = (e) => {
-                e.stopPropagation();
-                showDetailView(item);
             };
 
             const btnAddPlaylist = card.querySelector('.media-action-btn.add-playlist');
@@ -2449,7 +2456,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 actions = `
                     <div class="playlist-item-actions">
                         ${!state.readOnly ? `<button class="table-action-btn add-btn" title="Add to Playlist">+</button>` : ''}
-                        <button class="table-action-btn delete-btn" title="Move to Trash">🗑️</button>
+                        <button class="table-action-btn mark-played-btn" title="Mark as Played">✅</button>
+                        ${!state.readOnly ? `<button class="table-action-btn delete-btn" title="Move to Trash">🗑️</button>` : ''}
                     </div>
                 `;
             }
@@ -2487,6 +2495,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 ${cells}
                 <td>${actions}</td>
             `;
+
+            const btnMarkPlayed = tr.querySelector('.mark-played-btn');
+            if (btnMarkPlayed) btnMarkPlayed.onclick = (e) => {
+                e.stopPropagation();
+                markMediaPlayed(item);
+            };
 
             const btnDelete = tr.querySelector('.delete-btn');
             if (btnDelete) btnDelete.onclick = (e) => {
@@ -3696,6 +3710,11 @@ document.addEventListener('DOMContentLoaded', () => {
         truncateString,
         formatRelativeDate,
         formatDisplayPath,
+        openInPiP,
+        updateProgress,
+        closePiP,
+        getPlayCount,
+        markMediaPlayed,
         state
     };
 });

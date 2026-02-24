@@ -9,8 +9,10 @@ describe('Integration Test 2', () => {
     it('shows detail view', async () => {
         await new Promise(r => setTimeout(r, 200));
         const card = document.querySelector('.media-card');
-        const infoBtn = card.querySelector('.media-action-btn.info');
-        infoBtn.click();
+        card.click(); // Start playing
+
+        // Press 'd' to show details
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'd', bubbles: true }));
 
         const detailView = document.getElementById('detail-view');
         expect(detailView.classList.contains('hidden')).toBe(false);
