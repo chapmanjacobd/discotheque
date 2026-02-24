@@ -363,6 +363,12 @@ func (c *ServeCmd) handleQuery(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	totalCount, err := query.MediaQueryCount(ctx, c.Databases, flags)
+	if err != nil {
+		slog.Error("Count query failed", "dbs", c.Databases, "error", err)
+		// Don't fail the whole request just for count
+	}
+
 	if c.hasFfmpeg {
 		for i := range media {
 			media[i].Transcode = utils.GetTranscodeStrategy(media[i].Media).NeedsTranscode
@@ -371,7 +377,9 @@ func (c *ServeCmd) handleQuery(w http.ResponseWriter, r *http.Request) {
 
 	query.SortMedia(media, flags)
 
+	w.Header().Set("X-Total-Count", strconv.FormatInt(totalCount, 10))
 	w.Header().Set("Content-Type", "application/json")
+
 	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
 	json.NewEncoder(w).Encode(media)
 }

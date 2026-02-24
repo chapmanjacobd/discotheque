@@ -48,6 +48,7 @@ document.addEventListener('DOMContentLoaded', () => {
         view: 'grid',
         page: 'search', // 'search', 'trash', 'history', or 'playlist'
         currentPage: 1,
+        totalCount: 0,
         filters: {
             types: JSON.parse(localStorage.getItem('disco-types') || '["video", "audio"]'),
             search: '',
@@ -930,6 +931,11 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!resp.ok) {
                 const text = await resp.text();
                 throw new Error(text || `Server returned ${resp.status}`);
+            }
+
+            const xTotalCount = resp.headers.get('X-Total-Count');
+            if (xTotalCount) {
+                state.totalCount = parseInt(xTotalCount);
             }
 
             let data = await resp.json();
@@ -1991,11 +1997,16 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         paginationContainer.classList.remove('hidden');
-        pageInfo.textContent = `Page ${state.currentPage}`;
+
+        const totalPages = Math.ceil(state.totalCount / state.filters.limit);
+        if (totalPages > 0) {
+            pageInfo.textContent = `Page ${state.currentPage} of ${totalPages}`;
+        } else {
+            pageInfo.textContent = `Page ${state.currentPage}`;
+        }
+
         prevPageBtn.disabled = state.currentPage === 1;
-        // We don't know the total count easily without an extra API call,
-        // so we'll just disable "Next" if the current page has fewer items than the limit.
-        nextPageBtn.disabled = currentMedia.length < state.filters.limit;
+        nextPageBtn.disabled = state.currentPage >= totalPages;
     }
 
     function showDetailView(item) {
@@ -2124,18 +2135,14 @@ document.addEventListener('DOMContentLoaded', () => {
             const emptyBtn = document.getElementById('empty-bin-btn');
             if (emptyBtn) emptyBtn.onclick = emptyBin;
         } else if (state.page === 'history') {
-            const unit = currentMedia.length === 1 ? 'result' : 'results';
-            resultsCount.textContent = `${currentMedia.length} recently played ${unit}`;
+            const unit = state.totalCount === 1 ? 'result' : 'results';
+            resultsCount.textContent = `${state.totalCount} recently played ${unit}`;
         } else if (state.page === 'playlist') {
             const unit = currentMedia.length === 1 ? 'result' : 'results';
-            resultsCount.textContent = `${currentMedia.length} ${unit} in ${state.filters.playlist?.title || 'playlist'}`;
+            resultsCount.textContent = `${currentMedia.length} ${unit} in ${state.filters.playlist || 'playlist'}`;
         } else {
-            if (state.filters.all || currentMedia.length < state.filters.limit) {
-                const unit = currentMedia.length === 1 ? 'result' : 'results';
-                resultsCount.textContent = `${currentMedia.length} ${unit}`;
-            } else {
-                resultsCount.textContent = '';
-            }
+            const unit = state.totalCount === 1 ? 'result' : 'results';
+            resultsCount.textContent = `${state.totalCount} ${unit}`;
         }
 
         if (currentMedia.length === 0) {

@@ -29,8 +29,19 @@ func NewQueryBuilder(flags models.GlobalFlags) *QueryBuilder {
 }
 
 func (qb *QueryBuilder) Build() (string, []any) {
+	return qb.BuildSelect("*")
+}
+
+func (qb *QueryBuilder) BuildCount() (string, []any) {
+	return qb.BuildSelect("COUNT(*)")
+}
+
+func (qb *QueryBuilder) BuildSelect(columns string) (string, []any) {
 	// If raw query provided, use it
 	if qb.Flags.Query != "" {
+		if columns == "COUNT(*)" {
+			return "SELECT COUNT(*) FROM (" + qb.Flags.Query + ")", nil
+		}
 		return qb.Flags.Query, nil
 	}
 
@@ -315,10 +326,14 @@ func (qb *QueryBuilder) Build() (string, []any) {
 	}
 
 	// Build query
-	query := "SELECT * FROM media"
+	query := fmt.Sprintf("SELECT %s FROM media", columns)
 
 	if len(whereClauses) > 0 {
 		query += " WHERE " + strings.Join(whereClauses, " AND ")
+	}
+
+	if columns == "COUNT(*)" {
+		return query, args
 	}
 
 	// Order by
@@ -447,6 +462,59 @@ func MediaQuery(ctx context.Context, dbs []string, flags models.GlobalFlags) ([]
 
 	return allMedia, nil
 }
+
+// MediaQueryCount executes a count query against multiple databases concurrently
+func MediaQueryCount(ctx context.Context, dbs []string, flags models.GlobalFlags) (int64, error) {
+	qb := NewQueryBuilder(flags)
+	query, args := qb.BuildCount()
+
+	var wg sync.WaitGroup
+	results := make(chan int64, len(dbs))
+	errors := make(chan error, len(dbs))
+
+	for _, dbPath := range dbs {
+		wg.Add(1)
+		go func(path string) {
+			defer wg.Done()
+			sqlDB, err := db.Connect(path)
+			if err != nil {
+				errors <- err
+				return
+			}
+			defer sqlDB.Close()
+
+			var count int64
+			err = sqlDB.QueryRowContext(ctx, query, args...).Scan(&count)
+			if err != nil {
+				errors <- err
+				return
+			}
+			results <- count
+		}(dbPath)
+	}
+
+	go func() {
+		wg.Wait()
+		close(results)
+		close(errors)
+	}()
+
+	var total int64
+	for count := range results {
+		total += count
+	}
+
+	var errs []error
+	for err := range errors {
+		errs = append(errs, err)
+	}
+	if len(errs) > 0 {
+		return total, fmt.Errorf("count query errors: %v", errs)
+	}
+
+	return total, nil
+}
+
 
 func FetchSiblings(ctx context.Context, media []models.MediaWithDB, flags models.GlobalFlags) ([]models.MediaWithDB, error) {
 	if len(media) == 0 {
