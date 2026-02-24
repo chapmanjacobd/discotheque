@@ -109,6 +109,7 @@ document.addEventListener('DOMContentLoaded', () => {
             lastLocalUpdate: 0,
             lastPlayedIndex: -1,
             hasMarkedComplete: false,
+            pendingUpdate: null,
             skipTimeout: null,
             lastSkipTime: 0,
             hlsInstance: null,
@@ -1015,6 +1016,16 @@ document.addEventListener('DOMContentLoaded', () => {
             // Client-side DB filtering
             currentMedia = data.filter(item => !state.filters.excludedDbs.includes(item.db));
 
+            // Client-side unplayed filtering (in case server is slightly behind or for local counts)
+            if (state.filters.unplayed) {
+                currentMedia = currentMedia.filter(item => getPlayCount(item) === 0);
+            }
+
+            // Update total count after client-side filtering
+            if (state.filters.unplayed || state.filters.excludedDbs.length > 0) {
+                state.totalCount = currentMedia.length;
+            }
+
             // Local sorting for play_count if global progress is disabled
             if (!!state.readOnly && state.filters.sort === 'play_count') {
                 currentMedia.sort((a, b) => {
@@ -1178,6 +1189,7 @@ document.addEventListener('DOMContentLoaded', () => {
         state.playback.hasMarkedComplete = false;
 
         if (prevItem && prevItem.path !== item.path && state.filters.unplayed && wasPlayed) {
+            if (state.playback.pendingUpdate) await state.playback.pendingUpdate;
             performSearch();
         }
 
@@ -1221,7 +1233,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const now = Date.now();
 
         if (isComplete) {
-            if (state.playback.hasMarkedComplete) return;
+            if (state.playback.hasMarkedComplete) return state.playback.pendingUpdate;
             state.playback.hasMarkedComplete = true;
         }
 
@@ -1257,32 +1269,41 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        if (!!state.readOnly) return;
+        if (!!state.readOnly) return state.playback.pendingUpdate;
 
         // Server sync logic
-        if (item.type.includes('audio') && duration < 420) return; // 7 minutes
+        if (item.type.includes('audio') && duration < 420) return state.playback.pendingUpdate; // 7 minutes
 
         const sessionTime = (now - state.playback.startTime) / 1000;
 
-        if (!isComplete && sessionTime < 90) return; // 90s threshold
-        if (!isComplete && (now - state.playback.lastUpdate) < 30000) return; // 30s interval
+        if (!isComplete && sessionTime < 90) return state.playback.pendingUpdate; // 90s threshold
+        if (!isComplete && (now - state.playback.lastUpdate) < 30000) return state.playback.pendingUpdate; // 30s interval
 
         state.playback.lastUpdate = now;
 
-        try {
-            await fetch('/api/progress', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    path: item.path,
-                    playhead: isComplete ? 0 : Math.floor(playhead),
-                    duration: Math.floor(duration),
-                    completed: isComplete
-                })
-            });
-        } catch (err) {
-            console.error('Failed to update progress:', err);
-        }
+        const updatePromise = (async () => {
+            try {
+                await fetch('/api/progress', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        path: item.path,
+                        playhead: isComplete ? 0 : Math.floor(playhead),
+                        duration: Math.floor(duration),
+                        completed: isComplete
+                    })
+                });
+            } catch (err) {
+                console.error('Failed to update progress:', err);
+            } finally {
+                if (state.playback.pendingUpdate === updatePromise) {
+                    state.playback.pendingUpdate = null;
+                }
+            }
+        })();
+
+        state.playback.pendingUpdate = updatePromise;
+        return updatePromise;
     }
 
     function getLocalProgress(item) {
@@ -1590,6 +1611,7 @@ document.addEventListener('DOMContentLoaded', () => {
         state.playback.lastPlayedIndex = currentMedia.findIndex(m => m.path === item.path);
 
         if (prevItem && prevItem.path !== item.path && state.filters.unplayed && wasPlayed) {
+            if (state.playback.pendingUpdate) await state.playback.pendingUpdate;
             performSearch();
         }
 
@@ -1720,8 +1742,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 updateProgress(item, el.currentTime, el.duration, isComplete);
             };
 
-            el.onended = () => {
-                updateProgress(item, el.duration, el.duration, true);
+            el.onended = async () => {
+                await updateProgress(item, el.duration, el.duration, true);
                 handlePostPlayback(item);
             };
 
@@ -1799,8 +1821,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             };
 
-            el.onended = () => {
-                updateProgress(item, el.duration, el.duration, true);
+            el.onended = async () => {
+                await updateProgress(item, el.duration, el.duration, true);
                 handlePostPlayback(item);
             };
 
