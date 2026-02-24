@@ -1,0 +1,136 @@
+package commands
+
+import (
+	"net/http"
+	"net/url"
+	"slices"
+	"testing"
+)
+
+func TestServeCmd_ParseFlags(t *testing.T) {
+	cmd := &ServeCmd{}
+
+	tests := []struct {
+		name     string
+		query    url.Values
+		validate func(*testing.T, *ServeCmd, *http.Request)
+	}{
+		{
+			name: "Search",
+			query: url.Values{
+				"search": {"word1 word2"},
+			},
+			validate: func(t *testing.T, c *ServeCmd, r *http.Request) {
+				flags := c.parseFlags(r)
+				if len(flags.Search) != 2 || flags.Search[0] != "word1" || flags.Search[1] != "word2" {
+					t.Errorf("Unexpected search flags: %v", flags.Search)
+				}
+			},
+		},
+		{
+			name: "Rating",
+			query: url.Values{
+				"rating": {"0"},
+			},
+			validate: func(t *testing.T, c *ServeCmd, r *http.Request) {
+				flags := c.parseFlags(r)
+				found := slices.Contains(flags.Where, "(score IS NULL OR score = 0)")
+				if !found {
+					t.Error("Expected rating 0 where clause")
+				}
+			},
+		},
+		{
+			name: "RatingNonZero",
+			query: url.Values{
+				"rating": {"5"},
+			},
+			validate: func(t *testing.T, c *ServeCmd, r *http.Request) {
+				flags := c.parseFlags(r)
+				found := slices.Contains(flags.Where, "score = 5")
+				if !found {
+					t.Error("Expected rating 5 where clause")
+				}
+			},
+		},
+		{
+			name: "SortRandom",
+			query: url.Values{
+				"sort": {"random"},
+			},
+			validate: func(t *testing.T, c *ServeCmd, r *http.Request) {
+				flags := c.parseFlags(r)
+				if !flags.Random {
+					t.Error("Expected Random to be true")
+				}
+			},
+		},
+		{
+			name: "Ranges",
+			query: url.Values{
+				"min_size":     {"100"},
+				"max_size":     {"500"},
+				"min_duration": {"10"},
+				"max_duration": {"60"},
+				"min_score":    {"3"},
+				"max_score":    {"5"},
+			},
+			validate: func(t *testing.T, c *ServeCmd, r *http.Request) {
+				flags := c.parseFlags(r)
+				if len(flags.Size) != 2 || flags.Size[0] != ">100MB" || flags.Size[1] != "<500MB" {
+					t.Errorf("Unexpected size flags: %v", flags.Size)
+				}
+				if len(flags.Duration) != 2 || flags.Duration[0] != ">10min" || flags.Duration[1] != "<60min" {
+					t.Errorf("Unexpected duration flags: %v", flags.Duration)
+				}
+				foundMinScore := false
+				foundMaxScore := false
+				for _, w := range flags.Where {
+					if w == "score >= 3" {
+						foundMinScore = true
+					}
+					if w == "score <= 5" {
+						foundMaxScore = true
+					}
+				}
+				if !foundMinScore || !foundMaxScore {
+					t.Error("Expected score where clauses")
+				}
+			},
+		},
+		{
+			name: "TypeFilters",
+			query: url.Values{
+				"video":      {"true"},
+				"audio":      {"true"},
+				"image":      {"true"},
+				"text":       {"true"},
+				"unplayed":   {"true"},
+				"watched":    {"true"},
+				"unfinished": {"true"},
+				"completed":  {"true"},
+				"trash":      {"true"},
+			},
+			validate: func(t *testing.T, c *ServeCmd, r *http.Request) {
+				flags := c.parseFlags(r)
+				if !flags.VideoOnly || !flags.AudioOnly || !flags.ImageOnly || !flags.TextOnly {
+					t.Error("Expected type filters to be true")
+				}
+				if flags.Watched == nil || !*flags.Watched {
+					t.Error("Expected Watched to be true")
+				}
+				if !flags.Unfinished || !flags.Completed || !flags.OnlyDeleted {
+					t.Error("Expected playback/trash filters to be true")
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			u := &url.URL{RawQuery: tt.query.Encode()}
+			req := &http.Request{URL: u}
+			tt.validate(t, cmd, req)
+		})
+	}
+}

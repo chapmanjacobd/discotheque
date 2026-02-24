@@ -7,6 +7,7 @@ import (
 	"os/exec"
 
 	"github.com/alecthomas/kong"
+	"github.com/chapmanjacobd/discotheque/internal/db"
 	"github.com/chapmanjacobd/discotheque/internal/models"
 	"github.com/chapmanjacobd/discotheque/internal/query"
 	"github.com/chapmanjacobd/discotheque/internal/tui"
@@ -35,7 +36,20 @@ func (c *TuiCmd) Run(ctx *kong.Context) error {
 
 	query.SortMedia(media, c.GlobalFlags)
 
-	m := tui.NewModel(media, c.Databases, c.GlobalFlags)
+	var customCats []string
+	for _, dbPath := range c.Databases {
+		sqlDB, err := db.Connect(dbPath)
+		if err == nil {
+			queries := db.New(sqlDB)
+			cats, err := queries.GetCustomCategories(context.Background())
+			if err == nil {
+				customCats = append(customCats, cats...)
+			}
+			sqlDB.Close()
+		}
+	}
+
+	m := tui.NewModel(media, c.Databases, c.GlobalFlags, customCats)
 	p := tea.NewProgram(m, tea.WithAltScreen())
 
 	finalModel, err := p.Run()

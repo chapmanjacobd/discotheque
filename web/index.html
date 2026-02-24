@@ -40,6 +40,14 @@
                     All Media</button>
                 <button id="history-btn" class="category-btn" style="width: 100%; margin-bottom: 0.2rem;">🕒
                     History</button>
+                <button id="du-btn" class="category-btn" style="width: 100%; margin-bottom: 0.2rem;">📊
+                    Disk Usage</button>
+                <button id="similarity-btn" class="category-btn" style="width: 100%; margin-bottom: 0.2rem;">👯
+                    Similarity</button>
+                <button id="analytics-btn" class="category-btn" style="width: 100%; margin-bottom: 0.2rem;">📈
+                    Analytics</button>
+                <button id="curation-btn" class="category-btn" style="width: 100%; margin-bottom: 0.2rem;">🏷️
+                    Curation</button>
                 <button id="trash-btn" class="category-btn hidden" style="width: 100%; margin-bottom: 0.5rem;">🗑️
                     Trash</button>
             </div>
@@ -104,6 +112,8 @@
                     <button id="view-details">Details</button>
                 </div>
 
+                <button id="channel-surf-btn" class="type-btn" title="Interdimensional Cable">🔀 Channel Surf</button>
+                <button id="clear-filters-btn" class="type-btn" title="Clear all filters">🧹 Clear</button>
                 <button id="advanced-filter-toggle" class="type-btn">Filters ▽</button>
             </div>
 
@@ -162,9 +172,12 @@
                             <option value="">All</option>
                         </select>
                     </div>
-                    <div class="filter-item" style="justify-content: center;">
+                    <div class="filter-item" style="justify-content: center; flex-direction: row; gap: 15px;">
                         <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin-top: 1.2rem;">
                             <input type="checkbox" id="filter-unplayed"> Unplayed
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin-top: 1.2rem;">
+                            <input type="checkbox" id="filter-captions"> Search Captions
                         </label>
                     </div>
                                             <button id="apply-advanced-filters" class="category-btn" style="background: var(--accent-color); color: white;">Apply</button>
@@ -274,6 +287,10 @@
                     <div class="setting-item">
                         <label for="setting-slideshow-delay">Image Autoplay Delay (s):</label>
                         <input type="number" id="setting-slideshow-delay" value="5" min="1">
+                    </div>
+                    <div class="setting-item">
+                        <label for="setting-no-default-categories">Disable Default Categories:</label>
+                        <input type="checkbox" id="setting-no-default-categories">
                     </div>
                 </section>
                 <section>

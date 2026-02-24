@@ -25,6 +25,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const sidebarOverlay = document.getElementById('sidebar-overlay');
     const sidebar = document.querySelector('.sidebar');
 
+    const duBtn = document.getElementById('du-btn');
+    const similarityBtn = document.getElementById('similarity-btn');
+    const analyticsBtn = document.getElementById('analytics-btn');
+    const curationBtn = document.getElementById('curation-btn');
+    const channelSurfBtn = document.getElementById('channel-surf-btn');
+    const clearFiltersBtn = document.getElementById('clear-filters-btn');
+    const filterCaptions = document.getElementById('filter-captions');
+
     const pipPlayer = document.getElementById('pip-player');
     const pipViewer = document.getElementById('media-viewer');
     const pipTitle = document.getElementById('media-title');
@@ -71,9 +79,12 @@ document.addEventListener('DOMContentLoaded', () => {
             min_score: '',
             max_score: '',
             unplayed: localStorage.getItem('disco-unplayed') === 'true',
+            captions: localStorage.getItem('disco-captions') === 'true',
             browseCol: '',
             browseVal: ''
         },
+        noDefaultCategories: localStorage.getItem('disco-no-default-categories') === 'true',
+        duPath: '',
         draggedItem: null,
         applicationStartTime: null,
         lastActivity: Date.now() - (4 * 60 * 1000), // 4 mins ago
@@ -130,10 +141,48 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('setting-default-video-rate').value = state.defaultVideoRate;
     document.getElementById('setting-default-audio-rate').value = state.defaultAudioRate;
     document.getElementById('setting-slideshow-delay').value = state.slideshowDelay;
+    const initialNoDefaultCatsEl = document.getElementById('setting-no-default-categories');
+    if (initialNoDefaultCatsEl) initialNoDefaultCatsEl.checked = state.noDefaultCategories;
     if (limitInput) limitInput.value = state.filters.limit;
     if (limitAll) limitAll.checked = state.filters.all;
     const initialUnplayedEl = document.getElementById('filter-unplayed');
     if (initialUnplayedEl) initialUnplayedEl.checked = state.filters.unplayed;
+    if (filterCaptions) {
+        filterCaptions.checked = state.filters.captions;
+        filterCaptions.onchange = (e) => {
+            state.filters.captions = e.target.checked;
+            localStorage.setItem('disco-captions', state.filters.captions);
+            performSearch();
+        };
+    }
+
+    if (channelSurfBtn) {
+        channelSurfBtn.onclick = async () => {
+            try {
+                const resp = await fetch('/api/random-clip');
+                if (!resp.ok) throw new Error('Failed to fetch random clip');
+                const data = await resp.json();
+
+                // Show toast about what's playing
+                const filename = data.path.split('/').pop();
+                showToast(`Channel Surf: ${filename} (${formatDuration(data.start)})`, '🔀');
+
+                // Open in PiP
+                await openInPiP(data, true);
+
+                // Seek to the random start time
+                const media = pipViewer.querySelector('video, audio');
+                if (media) {
+                    media.currentTime = data.start;
+                    // Note: If we want to strictly enforce 'end', we need an ontimeupdate handler
+                    // but for a lean-back experience, letting it play through or onto the next random clip is also good.
+                }
+            } catch (err) {
+                console.error('Channel surf failed:', err);
+                showToast('Channel surf failed');
+            }
+        };
+    }
 
     const settingDefaultVideoRate = document.getElementById('setting-default-video-rate');
     if (settingDefaultVideoRate) {
@@ -169,6 +218,15 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
+    const settingNoDefaultCats = document.getElementById('setting-no-default-categories');
+    if (settingNoDefaultCats) {
+        settingNoDefaultCats.onchange = (e) => {
+            state.noDefaultCategories = e.target.checked;
+            localStorage.setItem('disco-no-default-categories', state.noDefaultCategories);
+            fetchCategories();
+        };
+    }
+
     if (sortBy) sortBy.value = state.filters.sort;
     if (sortReverseBtn && state.filters.reverse) sortReverseBtn.classList.add('active');
 
@@ -181,14 +239,6 @@ document.addEventListener('DOMContentLoaded', () => {
             viewDetails.classList.remove('active');
         }
     }
-
-    document.querySelectorAll('.type-btn').forEach(btn => {
-        if (state.filters.types.includes(btn.dataset.type)) {
-            btn.classList.add('active');
-        } else {
-            btn.classList.remove('active');
-        }
-    });
 
     // --- Sidebar Persistence ---
     function initSidebarPersistence() {
@@ -252,6 +302,15 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (state.page === 'playlist' && state.filters.playlist) {
             params.set('view', 'playlist');
             params.set('title', state.filters.playlist);
+        } else if (state.page === 'du') {
+            params.set('view', 'du');
+            if (state.duPath) params.set('path', state.duPath);
+        } else if (state.page === 'similarity') {
+            params.set('view', 'similarity');
+        } else if (state.page === 'analytics') {
+            params.set('view', 'analytics');
+        } else if (state.page === 'curation') {
+            params.set('view', 'curation');
         } else if (state.filters.types.length === 1 && state.filters.types[0] === 'text') {
             params.set('view', 'text');
         } else {
@@ -303,6 +362,23 @@ document.addEventListener('DOMContentLoaded', () => {
             state.filters.playlist = params.get('title');
             state.filters.category = '';
             state.filters.rating = '';
+        } else if (view === 'du') {
+            state.page = 'du';
+            state.duPath = params.get('path') || '';
+            state.filters.category = '';
+            state.filters.rating = '';
+        } else if (view === 'similarity') {
+            state.page = 'similarity';
+            state.filters.category = '';
+            state.filters.rating = '';
+        } else if (view === 'analytics') {
+            state.page = 'analytics';
+            state.filters.category = '';
+            state.filters.rating = '';
+        } else if (view === 'curation') {
+            state.page = 'curation';
+            state.filters.category = '';
+            state.filters.rating = '';
         } else if (view === 'text') {
             state.page = 'search';
             state.filters.types = ['text'];
@@ -352,12 +428,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const onUrlChange = () => {
         readUrl();
+        updateNavActiveStates();
         if (state.page === 'trash') {
             fetchTrash();
         } else if (state.page === 'history') {
             fetchHistory();
         } else if (state.page === 'playlist' && state.filters.playlist) {
             fetchPlaylistItems(state.filters.playlist);
+        } else if (state.page === 'du') {
+            fetchDU(state.duPath);
+        } else if (state.page === 'similarity') {
+            fetchSimilarity();
+        } else if (state.page === 'analytics') {
+            fetchAnalytics();
+        } else if (state.page === 'curation') {
+            fetchCuration();
         } else {
             performSearch();
         }
@@ -431,7 +516,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 // If browsing relative paths, bold the part that matches what's after the last slash
                 const lastSlash = inputVal.lastIndexOf('/');
                 const query = inputVal.substring(lastSlash + 1).toLowerCase();
-                
+
                 // If the item name contains the query, highlight it.
                 // We should only do this if we are actively filtering.
                 if (query && item.name.toLowerCase().includes(query)) {
@@ -496,7 +581,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function fetchCategories() {
         try {
-            const resp = await fetch('/api/categories');
+            const params = new URLSearchParams();
+            if (state.noDefaultCategories) params.append('no-default-categories', 'true');
+            const resp = await fetch(`/api/categories?${params.toString()}`);
             if (!resp.ok) throw new Error('Failed to fetch categories');
             state.categories = await resp.json() || [];
             renderCategoryList();
@@ -883,13 +970,498 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    async function fetchDU(path = '') {
+        state.page = 'du';
+        state.duPath = path;
+        syncUrl();
+
+        const skeletonTimeout = setTimeout(() => {
+            if (state.view === 'grid') showSkeletons();
+        }, 150);
+
+        try {
+            const params = new URLSearchParams();
+            params.append('path', path);
+            if (state.filters.search) params.append('search', state.filters.search);
+            let types = state.filters.types;
+            if (types.length === 0) {
+                types = ['video', 'audio', 'image', 'text'];
+            }
+            types.forEach(t => {
+                if (t === 'video') params.append('video', 'true');
+                if (t === 'audio') params.append('audio', 'true');
+                if (t === 'image') params.append('image', 'true');
+                if (t === 'text') params.append('text', 'true');
+            });
+
+            const resp = await fetch(`/api/du?${params.toString()}`);
+            clearTimeout(skeletonTimeout);
+            if (!resp.ok) throw new Error('Failed to fetch DU');
+            state.duData = await resp.json();
+            renderDU(state.duData);
+        } catch (err) {
+            clearTimeout(skeletonTimeout);
+            console.error('DU fetch failed:', err);
+            showToast('Failed to load Disk Usage');
+        }
+    }
+
+    function renderDU(data) {
+        if (!data) data = [];
+
+        resultsCount.textContent = `Disk Usage: ${state.duPath || 'Root'}`;
+        resultsContainer.className = 'grid du-view';
+        resultsContainer.innerHTML = '';
+
+        // Add "Back" item if not at root
+        if (state.duPath) {
+            const backCard = document.createElement('div');
+            backCard.className = 'media-card du-card back-card';
+            backCard.onclick = () => {
+                let p = state.duPath;
+                if (p.endsWith('/')) p = p.slice(0, -1);
+                const parts = p.split('/');
+                parts.pop();
+                const parent = parts.join('/');
+                fetchDU(parent + (parent === '' && state.duPath.startsWith('/') ? '/' : (parent === '' ? '' : '/')));
+            };
+            backCard.innerHTML = `
+                <div class="media-thumb" style="display: flex; align-items: center; justify-content: center; font-size: 3rem; background: var(--sidebar-bg);">
+                    🔙
+                </div>
+                <div class="media-info">
+                    <div class="media-title">Go Back</div>
+                    <div class="media-meta">To parent directory</div>
+                </div>
+            `;
+            resultsContainer.appendChild(backCard);
+        }
+
+        const maxSize = Math.max(...data.map(d => d.total_size || 0));
+
+        data.forEach(item => {
+            const isFile = item.count === 0 && item.files && item.files.length === 1 && item.files[0].path === item.path;
+            const card = document.createElement('div');
+            
+            if (isFile) {
+                const mediaItem = item.files[0];
+                card.className = 'media-card';
+                card.dataset.path = mediaItem.path;
+                card.onclick = () => playMedia(mediaItem);
+
+                const title = truncateString(mediaItem.title || mediaItem.path.split('/').pop());
+                const thumbUrl = `/api/thumbnail?path=${encodeURIComponent(mediaItem.path)}`;
+                const size = formatSize(mediaItem.size);
+                const duration = formatDuration(mediaItem.duration);
+
+                card.innerHTML = `
+                    <div class="media-thumb">
+                        <img src="${thumbUrl}" loading="lazy" onload="this.classList.add('loaded')">
+                        <span class="media-duration">${duration}</span>
+                    </div>
+                    <div class="media-info">
+                        <div class="media-title">${title}</div>
+                        <div class="media-meta">
+                            <span>${size}</span>
+                        </div>
+                    </div>
+                `;
+            } else {
+                card.className = 'media-card du-card';
+                card.onclick = () => fetchDU(item.path + (item.path.endsWith('/') ? '' : '/'));
+
+                const name = item.path.split('/').pop() || item.path;
+                const size = formatSize(item.total_size);
+                const duration = formatDuration(item.total_duration);
+                const count = item.count;
+
+                const percentage = maxSize > 0 ? Math.round((item.total_size / maxSize) * 100) : 0;
+
+                card.innerHTML = `
+                    <div class="media-thumb" style="display: flex; align-items: center; justify-content: center; font-size: 3rem; background: var(--sidebar-bg); position: relative;">
+                        📁
+                        <div class="du-bar-container" style="position: absolute; bottom: 0; left: 0; right: 0; height: 10px; background: rgba(0,0,0,0.1);">
+                            <div class="du-bar" style="width: ${percentage}%; height: 100%; background: var(--accent-color); opacity: 0.6;"></div>
+                        </div>
+                    </div>
+                    <div class="media-info">
+                        <div class="media-title" title="${item.path}">${name}</div>
+                        <div class="media-meta">
+                            <span>${size}</span>
+                            <span>${count} files</span>
+                            <span>${duration}</span>
+                        </div>
+                    </div>
+                `;
+            }
+            resultsContainer.appendChild(card);
+        });
+
+        paginationContainer.classList.add('hidden');
+        updateNavActiveStates();
+    }
+
+    async function fetchSimilarity() {
+        state.page = 'similarity';
+        syncUrl();
+
+        const skeletonTimeout = setTimeout(() => {
+            if (state.view === 'grid') showSkeletons();
+        }, 150);
+
+        try {
+            const params = new URLSearchParams();
+            state.filters.types.forEach(t => {
+                if (t === 'video') params.append('video', 'true');
+                if (t === 'audio') params.append('audio', 'true');
+                if (t === 'image') params.append('image', 'true');
+                if (t === 'text') params.append('text', 'true');
+            });
+            if (state.filters.search) params.append('search', state.filters.search);
+
+            const resp = await fetch(`/api/similarity?${params.toString()}`);
+            clearTimeout(skeletonTimeout);
+            if (!resp.ok) throw new Error('Failed to fetch similarity');
+            state.similarityData = await resp.json();
+            renderSimilarity(state.similarityData);
+        } catch (err) {
+            clearTimeout(skeletonTimeout);
+            console.error('Similarity fetch failed:', err);
+            showToast('Failed to load Similarity Explorer');
+        }
+    }
+
+    function renderSimilarity(data) {
+        if (!data) data = [];
+
+        let filtered = data.map(group => {
+            const files = group.files || [];
+            const filteredFiles = files.filter(f => {
+                // Filter by types
+                const selectedTypes = state.filters.types || [];
+                if (selectedTypes.length > 0) {
+                    const type = (f.type || '').split('/')[0];
+                    let match = selectedTypes.includes(type);
+                    if (!match && selectedTypes.includes('audio') && f.type === 'audiobook') match = true;
+                    if (!match) return false;
+                }
+
+                // Filter by search
+                if (state.filters.search) {
+                    const query = state.filters.search.toLowerCase();
+                    const path = (f.path || '').toLowerCase();
+                    const title = (f.title || '').toLowerCase();
+                    if (!path.includes(query) && !title.includes(query)) return false;
+                }
+
+                return true;
+            });
+
+            return { ...group, files: filteredFiles, count: filteredFiles.length };
+        }).filter(group => group.count > 0);
+
+        resultsCount.textContent = `${filtered.length} Similar groups found`;
+        resultsContainer.className = 'similarity-view';
+        resultsContainer.innerHTML = '';
+
+        filtered.forEach((group, gIdx) => {
+            const groupEl = document.createElement('div');
+            groupEl.className = 'similarity-group';
+
+            // Recalculate group stats
+            const totalSize = group.files.reduce((acc, f) => acc + (f.size || 0), 0);
+            const totalDuration = group.files.reduce((acc, f) => acc + (f.duration || 0), 0);
+
+            const groupHeader = document.createElement('div');
+            groupHeader.className = 'similarity-header';
+            groupHeader.innerHTML = `
+                <h3>Group #${gIdx + 1}: ${group.path || 'Common context'}</h3>
+                <div class="group-meta">${group.count} files • ${formatSize(totalSize)} • ${formatDuration(totalDuration)}</div>
+            `;
+            groupEl.appendChild(groupHeader);
+
+            const filesGrid = document.createElement('div');
+            filesGrid.className = 'grid';
+
+            group.files.forEach(item => {
+                const card = document.createElement('div');
+                card.className = 'media-card';
+                card.onclick = () => playMedia(item);
+
+                const title = truncateString(item.title || item.path.split('/').pop());
+                const thumbUrl = `/api/thumbnail?path=${encodeURIComponent(item.path)}`;
+
+                card.innerHTML = `
+                    <div class="media-thumb">
+                        <img src="${thumbUrl}" loading="lazy" onload="this.classList.add('loaded')">
+                        <span class="media-duration">${formatDuration(item.duration)}</span>
+                    </div>
+                    <div class="media-info">
+                        <div class="media-title">${title}</div>
+                        <div class="media-meta">
+                            <span>${formatSize(item.size)}</span>
+                            <span>${item.video_codecs || ''}</span>
+                        </div>
+                    </div>
+                `;
+                filesGrid.appendChild(card);
+            });
+
+            groupEl.appendChild(filesGrid);
+            resultsContainer.appendChild(groupEl);
+        });
+
+        paginationContainer.classList.add('hidden');
+        updateNavActiveStates();
+    }
+
+    async function fetchAnalytics() {
+        state.page = 'analytics';
+        syncUrl();
+
+        const skeletonTimeout = setTimeout(() => {
+            if (state.view === 'grid') showSkeletons();
+        }, 150);
+
+        try {
+            const [historyResp, libraryResp] = await Promise.all([
+                fetch('/api/stats/history?facet=watched&frequency=daily'),
+                fetch('/api/stats/library')
+            ]);
+            clearTimeout(skeletonTimeout);
+            if (!historyResp.ok || !libraryResp.ok) throw new Error('Failed to fetch analytics');
+            const historyData = await historyResp.json();
+            const libraryData = await libraryResp.json();
+            renderAnalytics(historyData, libraryData);
+        } catch (err) {
+            clearTimeout(skeletonTimeout);
+            console.error('Analytics fetch failed:', err);
+            showToast('Failed to load Analytics');
+        }
+    }
+
+    function renderAnalytics(historyData, libraryData) {
+        if (!historyData || !libraryData) return;
+
+        resultsCount.textContent = `Analytics`;
+        resultsContainer.className = 'analytics-view';
+        resultsContainer.innerHTML = '';
+
+        const totalCount = libraryData.reduce((acc, d) => acc + d.summary.total_count, 0);
+        const totalSize = libraryData.reduce((acc, d) => acc + d.summary.total_size, 0);
+        const totalDuration = libraryData.reduce((acc, d) => acc + d.summary.total_duration, 0);
+        const totalWatchedDuration = libraryData.reduce((acc, d) => acc + (d.summary.total_watched_duration || 0), 0);
+
+        const summaryEl = document.createElement('div');
+        summaryEl.className = 'analytics-summary';
+        summaryEl.innerHTML = `
+            <div class="stat-card"><h3>Total Files</h3><p>${totalCount}</p></div>
+            <div class="stat-card"><h3>Total Size</h3><p>${formatSize(totalSize)}</p></div>
+            <div class="stat-card"><h3>Total Duration</h3><p>${formatDuration(totalDuration)}</p></div>
+            <div class="stat-card"><h3>Total Watched</h3><p>${shortDuration(totalWatchedDuration)}</p></div>
+        `;
+        resultsContainer.appendChild(summaryEl);
+
+        const chartsGrid = document.createElement('div');
+        chartsGrid.className = 'charts-grid';
+
+        // Heatmap placeholder
+        const heatmapEl = document.createElement('div');
+        heatmapEl.className = 'chart-container';
+        heatmapEl.innerHTML = `<h3>Watching Activity (last 30 days)</h3><div id="activity-heatmap" class="heatmap-container"></div>`;
+        chartsGrid.appendChild(heatmapEl);
+
+        // Type Breakdown
+        const typeEl = document.createElement('div');
+        typeEl.className = 'chart-container';
+        typeEl.innerHTML = `<h3>Library Breakdown by Type</h3><div id="type-breakdown" class="breakdown-container"></div>`;
+        chartsGrid.appendChild(typeEl);
+
+        resultsContainer.appendChild(chartsGrid);
+
+        renderHeatmap(historyData);
+        renderTypeBreakdown(libraryData);
+
+        paginationContainer.classList.add('hidden');
+        updateNavActiveStates();
+    }
+
+    function renderHeatmap(data) {
+        const heatmap = document.getElementById('activity-heatmap');
+        if (!heatmap) return;
+
+        // Simplify multi-DB history data into a single map by date
+        const countsByDate = {};
+        data.forEach(db => {
+            db.stats.forEach(s => {
+                countsByDate[s.label] = (countsByDate[s.label] || 0) + s.count;
+            });
+        });
+
+        const dates = Object.keys(countsByDate).sort();
+        const maxCount = Math.max(...Object.values(countsByDate), 1);
+
+        heatmap.innerHTML = dates.map(date => {
+            const count = countsByDate[date];
+            const opacity = Math.max(0.1, count / maxCount);
+            return `<div class="heatmap-cell" title="${date}: ${count} files watched" style="opacity: ${opacity}; background: var(--accent-color);"></div>`;
+        }).join('');
+    }
+
+    function renderTypeBreakdown(data) {
+        const breakdown = document.getElementById('type-breakdown');
+        if (!breakdown) return;
+
+        const countsByType = {};
+        data.forEach(db => {
+            db.breakdown.forEach(b => {
+                countsByType[b.type] = (countsByType[b.type] || 0) + b.count;
+            });
+        });
+
+        const total = Object.values(countsByType).reduce((acc, c) => acc + c, 0);
+
+        breakdown.innerHTML = Object.keys(countsByType).sort((a, b) => countsByType[b] - countsByType[a]).map(type => {
+            const count = countsByType[type];
+            const percentage = Math.round((count / total) * 100);
+            return `
+                <div class="breakdown-row">
+                    <span class="type-label">${type}</span>
+                    <div class="bar-bg"><div class="bar-fill" style="width: ${percentage}%; background: var(--accent-color);"></div></div>
+                    <span class="type-count">${count} (${percentage}%)</span>
+                </div>
+            `;
+        }).join('');
+    }
+
+    async function fetchCuration() {
+        state.page = 'curation';
+        syncUrl();
+
+        document.getElementById('toolbar').classList.add('hidden');
+        document.querySelector('.search-container').classList.add('hidden');
+
+        try {
+            const resp = await fetch('/api/categorize/suggest');
+            if (!resp.ok) throw new Error('Failed to fetch suggestions');
+            const data = await resp.json();
+            renderCuration(data);
+        } catch (err) {
+            console.error('Curation fetch failed:', err);
+            showToast('Failed to load Curation Tool');
+        }
+    }
+
+    function renderCuration(suggestedTags) {
+        if (!suggestedTags) suggestedTags = [];
+
+        resultsCount.textContent = ``;
+        resultsContainer.className = 'curation-view';
+        resultsContainer.innerHTML = '';
+
+        const headerEl = document.createElement('div');
+        headerEl.className = 'curation-header';
+        headerEl.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
+                <button id="curation-back-btn" class="category-btn">← Back</button>
+                <h2 style="margin: 0;">Categorization</h2>
+            </div>
+            <p>Mine keywords from uncategorized media to create new categories, or run the categorization logic based on existing patterns.</p>
+            <div style="display: flex; gap: 1rem; margin: 1.5rem 0;">
+                <button id="run-auto-categorize" class="category-btn" style="background: var(--accent-color); color: white;">Run Categorization Now</button>
+                <button id="refresh-mining" class="category-btn">Refresh Suggested Keywords</button>
+            </div>
+        `;
+        resultsContainer.appendChild(headerEl);
+
+        const miningEl = document.createElement('div');
+        miningEl.className = 'mining-container';
+        miningEl.innerHTML = `
+            <h3>Suggested Keywords</h3>
+            <p>Frequently occurring words in unmatched files that could be potential categories. Click a keyword to save it.</p>
+            <div class="tags-cloud">
+                ${suggestedTags.map(tag => `<span class="curation-tag" data-word="${tag.word}" title="${tag.count} occurrences">${tag.word} <small>${tag.count}</small></span>`).join('')}
+            </div>
+        `;
+        resultsContainer.appendChild(miningEl);
+
+        const backBtn = headerEl.querySelector('#curation-back-btn');
+        if (backBtn) {
+            backBtn.onclick = () => {
+                state.page = 'search';
+                state.filters.category = '';
+                updateNavActiveStates();
+                performSearch();
+            };
+        }
+
+        const btnRun = headerEl.querySelector('#run-auto-categorize');
+        if (btnRun) {
+            btnRun.onclick = async () => {
+                if (state.readOnly) return showToast('Read-only mode');
+                btnRun.disabled = true;
+                btnRun.textContent = 'Running...';
+                try {
+                    const resp = await fetch('/api/categorize/apply', { method: 'POST' });
+                    if (!resp.ok) throw new Error('Apply failed');
+                    const data = await resp.json();
+                    showToast(`Successfully categorized ${data.count} files!`, '🏷️');
+                    fetchCategories();
+                    fetchCuration();
+                } catch (err) {
+                    console.error('Apply failed:', err);
+                    showToast('Failed to run categorization');
+                } finally {
+                    btnRun.disabled = false;
+                    btnRun.textContent = 'Run Categorization Now';
+                }
+            };
+        }
+
+        const btnRefresh = headerEl.querySelector('#refresh-mining');
+        if (btnRefresh) {
+            btnRefresh.onclick = fetchCuration;
+        }
+
+        miningEl.querySelectorAll('.curation-tag').forEach(tagEl => {
+            tagEl.onclick = async () => {
+                const keyword = tagEl.dataset.word;
+                const category = prompt(`Assign keyword "${keyword}" to category:`, keyword);
+                if (!category) return;
+
+                try {
+                    const resp = await fetch('/api/categorize/keyword', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ category, keyword })
+                    });
+                    if (!resp.ok) throw new Error('Failed to save keyword');
+                    showToast(`Saved keyword "${keyword}" to category "${category}"`);
+                    fetchCategories();
+                    fetchCuration();
+                } catch (err) {
+                    console.error('Keyword save failed:', err);
+                    showToast('Failed to save keyword');
+                }
+            };
+        });
+
+        paginationContainer.classList.add('hidden');
+        updateNavActiveStates();
+    }
+
     async function performSearch() {
         if (state.page === 'playlist' && state.filters.playlist) {
             filterPlaylistItems();
             return;
         }
 
-        if (state.page !== 'trash' && state.page !== 'history' && state.page !== 'playlist') {
+        if (state.page === 'similarity' && state.similarityData) {
+            renderSimilarity(state.similarityData);
+            return;
+        }
+
+        if (state.page !== 'trash' && state.page !== 'history' && state.page !== 'playlist' && state.page !== 'similarity' && state.page !== 'du' && state.page !== 'analytics' && state.page !== 'curation') {
             state.page = 'search';
         }
         state.filters.search = searchInput.value;
@@ -898,6 +1470,11 @@ document.addEventListener('DOMContentLoaded', () => {
         state.filters.all = limitAll ? limitAll.checked : false;
 
         syncUrl();
+
+        if (state.page === 'du') {
+            fetchDU(state.duPath || '');
+            return;
+        }
 
         const trashBtn = document.getElementById('trash-btn');
         const historyBtn = document.getElementById('history-btn');
@@ -946,7 +1523,11 @@ document.addEventListener('DOMContentLoaded', () => {
             if (state.filters.max_score) params.append('max_score', state.filters.max_score);
             if (state.filters.unplayed) params.append('unplayed', 'true');
 
-            state.filters.types.forEach(t => {
+            let types = state.filters.types;
+            if (types.length === 0) {
+                types = ['video', 'audio', 'image', 'text'];
+            }
+            types.forEach(t => {
                 if (t === 'video') params.append('video', 'true');
                 if (t === 'audio') params.append('audio', 'true');
                 if (t === 'image') params.append('image', 'true');
@@ -1038,7 +1619,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 currentMedia.sort((a, b) => {
                     const progA = (a.duration && a.playhead) ? a.playhead / a.duration : 0;
                     const progB = (b.duration && b.playhead) ? b.playhead / b.duration : 0;
-                    
+
                     if (progA === 0 && progB === 0) return 0;
                     if (progA === 0) return 1;
                     if (progB === 0) return -1;
@@ -2276,7 +2857,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
             card.onclick = (e) => {
                 if (e.target.closest('.media-actions') || e.target.closest('.media-action-btn')) return;
-                playMedia(item);
+
+                const isCaptionClick = e.target.closest('.caption-highlight');
+                if (isCaptionClick && item.caption_time) {
+                    playMedia(item).then(() => {
+                        const media = pipViewer.querySelector('video, audio');
+                        if (media) media.currentTime = item.caption_time;
+                    });
+                } else {
+                    playMedia(item);
+                }
             };
 
             const title = truncateString(item.title || item.path.split('/').pop());
@@ -2290,6 +2880,13 @@ document.addEventListener('DOMContentLoaded', () => {
             const progressHtml = progress > 0 ? `
                 <div class="progress-container" title="${progress}% completed">
                     <div class="progress-bar" style="width: ${progress}%"></div>
+                </div>
+            ` : '';
+
+            const captionHtml = item.caption_text ? `
+                <div class="caption-highlight" title="Click to play at this time">
+                    "…${item.caption_text}…"
+                    <span class="caption-time">${formatDuration(item.caption_time)}</span>
                 </div>
             ` : '';
 
@@ -2331,6 +2928,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         ${plays > 0 ? `<span title="Play count">▶️ ${plays}</span>` : ''}
                     </div>
                     ${progressHtml}
+                    ${captionHtml}
                 </div>
             `;
 
@@ -2727,9 +3325,25 @@ document.addEventListener('DOMContentLoaded', () => {
             <button class="category-btn ${state.filters.category === c.category ? 'active' : ''}" data-cat="${c.category}">
                 ${c.category} <small>(${c.count})</small>
             </button>
-        `).join('');
+        `).join('') + `
+            <div class="sidebar-separator" style="margin: 0.5rem 0; opacity: 0.3;"></div>
+            <button id="categorization-link-btn" class="category-btn ${state.page === 'curation' ? 'active' : ''}" style="width: 100%; text-align: left;">
+                🏷️ Categorization
+            </button>
+        `;
+
+        const curationLinkBtn = document.getElementById('categorization-link-btn');
+        if (curationLinkBtn) {
+            curationLinkBtn.onclick = () => {
+                categoryList.querySelectorAll('.category-btn').forEach(b => b.classList.remove('active'));
+                state.page = 'curation';
+                updateNavActiveStates();
+                fetchCuration();
+            };
+        }
 
         categoryList.querySelectorAll('.category-btn').forEach(btn => {
+            if (btn.id === 'categorization-link-btn') return;
             btn.onclick = (e) => {
                 const cat = e.target.dataset.cat;
                 state.page = 'search';
@@ -3534,10 +4148,35 @@ document.addEventListener('DOMContentLoaded', () => {
     const historyBtn = document.getElementById('history-btn');
     const allMediaBtn = document.getElementById('all-media-btn');
 
+    function updateToolbarActiveStates() {
+        document.querySelectorAll('.type-btn').forEach(btn => {
+            if (state.filters.types.includes(btn.dataset.type)) {
+                btn.classList.add('active');
+            } else {
+                btn.classList.remove('active');
+            }
+        });
+    }
+
     function updateNavActiveStates() {
+        updateToolbarActiveStates();
+        const toolbar = document.getElementById('toolbar');
+        const searchContainer = document.querySelector('.search-container');
+        if (state.page === 'curation') {
+            if (toolbar) toolbar.classList.add('hidden');
+            if (searchContainer) searchContainer.classList.add('hidden');
+        } else {
+            if (toolbar) toolbar.classList.remove('hidden');
+            if (searchContainer) searchContainer.classList.remove('hidden');
+        }
+
         if (allMediaBtn) allMediaBtn.classList.toggle('active', state.page === 'search' && state.filters.category === '' && state.filters.genre === '' && state.filters.rating === '' && !state.filters.playlist);
         if (historyBtn) historyBtn.classList.toggle('active', state.page === 'history');
         if (trashBtn) trashBtn.classList.toggle('active', state.page === 'trash');
+        if (duBtn) duBtn.classList.toggle('active', state.page === 'du');
+        if (similarityBtn) similarityBtn.classList.toggle('active', state.page === 'similarity');
+        if (analyticsBtn) analyticsBtn.classList.toggle('active', state.page === 'analytics');
+        if (curationBtn) curationBtn.classList.toggle('active', state.page === 'curation');
 
         // Handle playlists and categories in the sidebar lists
         document.querySelectorAll('.sidebar .category-btn').forEach(btn => {
@@ -3630,6 +4269,43 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
+    if (duBtn) {
+        duBtn.onclick = () => {
+            categoryList.querySelectorAll('.category-btn').forEach(b => b.classList.remove('active'));
+            state.page = 'du';
+            state.duPath = '';
+            updateNavActiveStates();
+            fetchDU();
+        };
+    }
+
+    if (similarityBtn) {
+        similarityBtn.onclick = () => {
+            categoryList.querySelectorAll('.category-btn').forEach(b => b.classList.remove('active'));
+            state.page = 'similarity';
+            updateNavActiveStates();
+            fetchSimilarity();
+        };
+    }
+
+    if (analyticsBtn) {
+        analyticsBtn.onclick = () => {
+            categoryList.querySelectorAll('.category-btn').forEach(b => b.classList.remove('active'));
+            state.page = 'analytics';
+            updateNavActiveStates();
+            fetchAnalytics();
+        };
+    }
+
+    if (curationBtn) {
+        curationBtn.onclick = () => {
+            categoryList.querySelectorAll('.category-btn').forEach(b => b.classList.remove('active'));
+            state.page = 'curation';
+            updateNavActiveStates();
+            fetchCuration();
+        };
+    }
+
     const newPlaylistBtn = document.getElementById('new-playlist-btn');
     if (newPlaylistBtn) {
         newPlaylistBtn.onclick = () => {
@@ -3650,9 +4326,49 @@ document.addEventListener('DOMContentLoaded', () => {
                 e.target.classList.add('active');
             }
             localStorage.setItem('disco-types', JSON.stringify(state.filters.types));
-            performSearch();
+            
+            if (state.page === 'similarity') {
+                fetchSimilarity();
+            } else if (state.page === 'du') {
+                fetchDU(state.duPath);
+            } else if (state.page === 'history') {
+                fetchHistory();
+            } else if (state.page === 'trash') {
+                fetchTrash();
+            } else {
+                performSearch();
+            }
         };
     });
+
+    if (clearFiltersBtn) {
+        clearFiltersBtn.onclick = () => {
+            state.filters.types = ['video', 'audio'];
+            state.filters.search = '';
+            state.filters.category = '';
+            state.filters.genre = '';
+            state.filters.rating = '';
+            state.filters.min_size = '';
+            state.filters.max_size = '';
+            state.filters.min_duration = '';
+            state.filters.max_duration = '';
+            state.filters.min_score = '';
+            state.filters.max_score = '';
+            state.filters.unplayed = false;
+            
+            if (searchInput) searchInput.value = '';
+            localStorage.setItem('disco-types', JSON.stringify(state.filters.types));
+            
+            if (state.page === 'similarity') {
+                fetchSimilarity();
+            } else if (state.page === 'du') {
+                fetchDU(state.duPath);
+            } else {
+                performSearch();
+            }
+            updateNavActiveStates();
+        };
+    }
 
     if (sortBy) sortBy.onchange = () => {
         state.filters.sort = sortBy.value;
@@ -3847,6 +4563,7 @@ document.addEventListener('DOMContentLoaded', () => {
     window.disco = {
         formatSize,
         formatDuration,
+        shortDuration,
         getIcon,
         truncateString,
         formatRelativeDate,
@@ -3896,6 +4613,21 @@ function formatDuration(seconds) {
         return `${h}:${m < 10 ? '0' + m : m}:${s < 10 ? '0' + s : s}`;
     }
     return `${m}:${s < 10 ? '0' + s : s}`;
+}
+
+function shortDuration(seconds) {
+    if (!seconds) return '0s';
+    const d = Math.floor(seconds / 86400);
+    const h = Math.floor((seconds % 86400) / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = Math.floor(seconds % 60);
+
+    const parts = [];
+    if (d > 0) parts.push(`${d}d`);
+    if (h > 0) parts.push(`${h}h`);
+    if (m > 0) parts.push(`${m}m`);
+    if (s > 0 && d === 0) parts.push(`${s}s`);
+    return parts.join(' ') || '0s';
 }
 
 function getIcon(type) {

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"math"
 	"path/filepath"
-	"reflect"
 	"strings"
 
 	"github.com/adrg/strutil"
@@ -269,6 +268,19 @@ func FilterNearDuplicates(groups []models.FolderStats) []models.FolderStats {
 	return regrouped
 }
 
+type PathObservation struct {
+	Path   string
+	Vector clusters.Coordinates
+}
+
+func (p PathObservation) Coordinates() clusters.Coordinates {
+	return p.Vector
+}
+
+func (p PathObservation) Distance(o clusters.Coordinates) float64 {
+	return p.Vector.Distance(o)
+}
+
 // ClusterPaths groups lines of text using TF-IDF and KMeans
 func ClusterPaths(flags models.GlobalFlags, lines []string) []models.FolderStats {
 	if len(lines) < 2 {
@@ -303,7 +315,7 @@ func ClusterPaths(flags models.GlobalFlags, lines []string) []models.FolderStats
 
 	numDocs := float64(len(lines))
 	var observations clusters.Observations
-	for _, doc := range corpus {
+	for i, doc := range corpus {
 		vec := make([]float64, len(vocab))
 		tf := make(map[string]int)
 		for _, word := range doc {
@@ -314,7 +326,10 @@ func ClusterPaths(flags models.GlobalFlags, lines []string) []models.FolderStats
 			idfScore := math.Log(numDocs / float64(df[word]))
 			vec[vocab[word]] = tfScore * idfScore
 		}
-		observations = append(observations, clusters.Coordinates(vec))
+		observations = append(observations, PathObservation{
+			Path:   lines[i],
+			Vector: clusters.Coordinates(vec),
+		})
 	}
 
 	km := kmeans.New()
@@ -328,12 +343,8 @@ func ClusterPaths(flags models.GlobalFlags, lines []string) []models.FolderStats
 	for _, c := range clusters {
 		var groupLines []string
 		for _, obs := range c.Observations {
-			// Find index of observation
-			for i, docObs := range observations {
-				if reflect.DeepEqual(obs, docObs) {
-					groupLines = append(groupLines, lines[i])
-					break
-				}
+			if po, ok := obs.(PathObservation); ok {
+				groupLines = append(groupLines, po.Path)
 			}
 		}
 		if len(groupLines) > 0 {

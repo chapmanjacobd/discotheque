@@ -26,19 +26,6 @@ func (c CategorizeCmd) IsQueryTrait()  {}
 func (c CategorizeCmd) IsFilterTrait() {}
 func (c CategorizeCmd) IsActionTrait() {}
 
-var defaultCategories = map[string][]string{
-	"sports":      {"sports?", "football", "soccer", "basketball", "tennis", "olympics", "training"},
-	"fitness":     {"workout", "fitness", "gym", "yoga", "pilates", "exercise", "bodybuilding", "cardio"},
-	"documentary": {"documentaries", "documentary", "docu", "history", "biography", "nature", "science", "planet", "wildlife", "factual"},
-	"comedy":      {"comedy", "comedies", "standup", "funny", "sitcom", "humor", "prank", "roast", "satire"},
-	"music":       {"music", "concerts?", "performance", "live", "musical", "video clip", "remix(es)?", "feat", "official video", "soundtracks?"},
-	"educational": {"educational", "tutorials?", "lessons?", "lectures?", "courses?", "learning", "how to", "explainers?", "masterclass(es)?"},
-	"news":        {"news", "reports?", "politics", "interviews?", "journalists?", "coverage", "current affairs", "broadcasts?", "press release"},
-	"gaming":      {"gaming", "gameplay", "walkthroughs?", "playthroughs?", "twitch", "nintendo", "playstation", "xbox", "steam", "speedruns?", "lets play"},
-	"tech":        {"tech", "technology", "software", "hardware", "programming", "coding", "reviews?", "unboxings?", "gadgets?", "silicon"},
-	"audiobook":   {"audiobooks?", "audio book", "narrated", "reading", "unabridged"},
-}
-
 func (c *CategorizeCmd) Run(ctx *kong.Context) error {
 	models.SetupLogging(c.Verbose)
 
@@ -52,24 +39,53 @@ func (c *CategorizeCmd) Run(ctx *kong.Context) error {
 		return fmt.Errorf("no media found")
 	}
 
-	// Compile regexes once
-	compiled := make(map[string][]*regexp.Regexp)
-	for cat, keywords := range defaultCategories {
-		for _, kw := range keywords {
-			re, err := regexp.Compile(`(?i)\b` + kw + `\b`)
-			if err != nil {
-				slog.Error("Failed to compile regex", "keyword", kw, "error", err)
-				continue
-			}
-			compiled[cat] = append(compiled[cat], re)
-		}
-	}
+	compiled := c.CompileRegexes()
 
 	if c.Other {
 		return c.mineCategories(media, compiled)
 	}
 
 	return c.applyCategories(media, compiled)
+}
+
+func (c *CategorizeCmd) CompileRegexes() map[string][]*regexp.Regexp {
+	compiled := make(map[string][]*regexp.Regexp)
+	if !c.NoDefaultCategories {
+		for cat, keywords := range models.DefaultCategories {
+			for _, kw := range keywords {
+				re, err := regexp.Compile(`(?i)\b` + kw + `\b`)
+				if err != nil {
+					slog.Error("Failed to compile regex", "keyword", kw, "error", err)
+					continue
+				}
+				compiled[cat] = append(compiled[cat], re)
+			}
+		}
+	}
+
+	// Load custom keywords from databases
+	for _, dbPath := range c.Databases {
+		sqlDB, err := db.Connect(dbPath)
+		if err != nil {
+			continue
+		}
+		rows, err := sqlDB.Query("SELECT category, keyword FROM custom_keywords")
+		if err == nil {
+			for rows.Next() {
+				var cat, kw string
+				if err := rows.Scan(&cat, &kw); err == nil {
+					re, err := regexp.Compile(`(?i)\b` + regexp.QuoteMeta(kw) + `\b`)
+					if err == nil {
+						compiled[cat] = append(compiled[cat], re)
+					}
+				}
+			}
+			rows.Close()
+		}
+		sqlDB.Close()
+	}
+
+	return compiled
 }
 
 func (c *CategorizeCmd) applyCategories(media []models.MediaWithDB, compiled map[string][]*regexp.Regexp) error {

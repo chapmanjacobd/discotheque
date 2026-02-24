@@ -95,6 +95,8 @@ type GlobalFlags struct {
 	MimeType   []string `help:"Filter by mimetype substring (e.g., video, mp4)" group:"Filter"`
 	NoMimeType []string `help:"Exclude by mimetype substring" group:"Filter"`
 
+	NoDefaultCategories bool `help:"Disable default categories" group:"Filter"`
+
 	// Deleted status
 	HideDeleted bool `default:"true" help:"Exclude deleted files from results" group:"Filter"`
 	OnlyDeleted bool `help:"Include only deleted files in results" group:"Filter"`

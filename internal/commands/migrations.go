@@ -69,5 +69,14 @@ func runMigrations(db *sql.DB) error {
 		}
 	}
 
+	// Create custom_keywords table if it doesn't exist
+	if _, err := db.Exec(`CREATE TABLE IF NOT EXISTS custom_keywords (
+		category TEXT NOT NULL,
+		keyword TEXT NOT NULL,
+		PRIMARY KEY (category, keyword)
+	)`); err != nil {
+		return fmt.Errorf("failed to create custom_keywords table: %w", err)
+	}
+
 	return nil
 }

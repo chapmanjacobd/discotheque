@@ -19,6 +19,11 @@ type CaptionsFts struct {
 	Text      string `json:"text"`
 }
 
+type CustomKeywords struct {
+	Category string `json:"category"`
+	Keyword  string `json:"keyword"`
+}
+
 type History struct {
 	ID         int64         `json:"id"`
 	MediaPath  string        `json:"media_path"`

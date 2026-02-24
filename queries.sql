@@ -144,6 +144,15 @@ UNION ALL
 SELECT 'Uncategorized' as category, COUNT(*) as count FROM media WHERE time_deleted = 0 AND (categories IS NULL OR categories = '')
 ORDER BY count DESC;
 
+-- name: GetUsedCategories :many
+SELECT categories, COUNT(*) as count
+FROM media
+WHERE time_deleted = 0 AND categories IS NOT NULL AND categories != ''
+GROUP BY categories;
+
+-- name: GetCustomCategories :many
+SELECT DISTINCT category FROM custom_keywords;
+
 -- name: GetRatingStats :many
 SELECT CAST(COALESCE(score, 0) AS INTEGER) as rating, COUNT(*) as count
 FROM media
@@ -280,7 +289,8 @@ SELECT
     SUM(size) as total_size,
     SUM(duration) as total_duration,
     COUNT(CASE WHEN COALESCE(time_last_played, 0) > 0 THEN 1 END) as watched_count,
-    COUNT(CASE WHEN COALESCE(time_last_played, 0) = 0 THEN 1 END) as unwatched_count
+    COUNT(CASE WHEN COALESCE(time_last_played, 0) = 0 THEN 1 END) as unwatched_count,
+    SUM(COALESCE(play_count, 0) * COALESCE(duration, 0) + COALESCE(playhead, 0)) as total_watched_duration
 FROM media
 WHERE time_deleted = 0;
 

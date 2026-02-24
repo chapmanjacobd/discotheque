@@ -152,7 +152,7 @@ type Model struct {
 	height      int
 }
 
-func NewModel(media []models.MediaWithDB, databases []string, flags models.GlobalFlags) *Model {
+func NewModel(media []models.MediaWithDB, databases []string, flags models.GlobalFlags, customCats []string) *Model {
 	// Prepare media list
 	items := make([]list.Item, len(media))
 	for i, m := range media {
@@ -185,6 +185,11 @@ func NewModel(media []models.MediaWithDB, databases []string, flags models.Globa
 		sidebarItem{title: "🗑️ Trash", filter: func(m models.MediaWithDB) bool { return m.TimeDeleted != nil && *m.TimeDeleted > 0 }},
 	}
 
+	isCustom := make(map[string]bool)
+	for _, c := range customCats {
+		isCustom[c] = true
+	}
+
 	// Extract Categories
 	categories := make(map[string]bool)
 	for _, m := range media {
@@ -192,10 +197,19 @@ func NewModel(media []models.MediaWithDB, databases []string, flags models.Globa
 			cats := strings.SplitSeq(*m.Categories, ";")
 			for c := range cats {
 				if c != "" {
+					if flags.NoDefaultCategories && !isCustom[c] {
+						if _, isDefault := models.DefaultCategories[c]; isDefault {
+							continue
+						}
+					}
 					categories[c] = true
 				}
 			}
 		}
+	}
+	// Add custom categories that might have 0 count
+	for _, c := range customCats {
+		categories[c] = true
 	}
 	sortedCats := make([]string, 0, len(categories))
 	for c := range categories {

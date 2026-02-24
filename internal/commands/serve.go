@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/alecthomas/kong"
+	"github.com/chapmanjacobd/discotheque/internal/aggregate"
 	database "github.com/chapmanjacobd/discotheque/internal/db"
 	"github.com/chapmanjacobd/discotheque/internal/models"
 	"github.com/chapmanjacobd/discotheque/internal/query"
@@ -62,6 +63,14 @@ func (c *ServeCmd) Mux() http.Handler {
 	mux.HandleFunc("/api/playlists/reorder", c.handlePlaylistReorder)
 	mux.HandleFunc("/api/events", c.handleEvents)
 	mux.HandleFunc("/api/ls", c.handleLs)
+	mux.HandleFunc("/api/du", c.handleDU)
+	mux.HandleFunc("/api/similarity", c.handleSimilarity)
+	mux.HandleFunc("/api/random-clip", c.handleRandomClip)
+	mux.HandleFunc("/api/stats/history", c.handleStatsHistory)
+	mux.HandleFunc("/api/stats/library", c.handleStatsLibrary)
+	mux.HandleFunc("/api/categorize/suggest", c.handleCategorizeSuggest)
+	mux.HandleFunc("/api/categorize/apply", c.handleCategorizeApply)
+	mux.HandleFunc("/api/categorize/keyword", c.handleCategorizeKeyword)
 	mux.HandleFunc("/api/raw", c.handleRaw)
 	mux.HandleFunc("/api/hls/playlist", c.handleHLSPlaylist)
 	mux.HandleFunc("/api/hls/segment", c.handleHLSSegment)
@@ -190,17 +199,43 @@ func (c *ServeCmd) handleDatabases(w http.ResponseWriter, r *http.Request) {
 
 func (c *ServeCmd) handleCategories(w http.ResponseWriter, r *http.Request) {
 	counts := make(map[string]int64)
+	isCustom := make(map[string]bool)
 
 	for _, dbPath := range c.Databases {
 		err := c.execDB(r.Context(), dbPath, func(sqlDB *sql.DB) error {
 			queries := database.New(sqlDB)
-			stats, err := queries.GetCategoryStats(r.Context())
+
+			// 1. Get categories already assigned to media
+			rows, err := queries.GetUsedCategories(r.Context())
 			if err != nil {
 				return err
 			}
-			for _, s := range stats {
-				counts[s.Category] = counts[s.Category] + s.Count
+			for _, row := range rows {
+				if row.Categories.Valid {
+					trimmed := strings.Trim(row.Categories.String, ";")
+					if trimmed == "" {
+						continue
+					}
+					cats := strings.SplitSeq(trimmed, ";")
+					for cat := range cats {
+						if cat != "" {
+							counts[cat] += row.Count
+						}
+					}
+				}
 			}
+
+			// 2. Get categories from custom keywords
+			customCats, err := queries.GetCustomCategories(r.Context())
+			if err == nil {
+				for _, cat := range customCats {
+					isCustom[cat] = true
+					if _, ok := counts[cat]; !ok {
+						counts[cat] = 0
+					}
+				}
+			}
+
 			return nil
 		})
 		if err != nil {
@@ -208,16 +243,48 @@ func (c *ServeCmd) handleCategories(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	var res []models.CatStat
-	res = make([]models.CatStat, 0)
-	for k, v := range counts {
-		if v > 0 {
-			res = append(res, models.CatStat{Category: k, Count: v})
+	// 3. Add default categories if they don't exist yet and not disabled
+	if !c.NoDefaultCategories {
+		for cat := range models.DefaultCategories {
+			if _, ok := counts[cat]; !ok {
+				counts[cat] = 0
+			}
 		}
 	}
 
+	// 4. Add Uncategorized count
+	for _, dbPath := range c.Databases {
+		c.execDB(r.Context(), dbPath, func(sqlDB *sql.DB) error {
+			var count int64
+			err := sqlDB.QueryRowContext(r.Context(), "SELECT COUNT(*) FROM media WHERE time_deleted = 0 AND (categories IS NULL OR categories = '')").Scan(&count)
+			if err == nil {
+				counts["Uncategorized"] += count
+			}
+			return nil
+		})
+	}
+
+	var res []models.CatStat
+	for k, v := range counts {
+		if c.NoDefaultCategories && !isCustom[k] {
+			if _, isDefault := models.DefaultCategories[k]; isDefault {
+				continue
+			}
+		}
+		res = append(res, models.CatStat{Category: k, Count: v})
+	}
+
 	sort.Slice(res, func(i, j int) bool {
-		return res[i].Count > res[j].Count
+		if res[i].Category == "Uncategorized" {
+			return false
+		}
+		if res[j].Category == "Uncategorized" {
+			return true
+		}
+		if res[i].Count != res[j].Count {
+			return res[i].Count > res[j].Count
+		}
+		return res[i].Category < res[j].Category
 	})
 
 	w.Header().Set("Content-Type", "application/json")
@@ -258,10 +325,8 @@ func (c *ServeCmd) handleRatings(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(res)
 }
 
-func (c *ServeCmd) handleQuery(w http.ResponseWriter, r *http.Request) {
+func (c *ServeCmd) parseFlags(r *http.Request) models.GlobalFlags {
 	flags := c.GlobalFlags
-
-	// Override flags from URL params
 	q := r.URL.Query()
 	if search := q.Get("search"); search != "" {
 		flags.Search = strings.Fields(search)
@@ -339,6 +404,12 @@ func (c *ServeCmd) handleQuery(w http.ResponseWriter, r *http.Request) {
 	if text := q.Get("text"); text == "true" {
 		flags.TextOnly = true
 	}
+	if q.Get("no-default-categories") == "true" {
+		flags.NoDefaultCategories = true
+	}
+	if q.Get("captions") == "true" {
+		flags.FTS = true
+	}
 	if watched := q.Get("watched"); watched == "true" {
 		w := true
 		flags.Watched = &w
@@ -351,8 +422,12 @@ func (c *ServeCmd) handleQuery(w http.ResponseWriter, r *http.Request) {
 	}
 	if q.Get("trash") == "true" {
 		flags.OnlyDeleted = true
-		flags.HideDeleted = false
 	}
+	return flags
+}
+
+func (c *ServeCmd) handleQuery(w http.ResponseWriter, r *http.Request) {
+	flags := c.parseFlags(r)
 
 	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
 	defer cancel()
@@ -362,6 +437,57 @@ func (c *ServeCmd) handleQuery(w http.ResponseWriter, r *http.Request) {
 		slog.Error("Query failed", "dbs", c.Databases, "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
+	}
+
+	// Caption search integration
+	if r.URL.Query().Get("captions") == "true" && len(flags.Search) > 0 {
+		queryStr := strings.Join(flags.Search, " ")
+		for _, dbPath := range c.Databases {
+			err := c.execDB(ctx, dbPath, func(sqlDB *sql.DB) error {
+				queries := database.New(sqlDB)
+				rows, err := queries.SearchCaptions(ctx, queryStr)
+				if err != nil {
+					return err
+				}
+
+				// Map to track paths already in media list for enrichment
+				mediaMap := make(map[string]int)
+				for i, m := range media {
+					mediaMap[m.Path] = i
+				}
+
+				for _, row := range rows {
+					if idx, ok := mediaMap[row.MediaPath]; ok {
+						// Enrich existing result
+						if media[idx].CaptionText == "" {
+							media[idx].CaptionText = row.Text.String
+							media[idx].CaptionTime = row.Time.Float64
+						}
+					} else {
+						// Add new result if it wasn't already matched by title/path
+						m := models.MediaWithDB{
+							Media: models.Media{
+								Path: row.MediaPath,
+							},
+							DB:          dbPath,
+							CaptionText: row.Text.String,
+							CaptionTime: row.Time.Float64,
+						}
+						// Try to fetch basic metadata for this item if it's new
+						if dbMedia, err := queries.GetMediaByPathExact(ctx, row.MediaPath); err == nil {
+							m.Media = models.FromDB(dbMedia)
+						}
+
+						media = append(media, m)
+						mediaMap[m.Path] = len(media) - 1
+					}
+				}
+				return nil
+			})
+			if err != nil {
+				slog.Error("Caption search failed", "db", dbPath, "error", err)
+			}
+		}
 	}
 
 	totalCount, err := query.MediaQueryCount(ctx, c.Databases, flags)
@@ -854,6 +980,525 @@ func (c *ServeCmd) handleLs(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(results)
+}
+
+func (c *ServeCmd) handleDU(w http.ResponseWriter, r *http.Request) {
+	path := r.URL.Query().Get("path")
+	flags := c.parseFlags(r)
+	flags.All = true // We need all matches to aggregate DU
+
+	if path != "" {
+		flags.Paths = append(flags.Paths, path+"%")
+	}
+
+	media, err := query.MediaQuery(r.Context(), c.Databases, flags)
+	if err != nil {
+		slog.Error("Failed to fetch media for DU", "path", path, "error", err)
+		http.Error(w, "Query failed", http.StatusInternalServerError)
+		return
+	}
+
+	depth := 1
+	if path != "" {
+		depth = strings.Count(filepath.Clean(path), string(filepath.Separator)) + 2
+		if strings.HasPrefix(path, "/") {
+			depth--
+		}
+	}
+
+	aggFlags := flags
+	aggFlags.Depth = depth
+	aggFlags.Parents = false
+
+	stats := query.AggregateMedia(media, aggFlags)
+	query.SortFolders(stats, aggFlags.SortBy, aggFlags.Reverse)
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(stats)
+}
+
+func (c *ServeCmd) handleSimilarity(w http.ResponseWriter, r *http.Request) {
+	flags := c.parseFlags(r)
+	q := r.URL.Query()
+
+	if q.Get("folders") == "true" {
+		flags.Similar = true
+	}
+	if q.Get("names") == "true" {
+		flags.FilterNames = true
+	}
+
+	flags.All = true
+	flags.Limit = 1000000
+
+	allMedia, err := query.MediaQuery(r.Context(), c.Databases, flags)
+	if err != nil {
+		slog.Error("Failed to fetch media for similarity", "error", err)
+		http.Error(w, "Query failed", http.StatusInternalServerError)
+		return
+	}
+
+	var results []models.FolderStats
+	if q.Get("folders") == "true" {
+		folders := query.AggregateMedia(allMedia, flags)
+		if flags.FilterNames {
+			results = aggregate.ClusterFoldersByName(flags, folders)
+		} else if flags.FilterSizes || flags.FilterDurations || flags.FilterCounts {
+			results = aggregate.ClusterFoldersByNumbers(flags, folders)
+		} else {
+			paths := make([]string, len(folders))
+			for i, f := range folders {
+				paths[i] = f.Path
+			}
+			results = aggregate.ClusterPaths(flags, paths)
+			// Map results back to folders to include files
+			folderMap := make(map[string]models.FolderStats)
+			for _, f := range folders {
+				folderMap[f.Path] = f
+			}
+			for i, r := range results {
+				var groupFiles []models.MediaWithDB
+				// results from ClusterPaths have files as wrapLines(paths)
+				for _, lineItem := range r.Files {
+					if f, ok := folderMap[lineItem.Path]; ok {
+						groupFiles = append(groupFiles, f.Files...)
+					}
+				}
+				results[i].Files = groupFiles
+				results[i].Count = len(groupFiles)
+			}
+		}
+	} else {
+		if flags.FilterSizes || flags.FilterDurations || flags.ClusterSort {
+			results = aggregate.ClusterByNumbers(flags, allMedia)
+		} else {
+			paths := make([]string, len(allMedia))
+			for i, m := range allMedia {
+				paths[i] = m.Path
+			}
+			results = aggregate.ClusterPaths(flags, paths)
+			// Map results back to media
+			mediaMap := make(map[string]models.MediaWithDB)
+			for _, m := range allMedia {
+				mediaMap[m.Path] = m
+			}
+			for i, r := range results {
+				var groupFiles []models.MediaWithDB
+				for _, lineItem := range r.Files {
+					if m, ok := mediaMap[lineItem.Path]; ok {
+						groupFiles = append(groupFiles, m)
+					}
+				}
+				results[i].Files = groupFiles
+				results[i].Count = len(groupFiles)
+			}
+		}
+	}
+
+	// Limit group size to 500 items
+	for i := range results {
+		if results[i].Count > 500 {
+			results[i].Count = 500
+			if len(results[i].Files) > 500 {
+				results[i].Files = results[i].Files[:500]
+			}
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(results)
+}
+
+func (c *ServeCmd) handleCategorizeKeyword(w http.ResponseWriter, r *http.Request) {
+	if c.ReadOnly {
+		http.Error(w, "Read-only mode", http.StatusForbidden)
+		return
+	}
+
+	var req struct {
+		Category string `json:"category"`
+		Keyword  string `json:"keyword"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if req.Category == "" || req.Keyword == "" {
+		http.Error(w, "Category and Keyword are required", http.StatusBadRequest)
+		return
+	}
+
+	for _, dbPath := range c.Databases {
+		err := c.execDB(r.Context(), dbPath, func(sqlDB *sql.DB) error {
+			_, err := sqlDB.ExecContext(r.Context(), "INSERT OR IGNORE INTO custom_keywords (category, keyword) VALUES (?, ?)", req.Category, req.Keyword)
+			return err
+		})
+		if err != nil {
+			slog.Error("Failed to save custom keyword", "db", dbPath, "error", err)
+		}
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+}
+
+func (c *ServeCmd) handleRandomClip(w http.ResponseWriter, r *http.Request) {
+	var allMedia []models.MediaWithDB
+	for _, dbPath := range c.Databases {
+		err := c.execDB(r.Context(), dbPath, func(sqlDB *sql.DB) error {
+			queries := database.New(sqlDB)
+			dbMedia, err := queries.GetMedia(r.Context(), 1000000)
+			if err != nil {
+				return err
+			}
+			for _, m := range dbMedia {
+				allMedia = append(allMedia, models.MediaWithDB{
+					Media: models.FromDB(m),
+					DB:    dbPath,
+				})
+			}
+			return nil
+		})
+		if err != nil {
+			slog.Error("Failed to fetch media for random clip", "error", err)
+		}
+	}
+
+	if len(allMedia) == 0 {
+		http.Error(w, "No media found", http.StatusNotFound)
+		return
+	}
+
+	// Filter for video/audio only
+	var playable []models.MediaWithDB
+	for _, m := range allMedia {
+		if m.Type != nil && (*m.Type == "video" || *m.Type == "audio" || *m.Type == "audiobook") {
+			playable = append(playable, m)
+		}
+	}
+
+	if len(playable) == 0 {
+		http.Error(w, "No playable media found", http.StatusNotFound)
+		return
+	}
+
+	item := playable[utils.RandomInt(0, len(playable)-1)]
+
+	duration := 0
+	if item.Duration != nil {
+		duration = int(*item.Duration)
+	}
+
+	cableDuration := 15 // Default 15s clips
+	if q := r.URL.Query().Get("duration"); q != "" {
+		if d, err := strconv.Atoi(q); err == nil {
+			cableDuration = d
+		}
+	}
+
+	start := 0
+	if duration > cableDuration {
+		start = utils.RandomInt(0, duration-cableDuration)
+	}
+
+	type clipResponse struct {
+		models.MediaWithDB
+		Start int `json:"start"`
+		End   int `json:"end"`
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(clipResponse{
+		MediaWithDB: item,
+		Start:       start,
+		End:         start + cableDuration,
+	})
+}
+
+func (c *ServeCmd) handleStatsHistory(w http.ResponseWriter, r *http.Request) {
+	facet := r.URL.Query().Get("facet")
+	if facet == "" {
+		facet = "watched"
+	}
+	frequency := r.URL.Query().Get("frequency")
+	if frequency == "" {
+		frequency = "daily"
+	}
+
+	timeCol := "time_last_played"
+	switch facet {
+	case "deleted":
+		timeCol = "time_deleted"
+	case "created":
+		timeCol = "time_created"
+	case "modified":
+		timeCol = "time_modified"
+	}
+
+	type dbStats struct {
+		DB    string                 `json:"db"`
+		Stats []query.FrequencyStats `json:"stats"`
+	}
+	var results []dbStats
+
+	for _, dbPath := range c.Databases {
+		stats, err := query.HistoricalUsage(r.Context(), dbPath, frequency, timeCol)
+		if err != nil {
+			slog.Error("Failed to fetch history stats", "db", dbPath, "error", err)
+			continue
+		}
+		results = append(results, dbStats{
+			DB:    dbPath,
+			Stats: stats,
+		})
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(results)
+}
+
+func (c *ServeCmd) handleStatsLibrary(w http.ResponseWriter, r *http.Request) {
+	type summary struct {
+		TotalCount           int64 `json:"total_count"`
+		TotalSize            int64 `json:"total_size"`
+		TotalDuration        int64 `json:"total_duration"`
+		WatchedCount         int64 `json:"watched_count"`
+		UnwatchedCount       int64 `json:"unwatched_count"`
+		TotalWatchedDuration int64 `json:"total_watched_duration"`
+	}
+
+	type typeStat struct {
+		Type          string `json:"type"`
+		Count         int64  `json:"count"`
+		TotalSize     int64  `json:"total_size"`
+		TotalDuration int64  `json:"total_duration"`
+	}
+
+	type dbResult struct {
+		DB        string     `json:"db"`
+		Summary   summary    `json:"summary"`
+		Breakdown []typeStat `json:"breakdown"`
+	}
+
+	var results []dbResult
+
+	for _, dbPath := range c.Databases {
+		err := c.execDB(r.Context(), dbPath, func(sqlDB *sql.DB) error {
+			queries := database.New(sqlDB)
+			s, err := queries.GetStats(r.Context())
+			if err != nil {
+				return err
+			}
+			ts, err := queries.GetStatsByType(r.Context())
+			if err != nil {
+				return err
+			}
+
+			res := dbResult{
+				DB: dbPath,
+				Summary: summary{
+					TotalCount:           s.TotalCount,
+					TotalSize:            utils.GetInt64(s.TotalSize),
+					TotalDuration:        utils.GetInt64(s.TotalDuration),
+					WatchedCount:         s.WatchedCount,
+					UnwatchedCount:       s.UnwatchedCount,
+					TotalWatchedDuration: utils.GetInt64(s.TotalWatchedDuration),
+				},
+			}
+
+			for _, t := range ts {
+				res.Breakdown = append(res.Breakdown, typeStat{
+					Type:          utils.StringValue(models.NullStringPtr(t.Type)),
+					Count:         t.Count,
+					TotalSize:     utils.GetInt64(t.TotalSize),
+					TotalDuration: utils.GetInt64(t.TotalDuration),
+				})
+			}
+			results = append(results, res)
+			return nil
+		})
+		if err != nil {
+			slog.Error("Failed to fetch library stats", "db", dbPath, "error", err)
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(results)
+}
+
+func (c *ServeCmd) handleCategorizeSuggest(w http.ResponseWriter, r *http.Request) {
+	var allMedia []models.MediaWithDB
+	for _, dbPath := range c.Databases {
+		err := c.execDB(r.Context(), dbPath, func(sqlDB *sql.DB) error {
+			queries := database.New(sqlDB)
+			dbMedia, err := queries.GetMedia(r.Context(), 1000000)
+			if err != nil {
+				return err
+			}
+			for _, m := range dbMedia {
+				allMedia = append(allMedia, models.MediaWithDB{
+					Media: models.FromDB(m),
+					DB:    dbPath,
+				})
+			}
+			return nil
+		})
+		if err != nil {
+			slog.Error("Failed to fetch media for categorize suggest", "error", err)
+		}
+	}
+
+	cmd := CategorizeCmd{
+		GlobalFlags: c.GlobalFlags,
+		Databases:   c.Databases,
+	}
+	// Note: mineCategories and applyCategories need to be exported or called through a wrapper
+	// Since I'm in the same package 'commands', I can call them directly.
+
+	// We need to compile regexes first
+	compiled := cmd.CompileRegexes()
+
+	wordCounts := make(map[string]int)
+	for _, m := range allMedia {
+		matched := false
+		pathAndTitle := m.Path
+		if m.Title != nil {
+			pathAndTitle += " " + *m.Title
+		}
+
+		for _, res := range compiled {
+			for _, re := range res {
+				if re.MatchString(pathAndTitle) {
+					matched = true
+					break
+				}
+			}
+			if matched {
+				break
+			}
+		}
+
+		if !matched {
+			words := utils.ExtractWords(utils.PathToSentence(m.Path))
+			if m.Title != nil {
+				words = append(words, utils.ExtractWords(*m.Title)...)
+			}
+
+			for _, word := range words {
+				if len(word) < 4 {
+					continue
+				}
+				wordCounts[word]++
+			}
+		}
+	}
+
+	type wordFreq struct {
+		Word  string `json:"word"`
+		Count int    `json:"count"`
+	}
+	var freqs []wordFreq
+	for w, c := range wordCounts {
+		if c > 1 {
+			freqs = append(freqs, wordFreq{Word: w, Count: c})
+		}
+	}
+
+	sort.Slice(freqs, func(i, j int) bool {
+		return freqs[i].Count > freqs[j].Count
+	})
+
+	limit := min(len(freqs), 100)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(freqs[:limit])
+}
+
+func (c *ServeCmd) handleCategorizeApply(w http.ResponseWriter, r *http.Request) {
+	if c.ReadOnly {
+		http.Error(w, "Read-only mode", http.StatusForbidden)
+		return
+	}
+
+	var allMedia []models.MediaWithDB
+	for _, dbPath := range c.Databases {
+		err := c.execDB(r.Context(), dbPath, func(sqlDB *sql.DB) error {
+			queries := database.New(sqlDB)
+			dbMedia, err := queries.GetMedia(r.Context(), 1000000)
+			if err != nil {
+				return err
+			}
+			for _, m := range dbMedia {
+				allMedia = append(allMedia, models.MediaWithDB{
+					Media: models.FromDB(m),
+					DB:    dbPath,
+				})
+			}
+			return nil
+		})
+		if err != nil {
+			slog.Error("Failed to fetch media for categorize apply", "error", err)
+		}
+	}
+
+	cmd := CategorizeCmd{
+		GlobalFlags: c.GlobalFlags,
+		Databases:   c.Databases,
+	}
+	compiled := cmd.CompileRegexes()
+
+	count := 0
+	for _, m := range allMedia {
+		foundCategories := []string{}
+		pathAndTitle := m.Path
+		if m.Title != nil {
+			pathAndTitle += " " + *m.Title
+		}
+
+		for cat, res := range compiled {
+			for _, re := range res {
+				if re.MatchString(pathAndTitle) {
+					foundCategories = append(foundCategories, cat)
+					break
+				}
+			}
+		}
+
+		if len(foundCategories) > 0 {
+			merged := make(map[string]bool)
+			if m.Categories != nil && *m.Categories != "" {
+				existing := strings.SplitSeq(strings.Trim(*m.Categories, ";"), ";")
+				for e := range existing {
+					if e != "" {
+						merged[strings.TrimSpace(e)] = true
+					}
+				}
+			}
+			for _, f := range foundCategories {
+				merged[f] = true
+			}
+			combined := []string{}
+			for k := range merged {
+				combined = append(combined, k)
+			}
+			sort.Strings(combined)
+			newCategories := ";" + strings.Join(combined, ";") + ";"
+
+			err := c.execDB(r.Context(), m.DB, func(sqlDB *sql.DB) error {
+				queries := database.New(sqlDB)
+				return queries.UpdateMediaCategories(r.Context(), database.UpdateMediaCategoriesParams{
+					Categories: utils.ToNullString(newCategories),
+					Path:       m.Path,
+				})
+			})
+			if err == nil {
+				count++
+			}
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	fmt.Fprintf(w, `{"count": %d}`, count)
 }
 
 func (c *ServeCmd) handleRaw(w http.ResponseWriter, r *http.Request) {

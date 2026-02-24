@@ -27,6 +27,19 @@ describe('Utility Functions', () => {
     });
   });
 
+  describe('shortDuration', () => {
+    it('formats seconds to short human readable format', () => {
+      const { shortDuration } = window.disco;
+      expect(shortDuration(0)).toBe('0s');
+      expect(shortDuration(45)).toBe('45s');
+      expect(shortDuration(65)).toBe('1m 5s');
+      expect(shortDuration(3600)).toBe('1h');
+      expect(shortDuration(3665)).toBe('1h 1m 5s');
+      expect(shortDuration(86400)).toBe('1d');
+      expect(shortDuration(86400 + 3600 + 60 + 1)).toBe('1d 1h 1m');
+    });
+  });
+
   describe('getIcon', () => {
     it('returns correct icons for types', () => {
       const { getIcon } = window.disco;

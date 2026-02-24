@@ -143,6 +143,33 @@ func (q *Queries) GetCategoryStats(ctx context.Context) ([]GetCategoryStatsRow, 
 	return items, nil
 }
 
+const getCustomCategories = `-- name: GetCustomCategories :many
+SELECT DISTINCT category FROM custom_keywords
+`
+
+func (q *Queries) GetCustomCategories(ctx context.Context) ([]string, error) {
+	rows, err := q.db.QueryContext(ctx, getCustomCategories)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []string{}
+	for rows.Next() {
+		var category string
+		if err := rows.Scan(&category); err != nil {
+			return nil, err
+		}
+		items = append(items, category)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getGenreStats = `-- name: GetGenreStats :many
 SELECT genre, COUNT(*) as count
 FROM media
@@ -1105,17 +1132,19 @@ SELECT
     SUM(size) as total_size,
     SUM(duration) as total_duration,
     COUNT(CASE WHEN COALESCE(time_last_played, 0) > 0 THEN 1 END) as watched_count,
-    COUNT(CASE WHEN COALESCE(time_last_played, 0) = 0 THEN 1 END) as unwatched_count
+    COUNT(CASE WHEN COALESCE(time_last_played, 0) = 0 THEN 1 END) as unwatched_count,
+    SUM(COALESCE(play_count, 0) * COALESCE(duration, 0) + COALESCE(playhead, 0)) as total_watched_duration
 FROM media
 WHERE time_deleted = 0
 `
 
 type GetStatsRow struct {
-	TotalCount     int64           `json:"total_count"`
-	TotalSize      sql.NullFloat64 `json:"total_size"`
-	TotalDuration  sql.NullFloat64 `json:"total_duration"`
-	WatchedCount   int64           `json:"watched_count"`
-	UnwatchedCount int64           `json:"unwatched_count"`
+	TotalCount           int64           `json:"total_count"`
+	TotalSize            sql.NullFloat64 `json:"total_size"`
+	TotalDuration        sql.NullFloat64 `json:"total_duration"`
+	WatchedCount         int64           `json:"watched_count"`
+	UnwatchedCount       int64           `json:"unwatched_count"`
+	TotalWatchedDuration sql.NullFloat64 `json:"total_watched_duration"`
 }
 
 func (q *Queries) GetStats(ctx context.Context) (GetStatsRow, error) {
@@ -1127,6 +1156,7 @@ func (q *Queries) GetStats(ctx context.Context) (GetStatsRow, error) {
 		&i.TotalDuration,
 		&i.WatchedCount,
 		&i.UnwatchedCount,
+		&i.TotalWatchedDuration,
 	)
 	return i, err
 }
@@ -1317,6 +1347,41 @@ func (q *Queries) GetUnwatchedMedia(ctx context.Context, limit int64) ([]Media, 
 			&i.Latitude,
 			&i.Longitude,
 		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getUsedCategories = `-- name: GetUsedCategories :many
+SELECT categories, COUNT(*) as count
+FROM media
+WHERE time_deleted = 0 AND categories IS NOT NULL AND categories != ''
+GROUP BY categories
+`
+
+type GetUsedCategoriesRow struct {
+	Categories sql.NullString `json:"categories"`
+	Count      int64          `json:"count"`
+}
+
+func (q *Queries) GetUsedCategories(ctx context.Context) ([]GetUsedCategoriesRow, error) {
+	rows, err := q.db.QueryContext(ctx, getUsedCategories)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetUsedCategoriesRow{}
+	for rows.Next() {
+		var i GetUsedCategoriesRow
+		if err := rows.Scan(&i.Categories, &i.Count); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

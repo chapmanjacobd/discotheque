@@ -156,12 +156,23 @@ func (qb *QueryBuilder) BuildSelect(columns string) (string, []any) {
 
 	// Exact path filters
 	if len(qb.Flags.Paths) > 0 {
-		placeholders := make([]string, len(qb.Flags.Paths))
-		for i := range qb.Flags.Paths {
-			placeholders[i] = "?"
-			args = append(args, qb.Flags.Paths[i])
+		var inPaths []string
+		for _, p := range qb.Flags.Paths {
+			if strings.Contains(p, "%") {
+				whereClauses = append(whereClauses, "path LIKE ?")
+				args = append(args, p)
+			} else {
+				inPaths = append(inPaths, p)
+			}
 		}
-		whereClauses = append(whereClauses, fmt.Sprintf("path IN (%s)", strings.Join(placeholders, ", ")))
+		if len(inPaths) > 0 {
+			placeholders := make([]string, len(inPaths))
+			for i := range inPaths {
+				placeholders[i] = "?"
+				args = append(args, inPaths[i])
+			}
+			whereClauses = append(whereClauses, fmt.Sprintf("path IN (%s)", strings.Join(placeholders, ", ")))
+		}
 	}
 
 	// Size filters

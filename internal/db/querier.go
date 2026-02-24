@@ -14,6 +14,7 @@ type Querier interface {
 	DeletePlaylist(ctx context.Context, arg DeletePlaylistParams) error
 	GetAllMediaMetadata(ctx context.Context) ([]GetAllMediaMetadataRow, error)
 	GetCategoryStats(ctx context.Context) ([]GetCategoryStatsRow, error)
+	GetCustomCategories(ctx context.Context) ([]string, error)
 	GetGenreStats(ctx context.Context) ([]GetGenreStatsRow, error)
 	GetHistoryCount(ctx context.Context, mediaPath string) (int64, error)
 	GetMedia(ctx context.Context, limit int64) ([]Media, error)
@@ -32,6 +33,7 @@ type Querier interface {
 	GetStatsByType(ctx context.Context) ([]GetStatsByTypeRow, error)
 	GetUnfinishedMedia(ctx context.Context, limit int64) ([]Media, error)
 	GetUnwatchedMedia(ctx context.Context, limit int64) ([]Media, error)
+	GetUsedCategories(ctx context.Context) ([]GetUsedCategoriesRow, error)
 	GetWatchedMedia(ctx context.Context, limit int64) ([]Media, error)
 	InsertCaption(ctx context.Context, arg InsertCaptionParams) error
 	InsertHistory(ctx context.Context, arg InsertHistoryParams) error

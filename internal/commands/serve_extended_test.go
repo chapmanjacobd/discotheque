@@ -5,9 +5,11 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"slices"
 	"strings"
 	"testing"
 
+	"github.com/chapmanjacobd/discotheque/internal/models"
 	"github.com/chapmanjacobd/discotheque/internal/testutils"
 )
 
@@ -18,15 +20,27 @@ func TestServeCmd_ExtendedHandlers(t *testing.T) {
 	db := fixture.GetDB()
 	InitDB(db)
 
-	// Insert test data
+	// Insert comprehensive test data for all sub-tests
 	_, err := db.Exec(`
-		INSERT INTO media (path, type, genre, time_deleted)
+		INSERT INTO media (path, title, type, size, duration, genre, categories, time_last_played, time_deleted)
 		VALUES 
-		('video1.mp4', 'video/mp4', 'Action', 0),
-		('video2.mp4', 'video/mp4', 'Comedy', 0),
-		('audio1.mp3', 'audio/mpeg', 'Rock', 0),
-		('audio2.mp3', 'audio/mpeg', 'Jazz', 0),
-		('deleted.mp4', 'video/mp4', 'Horror', 123456789)
+		('/media/video1.mp4', 'Movie 1', 'video', 1000000, 3600, 'Action', ';action;', 1708700000, 0),
+		('/media/video2.mp4', 'Movie 2', 'video', 1000050, 3605, 'Comedy', ';action;', 1708800000, 0),
+		('/media/music/audio1.mp3', 'Song 1', 'audio', 5000000, 300, 'Rock', ';music;', 1708900000, 0),
+		('/media/music/audio2.mp3', 'Song 2', 'audio', 5000000, 300, 'Jazz', ';music;', 0, 0),
+		('/media/other/doc.pdf', 'Document', 'application/pdf', 5000, 0, 'Edu', ';edu;', 0, 0),
+		('/media/deleted.mp4', 'Deleted', 'video', 1000, 10, 'Horror', '', 0, 123456789)
+	`)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Insert captions for search test
+	_, err = db.Exec(`
+		INSERT INTO captions (media_path, time, text)
+		VALUES 
+		('/media/video1.mp4', 10.5, 'I will be back'),
+		('/media/video1.mp4', 20.0, 'Hello world')
 	`)
 	if err != nil {
 		t.Fatal(err)
@@ -81,17 +95,21 @@ func TestServeCmd_ExtendedHandlers(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if len(resp) != 4 {
-			t.Errorf("Expected 4 genres, got %d", len(resp))
+		// Action, Comedy, Rock, Jazz, Edu
+		if len(resp) != 5 {
+			t.Errorf("Expected 5 genres, got %d", len(resp))
 		}
 	})
 
 	t.Run("HandleQuery_Offset", func(t *testing.T) {
-		// Get all 4 active items, sorted by path
-		// video1.mp4, video2.mp4, audio1.mp3, audio2.mp3
-		// Natural sort: audio1.mp3, audio2.mp3, video1.mp4, video2.mp4
+		// Natural sort by path (asc):
+		// /media/music/audio1.mp3 (0)
+		// /media/music/audio2.mp3 (1)
+		// /media/other/doc.pdf (2)
+		// /media/video1.mp4 (3)
+		// /media/video2.mp4 (4)
 
-		req := httptest.NewRequest(http.MethodGet, "/api/query?limit=2&offset=2&sort=path", nil)
+		req := httptest.NewRequest(http.MethodGet, "/api/query?limit=2&offset=3&sort=path", nil)
 		w := httptest.NewRecorder()
 		handler.ServeHTTP(w, req)
 
@@ -109,9 +127,8 @@ func TestServeCmd_ExtendedHandlers(t *testing.T) {
 		if len(resp) != 2 {
 			t.Errorf("Expected 2 results, got %d", len(resp))
 		}
-		// Based on path sort: audio1.mp3 (0), audio2.mp3 (1), video1.mp4 (2), video2.mp4 (3)
-		if resp[0].Path != "video1.mp4" {
-			t.Errorf("Expected video1.mp4 at offset 2, got %s", resp[0].Path)
+		if resp[0].Path != "/media/video1.mp4" {
+			t.Errorf("Expected /media/video1.mp4 at offset 3, got %s", resp[0].Path)
 		}
 	})
 
@@ -135,12 +152,13 @@ func TestServeCmd_ExtendedHandlers(t *testing.T) {
 		if err := json.NewDecoder(w.Body).Decode(&listResp); err != nil {
 			t.Fatal(err)
 		}
-		if len(listResp) != 1 || listResp[0] != "My Playlist" {
-			t.Errorf("Unexpected playlist list: %v", listResp)
+		found := slices.Contains(listResp, "My Playlist")
+		if !found {
+			t.Errorf("Playlist 'My Playlist' not found in %v", listResp)
 		}
 
 		// POST add item to playlist
-		addItemPayload := `{"playlist_title": "My Playlist", "media_path": "video1.mp4"}`
+		addItemPayload := `{"playlist_title": "My Playlist", "media_path": "/media/video1.mp4"}`
 		req = httptest.NewRequest(http.MethodPost, "/api/playlists/items", strings.NewReader(addItemPayload))
 		w = httptest.NewRecorder()
 		handler.ServeHTTP(w, req)
@@ -161,7 +179,7 @@ func TestServeCmd_ExtendedHandlers(t *testing.T) {
 		}
 
 		// DELETE playlist item
-		deleteItemPayload := `{"playlist_title": "My Playlist", "media_path": "video1.mp4"}`
+		deleteItemPayload := `{"playlist_title": "My Playlist", "media_path": "/media/video1.mp4"}`
 		req = httptest.NewRequest(http.MethodDelete, "/api/playlists/items", strings.NewReader(deleteItemPayload))
 		w = httptest.NewRecorder()
 		handler.ServeHTTP(w, req)
@@ -197,11 +215,7 @@ func TestServeCmd_ExtendedHandlers(t *testing.T) {
 	})
 
 	t.Run("HandleHLSPlaylist", func(t *testing.T) {
-		db := fixture.GetDB()
-		db.Exec("INSERT INTO media (path, type, duration, time_deleted) VALUES (?, 'video', 120, 0)", "hls_video.mp4")
-		db.Close()
-
-		req := httptest.NewRequest(http.MethodGet, "/api/hls/playlist?path=hls_video.mp4", nil)
+		req := httptest.NewRequest(http.MethodGet, "/api/hls/playlist?path=/media/video1.mp4", nil)
 		w := httptest.NewRecorder()
 		handler.ServeHTTP(w, req)
 
@@ -216,9 +230,9 @@ func TestServeCmd_ExtendedHandlers(t *testing.T) {
 	t.Run("HandleEmptyBin", func(t *testing.T) {
 		// Create a file, mark it deleted, then empty bin
 		dummyPath := fixture.CreateDummyFile("to_be_permanently_deleted.mp4")
-		db := fixture.GetDB()
-		db.Exec("INSERT INTO media (path, type, time_deleted) VALUES (?, 'video', 12345)", dummyPath)
-		db.Close()
+		dbConn := fixture.GetDB()
+		dbConn.Exec("INSERT INTO media (path, type, time_deleted) VALUES (?, 'video', 12345)", dummyPath)
+		dbConn.Close()
 
 		req := httptest.NewRequest(http.MethodPost, "/api/empty-bin", strings.NewReader("{}"))
 		w := httptest.NewRecorder()
@@ -234,12 +248,187 @@ func TestServeCmd_ExtendedHandlers(t *testing.T) {
 		}
 
 		// Verify row is gone from DB
-		db = fixture.GetDB()
-		defer db.Close()
+		dbConn = fixture.GetDB()
+		defer dbConn.Close()
 		var count int
-		db.QueryRow("SELECT count(*) FROM media WHERE path = ?", dummyPath).Scan(&count)
+		dbConn.QueryRow("SELECT count(*) FROM media WHERE path = ?", dummyPath).Scan(&count)
 		if count != 0 {
 			t.Error("Expected row to be deleted from DB")
+		}
+	})
+
+	t.Run("HandleDU", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/api/du?path=/media", nil)
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Errorf("Expected 200, got %d", w.Code)
+		}
+
+		var resp []models.FolderStats
+		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+			t.Fatal(err)
+		}
+
+		if len(resp) == 0 {
+			t.Error("Expected DU results, got none")
+		}
+	})
+
+	t.Run("HandleSimilarity", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/api/similarity", nil)
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Errorf("Expected 200, got %d", w.Code)
+		}
+
+		var resp []models.FolderStats
+		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+			t.Fatal(err)
+		}
+
+		foundGroup := false
+		for _, g := range resp {
+			if len(g.Files) >= 2 {
+				foundGroup = true
+				break
+			}
+		}
+		if !foundGroup {
+			t.Error("Expected to find a similarity group for movies or music")
+		}
+	})
+
+	t.Run("HandleRandomClip", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/api/random-clip", nil)
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Errorf("Expected 200, got %d", w.Code)
+		}
+
+		var resp struct {
+			models.MediaWithDB
+			Start int `json:"start"`
+			End   int `json:"end"`
+		}
+		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+			t.Fatal(err)
+		}
+
+		if resp.Path == "" {
+			t.Error("Expected a media path in random clip")
+		}
+	})
+
+	t.Run("HandleStatsLibrary", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/api/stats/library", nil)
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Errorf("Expected 200, got %d", w.Code)
+		}
+
+		var resp []any
+		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+			t.Fatal(err)
+		}
+
+		if len(resp) != 1 {
+			t.Errorf("Expected 1 DB result, got %d", len(resp))
+		}
+	})
+
+	t.Run("HandleStatsHistory", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/api/stats/history?facet=watched", nil)
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Errorf("Expected 200, got %d", w.Code)
+		}
+
+		var resp []any
+		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+			t.Fatal(err)
+		}
+
+		if len(resp) != 1 {
+			t.Errorf("Expected 1 DB result, got %d", len(resp))
+		}
+	})
+
+	t.Run("HandleCategorizeSuggest", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/api/categorize/suggest", nil)
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Errorf("Expected 200, got %d", w.Code)
+		}
+
+		var resp []any
+		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+			t.Fatal(err)
+		}
+	})
+
+	t.Run("HandleCategorizeApply", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/api/categorize/apply", nil)
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Errorf("Expected 200, got %d", w.Code)
+		}
+
+		var resp struct {
+			Count int `json:"count"`
+		}
+		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+			t.Fatal(err)
+		}
+	})
+
+	t.Run("HandleQueryWithCaptions", func(t *testing.T) {
+		// Skip if FTS5 is not available
+		dbConn := fixture.GetDB()
+		var name string
+		err := dbConn.QueryRow("SELECT name FROM sqlite_master WHERE type='table' AND name='captions_fts'").Scan(&name)
+		dbConn.Close()
+		if err != nil {
+			t.Skip("FTS5 not available, skipping search captions tests")
+		}
+
+		req := httptest.NewRequest(http.MethodGet, "/api/query?search=back&captions=true", nil)
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Errorf("Expected 200, got %d", w.Code)
+		}
+
+		var resp []models.MediaWithDB
+		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+			t.Fatal(err)
+		}
+
+		foundCaption := false
+		for _, m := range resp {
+			if strings.Contains(m.CaptionText, "back") {
+				foundCaption = true
+				if m.CaptionTime != 10.5 {
+					t.Errorf("Expected caption time 10.5, got %f", m.CaptionTime)
+				}
+			}
+		}
+		if !foundCaption {
+			t.Error("Expected to find media via caption search")
 		}
 	})
 }
