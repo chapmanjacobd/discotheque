@@ -60,11 +60,12 @@ describe('Utility Functions', () => {
     });
   });
 
-  describe('formatDisplayPath', () => {
+  describe('formatParents', () => {
     it('formats paths correctly', () => {
-      const { formatDisplayPath } = window.disco;
-      expect(formatDisplayPath('/home/user/media/video.mp4')).toBe('media/video.mp4');
-      expect(formatDisplayPath('video.mp4')).toBe('video.mp4');
+      const { formatParents } = window.disco;
+      expect(formatParents('/home/user/media/video.mp4')).toBe('user/media');
+      expect(formatParents('media/video.mp4')).toBe('media');
+      expect(formatParents('video.mp4')).toBe('');
     });
   });
 });

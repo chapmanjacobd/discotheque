@@ -439,7 +439,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
             displayName = truncateString(displayName);
-            const displayPath = formatDisplayPath(item.path);
+            const displayPath = formatParents(item.path);
 
             return `
                 <div class="suggestion-item" data-path="${item.path}" data-is-dir="${item.is_dir}" data-name="${item.name}" data-index="${idx}">
@@ -1170,6 +1170,17 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        const prevItem = state.playback.item;
+        const wasPlayed = state.playback.hasMarkedComplete || (prevItem && getPlayCount(prevItem) > 0);
+
+        state.playback.item = item;
+        state.playback.startTime = Date.now();
+        state.playback.hasMarkedComplete = false;
+
+        if (prevItem && prevItem.path !== item.path && state.filters.unplayed && wasPlayed) {
+            performSearch();
+        }
+
         const path = item.path;
         showToast(`Playing: ${path.split('/').pop()}`);
         try {
@@ -1430,7 +1441,7 @@ document.addEventListener('DOMContentLoaded', () => {
             counts[item.path] = (counts[item.path] || 0) + 1;
             localStorage.setItem('disco-play-counts', JSON.stringify(counts));
 
-            showToast('Marked as played (Local)', '✅');
+            showToast('Marked as seen (Local)', '✅');
         } else {
             try {
                 const resp = await fetch('/api/mark-played', {
@@ -1439,9 +1450,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     body: JSON.stringify({ path: item.path })
                 });
                 if (!resp.ok) throw new Error('Action failed');
-                showToast('Marked as played', '✅');
+                showToast('Marked as seen', '✅');
             } catch (err) {
-                console.error('Failed to mark as played:', err);
+                console.error('Failed to mark as seen:', err);
                 showToast('Action failed');
                 return;
             }
@@ -1450,7 +1461,9 @@ document.addEventListener('DOMContentLoaded', () => {
         // Update current state and re-render
         const updated = (m) => {
             if (m.path === item.path) {
-                m.play_count = getPlayCount(m);
+                if (!state.readOnly) {
+                    m.play_count = (m.play_count || 0) + 1;
+                }
                 m.playhead = 0;
                 m.time_last_played = Math.floor(Date.now() / 1000);
             }
@@ -1459,7 +1472,11 @@ document.addEventListener('DOMContentLoaded', () => {
         currentMedia = currentMedia.map(updated);
         if (state.playlistItems) state.playlistItems = state.playlistItems.map(updated);
 
-        renderResults();
+        if (state.filters.unplayed) {
+            performSearch();
+        } else {
+            renderResults();
+        }
     }
 
     function seekToProgress(el, targetPos, retryCount = 0) {
@@ -1563,11 +1580,18 @@ document.addEventListener('DOMContentLoaded', () => {
             if (speedBtn) speedBtn.textContent = `${state.playbackRate}x`;
         }
 
+        const prevItem = state.playback.item;
+        const wasPlayed = state.playback.hasMarkedComplete || (prevItem && getPlayCount(prevItem) > 0);
+
         state.playback.item = item;
         state.playback.startTime = Date.now();
         state.playback.lastUpdate = 0;
         state.playback.hasMarkedComplete = false;
         state.playback.lastPlayedIndex = currentMedia.findIndex(m => m.path === item.path);
+
+        if (prevItem && prevItem.path !== item.path && state.filters.unplayed && wasPlayed) {
+            performSearch();
+        }
 
         const path = item.path;
         pipTitle.textContent = truncateString(path.split('/').pop());
@@ -2059,7 +2083,7 @@ document.addEventListener('DOMContentLoaded', () => {
         detailView.classList.remove('hidden');
 
         const title = truncateString(item.title || item.path.split('/').pop());
-        const displayPath = formatDisplayPath(item.path);
+        const displayPath = formatParents(item.path);
         const thumbUrl = `/api/thumbnail?path=${encodeURIComponent(item.path)}`;
         const size = formatSize(item.size);
         const duration = formatDuration(item.duration);
@@ -2080,7 +2104,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         </div>
                         <div class="detail-actions">
                             <button class="category-btn play-now-btn">▶ Play</button>
-                            <button class="category-btn mark-viewed-btn">✅ Mark Viewed</button>
+                            <button class="category-btn mark-seen-btn">✅ Mark Seen</button>
                             ${!state.readOnly ? `<button class="category-btn add-playlist-btn">+ Add to Playlist</button>` : ''}
                             <button class="category-btn delete-item-btn">🗑 Trash</button>
                         </div>
@@ -2119,9 +2143,9 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
 
         detailContent.querySelector('.play-now-btn').onclick = () => playMedia(item);
-        const markViewedBtn = detailContent.querySelector('.mark-viewed-btn');
-        if (markViewedBtn) {
-            markViewedBtn.onclick = () => markMediaPlayed(item);
+        const markSeenBtn = detailContent.querySelector('.mark-seen-btn');
+        if (markSeenBtn) {
+            markSeenBtn.onclick = () => markMediaPlayed(item);
         }
         const addPlaylistBtn = detailContent.querySelector('.add-playlist-btn');
         if (addPlaylistBtn) {
@@ -2238,7 +2262,7 @@ document.addEventListener('DOMContentLoaded', () => {
             };
 
             const title = truncateString(item.title || item.path.split('/').pop());
-            const displayPath = formatDisplayPath(item.path);
+            const displayPath = formatParents(item.path);
             const size = formatSize(item.size);
             const duration = formatDuration(item.duration);
             const plays = getPlayCount(item);
@@ -2267,7 +2291,7 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 actionBtns = `
                     ${!state.readOnly ? `<button class="media-action-btn add-playlist" title="Add to Playlist">+</button>` : ''}
-                    <button class="media-action-btn mark-played" title="Mark as Played">✅</button>
+                    <button class="media-action-btn mark-played" title="Mark as Seen">✅</button>
                     ${!state.readOnly ? `<button class="media-action-btn delete" title="Move to Trash">🗑️</button>` : ''}
                 `;
             }
@@ -3808,7 +3832,7 @@ document.addEventListener('DOMContentLoaded', () => {
         getIcon,
         truncateString,
         formatRelativeDate,
-        formatDisplayPath,
+        formatParents,
         openInPiP,
         updateProgress,
         seekToProgress,
@@ -3872,13 +3896,16 @@ function truncateString(str) {
     return str.substring(0, limit - 3) + '...';
 }
 
-function formatDisplayPath(path) {
+function formatParents(path) {
     if (!path) return '';
     const parts = path.split('/');
-    if (parts.length > 2) {
-        // Show only parent folder and filename
+    if (parts.length > 1) {
+        // Remove filename
+        parts.pop();
+        if (parts.length === 0) return '';
+        // Show up to two parent folders
         const display = parts.slice(-2).join('/');
         return truncateString(display);
     }
-    return truncateString(path);
+    return '';
 }
