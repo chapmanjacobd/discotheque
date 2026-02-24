@@ -624,6 +624,33 @@ func (c *ServeCmd) handleLs(w http.ResponseWriter, r *http.Request) {
 	if strings.HasPrefix(path, "./") {
 		isPartial = true
 		path = strings.TrimPrefix(path, "./")
+	} else if !strings.HasPrefix(path, "/") {
+		// If it doesn't start with / or ./, treat as partial from current context
+		isPartial = true
+	}
+
+	// Split into dir and base for better contextual suggestions
+	searchDir := ""
+	searchBase := path
+	if isPartial {
+		lastSlash := strings.LastIndex(path, "/")
+		if lastSlash != -1 {
+			searchDir = path[:lastSlash+1]
+			searchBase = path[lastSlash+1:]
+		}
+	} else {
+		searchDir = path
+		searchBase = ""
+		if !strings.HasSuffix(path, "/") {
+			lastSlash := strings.LastIndex(path, "/")
+			if lastSlash != -1 {
+				searchDir = path[:lastSlash+1]
+				searchBase = path[lastSlash+1:]
+			} else {
+				searchDir = "/"
+				searchBase = path[1:]
+			}
+		}
 	}
 
 	type LsEntry struct {
@@ -634,6 +661,7 @@ func (c *ServeCmd) handleLs(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resultsMap := make(map[string]LsEntry)
+	counts := make(map[string]int)
 
 	for _, dbPath := range c.Databases {
 		err := c.execDB(r.Context(), dbPath, func(sqlDB *sql.DB) error {
@@ -641,18 +669,34 @@ func (c *ServeCmd) handleLs(w http.ResponseWriter, r *http.Request) {
 			var err error
 
 			if isPartial {
-				rows, err = sqlDB.QueryContext(r.Context(), `
-					SELECT path, type FROM media
-					WHERE time_deleted = 0
-					  AND path LIKE '%' || ? || '%'`, path)
-			} else {
-				if !strings.HasSuffix(path, "/") {
-					path += "/"
+				if searchDir == "" {
+					rows, err = sqlDB.QueryContext(r.Context(), `
+						SELECT path, type FROM media
+						WHERE time_deleted = 0
+						  AND path LIKE '%' || ? || '%'
+						LIMIT 500`, searchBase)
+				} else {
+					rows, err = sqlDB.QueryContext(r.Context(), `
+						SELECT path, type FROM media
+						WHERE time_deleted = 0
+						  AND path LIKE '%' || ? || '%' || ? || '%'
+						LIMIT 500`, searchDir, searchBase)
 				}
-				rows, err = sqlDB.QueryContext(r.Context(), `
-					SELECT path, type FROM media
-					WHERE time_deleted = 0
-					  AND path LIKE ? || '%'`, path)
+			} else {
+				if searchBase == "" {
+					rows, err = sqlDB.QueryContext(r.Context(), `
+						SELECT path, type FROM media
+						WHERE time_deleted = 0
+						  AND path LIKE ? || '%'
+						LIMIT 500`, searchDir)
+				} else {
+					rows, err = sqlDB.QueryContext(r.Context(), `
+						SELECT path, type FROM media
+						WHERE time_deleted = 0
+						  AND path LIKE ? || '%'
+						  AND path LIKE '%' || ? || '%'
+						LIMIT 500`, searchDir, searchBase)
+				}
 			}
 
 			if err != nil {
@@ -664,30 +708,64 @@ func (c *ServeCmd) handleLs(w http.ResponseWriter, r *http.Request) {
 				var p, t sql.NullString
 				if err := rows.Scan(&p, &t); err == nil && p.Valid {
 					fullPath := p.String
+
+					if isPartial && path == "" {
+						// Special case: empty partial search (./)
+						segments := strings.Split(strings.Trim(fullPath, "/"), "/")
+						current := "/"
+						for _, seg := range segments {
+							if seg == "" {
+								continue
+							}
+							entryName := seg
+							entryPath := current + seg + "/"
+							if !strings.HasSuffix(fullPath, "/") && seg == segments[len(segments)-1] {
+								entryPath = current + seg
+								counts[entryPath]++
+								if _, ok := resultsMap[entryPath]; !ok {
+									resultsMap[entryPath] = LsEntry{Name: entryName, Path: entryPath, IsDir: false, Type: t.String}
+								}
+								break
+							}
+							counts[entryPath]++
+							if _, ok := resultsMap[entryPath]; !ok {
+								resultsMap[entryPath] = LsEntry{Name: entryName, Path: entryPath, IsDir: true}
+							}
+							current = entryPath
+						}
+						continue
+					}
+
 					var entryName string
 					var entryPath string
 					var isDir bool
 
 					if isPartial {
-						idx := strings.Index(fullPath, path)
+						matchStr := path
+						if searchDir != "" {
+							matchStr = searchDir
+						}
+						
+						idx := strings.Index(fullPath, matchStr)
 						if idx == -1 {
 							continue
 						}
 
-						// We found 'path' in 'fullPath'.
-						// We want to extract the segment that starts with 'path'.
-						// If path ends in a slash, we want the segment AFTER that slash.
-
-						var remaining string
 						var prefix string
-						if strings.HasSuffix(path, "/") {
-							remaining = fullPath[idx+len(path):]
-							prefix = fullPath[:idx+len(path)]
+						var remaining string
+
+						if strings.HasSuffix(matchStr, "/") {
+							// Suggest contents of the matched directory
+							prefix = fullPath[:idx+len(matchStr)]
+							remaining = fullPath[idx+len(matchStr):]
 						} else {
-							// Find the start of the current segment
-							lastSlash := strings.LastIndex(fullPath[:idx+1], "/")
-							remaining = fullPath[lastSlash+1:]
+							// Suggest the segment containing the match
+							lastSlash := strings.LastIndex(fullPath[:idx], "/")
+							if lastSlash == -1 {
+								lastSlash = 0
+							}
 							prefix = fullPath[:lastSlash+1]
+							remaining = fullPath[lastSlash+1:]
 						}
 
 						if remaining == "" {
@@ -704,19 +782,22 @@ func (c *ServeCmd) handleLs(w http.ResponseWriter, r *http.Request) {
 							entryPath = prefix + entryName
 						}
 					} else {
-						suffix := strings.TrimPrefix(fullPath, path)
+						// Absolute path
+						if !strings.HasPrefix(fullPath, searchDir) {
+							continue
+						}
+						suffix := strings.TrimPrefix(fullPath, searchDir)
 						if suffix == "" {
 							continue
 						}
-
 						if before, _, ok := strings.Cut(suffix, "/"); ok {
 							entryName = before
 							isDir = true
-							entryPath = path + entryName + "/"
+							entryPath = searchDir + entryName + "/"
 						} else {
 							entryName = suffix
 							isDir = false
-							entryPath = path + entryName
+							entryPath = searchDir + entryName
 						}
 					}
 
@@ -724,18 +805,17 @@ func (c *ServeCmd) handleLs(w http.ResponseWriter, r *http.Request) {
 						continue
 					}
 
-					// Add or update entry in map
-					key := entryPath
-					if existing, ok := resultsMap[key]; ok {
+					counts[entryPath]++
+					if existing, ok := resultsMap[entryPath]; ok {
 						if !existing.IsDir && isDir {
-							resultsMap[key] = LsEntry{
+							resultsMap[entryPath] = LsEntry{
 								Name:  entryName,
 								Path:  entryPath,
 								IsDir: true,
 							}
 						}
 					} else {
-						resultsMap[key] = LsEntry{
+						resultsMap[entryPath] = LsEntry{
 							Name:  entryName,
 							Path:  entryPath,
 							IsDir: isDir,
@@ -757,11 +837,20 @@ func (c *ServeCmd) handleLs(w http.ResponseWriter, r *http.Request) {
 	}
 
 	sort.Slice(results, func(i, j int) bool {
+		countI := counts[results[i].Path]
+		countJ := counts[results[j].Path]
+		if countI != countJ {
+			return countI > countJ // Best matches first
+		}
 		if results[i].IsDir != results[j].IsDir {
 			return results[i].IsDir
 		}
 		return strings.ToLower(results[i].Name) < strings.ToLower(results[j].Name)
 	})
+
+	if len(results) > 20 {
+		results = results[:20]
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(results)

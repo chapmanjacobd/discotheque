@@ -39,19 +39,35 @@ describe('Integration Test 2', () => {
     });
 
     it('filters by genre', async () => {
+        // Open Advanced Filters
+        const advancedFilterToggle = document.getElementById('advanced-filter-toggle');
+        advancedFilterToggle.click();
+
+        // Select "Genre" in Browse By dropdown
+        const browseCol = document.getElementById('filter-browse-col');
+        browseCol.value = 'genre';
+        browseCol.dispatchEvent(new Event('change'));
+
+        // Wait for values to load and select "Rock"
         await vi.waitFor(() => {
-            const genreBtn = document.querySelector('.category-btn[data-genre="Rock"]');
-            expect(genreBtn).not.toBeNull();
+            const browseVal = document.getElementById('filter-browse-val');
+            expect(browseVal.querySelector('option[value="Rock"]')).not.toBeNull();
         });
 
-        const genreBtn = document.querySelector('.category-btn[data-genre="Rock"]');
-        genreBtn.click();
+        const browseVal = document.getElementById('filter-browse-val');
+        browseVal.value = 'Rock';
+        
+        // Apply filters
+        const applyBtn = document.getElementById('apply-advanced-filters');
+        applyBtn.click();
 
         await vi.waitFor(() => {
-            expect(global.fetch).toHaveBeenCalledWith(
-                expect.stringContaining('genre=Rock'),
-                expect.any(Object)
-            );
+            // Check that fetch was called with the correct genre parameter
+            // Note: The URL might contain other default parameters, so we check stringContaining
+            const calls = global.fetch.mock.calls;
+            const lastCall = calls[calls.length - 1];
+            const url = lastCall[0];
+            expect(url).toEqual(expect.stringContaining('genre=Rock'));
         });
     });
 

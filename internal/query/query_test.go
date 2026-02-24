@@ -120,6 +120,16 @@ func TestQueryBuilder_Build(t *testing.T) {
 			models.GlobalFlags{ImageOnly: true, Limit: 10, HideDeleted: true},
 			"SELECT * FROM media WHERE COALESCE(time_deleted, 0) = 0 AND (type = 'image') LIMIT 10",
 		},
+		{
+			"Path-like Search (absolute)",
+			models.GlobalFlags{Search: []string{"/home/"}, Limit: 10, HideDeleted: true},
+			"SELECT * FROM media WHERE COALESCE(time_deleted, 0) = 0 AND path LIKE ? LIMIT 10",
+		},
+		{
+			"Path-like Search (relative)",
+			models.GlobalFlags{Search: []string{"./home/"}, Limit: 10, HideDeleted: true},
+			"SELECT * FROM media WHERE COALESCE(time_deleted, 0) = 0 AND path LIKE ? LIMIT 10",
+		},
 	}
 
 	for _, tt := range tests {

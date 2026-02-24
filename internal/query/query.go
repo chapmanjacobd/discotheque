@@ -97,6 +97,21 @@ func (qb *QueryBuilder) BuildSelect(columns string) (string, []any) {
 	allInclude := append([]string{}, qb.Flags.Search...)
 	allInclude = append(allInclude, qb.Flags.Include...)
 
+	// Path contains filters
+	pathContains := append([]string{}, qb.Flags.PathContains...)
+
+	var filteredInclude []string
+	for _, term := range allInclude {
+		if strings.HasPrefix(term, "./") {
+			pathContains = append(pathContains, term[1:]) // Strip . keep /
+		} else if strings.HasPrefix(term, "/") {
+			pathContains = append(pathContains, term)
+		} else {
+			filteredInclude = append(filteredInclude, term)
+		}
+	}
+	allInclude = filteredInclude
+
 	if len(allInclude) > 0 {
 		joinOp := " AND "
 		if qb.Flags.FlexibleSearch {
@@ -134,7 +149,7 @@ func (qb *QueryBuilder) BuildSelect(columns string) (string, []any) {
 	}
 
 	// Path contains filters
-	for _, contain := range qb.Flags.PathContains {
+	for _, contain := range pathContains {
 		whereClauses = append(whereClauses, "path LIKE ?")
 		args = append(args, "%"+contain+"%")
 	}

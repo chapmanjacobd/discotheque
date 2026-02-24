@@ -430,15 +430,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 // If browsing relative paths, bold the part that matches what's after the last slash
                 const lastSlash = inputVal.lastIndexOf('/');
                 const query = inputVal.substring(lastSlash + 1).toLowerCase();
-                if (query && item.name.toLowerCase().startsWith(query)) {
-                    displayName = `<b>${item.name.substring(0, query.length)}</b>${item.name.substring(query.length)}`;
+                
+                // If the item name contains the query, highlight it.
+                // We should only do this if we are actively filtering.
+                if (query && item.name.toLowerCase().includes(query)) {
+                    const qIdx = item.name.toLowerCase().indexOf(query);
+                    displayName = `${item.name.substring(0, qIdx)}<b>${item.name.substring(qIdx, qIdx + query.length)}</b>${item.name.substring(qIdx + query.length)}`;
                 }
             }
             displayName = truncateString(displayName);
             const displayPath = formatDisplayPath(item.path);
 
             return `
-                <div class="suggestion-item" data-path="${item.path}" data-is-dir="${item.is_dir}" data-index="${idx}">
+                <div class="suggestion-item" data-path="${item.path}" data-is-dir="${item.is_dir}" data-name="${item.name}" data-index="${idx}">
                     <div class="suggestion-icon">${item.is_dir ? '📁' : getIcon(item.type)}</div>
                     <div class="suggestion-info">
                         <div class="suggestion-name">${displayName}</div>
@@ -457,7 +461,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const isDir = el.dataset.isDir === 'true';
                 if (isDir) {
                     if (searchInput.value.startsWith('./')) {
-                        const newName = el.querySelector('.suggestion-name').textContent;
+                        const newName = el.dataset.name;
                         const lastSlash = searchInput.value.lastIndexOf('/');
                         const newPath = searchInput.value.substring(0, lastSlash + 1) + newName + '/';
                         searchInput.value = newPath;
@@ -2986,13 +2990,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (val.startsWith('/') || val.startsWith('./')) {
             // Path browsing
-            const lastSlash = val.lastIndexOf('/');
-            const dirPath = val.substring(0, lastSlash + 1);
-            if (dirPath) {
-                fetchSuggestions(dirPath);
-            } else {
-                fetchSuggestions(val.startsWith('/') ? '/' : './');
-            }
+            fetchSuggestions(val);
         } else {
             searchSuggestions.classList.add('hidden');
             debouncedSearch();
@@ -3007,9 +3005,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         if (val.startsWith('/') || val.startsWith('./')) {
-            const lastSlash = val.lastIndexOf('/');
-            const dirPath = val.substring(0, lastSlash + 1);
-            fetchSuggestions(dirPath || (val.startsWith('/') ? '/' : './'));
+            fetchSuggestions(val);
         }
     };
 
@@ -3039,20 +3035,14 @@ document.addEventListener('DOMContentLoaded', () => {
         if (e.key === 'Tab') {
             e.preventDefault();
             if (selectedSuggestionIndex === -1) {
-                if (items.length === 1) {
-                    selectedSuggestionIndex = 0;
-                } else {
-                    selectedSuggestionIndex = 0;
-                    updateSelectedSuggestion(items);
-                    return;
-                }
+                selectedSuggestionIndex = 0;
             }
             const el = items[selectedSuggestionIndex];
             const path = el.dataset.path;
             const isDir = el.dataset.isDir === 'true';
             if (isDir) {
                 if (searchInput.value.startsWith('./')) {
-                    const newName = el.querySelector('.suggestion-name').textContent;
+                    const newName = el.dataset.name;
                     const lastSlash = searchInput.value.lastIndexOf('/');
                     const newPath = searchInput.value.substring(0, lastSlash + 1) + newName + '/';
                     searchInput.value = newPath;
@@ -3082,7 +3072,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const isDir = el.dataset.isDir === 'true';
             if (isDir) {
                 if (searchInput.value.startsWith('./')) {
-                    const newName = el.querySelector('.suggestion-name').textContent;
+                    const newName = el.dataset.name;
                     const lastSlash = searchInput.value.lastIndexOf('/');
                     const newPath = searchInput.value.substring(0, lastSlash + 1) + newName + '/';
                     searchInput.value = newPath;
