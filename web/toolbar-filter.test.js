@@ -63,15 +63,15 @@ describe('Toolbar Media Options Filtering', () => {
         });
     });
 
-    it('re-renders similarity results when toolbar filter is clicked on Similarity page', async () => {
-        const similarityBtn = document.getElementById('similarity-btn');
-        similarityBtn.click();
+    it('re-renders episodes results when toolbar filter is clicked on Episodes page', async () => {
+        const episodesBtn = document.getElementById('episodes-btn');
+        episodesBtn.click();
 
         await vi.waitFor(() => {
             const resultsContainer = document.getElementById('results-container');
             // Check for loading screen
-            if (resultsContainer.innerHTML.includes('Calculating Similarity')) {
-                expect(resultsContainer.innerHTML).toContain('Calculating Similarity');
+            if (resultsContainer.innerHTML.includes('Grouping by Parent Folder')) {
+                expect(resultsContainer.innerHTML).toContain('Grouping by Parent Folder');
             } else {
                 expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('/api/similarity'), expect.any(Object));
             }

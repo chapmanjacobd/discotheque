@@ -423,6 +423,9 @@ func (c *ServeCmd) parseFlags(r *http.Request) models.GlobalFlags {
 	if q.Get("trash") == "true" {
 		flags.OnlyDeleted = true
 	}
+	if episodes := q.Get("episodes"); episodes != "" {
+		flags.FileCounts = episodes
+	}
 	return flags
 }
 

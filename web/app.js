@@ -26,7 +26,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const sidebar = document.querySelector('.sidebar');
 
     const duBtn = document.getElementById('du-btn');
-    const similarityBtn = document.getElementById('similarity-btn');
+    const episodesBtn = document.getElementById('episodes-btn');
     const analyticsBtn = document.getElementById('analytics-btn');
     const curationBtn = document.getElementById('curation-btn');
     const channelSurfBtn = document.getElementById('channel-surf-btn');
@@ -305,8 +305,8 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (state.page === 'du') {
             params.set('view', 'du');
             if (state.duPath) params.set('path', state.duPath);
-        } else if (state.page === 'similarity') {
-            params.set('view', 'similarity');
+        } else if (state.page === 'episodes') {
+            params.set('view', 'episodes');
         } else if (state.page === 'analytics') {
             params.set('view', 'analytics');
         } else if (state.page === 'curation') {
@@ -324,6 +324,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (state.filters.max_duration) params.set('max_duration', state.filters.max_duration);
             if (state.filters.min_score) params.set('min_score', state.filters.min_score);
             if (state.filters.max_score) params.set('max_score', state.filters.max_score);
+            if (state.filters.episodes) params.set('episodes', state.filters.episodes);
             if (state.filters.unplayed) params.set('unplayed', 'true');
         }
 
@@ -367,8 +368,8 @@ document.addEventListener('DOMContentLoaded', () => {
             state.duPath = params.get('path') || '';
             state.filters.category = '';
             state.filters.rating = '';
-        } else if (view === 'similarity') {
-            state.page = 'similarity';
+        } else if (view === 'episodes') {
+            state.page = 'episodes';
             state.filters.category = '';
             state.filters.rating = '';
         } else if (view === 'analytics') {
@@ -395,6 +396,7 @@ document.addEventListener('DOMContentLoaded', () => {
             state.filters.max_duration = params.get('max_duration') || '';
             state.filters.min_score = params.get('min_score') || '';
             state.filters.max_score = params.get('max_score') || '';
+            state.filters.episodes = params.get('episodes') || '';
             state.filters.unplayed = params.get('unplayed') === 'true';
 
             if (searchInput) searchInput.value = state.filters.search;
@@ -410,6 +412,8 @@ document.addEventListener('DOMContentLoaded', () => {
             if (minScoreEl) minScoreEl.value = state.filters.min_score;
             const maxScoreEl = document.getElementById('filter-max-score');
             if (maxScoreEl) maxScoreEl.value = state.filters.max_score;
+            const episodesEl = document.getElementById('filter-episodes');
+            if (episodesEl) episodesEl.value = state.filters.episodes;
             const unplayedEl = document.getElementById('filter-unplayed');
             if (unplayedEl) unplayedEl.checked = state.filters.unplayed;
 
@@ -437,8 +441,8 @@ document.addEventListener('DOMContentLoaded', () => {
             fetchPlaylistItems(state.filters.playlist);
         } else if (state.page === 'du') {
             fetchDU(state.duPath);
-        } else if (state.page === 'similarity') {
-            fetchSimilarity();
+        } else if (state.page === 'episodes') {
+            fetchEpisodes();
         } else if (state.page === 'analytics') {
             fetchAnalytics();
         } else if (state.page === 'curation') {
@@ -1101,14 +1105,13 @@ document.addEventListener('DOMContentLoaded', () => {
         updateNavActiveStates();
     }
 
-    function showSimilarityLoading() {
+    function showEpisodesLoading() {
         resultsContainer.className = 'similarity-view';
         resultsContainer.innerHTML = `
             <div class="loading-container" style="text-align: center; padding: 3rem;">
                 <div class="spinner" style="border: 4px solid rgba(0,0,0,0.1); width: 36px; height: 36px; border-radius: 50%; border-left-color: var(--accent-color); animation: spin 1s linear infinite; margin: 0 auto 1rem;"></div>
-                <h3>Calculating Similarity...</h3>
-                <p>This process compares media signatures and can take some time.</p>
-                <p style="color: var(--text-color); opacity: 0.7; font-size: 0.9rem;">Estimated time: ~5-10 seconds for large libraries.</p>
+                <h3>Grouping by Parent Folder...</h3>
+                <p>Organizing media into episodic groups.</p>
             </div>
             <style>
                 @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
@@ -1116,8 +1119,8 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
     }
 
-    async function fetchSimilarity() {
-        state.page = 'similarity';
+    async function fetchEpisodes() {
+        state.page = 'episodes';
         syncUrl();
 
         if (searchAbortController) {
@@ -1125,8 +1128,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         searchAbortController = new AbortController();
 
-        // Use specific loading screen for similarity
-        showSimilarityLoading();
+        // Use specific loading screen for episodes
+        showEpisodesLoading();
 
         try {
             const params = new URLSearchParams();
@@ -1137,18 +1140,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (t === 'text') params.append('text', 'true');
             });
             if (state.filters.search) params.append('search', state.filters.search);
+            params.append('folders', 'true');
 
             const resp = await fetch(`/api/similarity?${params.toString()}`, {
                 signal: searchAbortController.signal
             });
-            if (!resp.ok) throw new Error('Failed to fetch similarity');
+            if (!resp.ok) throw new Error('Failed to fetch episodes');
             state.similarityData = await resp.json();
             renderSimilarity(state.similarityData);
         } catch (err) {
             if (err.name === 'AbortError') return;
-            console.error('Similarity fetch failed:', err);
-            showToast('Failed to load Similarity Explorer');
-            resultsContainer.innerHTML = `<div class="error">Failed to load similarity results.</div>`;
+            console.error('Episodes fetch failed:', err);
+            showToast('Failed to load Episodes Explorer');
+            resultsContainer.innerHTML = `<div class="error">Failed to load episodes.</div>`;
         }
     }
 
@@ -1181,7 +1185,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return { ...group, files: filteredFiles, count: filteredFiles.length };
         }).filter(group => group.count > 0);
 
-        resultsCount.textContent = `${filtered.length} Similar groups found`;
+        resultsCount.textContent = `${filtered.length} folders found`;
         resultsContainer.className = 'similarity-view';
         resultsContainer.innerHTML = '';
 
@@ -1196,7 +1200,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const groupHeader = document.createElement('div');
             groupHeader.className = 'similarity-header';
             groupHeader.innerHTML = `
-                <h3>Group #${gIdx + 1}: ${group.path || 'Common context'}</h3>
+                <h3>${group.path || 'Common context'}</h3>
                 <div class="group-meta">${group.count} files • ${formatSize(totalSize)} • ${formatDuration(totalDuration)}</div>
             `;
             groupEl.appendChild(groupHeader);
@@ -1542,6 +1546,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (state.filters.max_duration) params.append('max_duration', state.filters.max_duration);
             if (state.filters.min_score) params.append('min_score', state.filters.min_score);
             if (state.filters.max_score) params.append('max_score', state.filters.max_score);
+            if (state.filters.episodes) params.append('episodes', state.filters.episodes);
             if (state.filters.unplayed) params.append('unplayed', 'true');
 
             let types = state.filters.types;
@@ -3814,6 +3819,7 @@ document.addEventListener('DOMContentLoaded', () => {
             state.filters.max_duration = document.getElementById('filter-max-duration').value;
             state.filters.min_score = document.getElementById('filter-min-score').value;
             state.filters.max_score = document.getElementById('filter-max-score').value;
+            state.filters.episodes = document.getElementById('filter-episodes').value;
             state.filters.unplayed = document.getElementById('filter-unplayed').checked;
             localStorage.setItem('disco-unplayed', state.filters.unplayed);
 
@@ -3840,6 +3846,7 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('filter-max-duration').value = '';
             document.getElementById('filter-min-score').value = '';
             document.getElementById('filter-max-score').value = '';
+            document.getElementById('filter-episodes').value = '';
             document.getElementById('filter-unplayed').checked = false;
             filterBrowseCol.value = '';
             filterBrowseVal.value = '';
@@ -3851,6 +3858,7 @@ document.addEventListener('DOMContentLoaded', () => {
             state.filters.max_duration = '';
             state.filters.min_score = '';
             state.filters.max_score = '';
+            state.filters.episodes = '';
             state.filters.unplayed = false;
             state.filters.genre = '';
             state.filters.category = '';
@@ -4195,7 +4203,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (historyBtn) historyBtn.classList.toggle('active', state.page === 'history');
         if (trashBtn) trashBtn.classList.toggle('active', state.page === 'trash');
         if (duBtn) duBtn.classList.toggle('active', state.page === 'du');
-        if (similarityBtn) similarityBtn.classList.toggle('active', state.page === 'similarity');
+        if (episodesBtn) episodesBtn.classList.toggle('active', state.page === 'episodes');
         if (analyticsBtn) analyticsBtn.classList.toggle('active', state.page === 'analytics');
         if (curationBtn) curationBtn.classList.toggle('active', state.page === 'curation');
 
@@ -4300,12 +4308,12 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    if (similarityBtn) {
-        similarityBtn.onclick = () => {
+    if (episodesBtn) {
+        episodesBtn.onclick = () => {
             categoryList.querySelectorAll('.category-btn').forEach(b => b.classList.remove('active'));
-            state.page = 'similarity';
+            state.page = 'episodes';
             updateNavActiveStates();
-            fetchSimilarity();
+            fetchEpisodes();
         };
     }
 
@@ -4337,6 +4345,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Toolbar logic
     document.querySelectorAll('.type-btn').forEach(btn => {
+        if (!btn.dataset.type) return;
         btn.onclick = (e) => {
             const type = e.target.dataset.type;
             if (state.filters.types.includes(type)) {
@@ -4348,8 +4357,8 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             localStorage.setItem('disco-types', JSON.stringify(state.filters.types));
             
-            if (state.page === 'similarity') {
-                fetchSimilarity();
+            if (state.page === 'episodes') {
+                fetchEpisodes();
             } else if (state.page === 'du') {
                 fetchDU(state.duPath);
             } else if (state.page === 'history') {
@@ -4375,13 +4384,14 @@ document.addEventListener('DOMContentLoaded', () => {
             state.filters.max_duration = '';
             state.filters.min_score = '';
             state.filters.max_score = '';
+            state.filters.episodes = '';
             state.filters.unplayed = false;
             
             if (searchInput) searchInput.value = '';
             localStorage.setItem('disco-types', JSON.stringify(state.filters.types));
             
-            if (state.page === 'similarity') {
-                fetchSimilarity();
+            if (state.page === 'episodes') {
+                fetchEpisodes();
             } else if (state.page === 'du') {
                 fetchDU(state.duPath);
             } else {
