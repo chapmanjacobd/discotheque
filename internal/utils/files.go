@@ -293,45 +293,10 @@ func CommonPath(paths []string) string {
 	return strings.Join(parts, sep)
 }
 
-// CommonPathFull returns a common path prefix including common words in the suffix
+// CommonPathFull returns a common path prefix.
+// Previously it included common words in the suffix, but this was confusing for UI.
 func CommonPathFull(paths []string) string {
-	if len(paths) == 0 {
-		return ""
-	}
-	commonPrefix := CommonPath(paths)
-
-	wordCounts := make(map[string]int)
-	var allWords []string
-
-	for _, path := range paths {
-		suffix := strings.TrimPrefix(path, commonPrefix)
-		sentence := PathToSentence(suffix)
-		words := OrderedSet(strings.Fields(sentence))
-		for _, w := range words {
-			if len(w) > 1 {
-				wordCounts[w]++
-				allWords = append(allWords, w)
-			}
-		}
-	}
-
-	threshold := int(float64(len(paths)) * 0.6)
-	var commonWords []string
-	seen := make(map[string]bool)
-	uniqueAllWords := OrderedSet(allWords)
-
-	for _, w := range uniqueAllWords {
-		if wordCounts[w] > threshold && !seen[w] {
-			commonWords = append(commonWords, w)
-			seen[w] = true
-		}
-	}
-
-	if len(commonWords) == 0 {
-		return commonPrefix
-	}
-
-	return strings.TrimSpace(commonPrefix) + "*" + strings.Join(commonWords, "*")
+	return CommonPath(paths)
 }
 
 // GetExternalSubtitles finds external subtitle files associated with a media file

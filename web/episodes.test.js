@@ -22,8 +22,7 @@ describe('Episodes View and Filter', () => {
                 // If it resolved quickly
                 const calls = global.fetch.mock.calls;
                 const lastCall = calls[calls.length - 1];
-                expect(lastCall[0]).toContain('/api/similarity');
-                expect(lastCall[0]).toContain('folders=true');
+                expect(lastCall[0]).toContain('/api/episodes');
             }
         });
     });

@@ -107,6 +107,8 @@ Flags:
         Filter by mimetype substring (e.g., video, mp4)
   --no-mime-type
         Exclude by mimetype substring
+  --no-default-categories
+        Disable default categories
   --hide-deleted
         Exclude deleted files from results
   --only-deleted
@@ -283,6 +285,8 @@ Flags:
         Filter by mimetype substring (e.g., video, mp4)
   --no-mime-type
         Exclude by mimetype substring
+  --no-default-categories
+        Disable default categories
   --hide-deleted
         Exclude deleted files from results
   --only-deleted
@@ -417,6 +421,8 @@ Flags:
         Filter by mimetype substring (e.g., video, mp4)
   --no-mime-type
         Exclude by mimetype substring
+  --no-default-categories
+        Disable default categories
   --hide-deleted
         Exclude deleted files from results
   --only-deleted
@@ -618,6 +624,8 @@ Flags:
         Filter by mimetype substring (e.g., video, mp4)
   --no-mime-type
         Exclude by mimetype substring
+  --no-default-categories
+        Disable default categories
   --hide-deleted
         Exclude deleted files from results
   --only-deleted
@@ -934,6 +942,8 @@ Flags:
         Filter by mimetype substring (e.g., video, mp4)
   --no-mime-type
         Exclude by mimetype substring
+  --no-default-categories
+        Disable default categories
   --hide-deleted
         Exclude deleted files from results
   --only-deleted
@@ -1158,6 +1168,8 @@ Flags:
         Filter by mimetype substring (e.g., video, mp4)
   --no-mime-type
         Exclude by mimetype substring
+  --no-default-categories
+        Disable default categories
   --hide-deleted
         Exclude deleted files from results
   --only-deleted
@@ -1286,6 +1298,8 @@ Flags:
         Filter by mimetype substring (e.g., video, mp4)
   --no-mime-type
         Exclude by mimetype substring
+  --no-default-categories
+        Disable default categories
   --hide-deleted
         Exclude deleted files from results
   --only-deleted
@@ -1445,6 +1459,8 @@ Flags:
         Filter by mimetype substring (e.g., video, mp4)
   --no-mime-type
         Exclude by mimetype substring
+  --no-default-categories
+        Disable default categories
   --hide-deleted
         Exclude deleted files from results
   --only-deleted
@@ -1627,6 +1643,8 @@ Flags:
         Filter by mimetype substring (e.g., video, mp4)
   --no-mime-type
         Exclude by mimetype substring
+  --no-default-categories
+        Disable default categories
   --hide-deleted
         Exclude deleted files from results
   --only-deleted
@@ -1743,6 +1761,8 @@ Flags:
         Filter by mimetype substring (e.g., video, mp4)
   --no-mime-type
         Exclude by mimetype substring
+  --no-default-categories
+        Disable default categories
   --hide-deleted
         Exclude deleted files from results
   --only-deleted
@@ -1913,6 +1933,8 @@ Flags:
         Filter by mimetype substring (e.g., video, mp4)
   --no-mime-type
         Exclude by mimetype substring
+  --no-default-categories
+        Disable default categories
   --hide-deleted
         Exclude deleted files from results
   --only-deleted
@@ -2089,6 +2111,8 @@ Flags:
         Filter by mimetype substring (e.g., video, mp4)
   --no-mime-type
         Exclude by mimetype substring
+  --no-default-categories
+        Disable default categories
   --hide-deleted
         Exclude deleted files from results
   --only-deleted
@@ -2285,6 +2309,8 @@ Flags:
         Filter by mimetype substring (e.g., video, mp4)
   --no-mime-type
         Exclude by mimetype substring
+  --no-default-categories
+        Disable default categories
   --hide-deleted
         Exclude deleted files from results
   --only-deleted
@@ -2497,6 +2523,8 @@ Flags:
         Filter by mimetype substring (e.g., video, mp4)
   --no-mime-type
         Exclude by mimetype substring
+  --no-default-categories
+        Disable default categories
   --hide-deleted
         Exclude deleted files from results
   --only-deleted
@@ -2780,6 +2808,8 @@ Flags:
         Filter by mimetype substring (e.g., video, mp4)
   --no-mime-type
         Exclude by mimetype substring
+  --no-default-categories
+        Disable default categories
   --hide-deleted
         Exclude deleted files from results
   --only-deleted
@@ -3048,6 +3078,8 @@ Flags:
         Filter by mimetype substring (e.g., video, mp4)
   --no-mime-type
         Exclude by mimetype substring
+  --no-default-categories
+        Disable default categories
   --hide-deleted
         Exclude deleted files from results
   --only-deleted
@@ -3207,6 +3239,8 @@ Flags:
         Filter by mimetype substring (e.g., video, mp4)
   --no-mime-type
         Exclude by mimetype substring
+  --no-default-categories
+        Disable default categories
   --hide-deleted
         Exclude deleted files from results
   --only-deleted
@@ -3580,6 +3614,8 @@ Flags:
         Filter by mimetype substring (e.g., video, mp4)
   --no-mime-type
         Exclude by mimetype substring
+  --no-default-categories
+        Disable default categories
   --hide-deleted
         Exclude deleted files from results
   --only-deleted
@@ -3890,6 +3926,8 @@ Flags:
         Filter by mimetype substring (e.g., video, mp4)
   --no-mime-type
         Exclude by mimetype substring
+  --no-default-categories
+        Disable default categories
   --hide-deleted
         Exclude deleted files from results
   --only-deleted
@@ -4074,6 +4112,8 @@ Flags:
         Filter by mimetype substring (e.g., video, mp4)
   --no-mime-type
         Exclude by mimetype substring
+  --no-default-categories
+        Disable default categories
   --hide-deleted
         Exclude deleted files from results
   --only-deleted

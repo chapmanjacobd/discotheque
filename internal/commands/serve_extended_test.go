@@ -302,6 +302,53 @@ func TestServeCmd_ExtendedHandlers(t *testing.T) {
 		}
 	})
 
+	t.Run("HandleEpisodes", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/api/episodes", nil)
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Errorf("Expected 200, got %d", w.Code)
+		}
+
+		var resp []models.FolderStats
+		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+			t.Fatal(err)
+		}
+
+		// We expect groups for:
+		// /media (video1, video2, deleted)
+		// /media/music (audio1, audio2)
+		// /media/other (doc.pdf)
+
+		foundMusic := false
+		foundRoot := false
+
+		for _, g := range resp {
+			if g.Path == "/media/music" {
+				foundMusic = true
+				if g.Count != 2 {
+					t.Errorf("Expected 2 items in /media/music, got %d", g.Count)
+				}
+			}
+			if g.Path == "/media" {
+				foundRoot = true
+				// deleted.mp4 is hidden by default in this test setup (HideDeleted=true)
+				// video1.mp4, video2.mp4
+				if g.Count != 2 {
+					t.Errorf("Expected 2 items in /media, got %d", g.Count)
+				}
+			}
+		}
+
+		if !foundMusic {
+			t.Error("Expected to find /media/music group")
+		}
+		if !foundRoot {
+			t.Error("Expected to find /media group")
+		}
+	})
+
 	t.Run("HandleRandomClip", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/api/random-clip", nil)
 		w := httptest.NewRecorder()

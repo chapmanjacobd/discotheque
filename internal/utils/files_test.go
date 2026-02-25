@@ -3,7 +3,6 @@ package utils
 import (
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/chapmanjacobd/discotheque/internal/models"
@@ -224,7 +223,8 @@ func TestCommonPathFull(t *testing.T) {
 		"/home/user/vids/action_movie_part3.mp4",
 	}
 	got := CommonPathFull(paths)
-	if !strings.Contains(got, "action") || !strings.Contains(got, "movie") {
-		t.Errorf("CommonPathFull failed to find common words, got %q", got)
+	expected := "/home/user/vids"
+	if got != expected {
+		t.Errorf("CommonPathFull expected %q, got %q", expected, got)
 	}
 }

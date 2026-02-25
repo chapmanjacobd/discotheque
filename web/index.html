@@ -46,8 +46,6 @@
                     Episodes</button>
                 <button id="analytics-btn" class="category-btn" style="width: 100%; margin-bottom: 0.2rem;">📈
                     Analytics</button>
-                <button id="curation-btn" class="category-btn" style="width: 100%; margin-bottom: 0.2rem;">🏷️
-                    Curation</button>
                 <button id="trash-btn" class="category-btn hidden" style="width: 100%; margin-bottom: 0.5rem;">🗑️
                     Trash</button>
             </div>
@@ -112,8 +110,6 @@
                     <button id="view-details">Details</button>
                 </div>
 
-                <button id="channel-surf-btn" class="type-btn" title="Interdimensional Cable">🔀 Channel Surf</button>
-                <button id="clear-filters-btn" class="type-btn" title="Clear all filters">🧹 Clear</button>
                 <button id="advanced-filter-toggle" class="type-btn">Filters ▽</button>
             </div>
 
@@ -293,8 +289,8 @@
                         <input type="number" id="setting-slideshow-delay" value="5" min="1">
                     </div>
                     <div class="setting-item">
-                        <label for="setting-no-default-categories">Disable Default Categories:</label>
-                        <input type="checkbox" id="setting-no-default-categories">
+                        <label for="setting-track-shuffle-duration">Track shuffle/preview duration (s):</label>
+                        <input type="number" id="setting-track-shuffle-duration" value="0" min="0" placeholder="0 for full">
                     </div>
                 </section>
                 <section>
@@ -368,6 +364,7 @@
                     <button class="speed-opt" data-speed="1.75">1.75x</button>
                     <button class="speed-opt" data-speed="2.0">2.0x</button>
                 </div>
+                <button id="channel-surf-btn" title="Channel Surf (Interdimensional Cable)">🔀</button>
                 <button id="pip-stream-type" title="Switch Stream Type">🔄</button>
                 <button id="pip-native" title="Native Picture-in-Picture" class="hidden">📺</button>
                 <button id="pip-minimize" title="Minimize">_</button>

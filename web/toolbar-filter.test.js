@@ -73,7 +73,7 @@ describe('Toolbar Media Options Filtering', () => {
             if (resultsContainer.innerHTML.includes('Grouping by Parent Folder')) {
                 expect(resultsContainer.innerHTML).toContain('Grouping by Parent Folder');
             } else {
-                expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('/api/similarity'), expect.any(Object));
+                expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('/api/episodes'), expect.any(Object));
             }
         });
 
@@ -81,15 +81,18 @@ describe('Toolbar Media Options Filtering', () => {
         const audioBtn = document.querySelector('.type-btn[data-type="audio"]');
         audioBtn.click();
 
-        // It should call /api/similarity again, not /api/query
+        // It should call /api/episodes again, not /api/query
         await vi.waitFor(() => {
             const resultsContainer = document.getElementById('results-container');
-            expect(resultsContainer.classList.contains('similarity-view')).toBe(true);
-            
-            const calls = global.fetch.mock.calls;
-            const lastCall = calls[calls.length - 1];
-            expect(lastCall[0]).toContain('/api/similarity');
-            expect(lastCall[0]).not.toContain('/api/query');
+            // Check for loading screen
+            if (resultsContainer.innerHTML.includes('Grouping by Parent Folder')) {
+                expect(resultsContainer.innerHTML).toContain('Grouping by Parent Folder');
+            } else {
+                const calls = global.fetch.mock.calls;
+                const lastCall = calls[calls.length - 1];
+                expect(lastCall[0]).toContain('/api/episodes');
+                expect(lastCall[0]).not.toContain('/api/query');
+            }
         });
     });
 

@@ -40,7 +40,7 @@ describe('Channel Surf', () => {
         channelSurfBtn.click();
 
         await vi.waitFor(() => {
-            expect(global.fetch).toHaveBeenCalledWith('/api/random-clip');
+            expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('/api/random-clip'));
             
             const pipPlayer = document.getElementById('pip-player');
             expect(pipPlayer.classList.contains('hidden')).toBe(false);

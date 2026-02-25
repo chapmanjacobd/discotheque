@@ -65,11 +65,15 @@ func (c *ServeCmd) Mux() http.Handler {
 	mux.HandleFunc("/api/ls", c.handleLs)
 	mux.HandleFunc("/api/du", c.handleDU)
 	mux.HandleFunc("/api/similarity", c.handleSimilarity)
+	mux.HandleFunc("/api/episodes", c.handleEpisodes)
 	mux.HandleFunc("/api/random-clip", c.handleRandomClip)
 	mux.HandleFunc("/api/stats/history", c.handleStatsHistory)
 	mux.HandleFunc("/api/stats/library", c.handleStatsLibrary)
 	mux.HandleFunc("/api/categorize/suggest", c.handleCategorizeSuggest)
 	mux.HandleFunc("/api/categorize/apply", c.handleCategorizeApply)
+	mux.HandleFunc("/api/categorize/keywords", c.handleCategorizeKeywords)
+	mux.HandleFunc("/api/categorize/defaults", c.handleCategorizeDefaults)
+	mux.HandleFunc("/api/categorize/category", c.handleCategorizeDeleteCategory)
 	mux.HandleFunc("/api/categorize/keyword", c.handleCategorizeKeyword)
 	mux.HandleFunc("/api/raw", c.handleRaw)
 	mux.HandleFunc("/api/hls/playlist", c.handleHLSPlaylist)
@@ -1112,9 +1116,173 @@ func (c *ServeCmd) handleSimilarity(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(results)
 }
 
+func (c *ServeCmd) handleEpisodes(w http.ResponseWriter, r *http.Request) {
+	flags := c.parseFlags(r)
+	flags.All = true
+	flags.Limit = 1000000
+
+	allMedia, err := query.MediaQuery(r.Context(), c.Databases, flags)
+	if err != nil {
+		slog.Error("Failed to fetch media for episodes", "error", err)
+		http.Error(w, "Query failed", http.StatusInternalServerError)
+		return
+	}
+
+	results := aggregate.GroupByParent(allMedia)
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(results)
+}
+
+func (c *ServeCmd) handleCategorizeKeywords(w http.ResponseWriter, r *http.Request) {
+	type catKeywords struct {
+		Category string   `json:"category"`
+		Keywords []string `json:"keywords"`
+	}
+	
+	data := make(map[string]map[string]bool)
+
+	for _, dbPath := range c.Databases {
+		c.execDB(r.Context(), dbPath, func(sqlDB *sql.DB) error {
+			rows, err := sqlDB.QueryContext(r.Context(), "SELECT category, keyword FROM custom_keywords")
+			if err != nil {
+				return nil
+			}
+			defer rows.Close()
+			for rows.Next() {
+				var cat, kw string
+				if err := rows.Scan(&cat, &kw); err == nil {
+					if _, ok := data[cat]; !ok {
+						data[cat] = make(map[string]bool)
+					}
+					data[cat][kw] = true
+				}
+			}
+			return nil
+		})
+	}
+
+	var results []catKeywords
+	for cat, kwSet := range data {
+		var kws []string
+		for kw := range kwSet {
+			kws = append(kws, kw)
+		}
+		sort.Strings(kws)
+		results = append(results, catKeywords{
+			Category: cat,
+			Keywords: kws,
+		})
+	}
+
+	sort.Slice(results, func(i, j int) bool {
+		return results[i].Category < results[j].Category
+	})
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(results)
+}
+
+func (c *ServeCmd) handleCategorizeDefaults(w http.ResponseWriter, r *http.Request) {
+	if c.ReadOnly {
+		http.Error(w, "Read-only mode", http.StatusForbidden)
+		return
+	}
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	count := 0
+	for _, dbPath := range c.Databases {
+		err := c.execDB(r.Context(), dbPath, func(sqlDB *sql.DB) error {
+			tx, err := sqlDB.Begin()
+			if err != nil {
+				return err
+			}
+			stmt, err := tx.PrepareContext(r.Context(), "INSERT OR IGNORE INTO custom_keywords (category, keyword) VALUES (?, ?)")
+			if err != nil {
+				tx.Rollback()
+				return err
+			}
+			defer stmt.Close()
+
+			for cat, keywords := range models.DefaultCategories {
+				for _, kw := range keywords {
+					_, err := stmt.ExecContext(r.Context(), cat, kw)
+					if err == nil {
+						count++
+					}
+				}
+			}
+			return tx.Commit()
+		})
+		if err != nil {
+			slog.Error("Failed to insert default categories", "db", dbPath, "error", err)
+		}
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+}
+
+func (c *ServeCmd) handleCategorizeDeleteCategory(w http.ResponseWriter, r *http.Request) {
+	if c.ReadOnly {
+		http.Error(w, "Read-only mode", http.StatusForbidden)
+		return
+	}
+	if r.Method != http.MethodDelete {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	category := r.URL.Query().Get("category")
+	if category == "" {
+		http.Error(w, "Category required", http.StatusBadRequest)
+		return
+	}
+
+	for _, dbPath := range c.Databases {
+		err := c.execDB(r.Context(), dbPath, func(sqlDB *sql.DB) error {
+			_, err := sqlDB.ExecContext(r.Context(), "DELETE FROM custom_keywords WHERE category = ?", category)
+			return err
+		})
+		if err != nil {
+			slog.Error("Failed to delete category", "db", dbPath, "error", err)
+		}
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+}
+
 func (c *ServeCmd) handleCategorizeKeyword(w http.ResponseWriter, r *http.Request) {
 	if c.ReadOnly {
 		http.Error(w, "Read-only mode", http.StatusForbidden)
+		return
+	}
+
+	if r.Method == http.MethodDelete {
+		var req struct {
+			Category string `json:"category"`
+			Keyword  string `json:"keyword"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		for _, dbPath := range c.Databases {
+			err := c.execDB(r.Context(), dbPath, func(sqlDB *sql.DB) error {
+				_, err := sqlDB.ExecContext(r.Context(), "DELETE FROM custom_keywords WHERE category = ? AND keyword = ?", req.Category, req.Keyword)
+				return err
+			})
+			if err != nil {
+				slog.Error("Failed to delete keyword", "db", dbPath, "error", err)
+			}
+		}
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 		return
 	}
 
@@ -1175,9 +1343,22 @@ func (c *ServeCmd) handleRandomClip(w http.ResponseWriter, r *http.Request) {
 
 	// Filter for video/audio only
 	var playable []models.MediaWithDB
+	targetType := r.URL.Query().Get("type")
+
 	for _, m := range allMedia {
-		if m.Type != nil && (*m.Type == "video" || *m.Type == "audio" || *m.Type == "audiobook") {
-			playable = append(playable, m)
+		if m.Type == nil {
+			continue
+		}
+
+		if targetType != "" {
+			if strings.HasPrefix(*m.Type, targetType) {
+				playable = append(playable, m)
+			}
+		} else {
+			// Default behavior: video or audio
+			if strings.HasPrefix(*m.Type, "video") || strings.HasPrefix(*m.Type, "audio") || *m.Type == "audiobook" {
+				playable = append(playable, m)
+			}
 		}
 	}
 
@@ -1200,9 +1381,15 @@ func (c *ServeCmd) handleRandomClip(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// If 0, play the whole thing (start at 0, end at duration)
 	start := 0
-	if duration > cableDuration {
-		start = utils.RandomInt(0, duration-cableDuration)
+	end := duration
+
+	if cableDuration > 0 {
+		if duration > cableDuration {
+			start = utils.RandomInt(0, duration-cableDuration)
+		}
+		end = start + cableDuration
 	}
 
 	type clipResponse struct {
@@ -1215,7 +1402,7 @@ func (c *ServeCmd) handleRandomClip(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(clipResponse{
 		MediaWithDB: item,
 		Start:       start,
-		End:         start + cableDuration,
+		End:         end,
 	})
 }
 

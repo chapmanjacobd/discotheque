@@ -28,9 +28,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const duBtn = document.getElementById('du-btn');
     const episodesBtn = document.getElementById('episodes-btn');
     const analyticsBtn = document.getElementById('analytics-btn');
-    const curationBtn = document.getElementById('curation-btn');
     const channelSurfBtn = document.getElementById('channel-surf-btn');
-    const clearFiltersBtn = document.getElementById('clear-filters-btn');
     const filterCaptions = document.getElementById('filter-captions');
 
     const pipPlayer = document.getElementById('pip-player');
@@ -83,7 +81,6 @@ document.addEventListener('DOMContentLoaded', () => {
             browseCol: '',
             browseVal: ''
         },
-        noDefaultCategories: localStorage.getItem('disco-no-default-categories') === 'true',
         duPath: '',
         draggedItem: null,
         applicationStartTime: null,
@@ -100,6 +97,7 @@ document.addEventListener('DOMContentLoaded', () => {
         defaultAudioRate: parseFloat(localStorage.getItem('disco-default-audio-rate')) || 1.0,
         playbackRate: parseFloat(localStorage.getItem('disco-playback-rate')) || 1.0,
         slideshowDelay: parseInt(localStorage.getItem('disco-slideshow-delay')) || 5,
+        trackShuffleDuration: parseInt(localStorage.getItem('disco-track-shuffle-duration')) || 0,
         playerMode: localStorage.getItem('disco-default-view') || 'pip', // Initialize with preference
         trashcan: false,
         readOnly: false,
@@ -141,8 +139,8 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('setting-default-video-rate').value = state.defaultVideoRate;
     document.getElementById('setting-default-audio-rate').value = state.defaultAudioRate;
     document.getElementById('setting-slideshow-delay').value = state.slideshowDelay;
-    const initialNoDefaultCatsEl = document.getElementById('setting-no-default-categories');
-    if (initialNoDefaultCatsEl) initialNoDefaultCatsEl.checked = state.noDefaultCategories;
+    const settingTrackShuffleDuration = document.getElementById('setting-track-shuffle-duration');
+    if (settingTrackShuffleDuration) settingTrackShuffleDuration.value = state.trackShuffleDuration;
     if (limitInput) limitInput.value = state.filters.limit;
     if (limitAll) limitAll.checked = state.filters.all;
     const initialUnplayedEl = document.getElementById('filter-unplayed');
@@ -159,7 +157,24 @@ document.addEventListener('DOMContentLoaded', () => {
     if (channelSurfBtn) {
         channelSurfBtn.onclick = async () => {
             try {
-                const resp = await fetch('/api/random-clip');
+                // Determine filter type based on current media
+                let type = '';
+                if (state.playback.item && state.playback.item.type) {
+                    const currentType = state.playback.item.type;
+                    if (currentType.startsWith('video')) type = 'video';
+                    else if (currentType.startsWith('audio')) type = 'audio';
+                    else if (currentType.startsWith('image')) type = 'image';
+                    else if (currentType.startsWith('text')) type = 'text';
+                }
+
+                const params = new URLSearchParams();
+                if (type) params.append('type', type);
+                
+                // Add duration param
+                const duration = state.trackShuffleDuration || 0;
+                params.append('duration', duration);
+
+                const resp = await fetch(`/api/random-clip?${params.toString()}`);
                 if (!resp.ok) throw new Error('Failed to fetch random clip');
                 const data = await resp.json();
 
@@ -174,8 +189,29 @@ document.addEventListener('DOMContentLoaded', () => {
                 const media = pipViewer.querySelector('video, audio');
                 if (media) {
                     media.currentTime = data.start;
-                    // Note: If we want to strictly enforce 'end', we need an ontimeupdate handler
-                    // but for a lean-back experience, letting it play through or onto the next random clip is also good.
+                    
+                    // Add listener for end of clip
+                    if (data.end && data.end > data.start) {
+                        const checkTime = () => {
+                            if (media.currentTime >= data.end) {
+                                media.removeEventListener('timeupdate', checkTime);
+                                // Trigger next surf
+                                if (channelSurfBtn) channelSurfBtn.click();
+                            }
+                        };
+                        media.addEventListener('timeupdate', checkTime);
+                    }
+                } else {
+                    // Handle images
+                    const img = pipViewer.querySelector('img');
+                    if (img && duration > 0) {
+                        // Use a timeout for images
+                        if (state.playback.surfTimer) clearTimeout(state.playback.surfTimer);
+                        state.playback.surfTimer = setTimeout(() => {
+                            state.playback.surfTimer = null;
+                            if (channelSurfBtn) channelSurfBtn.click();
+                        }, duration * 1000);
+                    }
                 }
             } catch (err) {
                 console.error('Channel surf failed:', err);
@@ -218,12 +254,10 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    const settingNoDefaultCats = document.getElementById('setting-no-default-categories');
-    if (settingNoDefaultCats) {
-        settingNoDefaultCats.onchange = (e) => {
-            state.noDefaultCategories = e.target.checked;
-            localStorage.setItem('disco-no-default-categories', state.noDefaultCategories);
-            fetchCategories();
+    if (settingTrackShuffleDuration) {
+        settingTrackShuffleDuration.onchange = (e) => {
+            state.trackShuffleDuration = parseInt(e.target.value);
+            localStorage.setItem('disco-track-shuffle-duration', state.trackShuffleDuration);
         };
     }
 
@@ -585,9 +619,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function fetchCategories() {
         try {
-            const params = new URLSearchParams();
-            if (state.noDefaultCategories) params.append('no-default-categories', 'true');
-            const resp = await fetch(`/api/categories?${params.toString()}`);
+            const resp = await fetch('/api/categories');
             if (!resp.ok) throw new Error('Failed to fetch categories');
             state.categories = await resp.json() || [];
             renderCategoryList();
@@ -1140,14 +1172,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (t === 'text') params.append('text', 'true');
             });
             if (state.filters.search) params.append('search', state.filters.search);
-            params.append('folders', 'true');
 
-            const resp = await fetch(`/api/similarity?${params.toString()}`, {
+            const resp = await fetch(`/api/episodes?${params.toString()}`, {
                 signal: searchAbortController.signal
             });
             if (!resp.ok) throw new Error('Failed to fetch episodes');
             state.similarityData = await resp.json();
-            renderSimilarity(state.similarityData);
+            renderEpisodes(state.similarityData);
         } catch (err) {
             if (err.name === 'AbortError') return;
             console.error('Episodes fetch failed:', err);
@@ -1156,7 +1187,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function renderSimilarity(data) {
+    function renderEpisodes(data) {
         if (!data) data = [];
 
         let filtered = data.map(group => {
@@ -1366,19 +1397,23 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('toolbar').classList.add('hidden');
         document.querySelector('.search-container').classList.add('hidden');
 
+        // Show loading initially
+        resultsContainer.innerHTML = '<div class="loading-container" style="text-align: center; padding: 3rem;"><div class="spinner" style="border: 4px solid rgba(0,0,0,0.1); width: 36px; height: 36px; border-radius: 50%; border-left-color: var(--accent-color); animation: spin 1s linear infinite; margin: 0 auto 1rem;"></div><h3>Loading Categorization...</h3></div><style>@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }</style>';
+
         try {
-            const resp = await fetch('/api/categorize/suggest');
-            if (!resp.ok) throw new Error('Failed to fetch suggestions');
+            const resp = await fetch('/api/categorize/keywords');
+            if (!resp.ok) throw new Error('Failed to fetch keywords');
             const data = await resp.json();
             renderCuration(data);
         } catch (err) {
             console.error('Curation fetch failed:', err);
             showToast('Failed to load Curation Tool');
+            resultsContainer.innerHTML = '<div class="error">Failed to load categorization tool.</div>';
         }
     }
 
-    function renderCuration(suggestedTags) {
-        if (!suggestedTags) suggestedTags = [];
+    function renderCuration(keywordsData) {
+        if (!keywordsData) keywordsData = [];
 
         resultsCount.textContent = ``;
         resultsContainer.className = 'curation-view';
@@ -1391,25 +1426,171 @@ document.addEventListener('DOMContentLoaded', () => {
                 <button id="curation-back-btn" class="category-btn">← Back</button>
                 <h2 style="margin: 0;">Categorization</h2>
             </div>
-            <p>Mine keywords from uncategorized media to create new categories, or run the categorization logic based on existing patterns.</p>
+            <p>Manage categories and keywords. Drag keywords from the suggestion pool to a category, or add them manually.</p>
             <div style="display: flex; gap: 1rem; margin: 1.5rem 0;">
                 <button id="run-auto-categorize" class="category-btn" style="background: var(--accent-color); color: white;">Run Categorization Now</button>
-                <button id="refresh-mining" class="category-btn">Refresh Suggested Keywords</button>
+                <button id="add-default-cats" class="category-btn">Add Default Categories</button>
             </div>
         `;
         resultsContainer.appendChild(headerEl);
 
-        const miningEl = document.createElement('div');
-        miningEl.className = 'mining-container';
-        miningEl.innerHTML = `
-            <h3>Suggested Keywords</h3>
-            <p>Frequently occurring words in unmatched files that could be potential categories. Click a keyword to save it.</p>
-            <div class="tags-cloud">
-                ${suggestedTags.map(tag => `<span class="curation-tag" data-word="${tag.word}" title="${tag.count} occurrences">${tag.word} <small>${tag.count}</small></span>`).join('')}
-            </div>
-        `;
-        resultsContainer.appendChild(miningEl);
+        const container = document.createElement('div');
+        container.className = 'curation-container';
+        container.style.display = 'flex';
+        container.style.gap = '2rem';
+        container.style.height = 'calc(100vh - 250px)'; // Approx height
 
+        // --- Left Column: Categories ---
+        const categoriesCol = document.createElement('div');
+        categoriesCol.className = 'curation-col';
+        categoriesCol.style.flex = '1';
+        categoriesCol.style.overflowY = 'auto';
+        categoriesCol.style.borderRight = '1px solid var(--border-color)';
+        categoriesCol.style.paddingRight = '1rem';
+
+        categoriesCol.innerHTML = `<h3>Categories</h3>`;
+        const categoriesList = document.createElement('div');
+        categoriesList.className = 'curation-cat-list';
+        categoriesList.style.display = 'flex';
+        categoriesList.style.flexDirection = 'column';
+        categoriesList.style.gap = '1rem';
+
+        // Render existing categories
+        keywordsData.forEach(cat => {
+            const card = document.createElement('div');
+            card.className = 'curation-cat-card';
+            card.dataset.category = cat.category;
+            card.style.background = 'var(--sidebar-bg)';
+            card.style.padding = '1rem';
+            card.style.borderRadius = '8px';
+            card.style.border = '1px solid var(--border-color)';
+
+            let keywordsHtml = (cat.keywords || []).map(kw => 
+                `<span class="curation-tag existing-keyword" data-keyword="${kw}" data-category="${cat.category}">
+                    ${kw} <span class="remove-kw" style="cursor:pointer; margin-left:4px; opacity:0.6;">&times;</span>
+                </span>`
+            ).join('');
+
+            card.innerHTML = `
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                    <h4 style="margin: 0;">${cat.category}</h4>
+                    <button class="delete-cat-btn" title="Delete Category" style="background: none; border: none; cursor: pointer; opacity: 0.5;">🗑️</button>
+                </div>
+                <div class="cat-keywords" style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.5rem;">
+                    ${keywordsHtml}
+                </div>
+                <button class="add-kw-btn category-btn" style="font-size: 0.8rem; padding: 2px 8px;">+ Add Keyword</button>
+            `;
+
+            // Drag & Drop: Allow dropping tags here
+            card.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                card.style.borderColor = 'var(--accent-color)';
+            });
+            card.addEventListener('dragleave', () => {
+                card.style.borderColor = 'var(--border-color)';
+            });
+            card.addEventListener('drop', async (e) => {
+                e.preventDefault();
+                card.style.borderColor = 'var(--border-color)';
+                const keyword = e.dataTransfer.getData('text/plain');
+                if (keyword) {
+                    await addKeyword(cat.category, keyword);
+                }
+            });
+
+            // Delete Category
+            card.querySelector('.delete-cat-btn').onclick = async () => {
+                if (confirm(`Delete category "${cat.category}" and all its keywords?`)) {
+                    await deleteCategory(cat.category);
+                }
+            };
+
+            // Add Keyword manually
+            card.querySelector('.add-kw-btn').onclick = async () => {
+                const kw = prompt(`Add keyword to "${cat.category}":`);
+                if (kw) {
+                    await addKeyword(cat.category, kw);
+                }
+            };
+
+            // Remove Keyword
+            card.querySelectorAll('.remove-kw').forEach(btn => {
+                btn.onclick = async (e) => {
+                    e.stopPropagation(); // prevent drag start if any
+                    const tag = e.target.closest('.curation-tag');
+                    const kw = tag.dataset.keyword;
+                    await deleteKeyword(cat.category, kw);
+                };
+            });
+
+            categoriesList.appendChild(card);
+        });
+
+        // Add New Category Button at bottom of list
+        const newCatBtn = document.createElement('button');
+        newCatBtn.className = 'category-btn';
+        newCatBtn.style.marginTop = '1rem';
+        newCatBtn.style.width = '100%';
+        newCatBtn.style.border = '1px dashed var(--border-color)';
+        newCatBtn.textContent = '+ New Category';
+        newCatBtn.onclick = async () => {
+            const name = prompt('New Category Name:');
+            if (name) {
+                // To create a category, we need at least one keyword.
+                // Or we can just refresh, but the backend only stores keywords.
+                // So we'll prompt for a keyword too or add a placeholder?
+                // Let's prompt for keyword immediately.
+                const kw = prompt(`Add first keyword for "${name}":`);
+                if (kw) {
+                    await addKeyword(name, kw);
+                }
+            }
+        };
+        categoriesList.appendChild(newCatBtn);
+
+        categoriesCol.appendChild(categoriesList);
+        container.appendChild(categoriesCol);
+
+        // --- Right Column: Suggestions ---
+        const suggestionsCol = document.createElement('div');
+        suggestionsCol.className = 'curation-col';
+        suggestionsCol.style.flex = '1';
+        suggestionsCol.style.overflowY = 'auto';
+        suggestionsCol.style.paddingLeft = '1rem';
+
+        suggestionsCol.innerHTML = `
+            <h3>Uncategorized / Suggestions</h3>
+            <button id="find-keywords-btn" class="category-btn" style="width: 100%; margin-bottom: 1rem;">Find Potential Keywords</button>
+            <div id="suggestions-area"></div>
+        `;
+
+        const findBtn = suggestionsCol.querySelector('#find-keywords-btn');
+        const suggestionsArea = suggestionsCol.querySelector('#suggestions-area');
+
+        findBtn.onclick = async () => {
+            findBtn.disabled = true;
+            findBtn.textContent = 'Analyzing...';
+            suggestionsArea.innerHTML = '<div class="spinner" style="border: 4px solid rgba(0,0,0,0.1); width: 24px; height: 24px; border-radius: 50%; border-left-color: var(--accent-color); animation: spin 1s linear infinite; margin: 1rem auto;"></div>';
+            
+            try {
+                const resp = await fetch('/api/categorize/suggest');
+                if (!resp.ok) throw new Error('Failed');
+                const suggestions = await resp.json();
+                renderSuggestionsArea(suggestions, suggestionsArea);
+            } catch (err) {
+                console.error(err);
+                suggestionsArea.innerHTML = '<p>Failed to load suggestions.</p>';
+            } finally {
+                findBtn.disabled = false;
+                findBtn.textContent = 'Find Potential Keywords';
+            }
+        };
+
+        container.appendChild(suggestionsCol);
+        resultsContainer.appendChild(container);
+
+        // Header Actions
         const backBtn = headerEl.querySelector('#curation-back-btn');
         if (backBtn) {
             backBtn.onclick = () => {
@@ -1432,7 +1613,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const data = await resp.json();
                     showToast(`Successfully categorized ${data.count} files!`, '🏷️');
                     fetchCategories();
-                    fetchCuration();
+                    // Don't refresh curation page necessarily, user might want to keep editing
                 } catch (err) {
                     console.error('Apply failed:', err);
                     showToast('Failed to run categorization');
@@ -1443,36 +1624,105 @@ document.addEventListener('DOMContentLoaded', () => {
             };
         }
 
-        const btnRefresh = headerEl.querySelector('#refresh-mining');
-        if (btnRefresh) {
-            btnRefresh.onclick = fetchCuration;
-        }
-
-        miningEl.querySelectorAll('.curation-tag').forEach(tagEl => {
-            tagEl.onclick = async () => {
-                const keyword = tagEl.dataset.word;
-                const category = prompt(`Assign keyword "${keyword}" to category:`, keyword);
-                if (!category) return;
-
-                try {
-                    const resp = await fetch('/api/categorize/keyword', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ category, keyword })
-                    });
-                    if (!resp.ok) throw new Error('Failed to save keyword');
-                    showToast(`Saved keyword "${keyword}" to category "${category}"`);
-                    fetchCategories();
-                    fetchCuration();
-                } catch (err) {
-                    console.error('Keyword save failed:', err);
-                    showToast('Failed to save keyword');
+        const btnDefaults = headerEl.querySelector('#add-default-cats');
+        if (btnDefaults) {
+            btnDefaults.onclick = async () => {
+                if (confirm('Add default categories and keywords? (Existing ones will be kept)')) {
+                    try {
+                        const resp = await fetch('/api/categorize/defaults', { method: 'POST' });
+                        if (!resp.ok) throw new Error('Failed');
+                        showToast('Default categories added');
+                        fetchCuration(); // Refresh
+                    } catch (err) {
+                        console.error(err);
+                        showToast('Failed to add defaults');
+                    }
                 }
             };
-        });
+        }
 
         paginationContainer.classList.add('hidden');
         updateNavActiveStates();
+    }
+
+    function renderSuggestionsArea(suggestions, container) {
+        if (!suggestions || suggestions.length === 0) {
+            container.innerHTML = '<p>No common keywords found in uncategorized files.</p>';
+            return;
+        }
+
+        container.innerHTML = `
+            <p>Drag these keywords to a category on the left.</p>
+            <div class="tags-cloud">
+                ${suggestions.map(tag => `
+                    <span class="curation-tag suggestion-tag" draggable="true" data-word="${tag.word}" title="${tag.count} occurrences">
+                        ${tag.word} <small>${tag.count}</small>
+                    </span>
+                `).join('')}
+            </div>
+        `;
+
+        container.querySelectorAll('.suggestion-tag').forEach(tag => {
+            tag.addEventListener('dragstart', (e) => {
+                e.dataTransfer.setData('text/plain', tag.dataset.word);
+                tag.style.opacity = '0.5';
+            });
+            tag.addEventListener('dragend', (e) => {
+                tag.style.opacity = '1';
+            });
+            // Click also prompts for category (legacy behavior, still useful)
+            tag.onclick = async () => {
+                const keyword = tag.dataset.word;
+                const category = prompt(`Assign keyword "${keyword}" to category:`, keyword);
+                if (category) {
+                    await addKeyword(category, keyword);
+                }
+            };
+        });
+    }
+
+    async function addKeyword(category, keyword) {
+        try {
+            const resp = await fetch('/api/categorize/keyword', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ category, keyword })
+            });
+            if (!resp.ok) throw new Error('Failed');
+            showToast(`Saved keyword "${keyword}" to "${category}"`);
+            fetchCuration(); // Refresh UI
+        } catch (err) {
+            console.error(err);
+            showToast('Failed to save keyword');
+        }
+    }
+
+    async function deleteCategory(category) {
+        try {
+            const resp = await fetch(`/api/categorize/category?category=${encodeURIComponent(category)}`, { method: 'DELETE' });
+            if (!resp.ok) throw new Error('Failed');
+            showToast(`Deleted category "${category}"`);
+            fetchCuration();
+        } catch (err) {
+            console.error(err);
+            showToast('Failed to delete category');
+        }
+    }
+
+    async function deleteKeyword(category, keyword) {
+        try {
+            const resp = await fetch('/api/categorize/keyword', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ category, keyword })
+            });
+            if (!resp.ok) throw new Error('Failed');
+            showToast(`Removed keyword "${keyword}"`);
+            fetchCuration();
+        } catch (err) {
+            console.error(err);
+            showToast('Failed to delete keyword');
+        }
     }
 
     async function performSearch() {
@@ -1482,11 +1732,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         if (state.page === 'similarity' && state.similarityData) {
-            renderSimilarity(state.similarityData);
+            renderEpisodes(state.similarityData);
             return;
         }
 
-        if (state.page !== 'trash' && state.page !== 'history' && state.page !== 'playlist' && state.page !== 'similarity' && state.page !== 'du' && state.page !== 'analytics' && state.page !== 'curation') {
+        if (state.page !== 'trash' && state.page !== 'history' && state.page !== 'playlist' && state.page !== 'similarity' && state.page !== 'du' && state.page !== 'analytics' && state.page !== 'curation' && state.page !== 'episodes') {
             state.page = 'search';
         }
         state.filters.search = searchInput.value;
@@ -1498,6 +1748,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (state.page === 'du') {
             fetchDU(state.duPath || '');
+            return;
+        }
+
+        if (state.page === 'episodes') {
+            fetchEpisodes();
             return;
         }
 
@@ -4205,7 +4460,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (duBtn) duBtn.classList.toggle('active', state.page === 'du');
         if (episodesBtn) episodesBtn.classList.toggle('active', state.page === 'episodes');
         if (analyticsBtn) analyticsBtn.classList.toggle('active', state.page === 'analytics');
-        if (curationBtn) curationBtn.classList.toggle('active', state.page === 'curation');
 
         // Handle playlists and categories in the sidebar lists
         document.querySelectorAll('.sidebar .category-btn').forEach(btn => {
@@ -4326,15 +4580,6 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    if (curationBtn) {
-        curationBtn.onclick = () => {
-            categoryList.querySelectorAll('.category-btn').forEach(b => b.classList.remove('active'));
-            state.page = 'curation';
-            updateNavActiveStates();
-            fetchCuration();
-        };
-    }
-
     const newPlaylistBtn = document.getElementById('new-playlist-btn');
     if (newPlaylistBtn) {
         newPlaylistBtn.onclick = () => {
@@ -4370,36 +4615,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         };
     });
-
-    if (clearFiltersBtn) {
-        clearFiltersBtn.onclick = () => {
-            state.filters.types = ['video', 'audio'];
-            state.filters.search = '';
-            state.filters.category = '';
-            state.filters.genre = '';
-            state.filters.rating = '';
-            state.filters.min_size = '';
-            state.filters.max_size = '';
-            state.filters.min_duration = '';
-            state.filters.max_duration = '';
-            state.filters.min_score = '';
-            state.filters.max_score = '';
-            state.filters.episodes = '';
-            state.filters.unplayed = false;
-            
-            if (searchInput) searchInput.value = '';
-            localStorage.setItem('disco-types', JSON.stringify(state.filters.types));
-            
-            if (state.page === 'episodes') {
-                fetchEpisodes();
-            } else if (state.page === 'du') {
-                fetchDU(state.duPath);
-            } else {
-                performSearch();
-            }
-            updateNavActiveStates();
-        };
-    }
 
     if (sortBy) sortBy.onchange = () => {
         state.filters.sort = sortBy.value;
