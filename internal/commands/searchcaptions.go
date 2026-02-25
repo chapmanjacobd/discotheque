@@ -46,7 +46,15 @@ func (c *SearchCaptionsCmd) Run(ctx *kong.Context) error {
 	queries := db.New(sqlDB)
 	queryStr := strings.Join(c.Search, " ")
 
-	rows, err := queries.SearchCaptions(context.Background(), queryStr)
+	limit := int64(c.Limit)
+	if c.All {
+		limit = 1000000
+	}
+
+	rows, err := queries.SearchCaptions(context.Background(), db.SearchCaptionsParams{
+		Query: queryStr,
+		Limit: limit,
+	})
 	if err != nil {
 		return err
 	}

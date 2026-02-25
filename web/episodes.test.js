@@ -28,20 +28,20 @@ describe('Episodes View and Filter', () => {
     });
 
     it('appends episodes filter to search query via sidebar', async () => {
-        const input = document.getElementById('filter-episodes-min');
-        expect(input).toBeTruthy();
-        
-        input.value = '5';
-        input.dispatchEvent(new Event('input')); // Trigger change
+        document.getElementById('details-episodes').open = true;
 
-        // Click apply in sidebar
-        const applyBtn = document.getElementById('apply-sidebar-filters');
-        applyBtn.click();
+        await vi.waitFor(() => {
+            const btn = document.querySelector('#episodes-list .category-btn');
+            expect(btn).not.toBeNull();
+        });
+
+        const btn = document.querySelector('#episodes-list .category-btn');
+        btn.click(); // Select "1 only"
 
         await vi.waitFor(() => {
             const calls = global.fetch.mock.calls;
             const lastCall = calls[calls.length - 1];
-            expect(lastCall[0]).toContain('episodes=5-');
+            expect(lastCall[0]).toContain('episodes=1');
         });
     });
 });

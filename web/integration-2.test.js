@@ -298,13 +298,13 @@ describe('Integration Test 2', () => {
     it('resets state on logo click', async () => {
         const searchInput = document.getElementById('search-input');
         searchInput.value = 'some query';
-        window.disco.state.filters.category = 'comedy';
+        window.disco.state.filters.categories = ['comedy'];
 
         const logo = document.querySelector('.logo');
         logo.click();
 
         expect(searchInput.value).toBe('');
-        expect(window.disco.state.filters.category).toBe('');
+        expect(window.disco.state.filters.categories.length).toBe(0);
         expect(window.disco.state.currentPage).toBe(1);
     });
 

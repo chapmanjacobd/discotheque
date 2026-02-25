@@ -36,7 +36,7 @@ func TestServeCmd_ParseFlags(t *testing.T) {
 				flags := c.parseFlags(r)
 				found := slices.Contains(flags.Where, "(score IS NULL OR score = 0)")
 				if !found {
-					t.Error("Expected rating 0 where clause")
+					t.Errorf("Expected rating 0 where clause, got: %v", flags.Where)
 				}
 			},
 		},
@@ -49,7 +49,7 @@ func TestServeCmd_ParseFlags(t *testing.T) {
 				flags := c.parseFlags(r)
 				found := slices.Contains(flags.Where, "score = 5")
 				if !found {
-					t.Error("Expected rating 5 where clause")
+					t.Errorf("Expected rating 5 where clause, got: %v", flags.Where)
 				}
 			},
 		},
@@ -62,6 +62,51 @@ func TestServeCmd_ParseFlags(t *testing.T) {
 				flags := c.parseFlags(r)
 				if !flags.Random {
 					t.Error("Expected Random to be true")
+				}
+			},
+		},
+		{
+			name: "MultiCategory",
+			query: url.Values{
+				"category": {"comedy", "music"},
+			},
+			validate: func(t *testing.T, c *ServeCmd, r *http.Request) {
+				flags := c.parseFlags(r)
+				if len(flags.Category) != 2 || flags.Category[0] != "comedy" || flags.Category[1] != "music" {
+					t.Errorf("Unexpected category flags: %v", flags.Category)
+				}
+			},
+		},
+		{
+			name: "MultiRating",
+			query: url.Values{
+				"rating": {"5", "4"},
+			},
+			validate: func(t *testing.T, c *ServeCmd, r *http.Request) {
+				flags := c.parseFlags(r)
+				found := slices.Contains(flags.Where, "(score = 5 OR score = 4)")
+				if !found {
+					t.Errorf("Expected multi-rating where clause, got: %v", flags.Where)
+				}
+			},
+		},
+		{
+			name: "MultiBins",
+			query: url.Values{
+				"size":     {"+100", "-200"},
+				"duration": {"10-60", "300"},
+				"episodes": {"1", "5-10"},
+			},
+			validate: func(t *testing.T, c *ServeCmd, r *http.Request) {
+				flags := c.parseFlags(r)
+				if len(flags.Size) != 2 || flags.Size[0] != "+100" || flags.Size[1] != "-200" {
+					t.Errorf("Unexpected size bins: %v", flags.Size)
+				}
+				if len(flags.Duration) != 2 || flags.Duration[0] != "10-60" || flags.Duration[1] != "300" {
+					t.Errorf("Unexpected duration bins: %v", flags.Duration)
+				}
+				if flags.FileCounts != "1,5-10" {
+					t.Errorf("Unexpected episodes bins: %s", flags.FileCounts)
 				}
 			},
 		},

@@ -280,7 +280,10 @@ func TestQueries(t *testing.T) {
 			t.Fatalf("InsertCaption failed: %v", err)
 		}
 
-		resCaptions, err := q.SearchCaptions(ctx, "Hello")
+		resCaptions, err := q.SearchCaptions(ctx, SearchCaptionsParams{
+			Query: "Hello",
+			Limit: 10,
+		})
 		if err != nil {
 			t.Errorf("SearchCaptions failed: %v", err)
 		}

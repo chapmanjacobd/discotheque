@@ -45,6 +45,13 @@ func TestServeCmd_ExtendedHandlers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	// Manual FTS rebuild since triggers might not work across different connections/transfers in some sqlite versions or tests
+	_, err = db.Exec("INSERT INTO captions_fts(captions_fts) VALUES('rebuild')")
+	if err != nil {
+		t.Logf("FTS rebuild failed (likely not using FTS5): %v", err)
+	}
+
 	db.Close()
 
 	cmd := &ServeCmd{
@@ -388,7 +395,7 @@ func TestServeCmd_ExtendedHandlers(t *testing.T) {
 			t.Skip("FTS5 not available, skipping search captions tests")
 		}
 
-		req := httptest.NewRequest(http.MethodGet, "/api/query?search=back&captions=true", nil)
+		req := httptest.NewRequest(http.MethodGet, "/api/query?search=back&view=captions", nil)
 		w := httptest.NewRecorder()
 		handler.ServeHTTP(w, req)
 

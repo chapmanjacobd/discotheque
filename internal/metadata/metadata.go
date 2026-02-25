@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -73,6 +74,19 @@ func Extract(ctx context.Context, path string, scanSubtitles bool) (*MediaMetada
 		mediaType = parts[0]
 	}
 
+	params := db.UpsertMediaParams{
+		Path:         path,
+		Size:         utils.ToNullInt64(stat.Size()),
+		TimeCreated:  utils.ToNullInt64(stat.ModTime().Unix()),
+		TimeModified: utils.ToNullInt64(stat.ModTime().Unix()),
+		Type:         utils.ToNullString(mediaType),
+	}
+
+	result := &MediaMetadata{
+		Media: params,
+	}
+
+	var duration int64
 	cmd := exec.CommandContext(ctx, "ffprobe",
 		"-hide_banner",
 		"-show_format",
@@ -82,101 +96,100 @@ func Extract(ctx context.Context, path string, scanSubtitles bool) (*MediaMetada
 		path,
 	)
 
-	output, err := cmd.Output()
-	if err != nil {
-		// If ffprobe fails, we still return basic file info with detected mimetype
-		return basicInfo(path, stat, mediaType), nil
-	}
-
-	var data FFProbeOutput
-	if err := json.Unmarshal(output, &data); err != nil {
-		return basicInfo(path, stat, mediaType), nil
-	}
-
-	params := db.UpsertMediaParams{
-		Path:         path,
-		Size:         utils.ToNullInt64(stat.Size()),
-		TimeCreated:  utils.ToNullInt64(stat.ModTime().Unix()),
-		TimeModified: utils.ToNullInt64(stat.ModTime().Unix()),
-	}
-
-	// Format info
-	var duration int64
-	if d, err := strconv.ParseFloat(data.Format.Duration, 64); err == nil {
-		duration = int64(d)
-		params.Duration = utils.ToNullInt64(duration)
-	}
-
-	if data.Format.Tags != nil {
-		params.Title = utils.ToNullString(data.Format.Tags["title"])
-		params.Artist = utils.ToNullString(data.Format.Tags["artist"])
-		params.Album = utils.ToNullString(data.Format.Tags["album"])
-		params.Genre = utils.ToNullString(data.Format.Tags["genre"])
-		params.Mood = utils.ToNullString(data.Format.Tags["mood"])
-		if bpm, err := strconv.ParseInt(data.Format.Tags["bpm"], 10, 64); err == nil {
-			params.Bpm = utils.ToNullInt64(bpm)
-		}
-		params.Key = utils.ToNullString(data.Format.Tags["key"])
-		params.Decade = utils.ToNullString(data.Format.Tags["decade"])
-		params.Categories = utils.ToNullString(data.Format.Tags["categories"])
-		params.City = utils.ToNullString(data.Format.Tags["city"])
-		params.Country = utils.ToNullString(data.Format.Tags["country"])
-		params.Description = utils.ToNullString(data.Format.Tags["comment"])
-		params.Language = utils.ToNullString(data.Format.Tags["language"])
-
-		if ts := utils.SpecificDate(
-			data.Format.Tags["originalyear"],
-			data.Format.Tags["TDOR"],
-			data.Format.Tags["TORY"],
-			data.Format.Tags["date"],
-			data.Format.Tags["TDRC"],
-			data.Format.Tags["TDRL"],
-			data.Format.Tags["year"],
-		); ts != nil {
-			params.TimeCreated = utils.ToNullInt64(*ts)
-		}
-
-		params.Uploader = utils.ToNullString(data.Format.Tags["uploader"])
-		params.Webpath = utils.ToNullString(data.Format.Tags["purl"]) // FFmpeg sometimes puts URL in purl tag
-		if params.Webpath.String == "" {
-			params.Webpath = utils.ToNullString(data.Format.Tags["comment"]) // common for youtube-dl
-		}
-
-		if v, err := strconv.ParseInt(data.Format.Tags["view_count"], 10, 64); err == nil {
-			params.ViewCount = utils.ToNullInt64(v)
-		}
-		if v, err := strconv.ParseInt(data.Format.Tags["comment_count"], 10, 64); err == nil {
-			params.NumComments = utils.ToNullInt64(v)
-		}
-		if v, err := strconv.ParseInt(data.Format.Tags["like_count"], 10, 64); err == nil {
-			params.FavoriteCount = utils.ToNullInt64(v)
-		}
-	}
-
-	// Streams info
 	var vCodecs, aCodecs, sCodecs []string
 	var vCount, aCount, sCount int64
 
-	for _, s := range data.Streams {
-		switch s.CodecType {
-		case "video":
-			// Check if it's album art or image-based "video" codec
-			if s.Disposition["attached_pic"] == 1 || s.CodecName == "mjpeg" || s.CodecName == "png" {
-				continue
+	if output, err := cmd.Output(); err == nil {
+		var data FFProbeOutput
+		if err := json.Unmarshal(output, &data); err == nil {
+			// Format info
+			if d, err := strconv.ParseFloat(data.Format.Duration, 64); err == nil {
+				duration = int64(d)
+				params.Duration = utils.ToNullInt64(duration)
 			}
-			vCount++
-			vCodecs = append(vCodecs, s.CodecName)
-			if params.Width.Int64 == 0 {
-				params.Width = utils.ToNullInt64(int64(s.Width))
-				params.Height = utils.ToNullInt64(int64(s.Height))
-				params.Fps = utils.ToNullFloat64(parseFPS(s.AvgFrameRate))
+
+			if data.Format.Tags != nil {
+				params.Title = utils.ToNullString(data.Format.Tags["title"])
+				params.Artist = utils.ToNullString(data.Format.Tags["artist"])
+				params.Album = utils.ToNullString(data.Format.Tags["album"])
+				params.Genre = utils.ToNullString(data.Format.Tags["genre"])
+				params.Mood = utils.ToNullString(data.Format.Tags["mood"])
+				if bpm, err := strconv.ParseInt(data.Format.Tags["bpm"], 10, 64); err == nil {
+					params.Bpm = utils.ToNullInt64(bpm)
+				}
+				params.Key = utils.ToNullString(data.Format.Tags["key"])
+				params.Decade = utils.ToNullString(data.Format.Tags["decade"])
+				params.Categories = utils.ToNullString(data.Format.Tags["categories"])
+				params.City = utils.ToNullString(data.Format.Tags["city"])
+				params.Country = utils.ToNullString(data.Format.Tags["country"])
+				params.Description = utils.ToNullString(data.Format.Tags["comment"])
+				params.Language = utils.ToNullString(data.Format.Tags["language"])
+
+				if ts := utils.SpecificDate(
+					data.Format.Tags["originalyear"],
+					data.Format.Tags["TDOR"],
+					data.Format.Tags["TORY"],
+					data.Format.Tags["date"],
+					data.Format.Tags["TDRC"],
+					data.Format.Tags["TDRL"],
+					data.Format.Tags["year"],
+				); ts != nil {
+					params.TimeCreated = utils.ToNullInt64(*ts)
+				}
+
+				params.Uploader = utils.ToNullString(data.Format.Tags["uploader"])
+				params.Webpath = utils.ToNullString(data.Format.Tags["purl"])
+				if params.Webpath.String == "" {
+					params.Webpath = utils.ToNullString(data.Format.Tags["comment"])
+				}
+
+				if v, err := strconv.ParseInt(data.Format.Tags["view_count"], 10, 64); err == nil {
+					params.ViewCount = utils.ToNullInt64(v)
+				}
+				if v, err := strconv.ParseInt(data.Format.Tags["comment_count"], 10, 64); err == nil {
+					params.NumComments = utils.ToNullInt64(v)
+				}
+				if v, err := strconv.ParseInt(data.Format.Tags["like_count"], 10, 64); err == nil {
+					params.FavoriteCount = utils.ToNullInt64(v)
+				}
 			}
-		case "audio":
-			aCount++
-			aCodecs = append(aCodecs, s.CodecName)
-		case "subtitle":
-			sCount++
-			sCodecs = append(sCodecs, s.CodecName)
+
+			// Streams info
+			for _, s := range data.Streams {
+				switch s.CodecType {
+				case "video":
+					if s.Disposition["attached_pic"] == 1 || s.CodecName == "mjpeg" || s.CodecName == "png" {
+						continue
+					}
+					vCount++
+					vCodecs = append(vCodecs, s.CodecName)
+					if params.Width.Int64 == 0 {
+						params.Width = utils.ToNullInt64(int64(s.Width))
+						params.Height = utils.ToNullInt64(int64(s.Height))
+						params.Fps = utils.ToNullFloat64(parseFPS(s.AvgFrameRate))
+					}
+				case "audio":
+					aCount++
+					aCodecs = append(aCodecs, s.CodecName)
+				case "subtitle":
+					sCount++
+					sCodecs = append(sCodecs, s.CodecName)
+				}
+			}
+
+			// Chapters
+			for _, ch := range data.Chapters {
+				title := ch.Tags["title"]
+				if title == "" {
+					continue
+				}
+				startTime, _ := strconv.ParseFloat(ch.StartTime, 64)
+				result.Captions = append(result.Captions, db.InsertCaptionParams{
+					MediaPath: path,
+					Time:      sql.NullFloat64{Float64: startTime, Valid: true},
+					Text:      sql.NullString{String: title, Valid: true},
+				})
+			}
 		}
 	}
 
@@ -187,8 +200,16 @@ func Extract(ctx context.Context, path string, scanSubtitles bool) (*MediaMetada
 	if scanSubtitles {
 		externalSubs := utils.GetExternalSubtitles(path)
 		for _, sub := range externalSubs {
+			ext := strings.ToLower(filepath.Ext(sub))
 			sCount++
-			sCodecs = append(sCodecs, strings.TrimPrefix(filepath.Ext(sub), "."))
+			sCodecs = append(sCodecs, strings.TrimPrefix(ext, "."))
+
+			if ext == ".vtt" || ext == ".srt" {
+				caps, err := parseSubtitleFile(sub, path)
+				if err == nil {
+					result.Captions = append(result.Captions, caps...)
+				}
+			}
 		}
 	}
 
@@ -197,69 +218,29 @@ func Extract(ctx context.Context, path string, scanSubtitles bool) (*MediaMetada
 	params.AudioCount = utils.ToNullInt64(aCount)
 	params.SubtitleCount = utils.ToNullInt64(sCount)
 
-	// Refine Type Detection with stream info
+	// Refine Type Detection
 	if vCount > 0 {
 		mediaType = "video"
-		// If it's a single video track with no duration and no audio, it's actually an image
 		if vCount == 1 && aCount == 0 && duration == 0 {
 			mediaType = "image"
 		}
 	} else if aCount > 0 {
 		mediaType = "audio"
-		// Distinguish audiobooks: duration > 1 hour OR "audiobook" in path
 		lowerPath := strings.ToLower(path)
 		if duration > 3600 || strings.Contains(lowerPath, "audiobook") {
 			mediaType = "audiobook"
 		}
 	}
-
 	params.Type = utils.ToNullString(mediaType)
 
 	if mediaType == "text" && params.Duration.Int64 == 0 {
-		// Python: cast(length(tags) / 4.2 / 220 * 60 as INT) + 10 duration
-		allTags := ""
-		if data.Format.Tags != nil {
-			for _, v := range data.Format.Tags {
-				allTags += v
-			}
-		}
-		if allTags != "" {
-			d := int64(float64(len(allTags))/4.2/220*60) + 10
-			params.Duration = utils.ToNullInt64(d)
-		}
+		// Basic duration estimate for text
+		d := int64(float64(stat.Size())/4.2/220*60) + 10
+		params.Duration = utils.ToNullInt64(d)
 	}
 
-	metadata := &MediaMetadata{
-		Media: params,
-	}
-
-	// Extract chapters
-	for _, ch := range data.Chapters {
-		title := ch.Tags["title"]
-		if title == "" {
-			continue
-		}
-		startTime, _ := strconv.ParseFloat(ch.StartTime, 64)
-		metadata.Captions = append(metadata.Captions, db.InsertCaptionParams{
-			MediaPath: path,
-			Time:      sql.NullFloat64{Float64: startTime, Valid: true},
-			Text:      sql.NullString{String: title, Valid: true},
-		})
-	}
-
-	return metadata, nil
-}
-
-func basicInfo(path string, stat os.FileInfo, mimeStr string) *MediaMetadata {
-	return &MediaMetadata{
-		Media: db.UpsertMediaParams{
-			Path:         path,
-			Size:         utils.ToNullInt64(stat.Size()),
-			TimeCreated:  utils.ToNullInt64(stat.ModTime().Unix()),
-			TimeModified: utils.ToNullInt64(stat.ModTime().Unix()),
-			Type:         utils.ToNullString(mimeStr),
-		},
-	}
+	result.Media = params
+	return result, nil
 }
 
 func parseFPS(s string) float64 {
@@ -273,4 +254,61 @@ func parseFPS(s string) float64 {
 		return 0
 	}
 	return num / den
+}
+
+func parseSubtitleFile(subPath, mediaPath string) ([]db.InsertCaptionParams, error) {
+	data, err := os.ReadFile(subPath)
+	if err != nil {
+		return nil, err
+	}
+
+	content := string(data)
+	lines := strings.Split(content, "\n")
+
+	var captions []db.InsertCaptionParams
+	timeRegex := regexp.MustCompile(`(\d{2}:)?\d{2}:\d{2}[.,]\d{3}`)
+
+	for i := 0; i < len(lines); i++ {
+		line := strings.TrimSpace(lines[i])
+		if timeRegex.MatchString(line) && strings.Contains(line, "-->") {
+			matches := timeRegex.FindAllString(line, -1)
+			if len(matches) > 0 {
+				startTime := utils.FromTimestampSeconds(strings.ReplaceAll(matches[0], ",", "."))
+
+				// Text can span multiple lines until empty line
+				var textLines []string
+				for j := i + 1; j < len(lines); j++ {
+					textLine := strings.TrimSpace(lines[j])
+					if textLine == "" {
+						i = j
+						break
+					}
+					textLines = append(textLines, textLine)
+					i = j
+				}
+
+				if len(textLines) > 0 {
+					text := cleanCaptionText(strings.Join(textLines, " "))
+					if text != "" {
+						captions = append(captions, db.InsertCaptionParams{
+							MediaPath: mediaPath,
+							Time:      sql.NullFloat64{Float64: startTime, Valid: true},
+							Text:      sql.NullString{String: text, Valid: true},
+						})
+					}
+				}
+			}
+		}
+	}
+
+	return captions, nil
+}
+
+func cleanCaptionText(s string) string {
+	// Strip HTML tags like <v ...> or <i>
+	re := regexp.MustCompile(`<[^>]*>`)
+	s = re.ReplaceAllString(s, "")
+	// Strip SRT-style formatting if any
+	s = strings.TrimSpace(s)
+	return s
 }

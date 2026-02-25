@@ -122,8 +122,8 @@ type MediaWithDB struct {
 	Media
 	DB          string  `json:"db,omitempty"`
 	Transcode   bool    `json:"transcode"`
-	CaptionText string  `json:"caption_text,omitempty"`
-	CaptionTime float64 `json:"caption_time,omitempty"`
+	CaptionText string  `json:"caption_text"`
+	CaptionTime float64 `json:"caption_time"`
 }
 
 // FolderStats aggregates media by folder

@@ -30,10 +30,12 @@ export async function setupTestEnvironment() {
             data = mocks.ratings || [{ rating: 5, count: 1 }, { rating: 0, count: 10 }];
         } else if (url.includes('/api/playlists')) {
             data = mocks.playlists || ['My Playlist'];
+        } else if (url.includes('/api/filter-bins')) {
+            data = mocks.filter_bins || { episodes: [], size: [], duration: [] };
         } else if (url.includes('/api/query')) {
             data = mocks.media || [
-                { path: 'video1.mp4', type: 'video/mp4', size: 1024, duration: 60, db: 'test.db' },
-                { path: 'audio1.mp3', type: 'audio/mpeg', size: 512, duration: 120, db: 'test.db' }
+                { path: 'video1.mp4', type: 'video/mp4', size: 1024, duration: 60, db: 'test.db', caption_text: 'sample caption', caption_time: 10.5 },
+                { path: 'audio1.mp3', type: 'audio/mpeg', size: 512, duration: 120, db: 'test.db', caption_text: 'another caption', caption_time: 20.0 }
             ];
         }
 

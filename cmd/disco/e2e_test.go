@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"os"
 	"path/filepath"
 	"testing"
@@ -200,5 +201,73 @@ func TestCLI_Structure(t *testing.T) {
 	_, err := kong.New(cli)
 	if err != nil {
 		t.Fatalf("Failed to create parser: %v", err)
+	}
+}
+
+func TestE2E_AddWithVTTCaptions(t *testing.T) {
+	fixture := testutils.Setup(t)
+	defer fixture.Cleanup()
+
+	db, err := sql.Open("sqlite3", fixture.DBPath)
+	if err != nil {
+		t.Fatalf("failed to open database: %v", err)
+	}
+	if err := commands.InitDB(db); err != nil {
+		t.Fatalf("database initialization failed: %v", err)
+	}
+	db.Close()
+
+	// 1. Create a dummy video file and a sidecar VTT
+	videoPath := filepath.Join(fixture.TempDir, "movie.mp4")
+	if err := os.WriteFile(videoPath, []byte("fake video data"), 0o644); err != nil {
+		t.Fatalf("failed to create dummy video: %v", err)
+	}
+
+	vttPath := filepath.Join(fixture.TempDir, "movie.vtt")
+	vttContent := `WEBVTT
+
+00:00:01.000 --> 00:00:04.000
+This is a sample caption.
+
+00:00:05.000 --> 00:00:08.000
+Another caption here.
+`
+	if err := os.WriteFile(vttPath, []byte(vttContent), 0o644); err != nil {
+		t.Fatalf("failed to create dummy vtt: %v", err)
+	}
+
+	// 2. Run AddCmd with ScanSubtitles enabled
+	addCmd := &commands.AddCmd{
+		GlobalFlags: models.GlobalFlags{ScanSubtitles: true, Verbose: true},
+		Database:    fixture.DBPath,
+		Args:        []string{fixture.DBPath, videoPath},
+		Parallel:    1,
+	}
+	// We need to call AfterApply to set up Internal fields correctly
+	if err := addCmd.AfterApply(); err != nil {
+		t.Fatalf("AddCmd.AfterApply failed: %v", err)
+	}
+
+	if err := addCmd.Run(nil); err != nil {
+		t.Fatalf("AddCmd failed: %v", err)
+	}
+
+	// 3. Verify captions are in DB
+	db, err = sql.Open("sqlite3", fixture.DBPath)
+	if err != nil {
+		t.Fatalf("failed to open database: %v", err)
+	}
+	defer db.Close()
+
+	var count int
+	err = db.QueryRow("SELECT COUNT(*) FROM captions WHERE media_path = ?", videoPath).Scan(&count)
+	if err != nil {
+		t.Fatalf("failed to query captions: %v", err)
+	}
+
+	if count == 0 {
+		t.Error("Expected captions to be imported into the database, but found 0")
+	} else {
+		t.Logf("Found %d captions", count)
 	}
 }

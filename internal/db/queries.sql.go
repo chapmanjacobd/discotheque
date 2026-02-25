@@ -51,6 +51,51 @@ func (q *Queries) DeletePlaylist(ctx context.Context, arg DeletePlaylistParams) 
 	return err
 }
 
+const getAllCaptions = `-- name: GetAllCaptions :many
+SELECT c.media_path, c.time, c.text, m.title
+FROM captions c
+JOIN media m ON c.media_path = m.path
+WHERE m.time_deleted = 0
+  AND c.text IS NOT NULL AND c.text != ''
+ORDER BY c.media_path, c.time
+LIMIT ?
+`
+
+type GetAllCaptionsRow struct {
+	MediaPath string          `json:"media_path"`
+	Time      sql.NullFloat64 `json:"time"`
+	Text      sql.NullString  `json:"text"`
+	Title     sql.NullString  `json:"title"`
+}
+
+func (q *Queries) GetAllCaptions(ctx context.Context, limit int64) ([]GetAllCaptionsRow, error) {
+	rows, err := q.db.QueryContext(ctx, getAllCaptions, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetAllCaptionsRow{}
+	for rows.Next() {
+		var i GetAllCaptionsRow
+		if err := rows.Scan(
+			&i.MediaPath,
+			&i.Time,
+			&i.Text,
+			&i.Title,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getAllMediaMetadata = `-- name: GetAllMediaMetadata :many
 SELECT path, size, time_modified, time_deleted FROM media
 `
@@ -77,6 +122,35 @@ func (q *Queries) GetAllMediaMetadata(ctx context.Context) ([]GetAllMediaMetadat
 			&i.TimeModified,
 			&i.TimeDeleted,
 		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getCaptionsForMedia = `-- name: GetCaptionsForMedia :many
+SELECT media_path, time, text FROM captions
+WHERE media_path = ?
+ORDER BY time
+`
+
+func (q *Queries) GetCaptionsForMedia(ctx context.Context, mediaPath string) ([]Captions, error) {
+	rows, err := q.db.QueryContext(ctx, getCaptionsForMedia, mediaPath)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Captions{}
+	for rows.Next() {
+		var i Captions
+		if err := rows.Scan(&i.MediaPath, &i.Time, &i.Text); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -1575,8 +1649,15 @@ JOIN captions_fts f ON c.rowid = f.rowid
 JOIN media m ON c.media_path = m.path
 WHERE f.text MATCH ?1
   AND m.time_deleted = 0
+  AND c.text IS NOT NULL AND c.text != ''
 ORDER BY c.media_path, c.time
+LIMIT ?2
 `
+
+type SearchCaptionsParams struct {
+	Query string `json:"query"`
+	Limit int64  `json:"limit"`
+}
 
 type SearchCaptionsRow struct {
 	MediaPath string          `json:"media_path"`
@@ -1585,8 +1666,8 @@ type SearchCaptionsRow struct {
 	Title     sql.NullString  `json:"title"`
 }
 
-func (q *Queries) SearchCaptions(ctx context.Context, query string) ([]SearchCaptionsRow, error) {
-	rows, err := q.db.QueryContext(ctx, searchCaptions, query)
+func (q *Queries) SearchCaptions(ctx context.Context, arg SearchCaptionsParams) ([]SearchCaptionsRow, error) {
+	rows, err := q.db.QueryContext(ctx, searchCaptions, arg.Query, arg.Limit)
 	if err != nil {
 		return nil, err
 	}

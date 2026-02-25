@@ -66,6 +66,11 @@ func TestQueryBuilder_Build(t *testing.T) {
 			"SELECT * FROM media WHERE COALESCE(time_deleted, 0) > 0 LIMIT 10",
 		},
 		{
+			"Multiple Categories",
+			models.GlobalFlags{Category: []string{"comedy", "music"}, Limit: 10, HideDeleted: true},
+			"SELECT * FROM media WHERE COALESCE(time_deleted, 0) = 0 AND (categories LIKE '%' || ? || '%' OR categories LIKE '%' || ? || '%') LIMIT 10",
+		},
+		{
 			"Portrait",
 			models.GlobalFlags{Portrait: true, Limit: 10, HideDeleted: true},
 			"SELECT * FROM media WHERE COALESCE(time_deleted, 0) = 0 AND width < height LIMIT 10",

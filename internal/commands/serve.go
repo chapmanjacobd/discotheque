@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -65,6 +66,7 @@ func (c *ServeCmd) Mux() http.Handler {
 	mux.HandleFunc("/api/ls", c.handleLs)
 	mux.HandleFunc("/api/du", c.handleDU)
 	mux.HandleFunc("/api/episodes", c.handleEpisodes)
+	mux.HandleFunc("/api/filter-bins", c.handleFilterBins)
 	mux.HandleFunc("/api/random-clip", c.handleRandomClip)
 	mux.HandleFunc("/api/categorize/suggest", c.handleCategorizeSuggest)
 	mux.HandleFunc("/api/categorize/apply", c.handleCategorizeApply)
@@ -332,8 +334,10 @@ func (c *ServeCmd) parseFlags(r *http.Request) models.GlobalFlags {
 	if search := q.Get("search"); search != "" {
 		flags.Search = strings.Fields(search)
 	}
-	if category := q.Get("category"); category != "" {
-		flags.Category = category
+	if categories := q["category"]; len(categories) > 0 {
+		flags.Category = categories
+	} else if category := q.Get("category"); category != "" {
+		flags.Category = []string{category}
 	}
 	if genre := q.Get("genre"); genre != "" {
 		flags.Genre = genre
@@ -341,12 +345,22 @@ func (c *ServeCmd) parseFlags(r *http.Request) models.GlobalFlags {
 	if paths := q.Get("paths"); paths != "" {
 		flags.Paths = strings.Split(paths, ",")
 	}
-	if rating := q.Get("rating"); rating != "" {
-		if r, err := strconv.Atoi(rating); err == nil {
-			if r == 0 {
-				flags.Where = append(flags.Where, "(score IS NULL OR score = 0)")
+	if ratings := q["rating"]; len(ratings) > 0 {
+		var clauses []string
+		for _, rating := range ratings {
+			if r, err := strconv.Atoi(rating); err == nil {
+				if r == 0 {
+					clauses = append(clauses, "(score IS NULL OR score = 0)")
+				} else {
+					clauses = append(clauses, fmt.Sprintf("score = %d", r))
+				}
+			}
+		}
+		if len(clauses) > 0 {
+			if len(clauses) == 1 {
+				flags.Where = append(flags.Where, clauses[0])
 			} else {
-				flags.Where = append(flags.Where, fmt.Sprintf("score = %d", r))
+				flags.Where = append(flags.Where, "("+strings.Join(clauses, " OR ")+")")
 			}
 		}
 	}
@@ -375,11 +389,17 @@ func (c *ServeCmd) parseFlags(r *http.Request) models.GlobalFlags {
 	if maxSize := q.Get("max_size"); maxSize != "" {
 		flags.Size = append(flags.Size, "<"+maxSize+"MB")
 	}
+	if sizes := q["size"]; len(sizes) > 0 {
+		flags.Size = append(flags.Size, sizes...)
+	}
 	if minDuration := q.Get("min_duration"); minDuration != "" {
 		flags.Duration = append(flags.Duration, ">"+minDuration+"min")
 	}
 	if maxDuration := q.Get("max_duration"); maxDuration != "" {
 		flags.Duration = append(flags.Duration, "<"+maxDuration+"min")
+	}
+	if durations := q["duration"]; len(durations) > 0 {
+		flags.Duration = append(flags.Duration, durations...)
 	}
 	if minScore := q.Get("min_score"); minScore != "" {
 		flags.Where = append(flags.Where, "score >= "+minScore)
@@ -388,11 +408,25 @@ func (c *ServeCmd) parseFlags(r *http.Request) models.GlobalFlags {
 		flags.Where = append(flags.Where, "score <= "+maxScore)
 	}
 	if unplayed := q.Get("unplayed"); unplayed == "true" {
-		flags.Where = append(flags.Where, "COALESCE(play_count, 0) = 0")
+		flags.Where = append(flags.Where, "COALESCE(play_count, 0) = 0 AND COALESCE(playhead, 0) = 0")
 	}
 	if all := q.Get("all"); all == "true" {
 		flags.All = true
 	}
+
+	for _, t := range q["type"] {
+		switch t {
+		case "video":
+			flags.VideoOnly = true
+		case "audio":
+			flags.AudioOnly = true
+		case "image":
+			flags.ImageOnly = true
+		case "text":
+			flags.TextOnly = true
+		}
+	}
+
 	if video := q.Get("video"); video == "true" {
 		flags.VideoOnly = true
 	}
@@ -408,8 +442,8 @@ func (c *ServeCmd) parseFlags(r *http.Request) models.GlobalFlags {
 	if q.Get("no-default-categories") == "true" {
 		flags.NoDefaultCategories = true
 	}
-	if q.Get("captions") == "true" {
-		flags.FTS = true
+	if q.Get("captions") == "true" || q.Get("view") == "captions" {
+		flags.WithCaptions = true
 	}
 	if watched := q.Get("watched"); watched == "true" {
 		w := true
@@ -424,7 +458,9 @@ func (c *ServeCmd) parseFlags(r *http.Request) models.GlobalFlags {
 	if q.Get("trash") == "true" {
 		flags.OnlyDeleted = true
 	}
-	if episodes := q.Get("episodes"); episodes != "" {
+	if episodes := q["episodes"]; len(episodes) > 0 {
+		flags.FileCounts = strings.Join(episodes, ",")
+	} else if episodes := q.Get("episodes"); episodes != "" {
 		flags.FileCounts = episodes
 	}
 	return flags
@@ -432,9 +468,82 @@ func (c *ServeCmd) parseFlags(r *http.Request) models.GlobalFlags {
 
 func (c *ServeCmd) handleQuery(w http.ResponseWriter, r *http.Request) {
 	flags := c.parseFlags(r)
+	q := r.URL.Query()
 
 	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
 	defer cancel()
+
+	if q.Get("view") == "captions" {
+		var media []models.MediaWithDB
+		queryStr := strings.Join(flags.Search, " ")
+		limit := flags.Limit
+		if limit <= 0 {
+			limit = 100
+		}
+		if flags.All {
+			limit = 1000000
+		}
+
+		for _, dbPath := range c.Databases {
+			err := c.execDB(ctx, dbPath, func(sqlDB *sql.DB) error {
+				queries := database.New(sqlDB)
+				var rows []database.SearchCaptionsRow
+				var err error
+
+				if queryStr != "" {
+					rows, err = queries.SearchCaptions(ctx, database.SearchCaptionsParams{
+						Query: queryStr,
+						Limit: int64(limit),
+					})
+				} else {
+					var rawRows []database.GetAllCaptionsRow
+					rawRows, err = queries.GetAllCaptions(ctx, int64(limit))
+					for _, r := range rawRows {
+						rows = append(rows, database.SearchCaptionsRow(r))
+					}
+				}
+
+				if err != nil {
+					return err
+				}
+
+				for _, row := range rows {
+					m := models.MediaWithDB{
+						Media: models.Media{
+							Path:  row.MediaPath,
+							Title: models.NullStringPtr(row.Title),
+						},
+						DB:          dbPath,
+						CaptionText: row.Text.String,
+						CaptionTime: row.Time.Float64,
+					}
+					media = append(media, m)
+				}
+				return nil
+			})
+			if err != nil {
+				slog.Error("Caption fetch failed", "db", dbPath, "error", err)
+			}
+		}
+
+		totalCount := len(media)
+
+		// Pagination for captions (since we fetched them all or up to limit per DB)
+		if !flags.All && flags.Limit > 0 {
+			start := flags.Offset
+			if start > len(media) {
+				media = []models.MediaWithDB{}
+			} else {
+				end := min(start+flags.Limit, len(media))
+				media = media[start:end]
+			}
+		}
+
+		w.Header().Set("X-Total-Count", strconv.Itoa(totalCount))
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(media)
+		return
+	}
 
 	media, err := query.MediaQuery(ctx, c.Databases, flags)
 	if err != nil {
@@ -443,18 +552,21 @@ func (c *ServeCmd) handleQuery(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Caption search integration
-	if r.URL.Query().Get("captions") == "true" && len(flags.Search) > 0 {
+	// Caption enrichment for main media grid
+	if flags.WithCaptions && len(flags.Search) > 0 {
 		queryStr := strings.Join(flags.Search, " ")
 		for _, dbPath := range c.Databases {
 			err := c.execDB(ctx, dbPath, func(sqlDB *sql.DB) error {
 				queries := database.New(sqlDB)
-				rows, err := queries.SearchCaptions(ctx, queryStr)
+				// Enrich existing results with matching caption segments
+				rows, err := queries.SearchCaptions(ctx, database.SearchCaptionsParams{
+					Query: queryStr,
+					Limit: 5, // Just get a few per DB for enrichment
+				})
 				if err != nil {
 					return err
 				}
 
-				// Map to track paths already in media list for enrichment
 				mediaMap := make(map[string]int)
 				for i, m := range media {
 					mediaMap[m.Path] = i
@@ -462,34 +574,16 @@ func (c *ServeCmd) handleQuery(w http.ResponseWriter, r *http.Request) {
 
 				for _, row := range rows {
 					if idx, ok := mediaMap[row.MediaPath]; ok {
-						// Enrich existing result
 						if media[idx].CaptionText == "" {
 							media[idx].CaptionText = row.Text.String
 							media[idx].CaptionTime = row.Time.Float64
 						}
-					} else {
-						// Add new result if it wasn't already matched by title/path
-						m := models.MediaWithDB{
-							Media: models.Media{
-								Path: row.MediaPath,
-							},
-							DB:          dbPath,
-							CaptionText: row.Text.String,
-							CaptionTime: row.Time.Float64,
-						}
-						// Try to fetch basic metadata for this item if it's new
-						if dbMedia, err := queries.GetMediaByPathExact(ctx, row.MediaPath); err == nil {
-							m.Media = models.FromDB(dbMedia)
-						}
-
-						media = append(media, m)
-						mediaMap[m.Path] = len(media) - 1
 					}
 				}
 				return nil
 			})
 			if err != nil {
-				slog.Error("Caption search failed", "db", dbPath, "error", err)
+				slog.Error("Caption enrichment failed", "db", dbPath, "error", err)
 			}
 		}
 	}
@@ -1034,6 +1128,197 @@ func (c *ServeCmd) handleEpisodes(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(results)
+}
+
+func (c *ServeCmd) handleFilterBins(w http.ResponseWriter, r *http.Request) {
+	flags := c.parseFlags(r)
+	q := r.URL.Query()
+
+	flags.All = true
+	flags.Limit = 0
+
+	var mu sync.Mutex
+	resp := models.FilterBinsResponse{}
+
+	calculateBins := func(filterToIgnore string) ([]int64, []int64, map[string]int64) {
+		tempFlags := flags
+		// Deep copy Where slice to avoid side effects
+		tempFlags.Where = append([]string{}, flags.Where...)
+
+		if filterToIgnore == "size" {
+			tempFlags.Size = nil
+		} else if filterToIgnore == "duration" {
+			tempFlags.Duration = nil
+		} else if filterToIgnore == "episodes" {
+			tempFlags.FileCounts = ""
+		}
+
+		var sizes []int64
+		var durations []int64
+		parentCounts := make(map[string]int64)
+
+		qb := query.NewQueryBuilder(tempFlags)
+		sqlQuery, args := qb.BuildSelect("path, size, duration")
+
+		var wg sync.WaitGroup
+		for _, dbPath := range c.Databases {
+			wg.Add(1)
+			go func(path string) {
+				defer wg.Done()
+				c.execDB(r.Context(), path, func(sqlDB *sql.DB) error {
+					rows, err := sqlDB.QueryContext(r.Context(), sqlQuery, args...)
+					if err != nil {
+						return err
+					}
+					defer rows.Close()
+
+					var localSizes []int64
+					var localDurations []int64
+					localParentCounts := make(map[string]int64)
+
+					for rows.Next() {
+						var p string
+						var s, d sql.NullInt64
+						if err := rows.Scan(&p, &s, &d); err == nil {
+							if s.Valid {
+								localSizes = append(localSizes, s.Int64)
+							}
+							if d.Valid {
+								localDurations = append(localDurations, d.Int64)
+							}
+							parent := filepath.Dir(p)
+							localParentCounts[parent]++
+						}
+					}
+
+					mu.Lock()
+					sizes = append(sizes, localSizes...)
+					durations = append(durations, localDurations...)
+					for k, v := range localParentCounts {
+						parentCounts[k] += v
+					}
+					mu.Unlock()
+					return nil
+				})
+			}(dbPath)
+		}
+		wg.Wait()
+		return sizes, durations, parentCounts
+	}
+
+	// 1. Episodes Bins (6 quantiles)
+	if !q.Has("episodes") {
+		_, _, parentCounts := calculateBins("episodes")
+		var epsGT1 []int64
+		for _, c := range parentCounts {
+			if c > 1 {
+				epsGT1 = append(epsGT1, c)
+			}
+		}
+
+		resp.Episodes = append(resp.Episodes, models.FilterBin{Label: "Specials", Value: 1})
+		if len(epsGT1) > 0 {
+			q1 := int64(utils.Percentile(epsGT1, 16.6))
+			q2 := int64(utils.Percentile(epsGT1, 33.3))
+			q3 := int64(utils.Percentile(epsGT1, 50.0))
+			q4 := int64(utils.Percentile(epsGT1, 66.6))
+			q5 := int64(utils.Percentile(epsGT1, 83.3))
+			maxEps := int64(utils.Percentile(epsGT1, 100))
+
+			rawBins := []int64{2, q1, q2, q3, q4, q5, maxEps}
+			slices.Sort(rawBins)
+
+			uniqueBins := []int64{rawBins[0]}
+			for i := 1; i < len(rawBins); i++ {
+				if rawBins[i] > uniqueBins[len(uniqueBins)-1] {
+					uniqueBins = append(uniqueBins, rawBins[i])
+				}
+			}
+
+			for i := 0; i < len(uniqueBins)-1; i++ {
+				minE := uniqueBins[i]
+				maxE := uniqueBins[i+1]
+				displayMin := minE
+				if i > 0 {
+					displayMin = uniqueBins[i] + 1
+				}
+				if displayMin > maxE {
+					continue
+				}
+				if displayMin == maxE {
+					resp.Episodes = append(resp.Episodes, models.FilterBin{Label: fmt.Sprintf("%d", displayMin), Value: displayMin})
+				} else {
+					resp.Episodes = append(resp.Episodes, models.FilterBin{Label: fmt.Sprintf("%d-%d", displayMin, maxE), Min: displayMin, Max: maxE})
+				}
+			}
+			lastMax := uniqueBins[len(uniqueBins)-1]
+			alreadyAdded := false
+			if len(resp.Episodes) > 0 {
+				lastBin := resp.Episodes[len(resp.Episodes)-1]
+				if lastBin.Max == lastMax || lastBin.Value == lastMax {
+					alreadyAdded = true
+				}
+			}
+			if !alreadyAdded {
+				resp.Episodes = append(resp.Episodes, models.FilterBin{Label: fmt.Sprintf("%d+", lastMax), Min: lastMax})
+			}
+		}
+	}
+
+	// 2. File Size Bins (6 quantiles)
+	if !q.Has("size") {
+		sizes, _, _ := calculateBins("size")
+		if len(sizes) > 0 {
+			p16 := int64(utils.Percentile(sizes, 16.6))
+			p33 := int64(utils.Percentile(sizes, 33.3))
+			p50 := int64(utils.Percentile(sizes, 50.0))
+			p66 := int64(utils.Percentile(sizes, 66.6))
+			p83 := int64(utils.Percentile(sizes, 83.3))
+			maxS := int64(utils.Percentile(sizes, 100))
+
+			sbins := []int64{0, p16, p33, p50, p66, p83, maxS}
+			for i := 0; i < len(sbins)-1; i++ {
+				minS := sbins[i]
+				maxS := sbins[i+1]
+				if i == 0 {
+					resp.Size = append(resp.Size, models.FilterBin{Label: "less than " + utils.FormatSize(maxS), Max: maxS})
+				} else if i == len(sbins)-2 {
+					resp.Size = append(resp.Size, models.FilterBin{Label: utils.FormatSize(minS) + "+", Min: minS})
+				} else {
+					resp.Size = append(resp.Size, models.FilterBin{Label: utils.FormatSize(minS) + " - " + utils.FormatSize(maxS), Min: minS, Max: maxS})
+				}
+			}
+		}
+	}
+
+	// 3. Duration Bins (6 quantiles)
+	if !q.Has("duration") {
+		_, durations, _ := calculateBins("duration")
+		if len(durations) > 0 {
+			p16 := int64(utils.Percentile(durations, 16.6))
+			p33 := int64(utils.Percentile(durations, 33.3))
+			p50 := int64(utils.Percentile(durations, 50.0))
+			p66 := int64(utils.Percentile(durations, 66.6))
+			p83 := int64(utils.Percentile(durations, 83.3))
+			maxD := int64(utils.Percentile(durations, 100))
+
+			dbins := []int64{0, p16, p33, p50, p66, p83, maxD}
+			for i := 0; i < len(dbins)-1; i++ {
+				minD := dbins[i]
+				maxD := dbins[i+1]
+				if i == 0 {
+					resp.Duration = append(resp.Duration, models.FilterBin{Label: "under " + utils.FormatDuration(int(maxD)), Max: maxD})
+				} else if i == len(dbins)-2 {
+					resp.Duration = append(resp.Duration, models.FilterBin{Label: utils.FormatDuration(int(minD)) + "+", Min: minD})
+				} else {
+					resp.Duration = append(resp.Duration, models.FilterBin{Label: utils.FormatDuration(int(minD)) + " - " + utils.FormatDuration(int(maxD)), Min: minD, Max: maxD})
+				}
+			}
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(resp)
 }
 
 func (c *ServeCmd) handleCategorizeKeywords(w http.ResponseWriter, r *http.Request) {

@@ -75,6 +75,34 @@ func SafeMedian[T Number](slice []T) float64 {
 	return (sorted[n/2-1] + sorted[n/2]) / 2
 }
 
+func Percentile[T Number](slice []T, p float64) float64 {
+	if len(slice) == 0 {
+		return 0
+	}
+	sorted := make([]float64, len(slice))
+	for i, v := range slice {
+		sorted[i] = float64(v)
+	}
+	sort.Float64s(sorted)
+
+	if p <= 0 {
+		return sorted[0]
+	}
+	if p >= 100 {
+		return sorted[len(sorted)-1]
+	}
+
+	index := p / 100.0 * float64(len(sorted)-1)
+	i := int(index)
+	fraction := index - float64(i)
+
+	if i >= len(sorted)-1 {
+		return sorted[len(sorted)-1]
+	}
+
+	return sorted[i]*(1-fraction) + sorted[i+1]*fraction
+}
+
 func HumanToBytes(s string) (int64, error) {
 	s = strings.ToUpper(strings.TrimSpace(s))
 

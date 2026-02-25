@@ -38,13 +38,13 @@ describe('Integration Test', () => {
         });
     });
 
-    it('toggles media type filters', async () => {
-        const audioBtn = document.querySelector('.type-btn[data-type="audio"]');
+    it('toggles media type filters in sidebar', async () => {
+        const audioBtn = document.querySelector('#media-type-list .category-btn[data-type="audio"]');
         audioBtn.click(); // Toggle off
 
         await vi.waitFor(() => {
             expect(global.fetch).toHaveBeenCalledWith(
-                expect.not.stringContaining('audio=true'),
+                expect.not.stringContaining('type=audio'),
                 expect.any(Object)
             );
         });
@@ -298,8 +298,8 @@ describe('Integration Test', () => {
         };
         localStorage.setItem('disco-progress', JSON.stringify(localProgress));
 
-        const historyRecentBtn = document.getElementById('history-recent-btn');
-        historyRecentBtn.click();
+        const historyCompletedBtn = document.getElementById('history-completed-btn');
+        historyCompletedBtn.click();
 
         // Should fetch metadata for missing paths
         await vi.waitFor(() => {
@@ -436,35 +436,23 @@ describe('Integration Test', () => {
         expect(window.disco.state.currentPage).toBe(1);
     });
 
-    it('applies sidebar filters', async () => {
-        document.getElementById('details-filters').open = true;
+    it('applies sidebar bin filters', async () => {
+        document.getElementById('details-size').open = true;
 
-        document.getElementById('filter-size-min').value = '100MB';
-        document.getElementById('filter-size-max').value = '200MB';
-        document.getElementById('filter-duration-min').value = '60s';
-        document.getElementById('filter-duration-max').value = '120s';
+        await vi.waitFor(() => {
+            const sizeBtn = document.querySelector('#size-list .category-btn');
+            expect(sizeBtn).not.toBeNull();
+        });
 
-        const applyBtn = document.getElementById('apply-sidebar-filters');
-        applyBtn.click();
+        const sizeBtn = document.querySelector('#size-list .category-btn');
+        sizeBtn.click();
 
         await vi.waitFor(() => {
             expect(global.fetch).toHaveBeenCalledWith(
-                expect.stringContaining('min_size=100MB'),
-                expect.any(Object)
-            );
-            expect(global.fetch).toHaveBeenCalledWith(
-                expect.stringContaining('max_size=200MB'),
+                expect.stringContaining('size=-104857600'), // "less than 100MB" uses max: 104857600
                 expect.any(Object)
             );
         });
-    });
-
-    it('resets sidebar filters', async () => {
-        document.getElementById('filter-size-min').value = '100MB';
-        const resetBtn = document.getElementById('reset-sidebar-filters');
-        resetBtn.click();
-
-        expect(document.getElementById('filter-size-min').value).toBe('');
     });
 
     it('toggles settings options', async () => {

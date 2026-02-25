@@ -45,4 +45,17 @@ type LsEntry struct {
 	Type  string `json:"type"`
 }
 
+type FilterBin struct {
+	Label string `json:"label"`
+	Min   int64  `json:"min,omitempty"`
+	Max   int64  `json:"max,omitempty"`
+	Value int64  `json:"value,omitempty"`
+}
+
+type FilterBinsResponse struct {
+	Episodes []FilterBin `json:"episodes"`
+	Size     []FilterBin `json:"size"`
+	Duration []FilterBin `json:"duration"`
+}
+
 type PlaylistResponse []string

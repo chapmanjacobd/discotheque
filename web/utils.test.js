@@ -19,7 +19,7 @@ describe('Utility Functions', () => {
   describe('formatDuration', () => {
     it('formats seconds correctly', () => {
       const { formatDuration } = window.disco;
-      expect(formatDuration(0)).toBe('');
+      expect(formatDuration(0)).toBe('0:00');
       expect(formatDuration(59)).toBe('0:59');
       expect(formatDuration(60)).toBe('1:00');
       expect(formatDuration(3600)).toBe('1:00:00');

@@ -47,7 +47,7 @@ type GlobalFlags struct {
 	Include      []string `short:"s" help:"Include paths matching pattern" group:"Filter"`
 	Exclude      []string `short:"E" help:"Exclude paths matching pattern" group:"Filter"`
 	Search       []string `help:"Search terms (space-separated for AND, | for OR)" group:"Filter"`
-	Category     string   `help:"Filter by category" group:"Filter"`
+	Category     []string `help:"Filter by category" group:"Filter"`
 	Genre        string   `help:"Filter by genre" group:"Filter"`
 	Regex        string   `help:"Filter paths by regex pattern" group:"Filter"`
 	PathContains []string `help:"Path must contain all these strings" group:"Filter"`
@@ -77,6 +77,7 @@ type GlobalFlags struct {
 	PlayCountMax int    `help:"Maximum play count" group:"Filter"`
 	Completed    bool   `help:"Show only completed items" group:"Filter"`
 	InProgress   bool   `help:"Show only items in progress" group:"Filter"`
+	WithCaptions bool   `help:"Show only items with captions" group:"Filter"`
 
 	// Content type filters
 	VideoOnly       bool     `help:"Only video files" group:"Filter"`

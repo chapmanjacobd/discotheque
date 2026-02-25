@@ -78,12 +78,18 @@ func (qb *QueryBuilder) BuildSelect(columns string) (string, []any) {
 	}
 
 	// Category filter
-	if qb.Flags.Category != "" {
-		if qb.Flags.Category == "Uncategorized" {
-			whereClauses = append(whereClauses, "(categories IS NULL OR categories = '')")
-		} else {
-			whereClauses = append(whereClauses, "categories LIKE '%' || ? || '%'")
-			args = append(args, ";"+qb.Flags.Category+";")
+	if len(qb.Flags.Category) > 0 {
+		var catClauses []string
+		for _, cat := range qb.Flags.Category {
+			if cat == "Uncategorized" {
+				catClauses = append(catClauses, "(categories IS NULL OR categories = '')")
+			} else {
+				catClauses = append(catClauses, "categories LIKE '%' || ? || '%'")
+				args = append(args, ";"+cat+";")
+			}
+		}
+		if len(catClauses) > 0 {
+			whereClauses = append(whereClauses, "("+strings.Join(catClauses, " OR ")+")")
 		}
 	}
 
@@ -260,7 +266,7 @@ func (qb *QueryBuilder) BuildSelect(columns string) (string, []any) {
 
 	// Unfinished (has playhead but presumably not done)
 	if qb.Flags.Unfinished || qb.Flags.InProgress {
-		whereClauses = append(whereClauses, "playhead > 0 AND playhead < duration * 0.95")
+		whereClauses = append(whereClauses, "COALESCE(play_count, 0) = 0 AND COALESCE(playhead, 0) > 0")
 	}
 
 	if qb.Flags.Partial != "" {
@@ -272,7 +278,11 @@ func (qb *QueryBuilder) BuildSelect(columns string) (string, []any) {
 	}
 
 	if qb.Flags.Completed {
-		whereClauses = append(whereClauses, "playhead >= duration * 0.95")
+		whereClauses = append(whereClauses, "COALESCE(play_count, 0) > 0")
+	}
+
+	if qb.Flags.WithCaptions {
+		whereClauses = append(whereClauses, "path IN (SELECT DISTINCT media_path FROM captions)")
 	}
 
 	// Play count filters
@@ -622,10 +632,19 @@ func FetchSiblings(ctx context.Context, media []models.MediaWithDB, flags models
 
 // FilterEpisodic filters media based on the number of files in its directory
 func FilterEpisodic(media []models.MediaWithDB, criteria string) []models.MediaWithDB {
-	r, err := utils.ParseRange(criteria, func(s string) (int64, error) {
-		return strconv.ParseInt(s, 10, 64)
-	})
-	if err != nil {
+	parts := strings.Split(criteria, ",")
+	var ranges []utils.Range
+
+	for _, p := range parts {
+		r, err := utils.ParseRange(p, func(s string) (int64, error) {
+			return strconv.ParseInt(s, 10, 64)
+		})
+		if err == nil {
+			ranges = append(ranges, r)
+		}
+	}
+
+	if len(ranges) == 0 {
 		return media
 	}
 
@@ -638,7 +657,14 @@ func FilterEpisodic(media []models.MediaWithDB, criteria string) []models.MediaW
 	filtered := []models.MediaWithDB{}
 	for _, m := range media {
 		count := counts[m.Parent()]
-		if r.Matches(count) {
+		matched := false
+		for _, r := range ranges {
+			if r.Matches(count) {
+				matched = true
+				break
+			}
+		}
+		if matched {
 			filtered = append(filtered, m)
 		}
 	}

@@ -12,7 +12,9 @@ type Querier interface {
 	AddPlaylistItem(ctx context.Context, arg AddPlaylistItemParams) error
 	ClearPlaylist(ctx context.Context, playlistID int64) error
 	DeletePlaylist(ctx context.Context, arg DeletePlaylistParams) error
+	GetAllCaptions(ctx context.Context, limit int64) ([]GetAllCaptionsRow, error)
 	GetAllMediaMetadata(ctx context.Context) ([]GetAllMediaMetadataRow, error)
+	GetCaptionsForMedia(ctx context.Context, mediaPath string) ([]Captions, error)
 	GetCategoryStats(ctx context.Context) ([]GetCategoryStatsRow, error)
 	GetCustomCategories(ctx context.Context) ([]string, error)
 	GetGenreStats(ctx context.Context) ([]GetGenreStatsRow, error)
@@ -40,7 +42,7 @@ type Querier interface {
 	InsertPlaylist(ctx context.Context, arg InsertPlaylistParams) (int64, error)
 	MarkDeleted(ctx context.Context, arg MarkDeletedParams) error
 	RemovePlaylistItem(ctx context.Context, arg RemovePlaylistItemParams) error
-	SearchCaptions(ctx context.Context, query string) ([]SearchCaptionsRow, error)
+	SearchCaptions(ctx context.Context, arg SearchCaptionsParams) ([]SearchCaptionsRow, error)
 	SearchMediaFTS(ctx context.Context, arg SearchMediaFTSParams) ([]Media, error)
 	UpdateMediaCategories(ctx context.Context, arg UpdateMediaCategoriesParams) error
 	UpdatePath(ctx context.Context, arg UpdatePathParams) error

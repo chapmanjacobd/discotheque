@@ -30,21 +30,6 @@ func TestExtract_BasicInfo(t *testing.T) {
 	}
 }
 
-func TestBasicInfo(t *testing.T) {
-	f, _ := os.CreateTemp("", "basic-test")
-	defer os.Remove(f.Name())
-	stat, _ := f.Stat()
-	f.Close()
-
-	meta := basicInfo(f.Name(), stat, "video")
-	if meta.Media.Path != f.Name() {
-		t.Error("Path mismatch")
-	}
-	if meta.Media.Type.String != "video" {
-		t.Error("Type mismatch")
-	}
-}
-
 func TestExtract_MimeTypes(t *testing.T) {
 	tests := []struct {
 		filename string

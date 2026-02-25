@@ -274,6 +274,20 @@ VALUES (?, ?, ?, ?);
 -- name: GetHistoryCount :one
 SELECT COUNT(*) FROM history WHERE media_path = ?;
 
+-- name: GetCaptionsForMedia :many
+SELECT * FROM captions
+WHERE media_path = ?
+ORDER BY time;
+
+-- name: GetAllCaptions :many
+SELECT c.media_path, c.time, c.text, m.title
+FROM captions c
+JOIN media m ON c.media_path = m.path
+WHERE m.time_deleted = 0
+  AND c.text IS NOT NULL AND c.text != ''
+ORDER BY c.media_path, c.time
+LIMIT ?;
+
 -- name: SearchCaptions :many
 SELECT c.media_path, c.time, c.text, m.title
 FROM captions c
@@ -281,7 +295,9 @@ JOIN captions_fts f ON c.rowid = f.rowid
 JOIN media m ON c.media_path = m.path
 WHERE f.text MATCH sqlc.arg('query')
   AND m.time_deleted = 0
-ORDER BY c.media_path, c.time;
+  AND c.text IS NOT NULL AND c.text != ''
+ORDER BY c.media_path, c.time
+LIMIT sqlc.arg('limit');
 
 -- name: GetStats :one
 SELECT

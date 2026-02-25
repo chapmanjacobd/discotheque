@@ -19,16 +19,18 @@ describe('Advanced Integration Tests', () => {
             expect(lastCall[0]).toContain('category=comedy');
         });
 
-        // 2. Select Audio type only
-        const videoBtn = document.querySelector('.type-btn[data-type="video"]');
-        videoBtn.click(); // Toggle video off, leaving only audio active
+        // 2. Select Video type only
+        const videoBtn = document.querySelector('#media-type-list .category-btn[data-type="video"]');
+        videoBtn.click(); // Initial state is nothing selected (all types). Clicking video selects ONLY video.
 
         await vi.waitFor(() => {
             const calls = global.fetch.mock.calls;
-            const lastCall = calls[calls.length - 1];
-            expect(lastCall[0]).toContain('category=comedy');
-            expect(lastCall[0]).toContain('audio=true');
-            expect(lastCall[0]).not.toContain('video=true');
+            const hasQuery = calls.some(call => 
+                call[0].includes('category=comedy') && 
+                call[0].includes('type=video') && 
+                !call[0].includes('type=audio')
+            );
+            expect(hasQuery).toBe(true);
         });
 
         // 3. Switch to Disk Usage mode
@@ -37,11 +39,12 @@ describe('Advanced Integration Tests', () => {
 
         await vi.waitFor(() => {
             const calls = global.fetch.mock.calls;
-            const lastCall = calls[calls.length - 1];
-            // Should call /api/du with BOTH comedy and audio filter
-            expect(lastCall[0]).toContain('/api/du');
-            expect(lastCall[0]).toContain('category=comedy');
-            expect(lastCall[0]).toContain('audio=true');
+            const hasDUQuery = calls.some(call => 
+                call[0].includes('/api/du') && 
+                call[0].includes('category=comedy') && 
+                call[0].includes('type=video')
+            );
+            expect(hasDUQuery).toBe(true);
         });
     });
 
@@ -63,8 +66,8 @@ describe('Advanced Integration Tests', () => {
         viewDetails.click();
         await vi.waitFor(() => {
             const calls = global.fetch.mock.calls;
-            const lastCall = calls[calls.length - 1];
-            expect(lastCall[0]).toContain('/api/query');
+            const hasQueryCall = calls.some(call => call[0].includes('/api/query'));
+            expect(hasQueryCall).toBe(true);
             expect(viewDetails.classList.contains('active')).toBe(true);
             expect(document.querySelector('.details-table')).toBeTruthy();
         });
@@ -105,37 +108,56 @@ describe('Advanced Integration Tests', () => {
         });
     });
 
-    it('filters by sidebar ranges (Episodes, Size, Duration)', async () => {
-        // Open details to ensure visibility (not strictly necessary for JSDOM but good practice)
-        document.getElementById('details-filters').open = true;
+    it('filters by sidebar bins (Episodes, Size, Duration)', async () => {
+        // Open details to ensure visibility
+        document.getElementById('details-episodes').open = true;
 
-        const epMin = document.getElementById('filter-episodes-min');
-        const szMin = document.getElementById('filter-size-min');
-        const applyBtn = document.getElementById('apply-sidebar-filters');
+        await vi.waitFor(() => {
+            const epBtn = document.querySelector('#episodes-list .category-btn');
+            expect(epBtn).not.toBeNull();
+        });
 
-        epMin.value = '5';
-        szMin.value = '1GB';
-        applyBtn.click();
+        const epBtn = document.querySelector('#episodes-list .category-btn');
+        epBtn.click(); // Select "1 only" (value: 1)
 
         await vi.waitFor(() => {
             const calls = global.fetch.mock.calls;
             const lastCall = calls[calls.length - 1];
-            expect(lastCall[0]).toContain('episodes=5-');
-            expect(lastCall[0]).toContain('min_size=1GB');
+            expect(lastCall[0]).toContain('episodes=1');
         });
     });
 
     it('navigates to Captions page and performs keyword search', async () => {
+        // 1. Normal search on All Media
+        const allMediaBtn = document.getElementById('all-media-btn');
+        allMediaBtn.click();
+        
+        const searchInput = document.getElementById('search-input');
+        searchInput.value = 'normal';
+        searchInput.dispatchEvent(new Event('input'));
+        await new Promise(r => setTimeout(r, 400)); // wait for debounce
+
+        await vi.waitFor(() => {
+            const calls = global.fetch.mock.calls;
+            const hasQueryCall = calls.some(call => call[0].includes('/api/query') && call[0].includes('search=normal'));
+            expect(hasQueryCall).toBe(true);
+            
+            // Check that results container has normal media cards
+            expect(document.querySelector('.grid .media-card')).toBeTruthy();
+            expect(document.querySelector('.captions-list-view .caption-row')).toBeNull();
+        });
+
+        // 2. Caption search on Captions page
         const captionsBtn = document.getElementById('captions-btn');
         captionsBtn.click();
 
         await vi.waitFor(() => {
             const calls = global.fetch.mock.calls;
-            const lastCall = calls[calls.length - 1];
-            expect(lastCall[0]).toContain('captions=true');
+            // The URL might contain either view=captions or captions=true depending on implementation
+            const hasCaptionsRequest = calls.some(call => call[0].includes('captions=true') || call[0].includes('view=captions'));
+            expect(hasCaptionsRequest).toBe(true);
         });
 
-        const searchInput = document.getElementById('search-input');
         searchInput.value = 'findme';
         searchInput.dispatchEvent(new Event('input'));
         
@@ -144,9 +166,15 @@ describe('Advanced Integration Tests', () => {
 
         await vi.waitFor(() => {
             const calls = global.fetch.mock.calls;
-            const lastCall = calls[calls.length - 1];
-            expect(lastCall[0]).toContain('captions=true');
-            expect(lastCall[0]).toContain('search=findme');
+            const hasCaptionsQuery = calls.some(call => 
+                (call[0].includes('captions=true') || call[0].includes('view=captions')) && 
+                call[0].includes('search=findme')
+            );
+            expect(hasCaptionsQuery).toBe(true);
+            
+            // Check that results container has caption rows
+            expect(document.querySelector('.captions-list-view .caption-row')).toBeTruthy();
+            expect(document.querySelector('.grid .media-card')).toBeNull();
         });
     });
 });

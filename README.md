@@ -79,6 +79,8 @@ Flags:
         Show only completed items
   --in-progress
         Show only items in progress
+  --with-captions
+        Show only items with captions
   --video-only
         Only video files
   --audio-only
@@ -257,6 +259,8 @@ Flags:
         Show only completed items
   --in-progress
         Show only items in progress
+  --with-captions
+        Show only items with captions
   --video-only
         Only video files
   --audio-only
@@ -393,6 +397,8 @@ Flags:
         Show only completed items
   --in-progress
         Show only items in progress
+  --with-captions
+        Show only items with captions
   --video-only
         Only video files
   --audio-only
@@ -596,6 +602,8 @@ Flags:
         Show only completed items
   --in-progress
         Show only items in progress
+  --with-captions
+        Show only items with captions
   --video-only
         Only video files
   --audio-only
@@ -914,6 +922,8 @@ Flags:
         Show only completed items
   --in-progress
         Show only items in progress
+  --with-captions
+        Show only items with captions
   --video-only
         Only video files
   --audio-only
@@ -1140,6 +1150,8 @@ Flags:
         Show only completed items
   --in-progress
         Show only items in progress
+  --with-captions
+        Show only items with captions
   --video-only
         Only video files
   --audio-only
@@ -1270,6 +1282,8 @@ Flags:
         Show only completed items
   --in-progress
         Show only items in progress
+  --with-captions
+        Show only items with captions
   --video-only
         Only video files
   --audio-only
@@ -1431,6 +1445,8 @@ Flags:
         Show only completed items
   --in-progress
         Show only items in progress
+  --with-captions
+        Show only items with captions
   --video-only
         Only video files
   --audio-only
@@ -1615,6 +1631,8 @@ Flags:
         Show only completed items
   --in-progress
         Show only items in progress
+  --with-captions
+        Show only items with captions
   --video-only
         Only video files
   --audio-only
@@ -1733,6 +1751,8 @@ Flags:
         Show only completed items
   --in-progress
         Show only items in progress
+  --with-captions
+        Show only items with captions
   --video-only
         Only video files
   --audio-only
@@ -1905,6 +1925,8 @@ Flags:
         Show only completed items
   --in-progress
         Show only items in progress
+  --with-captions
+        Show only items with captions
   --video-only
         Only video files
   --audio-only
@@ -2083,6 +2105,8 @@ Flags:
         Show only completed items
   --in-progress
         Show only items in progress
+  --with-captions
+        Show only items with captions
   --video-only
         Only video files
   --audio-only
@@ -2281,6 +2305,8 @@ Flags:
         Show only completed items
   --in-progress
         Show only items in progress
+  --with-captions
+        Show only items with captions
   --video-only
         Only video files
   --audio-only
@@ -2495,6 +2521,8 @@ Flags:
         Show only completed items
   --in-progress
         Show only items in progress
+  --with-captions
+        Show only items with captions
   --video-only
         Only video files
   --audio-only
@@ -2780,6 +2808,8 @@ Flags:
         Show only completed items
   --in-progress
         Show only items in progress
+  --with-captions
+        Show only items with captions
   --video-only
         Only video files
   --audio-only
@@ -3050,6 +3080,8 @@ Flags:
         Show only completed items
   --in-progress
         Show only items in progress
+  --with-captions
+        Show only items with captions
   --video-only
         Only video files
   --audio-only
@@ -3211,6 +3243,8 @@ Flags:
         Show only completed items
   --in-progress
         Show only items in progress
+  --with-captions
+        Show only items with captions
   --video-only
         Only video files
   --audio-only
@@ -3586,6 +3620,8 @@ Flags:
         Show only completed items
   --in-progress
         Show only items in progress
+  --with-captions
+        Show only items with captions
   --video-only
         Only video files
   --audio-only
@@ -3898,6 +3934,8 @@ Flags:
         Show only completed items
   --in-progress
         Show only items in progress
+  --with-captions
+        Show only items with captions
   --video-only
         Only video files
   --audio-only
@@ -4084,6 +4122,8 @@ Flags:
         Show only completed items
   --in-progress
         Show only items in progress
+  --with-captions
+        Show only items with captions
   --video-only
         Only video files
   --audio-only

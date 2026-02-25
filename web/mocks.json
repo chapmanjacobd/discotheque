@@ -66,5 +66,19 @@
   ],
   "playlists": [
     "My Playlist"
-  ]
+  ],
+  "filter_bins": {
+    "episodes": [
+      { "label": "Specials", "value": 1 },
+      { "label": "2-5", "min": 2, "max": 5 }
+    ],
+    "size": [
+      { "label": "less than 100MB", "max": 104857600 },
+      { "label": "100MB+", "min": 104857600 }
+    ],
+    "duration": [
+      { "label": "under 1:00", "max": 60 },
+      { "label": "1:00+", "min": 60 }
+    ]
+  }
 }
