@@ -6,12 +6,12 @@ describe('Episodes View and Filter', () => {
         await setupTestEnvironment();
     });
 
-    it('navigates to Episodes view and fetches data', async () => {
-        const episodesBtn = document.getElementById('episodes-btn');
-        expect(episodesBtn).toBeTruthy();
-        expect(episodesBtn.textContent).toContain('Episodes');
+    it('navigates to Group view and fetches data', async () => {
+        const viewGroup = document.getElementById('view-group');
+        expect(viewGroup).toBeTruthy();
+        expect(viewGroup.textContent).toContain('Group');
 
-        episodesBtn.click();
+        viewGroup.click();
 
         await vi.waitFor(() => {
             const resultsContainer = document.getElementById('results-container');
@@ -27,25 +27,21 @@ describe('Episodes View and Filter', () => {
         });
     });
 
-    it('appends episodes filter to search query', async () => {
-        // Open advanced filters
-        const toggle = document.getElementById('advanced-filter-toggle');
-        toggle.click();
-
-        const input = document.getElementById('filter-episodes');
+    it('appends episodes filter to search query via sidebar', async () => {
+        const input = document.getElementById('filter-episodes-min');
         expect(input).toBeTruthy();
         
         input.value = '5';
         input.dispatchEvent(new Event('input')); // Trigger change
 
-        // Click apply
-        const applyBtn = document.getElementById('apply-advanced-filters');
+        // Click apply in sidebar
+        const applyBtn = document.getElementById('apply-sidebar-filters');
         applyBtn.click();
 
         await vi.waitFor(() => {
             const calls = global.fetch.mock.calls;
             const lastCall = calls[calls.length - 1];
-            expect(lastCall[0]).toContain('episodes=5');
+            expect(lastCall[0]).toContain('episodes=5-');
         });
     });
 });

@@ -38,39 +38,6 @@ describe('Integration Test 2', () => {
         expect(overlay.classList.contains('hidden')).toBe(true);
     });
 
-    it('filters by genre', async () => {
-        // Open Advanced Filters
-        const advancedFilterToggle = document.getElementById('advanced-filter-toggle');
-        advancedFilterToggle.click();
-
-        // Select "Genre" in Browse By dropdown
-        const browseCol = document.getElementById('filter-browse-col');
-        browseCol.value = 'genre';
-        browseCol.dispatchEvent(new Event('change'));
-
-        // Wait for values to load and select "Rock"
-        await vi.waitFor(() => {
-            const browseVal = document.getElementById('filter-browse-val');
-            expect(browseVal.querySelector('option[value="Rock"]')).not.toBeNull();
-        });
-
-        const browseVal = document.getElementById('filter-browse-val');
-        browseVal.value = 'Rock';
-        
-        // Apply filters
-        const applyBtn = document.getElementById('apply-advanced-filters');
-        applyBtn.click();
-
-        await vi.waitFor(() => {
-            // Check that fetch was called with the correct genre parameter
-            // Note: The URL might contain other default parameters, so we check stringContaining
-            const calls = global.fetch.mock.calls;
-            const lastCall = calls[calls.length - 1];
-            const url = lastCall[0];
-            expect(url).toEqual(expect.stringContaining('genre=Rock'));
-        });
-    });
-
     it('empties the bin', async () => {
         const trashBtn = document.getElementById('trash-btn');
         trashBtn.click();

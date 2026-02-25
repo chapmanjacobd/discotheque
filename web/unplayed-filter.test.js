@@ -28,12 +28,9 @@ describe('Unplayed Filter Client-side', () => {
             'video1.mp4': 1
         }));
 
-        // Use UI elements
-        const unplayedCheckbox = document.getElementById('filter-unplayed');
-        unplayedCheckbox.checked = true;
-        
-        const applyBtn = document.getElementById('apply-advanced-filters');
-        applyBtn.click();
+        // Click Unplayed button in sidebar
+        const unplayedBtn = document.getElementById('history-unplayed-btn');
+        unplayedBtn.click();
 
         await vi.waitFor(() => {
             // Let's check the DOM results instead which is more "end-to-end"

@@ -276,32 +276,6 @@ func TestServeCmd_ExtendedHandlers(t *testing.T) {
 		}
 	})
 
-	t.Run("HandleSimilarity", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/api/similarity", nil)
-		w := httptest.NewRecorder()
-		handler.ServeHTTP(w, req)
-
-		if w.Code != http.StatusOK {
-			t.Errorf("Expected 200, got %d", w.Code)
-		}
-
-		var resp []models.FolderStats
-		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
-			t.Fatal(err)
-		}
-
-		foundGroup := false
-		for _, g := range resp {
-			if len(g.Files) >= 2 {
-				foundGroup = true
-				break
-			}
-		}
-		if !foundGroup {
-			t.Error("Expected to find a similarity group for movies or music")
-		}
-	})
-
 	t.Run("HandleEpisodes", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/api/episodes", nil)
 		w := httptest.NewRecorder()
@@ -369,44 +343,6 @@ func TestServeCmd_ExtendedHandlers(t *testing.T) {
 
 		if resp.Path == "" {
 			t.Error("Expected a media path in random clip")
-		}
-	})
-
-	t.Run("HandleStatsLibrary", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/api/stats/library", nil)
-		w := httptest.NewRecorder()
-		handler.ServeHTTP(w, req)
-
-		if w.Code != http.StatusOK {
-			t.Errorf("Expected 200, got %d", w.Code)
-		}
-
-		var resp []any
-		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
-			t.Fatal(err)
-		}
-
-		if len(resp) != 1 {
-			t.Errorf("Expected 1 DB result, got %d", len(resp))
-		}
-	})
-
-	t.Run("HandleStatsHistory", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/api/stats/history?facet=watched", nil)
-		w := httptest.NewRecorder()
-		handler.ServeHTTP(w, req)
-
-		if w.Code != http.StatusOK {
-			t.Errorf("Expected 200, got %d", w.Code)
-		}
-
-		var resp []any
-		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
-			t.Fatal(err)
-		}
-
-		if len(resp) != 1 {
-			t.Errorf("Expected 1 DB result, got %d", len(resp))
 		}
 	})
 

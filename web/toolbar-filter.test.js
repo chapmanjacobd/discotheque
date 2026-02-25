@@ -23,8 +23,8 @@ describe('Toolbar Media Options Filtering', () => {
     });
 
     it('filters media by type on History page', async () => {
-        const historyBtn = document.getElementById('history-btn');
-        historyBtn.click();
+        const historyRecentBtn = document.getElementById('history-recent-btn');
+        historyRecentBtn.click();
 
         await vi.waitFor(() => {
             expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('watched=true'), expect.any(Object));
@@ -63,9 +63,9 @@ describe('Toolbar Media Options Filtering', () => {
         });
     });
 
-    it('re-renders episodes results when toolbar filter is clicked on Episodes page', async () => {
-        const episodesBtn = document.getElementById('episodes-btn');
-        episodesBtn.click();
+    it('re-renders episodes results when toolbar filter is clicked on Group view', async () => {
+        const viewGroup = document.getElementById('view-group');
+        viewGroup.click();
 
         await vi.waitFor(() => {
             const resultsContainer = document.getElementById('results-container');

@@ -11,58 +11,6 @@ import (
 	"github.com/chapmanjacobd/discotheque/internal/testutils"
 )
 
-func TestSimilarityLimit(t *testing.T) {
-	fixture := testutils.Setup(t)
-	defer fixture.Cleanup()
-
-	db := fixture.GetDB()
-	InitDB(db)
-
-	// Insert 505 similar files
-	for i := range 505 {
-		_, err := db.Exec(`
-			INSERT INTO media (path, type, size, duration, time_deleted)
-			VALUES (?, 'video', 1000000, 3600, 0)
-		`, "/media/video"+string(rune(i))+".mp4")
-		if err != nil {
-			t.Fatal(err)
-		}
-	}
-	db.Close()
-
-	cmd := &ServeCmd{
-		Databases: []string{fixture.DBPath},
-	}
-	handler := cmd.Mux()
-
-	req := httptest.NewRequest(http.MethodGet, "/api/similarity", nil)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, req)
-
-	if w.Code != http.StatusOK {
-		t.Fatalf("Expected 200, got %d", w.Code)
-	}
-
-	var resp []struct {
-		Count int   `json:"count"`
-		Files []any `json:"files"`
-	}
-	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
-		t.Fatal(err)
-	}
-
-	if len(resp) == 0 {
-		t.Fatal("Expected at least one similarity group")
-	}
-
-	if resp[0].Count > 500 {
-		t.Errorf("Expected group count to be limited to 500, got %d", resp[0].Count)
-	}
-	if len(resp[0].Files) > 500 {
-		t.Errorf("Expected group files to be limited to 500, got %d", len(resp[0].Files))
-	}
-}
-
 func TestCustomKeywordsCategorization(t *testing.T) {
 	fixture := testutils.Setup(t)
 	defer fixture.Cleanup()

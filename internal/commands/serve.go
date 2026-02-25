@@ -64,11 +64,8 @@ func (c *ServeCmd) Mux() http.Handler {
 	mux.HandleFunc("/api/events", c.handleEvents)
 	mux.HandleFunc("/api/ls", c.handleLs)
 	mux.HandleFunc("/api/du", c.handleDU)
-	mux.HandleFunc("/api/similarity", c.handleSimilarity)
 	mux.HandleFunc("/api/episodes", c.handleEpisodes)
 	mux.HandleFunc("/api/random-clip", c.handleRandomClip)
-	mux.HandleFunc("/api/stats/history", c.handleStatsHistory)
-	mux.HandleFunc("/api/stats/library", c.handleStatsLibrary)
 	mux.HandleFunc("/api/categorize/suggest", c.handleCategorizeSuggest)
 	mux.HandleFunc("/api/categorize/apply", c.handleCategorizeApply)
 	mux.HandleFunc("/api/categorize/keywords", c.handleCategorizeKeywords)
@@ -1006,11 +1003,8 @@ func (c *ServeCmd) handleDU(w http.ResponseWriter, r *http.Request) {
 	}
 
 	depth := 1
-	if path != "" {
-		depth = strings.Count(filepath.Clean(path), string(filepath.Separator)) + 2
-		if strings.HasPrefix(path, "/") {
-			depth--
-		}
+	if path != "" && path != "/" {
+		depth = strings.Count(filepath.Clean(path), string(filepath.Separator)) + 1
 	}
 
 	aggFlags := flags
@@ -1022,98 +1016,6 @@ func (c *ServeCmd) handleDU(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(stats)
-}
-
-func (c *ServeCmd) handleSimilarity(w http.ResponseWriter, r *http.Request) {
-	flags := c.parseFlags(r)
-	q := r.URL.Query()
-
-	if q.Get("folders") == "true" {
-		flags.Similar = true
-	}
-	if q.Get("names") == "true" {
-		flags.FilterNames = true
-	}
-
-	flags.All = true
-	flags.Limit = 1000000
-
-	allMedia, err := query.MediaQuery(r.Context(), c.Databases, flags)
-	if err != nil {
-		slog.Error("Failed to fetch media for similarity", "error", err)
-		http.Error(w, "Query failed", http.StatusInternalServerError)
-		return
-	}
-
-	var results []models.FolderStats
-	if q.Get("folders") == "true" {
-		folders := query.AggregateMedia(allMedia, flags)
-		if flags.FilterNames {
-			results = aggregate.ClusterFoldersByName(flags, folders)
-		} else if flags.FilterSizes || flags.FilterDurations || flags.FilterCounts {
-			results = aggregate.ClusterFoldersByNumbers(flags, folders)
-		} else {
-			paths := make([]string, len(folders))
-			for i, f := range folders {
-				paths[i] = f.Path
-			}
-			results = aggregate.ClusterPaths(flags, paths)
-			// Map results back to folders to include files
-			folderMap := make(map[string]models.FolderStats)
-			for _, f := range folders {
-				folderMap[f.Path] = f
-			}
-			for i, r := range results {
-				var groupFiles []models.MediaWithDB
-				// results from ClusterPaths have files as wrapLines(paths)
-				for _, lineItem := range r.Files {
-					if f, ok := folderMap[lineItem.Path]; ok {
-						groupFiles = append(groupFiles, f.Files...)
-					}
-				}
-				results[i].Files = groupFiles
-				results[i].Count = len(groupFiles)
-			}
-		}
-	} else {
-		if flags.FilterSizes || flags.FilterDurations || flags.ClusterSort {
-			results = aggregate.ClusterByNumbers(flags, allMedia)
-		} else {
-			paths := make([]string, len(allMedia))
-			for i, m := range allMedia {
-				paths[i] = m.Path
-			}
-			results = aggregate.ClusterPaths(flags, paths)
-			// Map results back to media
-			mediaMap := make(map[string]models.MediaWithDB)
-			for _, m := range allMedia {
-				mediaMap[m.Path] = m
-			}
-			for i, r := range results {
-				var groupFiles []models.MediaWithDB
-				for _, lineItem := range r.Files {
-					if m, ok := mediaMap[lineItem.Path]; ok {
-						groupFiles = append(groupFiles, m)
-					}
-				}
-				results[i].Files = groupFiles
-				results[i].Count = len(groupFiles)
-			}
-		}
-	}
-
-	// Limit group size to 500 items
-	for i := range results {
-		if results[i].Count > 500 {
-			results[i].Count = 500
-			if len(results[i].Files) > 500 {
-				results[i].Files = results[i].Files[:500]
-			}
-		}
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(results)
 }
 
 func (c *ServeCmd) handleEpisodes(w http.ResponseWriter, r *http.Request) {
@@ -1139,7 +1041,7 @@ func (c *ServeCmd) handleCategorizeKeywords(w http.ResponseWriter, r *http.Reque
 		Category string   `json:"category"`
 		Keywords []string `json:"keywords"`
 	}
-	
+
 	data := make(map[string]map[string]bool)
 
 	for _, dbPath := range c.Databases {
@@ -1404,117 +1306,6 @@ func (c *ServeCmd) handleRandomClip(w http.ResponseWriter, r *http.Request) {
 		Start:       start,
 		End:         end,
 	})
-}
-
-func (c *ServeCmd) handleStatsHistory(w http.ResponseWriter, r *http.Request) {
-	facet := r.URL.Query().Get("facet")
-	if facet == "" {
-		facet = "watched"
-	}
-	frequency := r.URL.Query().Get("frequency")
-	if frequency == "" {
-		frequency = "daily"
-	}
-
-	timeCol := "time_last_played"
-	switch facet {
-	case "deleted":
-		timeCol = "time_deleted"
-	case "created":
-		timeCol = "time_created"
-	case "modified":
-		timeCol = "time_modified"
-	}
-
-	type dbStats struct {
-		DB    string                 `json:"db"`
-		Stats []query.FrequencyStats `json:"stats"`
-	}
-	var results []dbStats
-
-	for _, dbPath := range c.Databases {
-		stats, err := query.HistoricalUsage(r.Context(), dbPath, frequency, timeCol)
-		if err != nil {
-			slog.Error("Failed to fetch history stats", "db", dbPath, "error", err)
-			continue
-		}
-		results = append(results, dbStats{
-			DB:    dbPath,
-			Stats: stats,
-		})
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(results)
-}
-
-func (c *ServeCmd) handleStatsLibrary(w http.ResponseWriter, r *http.Request) {
-	type summary struct {
-		TotalCount           int64 `json:"total_count"`
-		TotalSize            int64 `json:"total_size"`
-		TotalDuration        int64 `json:"total_duration"`
-		WatchedCount         int64 `json:"watched_count"`
-		UnwatchedCount       int64 `json:"unwatched_count"`
-		TotalWatchedDuration int64 `json:"total_watched_duration"`
-	}
-
-	type typeStat struct {
-		Type          string `json:"type"`
-		Count         int64  `json:"count"`
-		TotalSize     int64  `json:"total_size"`
-		TotalDuration int64  `json:"total_duration"`
-	}
-
-	type dbResult struct {
-		DB        string     `json:"db"`
-		Summary   summary    `json:"summary"`
-		Breakdown []typeStat `json:"breakdown"`
-	}
-
-	var results []dbResult
-
-	for _, dbPath := range c.Databases {
-		err := c.execDB(r.Context(), dbPath, func(sqlDB *sql.DB) error {
-			queries := database.New(sqlDB)
-			s, err := queries.GetStats(r.Context())
-			if err != nil {
-				return err
-			}
-			ts, err := queries.GetStatsByType(r.Context())
-			if err != nil {
-				return err
-			}
-
-			res := dbResult{
-				DB: dbPath,
-				Summary: summary{
-					TotalCount:           s.TotalCount,
-					TotalSize:            utils.GetInt64(s.TotalSize),
-					TotalDuration:        utils.GetInt64(s.TotalDuration),
-					WatchedCount:         s.WatchedCount,
-					UnwatchedCount:       s.UnwatchedCount,
-					TotalWatchedDuration: utils.GetInt64(s.TotalWatchedDuration),
-				},
-			}
-
-			for _, t := range ts {
-				res.Breakdown = append(res.Breakdown, typeStat{
-					Type:          utils.StringValue(models.NullStringPtr(t.Type)),
-					Count:         t.Count,
-					TotalSize:     utils.GetInt64(t.TotalSize),
-					TotalDuration: utils.GetInt64(t.TotalDuration),
-				})
-			}
-			results = append(results, res)
-			return nil
-		})
-		if err != nil {
-			slog.Error("Failed to fetch library stats", "db", dbPath, "error", err)
-		}
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(results)
 }
 
 func (c *ServeCmd) handleCategorizeSuggest(w http.ResponseWriter, r *http.Request) {

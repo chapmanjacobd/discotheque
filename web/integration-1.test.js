@@ -64,15 +64,21 @@ describe('Integration Test', () => {
     });
 
     it('toggles view modes', async () => {
-        const viewDetails = document.getElementById('view-details');
+        const viewGroup = document.getElementById('view-group');
         const resultsContainer = document.getElementById('results-container');
 
-        viewDetails.click();
-        expect(resultsContainer.classList.contains('details-view')).toBe(true);
+        viewGroup.click();
+        await vi.waitFor(() => {
+            const calls = global.fetch.mock.calls;
+            const lastCall = calls[calls.length - 1];
+            expect(lastCall[0]).toContain('/api/episodes');
+        });
 
         const viewGrid = document.getElementById('view-grid');
         viewGrid.click();
-        expect(resultsContainer.classList.contains('grid')).toBe(true);
+        await vi.waitFor(() => {
+            expect(resultsContainer.classList.contains('grid')).toBe(true);
+        });
     });
 
     it('trashes a media item', async () => {
@@ -292,8 +298,8 @@ describe('Integration Test', () => {
         };
         localStorage.setItem('disco-progress', JSON.stringify(localProgress));
 
-        const historyBtn = document.getElementById('history-btn');
-        historyBtn.click();
+        const historyRecentBtn = document.getElementById('history-recent-btn');
+        historyRecentBtn.click();
 
         // Should fetch metadata for missing paths
         await vi.waitFor(() => {
@@ -430,43 +436,35 @@ describe('Integration Test', () => {
         expect(window.disco.state.currentPage).toBe(1);
     });
 
-    it('applies advanced filters', async () => {
-        const toggle = document.getElementById('advanced-filter-toggle');
-        toggle.click();
+    it('applies sidebar filters', async () => {
+        document.getElementById('details-filters').open = true;
 
-        document.getElementById('filter-min-size').value = '100';
-        document.getElementById('filter-max-size').value = '200';
-        document.getElementById('filter-min-duration').value = '60';
-        document.getElementById('filter-max-duration').value = '120';
-        document.getElementById('filter-min-score').value = '5';
-        document.getElementById('filter-max-score').value = '10';
-        document.getElementById('filter-unplayed').checked = true;
+        document.getElementById('filter-size-min').value = '100MB';
+        document.getElementById('filter-size-max').value = '200MB';
+        document.getElementById('filter-duration-min').value = '60s';
+        document.getElementById('filter-duration-max').value = '120s';
 
-        const applyBtn = document.getElementById('apply-advanced-filters');
+        const applyBtn = document.getElementById('apply-sidebar-filters');
         applyBtn.click();
 
         await vi.waitFor(() => {
             expect(global.fetch).toHaveBeenCalledWith(
-                expect.stringContaining('min_size=100'),
+                expect.stringContaining('min_size=100MB'),
                 expect.any(Object)
             );
             expect(global.fetch).toHaveBeenCalledWith(
-                expect.stringContaining('max_size=200'),
-                expect.any(Object)
-            );
-            expect(global.fetch).toHaveBeenCalledWith(
-                expect.stringContaining('unplayed=true'),
+                expect.stringContaining('max_size=200MB'),
                 expect.any(Object)
             );
         });
     });
 
-    it('resets advanced filters', async () => {
-        document.getElementById('filter-min-size').value = '100';
-        const resetBtn = document.getElementById('reset-advanced-filters');
+    it('resets sidebar filters', async () => {
+        document.getElementById('filter-size-min').value = '100MB';
+        const resetBtn = document.getElementById('reset-sidebar-filters');
         resetBtn.click();
 
-        expect(document.getElementById('filter-min-size').value).toBe('');
+        expect(document.getElementById('filter-size-min').value).toBe('');
     });
 
     it('toggles settings options', async () => {
