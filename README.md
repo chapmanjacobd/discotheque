@@ -159,6 +159,12 @@ Flags:
         Interactive decision making after playback
   --trash
         Trash files after action
+  --syncweb-url
+        Syncweb/Syncthing API URL
+  --syncweb-api-key
+        Syncweb/Syncthing API Key
+  --syncweb-home
+        Syncweb home directory
   --post-action
         Post-action: none, delete, mark-deleted, move, copy
   --delete-files
@@ -299,6 +305,12 @@ Flags:
         Fetch siblings of matched files (each, all, if-audiobook)
   --fetch-siblings-max
         Maximum number of siblings to fetch
+  --syncweb-url
+        Syncweb/Syncthing API URL
+  --syncweb-api-key
+        Syncweb/Syncthing API Key
+  --syncweb-home
+        Syncweb home directory
   -v, --verbose
         Enable verbose logging
   --simulate
@@ -507,6 +519,12 @@ Flags:
         FTS table name
   -R, --related
         Find media related to the first result
+  --syncweb-url
+        Syncweb/Syncthing API URL
+  --syncweb-api-key
+        Syncweb/Syncthing API Key
+  --syncweb-home
+        Syncweb home directory
   -v, --verbose
         Enable verbose logging
   --simulate
@@ -694,6 +712,12 @@ Flags:
         FTS table name
   -R, --related
         Find media related to the first result
+  --syncweb-url
+        Syncweb/Syncthing API URL
+  --syncweb-api-key
+        Syncweb/Syncthing API Key
+  --syncweb-home
+        Syncweb home directory
   -v, --verbose
         Enable verbose logging
   --simulate
@@ -762,6 +786,12 @@ Flags:
         Player arguments for videos with subtitles
   --player-args-no-sub
         Player arguments for videos without subtitles
+  --syncweb-url
+        Syncweb/Syncthing API URL
+  --syncweb-api-key
+        Syncweb/Syncthing API Key
+  --syncweb-home
+        Syncweb home directory
   --cast
         Cast to chromecast groups
   --cast-device
@@ -834,6 +864,12 @@ Flags:
         Filter folders by total size
   --folder-counts
         Filter folders by number of subfolders
+  --syncweb-url
+        Syncweb/Syncthing API URL
+  --syncweb-api-key
+        Syncweb/Syncthing API Key
+  --syncweb-home
+        Syncweb home directory
   -v, --verbose
         Enable verbose logging
   --simulate
@@ -1038,6 +1074,12 @@ Flags:
         Interactive decision making after playback
   --trash
         Trash files after action
+  --syncweb-url
+        Syncweb/Syncthing API URL
+  --syncweb-api-key
+        Syncweb/Syncthing API Key
+  --syncweb-home
+        Syncweb home directory
   -t, --only-tables
         Comma separated specific table(s)
   --primary-keys
@@ -1190,6 +1232,12 @@ Flags:
         Fetch siblings of matched files (each, all, if-audiobook)
   --fetch-siblings-max
         Maximum number of siblings to fetch
+  --syncweb-url
+        Syncweb/Syncthing API URL
+  --syncweb-api-key
+        Syncweb/Syncthing API Key
+  --syncweb-home
+        Syncweb home directory
   -v, --verbose
         Enable verbose logging
   --simulate
@@ -1358,6 +1406,12 @@ Flags:
         Filter folders by total size
   --folder-counts
         Filter folders by number of subfolders
+  --syncweb-url
+        Syncweb/Syncthing API URL
+  --syncweb-api-key
+        Syncweb/Syncthing API Key
+  --syncweb-home
+        Syncweb home directory
   -v, --verbose
         Enable verbose logging
   --simulate
@@ -1531,6 +1585,12 @@ Flags:
         Filter folders by number of subfolders
   -k, --re-rank
         Add key/value pairs re-rank sorting by multiple attributes (COLUMN=WEIGHT)
+  --syncweb-url
+        Syncweb/Syncthing API URL
+  --syncweb-api-key
+        Syncweb/Syncthing API Key
+  --syncweb-home
+        Syncweb home directory
   -v, --verbose
         Enable verbose logging
   --simulate
@@ -1671,6 +1731,12 @@ Flags:
         Fetch siblings of matched files (each, all, if-audiobook)
   --fetch-siblings-max
         Maximum number of siblings to fetch
+  --syncweb-url
+        Syncweb/Syncthing API URL
+  --syncweb-api-key
+        Syncweb/Syncthing API Key
+  --syncweb-home
+        Syncweb home directory
   -v, --verbose
         Enable verbose logging
   --simulate
@@ -1837,6 +1903,12 @@ Flags:
         Filter folders by number of subfolders
   -k, --re-rank
         Add key/value pairs re-rank sorting by multiple attributes (COLUMN=WEIGHT)
+  --syncweb-url
+        Syncweb/Syncthing API URL
+  --syncweb-api-key
+        Syncweb/Syncthing API Key
+  --syncweb-home
+        Syncweb home directory
   -v, --verbose
         Enable verbose logging
   --simulate
@@ -2005,6 +2077,12 @@ Flags:
         Interactive decision making after playback
   --trash
         Trash files after action
+  --syncweb-url
+        Syncweb/Syncthing API URL
+  --syncweb-api-key
+        Syncweb/Syncthing API Key
+  --syncweb-home
+        Syncweb home directory
   --post-action
         Post-action: none, delete, mark-deleted, move, copy
   --delete-files
@@ -2225,6 +2303,12 @@ Flags:
         Print clusters as JSON
   -k, --re-rank
         Add key/value pairs re-rank sorting by multiple attributes (COLUMN=WEIGHT)
+  --syncweb-url
+        Syncweb/Syncthing API URL
+  --syncweb-api-key
+        Syncweb/Syncthing API Key
+  --syncweb-home
+        Syncweb home directory
   -v, --verbose
         Enable verbose logging
   --simulate
@@ -2425,6 +2509,12 @@ Flags:
         Print clusters as JSON
   -k, --re-rank
         Add key/value pairs re-rank sorting by multiple attributes (COLUMN=WEIGHT)
+  --syncweb-url
+        Syncweb/Syncthing API URL
+  --syncweb-api-key
+        Syncweb/Syncthing API Key
+  --syncweb-home
+        Syncweb home directory
   -v, --verbose
         Enable verbose logging
   --simulate
@@ -2689,6 +2779,12 @@ Flags:
         Interactive decision making after playback
   --trash
         Trash files after action
+  --syncweb-url
+        Syncweb/Syncthing API URL
+  --syncweb-api-key
+        Syncweb/Syncthing API Key
+  --syncweb-home
+        Syncweb home directory
   --cast
         Cast to chromecast groups
   --cast-device
@@ -2976,6 +3072,12 @@ Flags:
         Interactive decision making after playback
   --trash
         Trash files after action
+  --syncweb-url
+        Syncweb/Syncthing API URL
+  --syncweb-api-key
+        Syncweb/Syncthing API Key
+  --syncweb-home
+        Syncweb home directory
   --cast
         Cast to chromecast groups
   --cast-device
@@ -3156,6 +3258,12 @@ Flags:
         Filter folders by total size
   --folder-counts
         Filter folders by number of subfolders
+  --syncweb-url
+        Syncweb/Syncthing API URL
+  --syncweb-api-key
+        Syncweb/Syncthing API Key
+  --syncweb-home
+        Syncweb home directory
   -v, --verbose
         Enable verbose logging
   --simulate
@@ -3369,6 +3477,12 @@ Flags:
         Interactive decision making after playback
   --trash
         Trash files after action
+  --syncweb-url
+        Syncweb/Syncthing API URL
+  --syncweb-api-key
+        Syncweb/Syncthing API Key
+  --syncweb-home
+        Syncweb home directory
   --post-action
         Post-action: none, delete, mark-deleted, move, copy
   --delete-files
@@ -3413,6 +3527,12 @@ Add paths to playback history
 $ disco history-add --help
 
 Flags:
+  --syncweb-url
+        Syncweb/Syncthing API URL
+  --syncweb-api-key
+        Syncweb/Syncthing API Key
+  --syncweb-home
+        Syncweb home directory
   -v, --verbose
         Enable verbose logging
   --simulate
@@ -3439,6 +3559,12 @@ Import mpv watchlater files to history
 $ disco mpv-watchlater --help
 
 Flags:
+  --syncweb-url
+        Syncweb/Syncthing API URL
+  --syncweb-api-key
+        Syncweb/Syncthing API Key
+  --syncweb-home
+        Syncweb home directory
   -v, --verbose
         Enable verbose logging
   --simulate
@@ -3472,6 +3598,12 @@ $ disco serve --trashcan my_videos.db
 $ disco serve --help
 
 Flags:
+  --syncweb-url
+        Syncweb/Syncthing API URL
+  --syncweb-api-key
+        Syncweb/Syncthing API Key
+  --syncweb-home
+        Syncweb home directory
   -v, --verbose
         Enable verbose logging
   --simulate
@@ -3514,6 +3646,12 @@ $ disco optimize my_videos.db
 $ disco optimize --help
 
 Flags:
+  --syncweb-url
+        Syncweb/Syncthing API URL
+  --syncweb-api-key
+        Syncweb/Syncthing API Key
+  --syncweb-home
+        Syncweb home directory
   -v, --verbose
         Enable verbose logging
   --simulate
@@ -3540,6 +3678,12 @@ Repair malformed database using sqlite3
 $ disco repair --help
 
 Flags:
+  --syncweb-url
+        Syncweb/Syncthing API URL
+  --syncweb-api-key
+        Syncweb/Syncthing API Key
+  --syncweb-home
+        Syncweb home directory
   -v, --verbose
         Enable verbose logging
   --simulate
@@ -3670,6 +3814,12 @@ Flags:
         Random order
   -k, --re-rank
         Add key/value pairs re-rank sorting by multiple attributes (COLUMN=WEIGHT)
+  --syncweb-url
+        Syncweb/Syncthing API URL
+  --syncweb-api-key
+        Syncweb/Syncthing API Key
+  --syncweb-home
+        Syncweb home directory
   -v, --verbose
         Enable verbose logging
   --simulate
@@ -3696,6 +3846,12 @@ Generate README.md content
 $ disco readme --help
 
 Flags:
+  --syncweb-url
+        Syncweb/Syncthing API URL
+  --syncweb-api-key
+        Syncweb/Syncthing API Key
+  --syncweb-home
+        Syncweb home directory
   -v, --verbose
         Enable verbose logging
   --simulate
@@ -3740,6 +3896,12 @@ Flags:
         Filter for duplicate words (true/false)
   --unique-only
         Filter for unique words (true/false)
+  --syncweb-url
+        Syncweb/Syncthing API URL
+  --syncweb-api-key
+        Syncweb/Syncthing API Key
+  --syncweb-home
+        Syncweb home directory
   -v, --verbose
         Enable verbose logging
   --simulate
@@ -3820,6 +3982,12 @@ Flags:
         Move grouped files into separate directories
   --print-groups
         Print clusters as JSON
+  --syncweb-url
+        Syncweb/Syncthing API URL
+  --syncweb-api-key
+        Syncweb/Syncthing API Key
+  --syncweb-home
+        Syncweb home directory
   -v, --verbose
         Enable verbose logging
   --simulate
@@ -3854,6 +4022,12 @@ Flags:
         Size of each segment to hash
   --hash-threads
         Number of threads to use for hashing a single file
+  --syncweb-url
+        Syncweb/Syncthing API URL
+  --syncweb-api-key
+        Syncweb/Syncthing API Key
+  --syncweb-home
+        Syncweb home directory
   -v, --verbose
         Enable verbose logging
   --simulate
@@ -4024,6 +4198,12 @@ Flags:
         Interactive decision making after playback
   --trash
         Trash files after action
+  --syncweb-url
+        Syncweb/Syncthing API URL
+  --syncweb-api-key
+        Syncweb/Syncthing API Key
+  --syncweb-home
+        Syncweb home directory
   --post-action
         Post-action: none, delete, mark-deleted, move, copy
   --delete-files
@@ -4162,6 +4342,12 @@ Flags:
         Fetch siblings of matched files (each, all, if-audiobook)
   --fetch-siblings-max
         Maximum number of siblings to fetch
+  --syncweb-url
+        Syncweb/Syncthing API URL
+  --syncweb-api-key
+        Syncweb/Syncthing API Key
+  --syncweb-home
+        Syncweb home directory
   -v, --verbose
         Enable verbose logging
   --simulate
@@ -4290,6 +4476,12 @@ Merge multiple SQLite databases
 $ disco merge-dbs --help
 
 Flags:
+  --syncweb-url
+        Syncweb/Syncthing API URL
+  --syncweb-api-key
+        Syncweb/Syncthing API Key
+  --syncweb-home
+        Syncweb home directory
   -t, --only-tables
         Comma separated specific table(s)
   --primary-keys
@@ -4304,6 +4496,38 @@ Flags:
         Only copy columns that exist in target
   --skip-columns
         Columns to skip during merge
+  -v, --verbose
+        Enable verbose logging
+  --simulate
+        Dry run; don't actually do anything
+  -y, --no-confirm
+        Don't ask for confirmation
+  -T, --timeout
+        Quit after N minutes/seconds
+  --threads
+        Use N threads for parallel processing
+  -i, --ignore-errors
+        Ignore errors and continue to next file
+```
+
+</details>
+
+### syncweb
+
+Syncweb: an offline-first distributed web
+
+<details><summary>All Options</summary>
+
+```bash
+$ disco syncweb --help
+
+Flags:
+  --syncweb-url
+        Syncweb/Syncthing API URL
+  --syncweb-api-key
+        Syncweb/Syncthing API Key
+  --syncweb-home
+        Syncweb home directory
   -v, --verbose
         Enable verbose logging
   --simulate

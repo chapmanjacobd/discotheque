@@ -1686,3 +1686,20 @@ body.is-dragging .sidebar .category-btn * {
         min-width: 120px;
     }
 }
+
+/* Syncweb Styles */
+.folder-thumb, .remote-thumb {
+    user-select: none;
+}
+
+.media-action-btn.download-btn:hover {
+    background: var(--accent-color);
+}
+
+.remote-thumb:hover {
+    background: var(--hover-color) !important;
+}
+
+[data-theme="dark"] .folder-thumb, [data-theme="dark"] .remote-thumb {
+    background: #111 !important;
+}

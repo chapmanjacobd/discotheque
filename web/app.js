@@ -45,6 +45,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const allMediaBtn = document.getElementById('all-media-btn');
     const trashBtn = document.getElementById('trash-btn');
+    const syncwebList = document.getElementById('syncweb-list');
+    const detailsSyncweb = document.getElementById('details-syncweb');
 
     const pipSpeedBtn = document.getElementById('pip-speed');
     const pipSpeedMenu = document.getElementById('pip-speed-menu');
@@ -86,7 +88,8 @@ document.addEventListener('DOMContentLoaded', () => {
             completed: false,
             captions: false,
             browseCol: '',
-            browseVal: ''
+            browseVal: '',
+            isSyncweb: false
         },
         duPath: '',
         draggedItem: null,
@@ -509,6 +512,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (state.filters.genre) params.set('genre', state.filters.genre);
             state.filters.ratings.forEach(r => params.append('rating', r));
             if (state.filters.search) params.set('search', state.filters.search);
+            if (state.filters.isSyncweb) params.set('syncweb', 'true');
             if (state.filters.min_score) params.set('min_score', state.filters.min_score);
             if (state.filters.max_score) params.set('max_score', state.filters.max_score);
             if (state.filters.unplayed) params.set('unplayed', 'true');
@@ -591,6 +595,7 @@ document.addEventListener('DOMContentLoaded', () => {
             state.filters.genre = params.get('genre') || '';
             state.filters.ratings = params.getAll('rating');
             state.filters.search = params.get('search') || '';
+            state.filters.isSyncweb = params.get('syncweb') === 'true';
             state.filters.min_score = params.get('min_score') || '';
             state.filters.max_score = params.get('max_score') || '';
             state.filters.unplayed = params.get('unplayed') === 'true';
@@ -701,8 +706,21 @@ document.addEventListener('DOMContentLoaded', () => {
         if (suggestionAbortController) suggestionAbortController.abort();
         suggestionAbortController = new AbortController();
 
+        let apiURL = `/api/ls?path=${encodeURIComponent(path)}`;
+        if (path.startsWith('syncweb://')) {
+            try {
+                const url = new URL(path);
+                const folderID = url.host;
+                const prefix = url.pathname.substring(1);
+                apiURL = `/api/syncweb/ls?folder=${encodeURIComponent(folderID)}&prefix=${encodeURIComponent(prefix)}`;
+            } catch (e) {
+                // If incomplete URL, just return
+                return;
+            }
+        }
+
         try {
-            const resp = await fetch(`/api/ls?path=${encodeURIComponent(path)}`, {
+            const resp = await fetch(apiURL, {
                 signal: suggestionAbortController.signal
             });
             if (!resp.ok) throw new Error('Failed to fetch suggestions');
@@ -792,6 +810,34 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             };
         });
+    }
+
+    async function fetchSyncwebFolders() {
+        try {
+            const resp = await fetch('/api/syncweb/folders');
+            if (!resp.ok) return;
+            const folders = await resp.json();
+            if (folders.length > 0) {
+                detailsSyncweb.classList.remove('hidden');
+                syncwebList.innerHTML = '';
+                folders.forEach(f => {
+                    const btn = document.createElement('button');
+                    btn.className = 'category-btn';
+                    btn.style.width = '100%';
+                    btn.style.marginBottom = '0.2rem';
+                    btn.innerHTML = `📂 ${f.id}`;
+                    btn.onclick = () => {
+                        state.filters.isSyncweb = true;
+                        state.filters.search = `syncweb://${f.id}/`;
+                        searchInput.value = state.filters.search;
+                        handleSearch();
+                    };
+                    syncwebList.appendChild(btn);
+                });
+            }
+        } catch (e) {
+            console.error('Failed to fetch syncweb folders', e);
+        }
     }
 
     async function fetchCategories() {
@@ -1776,7 +1822,55 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    async function performSyncwebLs(path) {
+        state.page = 'search';
+        state.filters.search = path;
+        syncUrl();
+
+        const url = new URL(path);
+        const folderID = url.host;
+        const prefix = url.pathname.substring(1);
+
+        try {
+            const resp = await fetch(`/api/syncweb/ls?folder=${encodeURIComponent(folderID)}&prefix=${encodeURIComponent(prefix)}`);
+            if (!resp.ok) throw new Error(await resp.text());
+
+            const data = await resp.json();
+            currentMedia = data.map(f => ({
+                path: f.path,
+                is_dir: f.is_dir,
+                local: f.local,
+                size: f.size,
+                type: f.type,
+                name: f.name
+            }));
+            state.totalCount = currentMedia.length;
+            renderResults();
+        } catch (err) {
+            console.error('Syncweb Ls failed:', err);
+            resultsContainer.innerHTML = `<div class="error">Syncweb error: ${err.message}</div>`;
+        }
+    }
+
+    async function triggerSyncwebDownload(path) {
+        try {
+            const resp = await fetch(`/api/syncweb/download?path=${encodeURIComponent(path)}`, { method: 'POST' });
+            if (resp.ok) {
+                showToast('Download triggered via Syncweb');
+            } else {
+                showToast('Failed to trigger download', true);
+            }
+        } catch (e) {
+            showToast('Syncweb error', true);
+        }
+    }
+
     async function performSearch() {
+        if (searchInput.value.startsWith('syncweb://')) {
+            performSyncwebLs(searchInput.value);
+            return;
+        }
+
         if (state.page === 'playlist' && state.filters.playlist) {
             filterPlaylistItems();
             return;
@@ -3167,6 +3261,17 @@ document.addEventListener('DOMContentLoaded', () => {
             card.onclick = (e) => {
                 if (e.target.closest('.media-actions') || e.target.closest('.media-action-btn')) return;
 
+                if (item.is_dir) {
+                    searchInput.value = item.path.endsWith('/') ? item.path : item.path + '/';
+                    performSearch();
+                    return;
+                }
+
+                if (item.path.startsWith('syncweb://') && !item.local) {
+                    triggerSyncwebDownload(item.path);
+                    return;
+                }
+
                 const isCaptionClick = e.target.closest('.caption-highlight');
                 if (isCaptionClick && item.caption_time) {
                     playMedia(item).then(() => {
@@ -3220,10 +3325,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 `;
             }
 
+            const isSyncweb = item.path.startsWith('syncweb://');
+            let thumbHtml = `
+                <img src="${thumbUrl}" loading="lazy" onload="this.classList.add('loaded')" onerror="this.style.display='none'; this.nextElementSibling.style.display='block'">
+                <i style="display: none">${getIcon(item.type)}</i>
+            `;
+
+            if (item.is_dir) {
+                thumbHtml = `<div style="width:100%; height:100%; display:flex; align-items:center; justify-content:center; background:var(--sidebar-bg); font-size:4rem;">📂</div>`;
+            } else if (isSyncweb && !item.local) {
+                thumbHtml = `<div style="width:100%; height:100%; display:flex; align-items:center; justify-content:center; background:var(--sidebar-bg); font-size:4rem; color: var(--accent-color)" title="Not local. Click to trigger download.">☁️</div>`;
+            }
+
             card.innerHTML = `
                 <div class="media-thumb">
-                    <img src="${thumbUrl}" loading="lazy" onload="this.classList.add('loaded')" onerror="this.style.display='none'; this.nextElementSibling.style.display='block'">
-                    <i style="display: none">${getIcon(item.type)}</i>
+                    ${thumbHtml}
                     ${duration ? `<span class="media-duration">${duration}</span>` : ''}
                     <div class="media-actions">
                         ${actionBtns}
@@ -3235,6 +3351,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <span>${size}</span>
                         <span title="${item.path}">${displayPath}</span>
                         ${plays > 0 ? `<span title="Play count">▶️ ${plays}</span>` : ''}
+                        ${isSyncweb && !item.local ? `<span style="color:var(--accent-color)">Remote</span>` : ''}
                     </div>
                     ${progressHtml}
                     ${captionHtml}
@@ -4813,6 +4930,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Initial load
     readUrl();
     fetchDatabases();
+    fetchSyncwebFolders();
     fetchCategories();
     fetchGenres();
     fetchRatings();

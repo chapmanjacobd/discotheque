@@ -222,6 +222,13 @@ type GlobalFlags struct {
 	HashChunkSize int64   `help:"Size of each segment to hash" group:"Hashing"`
 	HashThreads   int     `default:"1" help:"Number of threads to use for hashing a single file" group:"Hashing"`
 
+	// Syncweb
+	SyncwebURL      string `help:"Syncweb/Syncthing API URL" group:"Syncweb" env:"SYNCWEB_URL"`
+	SyncwebAPIKey   string `help:"Syncweb/Syncthing API Key" group:"Syncweb" env:"SYNCWEB_API_KEY"`
+	SyncwebHome     string `help:"Syncweb home directory" group:"Syncweb" env:"SYNCWEB_HOME"`
+	SyncwebPublic_  string `kong:"-" env:"SYNCWEB_PUBLIC"`
+	SyncwebPrivate_ string `kong:"-" env:"SYNCWEB_PRIVATE"`
+
 	// Chromecast
 	Cast          bool   `help:"Cast to chromecast groups" group:"Playback"`
 	CastDevice    string `alias:"cast-to" help:"Chromecast device name" group:"Playback"`

@@ -1,12 +1,14 @@
 .PHONY: build test cover webtest webcover clean fmt lint sql install all readme dev
 
 BINARY_NAME=disco
-BUILD_TAGS=fts5
+SYNCWEB_BINARY=syncweb
+BUILD_TAGS=fts5,noassets
 
 all: fmt lint sql test webtest build readme
 
 build:
 	go build -tags "$(BUILD_TAGS)" -o $(BINARY_NAME) ./cmd/disco
+	go build -tags "$(BUILD_TAGS)" -o $(SYNCWEB_BINARY) ./cmd/syncweb
 
 dev:
 	(sleep 2 && xdg-open http://localhost:5555) &
@@ -29,14 +31,14 @@ webcover:
 
 fmt:
 	gofmt -s -w -e .
-	go fix ./...
+	go fix -tags "$(BUILD_TAGS)" ./...
 	-goimports -w -e .
 	-gofumpt -w .
 	-gci write .
 
 lint:
-	-staticcheck ./...
-	go vet ./...
+	-staticcheck -tags "$(BUILD_TAGS)" ./...
+	go vet -tags "$(BUILD_TAGS)" ./...
 
 sql:
 	sqlc generate
@@ -44,10 +46,11 @@ sql:
 	-sqlc diff
 
 clean:
-	rm -f $(BINARY_NAME)
+	rm -f $(BINARY_NAME) $(SYNCWEB_BINARY)
 	rm -f test.db
 	rm -f coverage.out
 
 # Install the binary to $GOPATH/bin
 install:
 	go install -tags "$(BUILD_TAGS)" ./cmd/disco
+	go install -tags "$(BUILD_TAGS)" ./cmd/syncweb
