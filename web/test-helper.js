@@ -54,6 +54,19 @@ export async function setupTestEnvironment() {
     // Mock window.innerWidth
     global.innerWidth = 1024;
 
+    // Mock window.location
+    delete window.location;
+    window.location = {
+        hash: '',
+        search: '',
+        href: 'http://localhost/',
+        pathname: '/',
+        reload: vi.fn(),
+        replace: vi.fn(),
+        assign: vi.fn(),
+        toString: () => 'http://localhost/'
+    };
+
     // Mock matchMedia
     window.matchMedia = vi.fn().mockImplementation(query => ({
         matches: false,

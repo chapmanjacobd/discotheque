@@ -1101,13 +1101,32 @@ document.addEventListener('DOMContentLoaded', () => {
         updateNavActiveStates();
     }
 
+    function showSimilarityLoading() {
+        resultsContainer.className = 'similarity-view';
+        resultsContainer.innerHTML = `
+            <div class="loading-container" style="text-align: center; padding: 3rem;">
+                <div class="spinner" style="border: 4px solid rgba(0,0,0,0.1); width: 36px; height: 36px; border-radius: 50%; border-left-color: var(--accent-color); animation: spin 1s linear infinite; margin: 0 auto 1rem;"></div>
+                <h3>Calculating Similarity...</h3>
+                <p>This process compares media signatures and can take some time.</p>
+                <p style="color: var(--text-color); opacity: 0.7; font-size: 0.9rem;">Estimated time: ~5-10 seconds for large libraries.</p>
+            </div>
+            <style>
+                @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+            </style>
+        `;
+    }
+
     async function fetchSimilarity() {
         state.page = 'similarity';
         syncUrl();
 
-        const skeletonTimeout = setTimeout(() => {
-            if (state.view === 'grid') showSkeletons();
-        }, 150);
+        if (searchAbortController) {
+            searchAbortController.abort();
+        }
+        searchAbortController = new AbortController();
+
+        // Use specific loading screen for similarity
+        showSimilarityLoading();
 
         try {
             const params = new URLSearchParams();
@@ -1119,15 +1138,17 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             if (state.filters.search) params.append('search', state.filters.search);
 
-            const resp = await fetch(`/api/similarity?${params.toString()}`);
-            clearTimeout(skeletonTimeout);
+            const resp = await fetch(`/api/similarity?${params.toString()}`, {
+                signal: searchAbortController.signal
+            });
             if (!resp.ok) throw new Error('Failed to fetch similarity');
             state.similarityData = await resp.json();
             renderSimilarity(state.similarityData);
         } catch (err) {
-            clearTimeout(skeletonTimeout);
+            if (err.name === 'AbortError') return;
             console.error('Similarity fetch failed:', err);
             showToast('Failed to load Similarity Explorer');
+            resultsContainer.innerHTML = `<div class="error">Failed to load similarity results.</div>`;
         }
     }
 
