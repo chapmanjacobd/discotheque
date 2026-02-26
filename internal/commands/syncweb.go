@@ -1,3 +1,5 @@
+//go:build syncweb
+
 package commands
 
 import (
@@ -18,7 +20,8 @@ import (
 )
 
 type SyncwebCmd struct {
-	models.GlobalFlags
+	models.CoreFlags
+	models.SyncwebFlags
 
 	Create    SyncwebCreateCmd    `cmd:"" help:"Create a syncweb folder" aliases:"init,in,share"`
 	Join      SyncwebJoinCmd      `cmd:"" help:"Join syncweb folders/devices" aliases:"import,clone"`
@@ -43,6 +46,8 @@ func (c *SyncwebCmd) AfterApply() error {
 	}
 	return nil
 }
+
+func (c *SyncwebCmd) IsSyncwebTrait() {}
 
 func (c *SyncwebCmd) WithSyncweb(fn func(s *syncweb.Syncweb) error) error {
 	s, err := syncweb.NewSyncweb(c.SyncwebHome, "disco-syncweb", c.SyncwebPublic_, c.SyncwebPrivate_, "")
@@ -160,12 +165,16 @@ func (c *SyncwebDropCmd) Run(g *SyncwebCmd) error {
 type SyncwebFoldersCmd struct {
 	Pending bool `help:"Show pending folders"`
 	Join    bool `help:"Join pending folders"`
+	Pause   bool `help:"Pause matching folders"`
+	Resume  bool `help:"Resume matching folders"`
+	Delete  bool `help:"Delete matching folders"`
 }
 
 func (c *SyncwebFoldersCmd) Run(g *SyncwebCmd) error {
 	return g.WithSyncweb(func(s *syncweb.Syncweb) error {
+		cfg := s.Node.Cfg.RawCopy()
+
 		if c.Pending || c.Join {
-			cfg := s.Node.Cfg.RawCopy()
 			for _, dev := range cfg.Devices {
 				pending, err := s.Node.App.Internals.PendingFolders(dev.DeviceID)
 				if err != nil {
@@ -175,7 +184,6 @@ func (c *SyncwebFoldersCmd) Run(g *SyncwebCmd) error {
 					fmt.Printf("Pending: %s from %s\n", folderID, dev.DeviceID)
 					if c.Join {
 						path := filepath.Join(g.SyncwebHome, folderID)
-						// Use folderID as Label if no other field is available
 						if err := s.AddFolder(folderID, folderID, path, config.FolderTypeSendReceive); err != nil {
 							slog.Error("Failed to join folder", "id", folderID, "error", err)
 						} else {
@@ -187,16 +195,44 @@ func (c *SyncwebFoldersCmd) Run(g *SyncwebCmd) error {
 					}
 				}
 			}
-			if !c.Join { // If we just listed them, we are done
+			if !c.Join {
 				if c.Pending {
 					return nil
 				}
+			} else {
+				// Refresh config after joining
+				cfg = s.Node.Cfg.RawCopy()
 			}
 		}
 
-		cfg := s.Node.Cfg.RawCopy()
 		for _, f := range cfg.Folders {
-			fmt.Printf("%s: %s (%s)\n", f.ID, f.Label, f.Path)
+			status := "OK"
+			if f.Paused {
+				status = "Paused"
+			}
+			fmt.Printf("%s: %s (%s) [%s]\n", f.ID, f.Label, f.Path, status)
+
+			if c.Pause && !f.Paused {
+				if err := s.PauseFolder(f.ID); err != nil {
+					slog.Error("Failed to pause folder", "id", f.ID, "error", err)
+				} else {
+					slog.Info("Paused folder", "id", f.ID)
+				}
+			}
+			if c.Resume && f.Paused {
+				if err := s.ResumeFolder(f.ID); err != nil {
+					slog.Error("Failed to resume folder", "id", f.ID, "error", err)
+				} else {
+					slog.Info("Resumed folder", "id", f.ID)
+				}
+			}
+			if c.Delete {
+				if err := s.DeleteFolder(f.ID); err != nil {
+					slog.Error("Failed to delete folder", "id", f.ID, "error", err)
+				} else {
+					slog.Info("Deleted folder", "id", f.ID)
+				}
+			}
 		}
 		return nil
 	})
@@ -205,6 +241,9 @@ func (c *SyncwebFoldersCmd) Run(g *SyncwebCmd) error {
 type SyncwebDevicesCmd struct {
 	Pending bool `help:"Show pending devices"`
 	Accept  bool `help:"Accept pending devices"`
+	Pause   bool `help:"Pause matching devices"`
+	Resume  bool `help:"Resume matching devices"`
+	Delete  bool `help:"Delete matching devices"`
 }
 
 func (c *SyncwebDevicesCmd) Run(g *SyncwebCmd) error {
@@ -216,15 +255,42 @@ func (c *SyncwebDevicesCmd) Run(g *SyncwebCmd) error {
 
 		cfg := s.Node.Cfg.RawCopy()
 		for _, d := range cfg.Devices {
-			fmt.Printf("%s: %s\n", d.DeviceID, d.Name)
+			status := "OK"
+			if d.Paused {
+				status = "Paused"
+			}
+			fmt.Printf("%s: %s [%s]\n", d.DeviceID, d.Name, status)
+
+			if c.Pause && !d.Paused {
+				if err := s.PauseDevice(d.DeviceID.String()); err != nil {
+					slog.Error("Failed to pause device", "id", d.DeviceID, "error", err)
+				} else {
+					slog.Info("Paused device", "id", d.DeviceID)
+				}
+			}
+			if c.Resume && d.Paused {
+				if err := s.ResumeDevice(d.DeviceID.String()); err != nil {
+					slog.Error("Failed to resume device", "id", d.DeviceID, "error", err)
+				} else {
+					slog.Info("Resumed device", "id", d.DeviceID)
+				}
+			}
+			if c.Delete {
+				if err := s.DeleteDevice(d.DeviceID.String()); err != nil {
+					slog.Error("Failed to delete device", "id", d.DeviceID, "error", err)
+				} else {
+					slog.Info("Deleted device", "id", d.DeviceID)
+				}
+			}
 		}
 		return nil
 	})
 }
 
 type SyncwebLsCmd struct {
-	Paths []string `arg:"" optional:"" default:"." help:"Path relative to the root"`
-	Long  bool     `short:"l" help:"Use long listing format"`
+	Paths         []string `arg:"" optional:"" default:"." help:"Path relative to the root"`
+	Long          bool     `short:"l" help:"Use long listing format"`
+	HumanReadable bool     `help:"Print sizes in human readable format" default:"true"`
 }
 
 func (c *SyncwebLsCmd) Run(g *SyncwebCmd) error {
@@ -274,6 +340,11 @@ func (c *SyncwebLsCmd) Run(g *SyncwebCmd) error {
 			seq, cancel := s.Node.App.Internals.AllGlobalFiles(folderID)
 			resultsMap := make(map[string]bool)
 
+			if c.Long {
+				fmt.Printf("%-4s %10s  %12s  %s\n", "Type", "Size", "Modified", "Name")
+				fmt.Println(strings.Repeat("-", 40))
+			}
+
 			for meta := range seq {
 				name := meta.Name
 				if !strings.HasPrefix(name, prefix) || name == prefix {
@@ -291,10 +362,19 @@ func (c *SyncwebLsCmd) Run(g *SyncwebCmd) error {
 				resultsMap[entryName] = true
 
 				if isDir {
-					fmt.Printf("%s/\n", entryName)
+					if c.Long {
+						fmt.Printf("d    %10s  %12s  %s/\n", "-", "", entryName)
+					} else {
+						fmt.Printf("%s/\n", entryName)
+					}
 				} else {
 					if c.Long {
-						fmt.Printf("- %10d  %s\n", meta.Size, entryName)
+						sizeStr := fmt.Sprintf("%d", meta.Size)
+						if c.HumanReadable {
+							sizeStr = utils.FormatSize(meta.Size)
+						}
+						modTime := meta.ModTime().Format("02 Jan 15:04")
+						fmt.Printf("-    %10s  %12s  %s\n", sizeStr, modTime, entryName)
 					} else {
 						fmt.Println(entryName)
 					}
@@ -307,8 +387,10 @@ func (c *SyncwebLsCmd) Run(g *SyncwebCmd) error {
 }
 
 type SyncwebFindCmd struct {
-	Pattern string   `arg:"" optional:"" default:".*" help:"Search patterns"`
-	Paths   []string `arg:"" optional:"" help:"Root directories to search"`
+	Pattern  string   `arg:"" optional:"" default:".*" help:"Search patterns"`
+	Type     string   `help:"Filter by type (f=file, d=directory)" short:"t"`
+	FullPath bool     `help:"Search full path (default: filename only)" short:"p"`
+	Paths    []string `arg:"" optional:"" help:"Root directories to search"`
 }
 
 func (c *SyncwebFindCmd) Run(g *SyncwebCmd) error {
@@ -322,7 +404,20 @@ func (c *SyncwebFindCmd) Run(g *SyncwebCmd) error {
 		for _, f := range cfg.Folders {
 			seq, cancel := s.Node.App.Internals.AllGlobalFiles(f.ID)
 			for meta := range seq {
-				if re.MatchString(meta.Name) {
+				isDir := meta.Type == protocol.FileInfoTypeDirectory
+				if c.Type == "f" && isDir {
+					continue
+				}
+				if c.Type == "d" && !isDir {
+					continue
+				}
+
+				searchTarget := meta.Name
+				if !c.FullPath {
+					searchTarget = filepath.Base(meta.Name)
+				}
+
+				if re.MatchString(searchTarget) {
 					fmt.Printf("syncweb://%s/%s\n", f.ID, meta.Name)
 				}
 			}
@@ -371,7 +466,7 @@ func (c *SyncwebStatCmd) Run(g *SyncwebCmd) error {
 
 			fmt.Printf("File: %s\n", info.Name)
 			fmt.Printf("Size: %d bytes (%s)\n", info.Size, utils.FormatSize(info.Size))
-			fmt.Printf("Modified: %v\n", time.Unix(info.ModifiedS, 0))
+			fmt.Printf("Modified: %v\n", info.ModTime())
 			fmt.Printf("Type: %v\n", info.Type)
 			fmt.Printf("Permissions: %o\n", info.Permissions)
 			fmt.Printf("Blocks: %d\n", len(info.Blocks))
@@ -383,12 +478,18 @@ func (c *SyncwebStatCmd) Run(g *SyncwebCmd) error {
 }
 
 type SyncwebSortCmd struct {
-	Paths []string `arg:"" required:"" help:"File paths to sort"`
-	Sort  []string `help:"Sort criteria (size, name)" default:"name"`
+	Paths     []string `arg:"" optional:"" help:"File paths to sort"`
+	Sort      []string `help:"Sort criteria (size, name)" default:"name"`
+	LimitSize string   `help:"Stop after printing N bytes" short:"S"`
 }
 
 func (c *SyncwebSortCmd) Run(g *SyncwebCmd) error {
 	return g.WithSyncweb(func(s *syncweb.Syncweb) error {
+		limitBytes := int64(0)
+		if c.LimitSize != "" {
+			limitBytes, _ = utils.HumanToBytes(c.LimitSize)
+		}
+
 		type fileWithInfo struct {
 			Path string
 			Info protocol.FileInfo
@@ -453,19 +554,32 @@ func (c *SyncwebSortCmd) Run(g *SyncwebCmd) error {
 			return false
 		})
 
+		currentSize := int64(0)
 		for _, f := range files {
+			if limitBytes > 0 && currentSize+f.Info.Size > limitBytes {
+				break
+			}
 			fmt.Println(f.Path)
+			currentSize += f.Info.Size
 		}
 		return nil
 	})
 }
 
 type SyncwebDownloadCmd struct {
-	Paths []string `arg:"" required:"" help:"File or directory paths to download"`
+	Paths []string `arg:"" optional:"" help:"File or directory paths to download"`
 }
 
 func (c *SyncwebDownloadCmd) Run(g *SyncwebCmd) error {
 	return g.WithSyncweb(func(s *syncweb.Syncweb) error {
+		type downloadItem struct {
+			folderID string
+			relPath  string
+			size     int64
+		}
+		var items []downloadItem
+		var totalSize int64
+
 		for _, p := range c.Paths {
 			localPath, folderID, err := s.ResolveLocalPath(p)
 			if err != nil {
@@ -488,10 +602,43 @@ func (c *SyncwebDownloadCmd) Run(g *SyncwebCmd) error {
 			}
 
 			relativePath, _ := filepath.Rel(s.GetFolders()[folderID], localPath)
-			if err := s.Unignore(folderID, relativePath); err != nil {
-				slog.Error("Failed to trigger download", "path", p, "error", err)
+			info, ok, err := s.GetGlobalFileInfo(folderID, relativePath)
+			if err != nil || !ok {
+				slog.Error("Failed to get file info for download", "path", p)
+				continue
+			}
+
+			items = append(items, downloadItem{folderID, relativePath, info.Size})
+			totalSize += info.Size
+		}
+
+		if len(items) == 0 {
+			fmt.Println("No files found to download")
+			return nil
+		}
+
+		fmt.Printf("\nDownload Summary:\n")
+		fmt.Println(strings.Repeat("-", 60))
+		fmt.Printf("%-20s %-30s %10s\n", "Folder ID", "Path", "Size")
+		fmt.Println(strings.Repeat("-", 60))
+		for _, item := range items {
+			fmt.Printf("%-20s %-30s %10s\n", item.folderID, item.relPath, utils.FormatSize(item.size))
+		}
+		fmt.Println(strings.Repeat("-", 60))
+		fmt.Printf("TOTAL: %d files (%s)\n", len(items), utils.FormatSize(totalSize))
+
+		if !g.Yes {
+			if !utils.Confirm(fmt.Sprintf("Mark %d files for download?", len(items))) {
+				fmt.Println("Download cancelled")
+				return nil
+			}
+		}
+
+		for _, item := range items {
+			if err := s.Unignore(item.folderID, item.relPath); err != nil {
+				slog.Error("Failed to trigger download", "folder", item.folderID, "path", item.relPath, "error", err)
 			} else {
-				slog.Info("Download triggered", "path", p)
+				slog.Info("Download triggered", "folder", item.folderID, "path", item.relPath)
 			}
 		}
 		return nil

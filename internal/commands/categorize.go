@@ -22,9 +22,13 @@ type CategorizeCmd struct {
 	Other bool `help:"Analyze 'other' category to find potential new categories"`
 }
 
-func (c CategorizeCmd) IsQueryTrait()  {}
-func (c CategorizeCmd) IsFilterTrait() {}
-func (c CategorizeCmd) IsActionTrait() {}
+func (c CategorizeCmd) IsQueryTrait()       {}
+func (c CategorizeCmd) IsFilterTrait()      {}
+func (c CategorizeCmd) IsMediaFilterTrait() {}
+func (c CategorizeCmd) IsPathFilterTrait()  {}
+func (c CategorizeCmd) IsTimeTrait()        {}
+func (c CategorizeCmd) IsDeletedTrait()     {}
+func (c CategorizeCmd) IsPostActionTrait()  {}
 
 func (c *CategorizeCmd) Run(ctx *kong.Context) error {
 	models.SetupLogging(c.Verbose)
@@ -50,18 +54,6 @@ func (c *CategorizeCmd) Run(ctx *kong.Context) error {
 
 func (c *CategorizeCmd) CompileRegexes() map[string][]*regexp.Regexp {
 	compiled := make(map[string][]*regexp.Regexp)
-	if !c.NoDefaultCategories {
-		for cat, keywords := range models.DefaultCategories {
-			for _, kw := range keywords {
-				re, err := regexp.Compile(`(?i)\b` + kw + `\b`)
-				if err != nil {
-					slog.Error("Failed to compile regex", "keyword", kw, "error", err)
-					continue
-				}
-				compiled[cat] = append(compiled[cat], re)
-			}
-		}
-	}
 
 	// Load custom keywords from databases
 	for _, dbPath := range c.Databases {

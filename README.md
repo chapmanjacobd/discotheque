@@ -25,22 +25,20 @@ $ disco add --video-only my_videos.db /mnt/media
 $ disco add --help
 
 Flags:
-  -s, --include
-        Include paths matching pattern
-  -E, --exclude
-        Exclude paths matching pattern
+  -v, --verbose
+        Enable verbose logging
+  --simulate
+        Dry run; don't actually do anything
+  -y, --no-confirm
+        Don't ask for confirmation
+  -T, --timeout
+        Quit after N minutes/seconds
   --search
         Search terms (space-separated for AND, | for OR)
   --category
         Filter by category
   --genre
         Filter by genre
-  --regex
-        Filter paths by regex pattern
-  --path-contains
-        Path must contain all these strings
-  --paths
-        Exact paths to include
   -S, --size
         Size range (e.g., >100MB, 1GB%10)
   -d, --duration
@@ -49,22 +47,6 @@ Flags:
         Constrain media to duration of videos which match any size constraints
   -e, --ext
         Filter by extensions (e.g., .mp4,.mkv)
-  --created-after
-        Created after date (YYYY-MM-DD)
-  --created-before
-        Created before date (YYYY-MM-DD)
-  --modified-after
-        Modified after date (YYYY-MM-DD)
-  --modified-before
-        Modified before date (YYYY-MM-DD)
-  --deleted-after
-        Deleted after date (YYYY-MM-DD)
-  --deleted-before
-        Deleted before date (YYYY-MM-DD)
-  --played-after
-        Last played after date (YYYY-MM-DD)
-  --played-before
-        Last played before date (YYYY-MM-DD)
   --watched
         Filter by watched status (true/false)
   --unfinished
@@ -111,86 +93,10 @@ Flags:
         Exclude by mimetype substring
   --no-default-categories
         Disable default categories
-  --hide-deleted
-        Exclude deleted files from results
-  --only-deleted
-        Include only deleted files in results
   -o, --fetch-siblings
         Fetch siblings of matched files (each, all, if-audiobook)
   --fetch-siblings-max
         Maximum number of siblings to fetch
-  --cmd-0
-        Command to run if mpv exits with code 0
-  --cmd-1
-        Command to run if mpv exits with code 1
-  --cmd-2
-        Command to run if mpv exits with code 2
-  --cmd-3
-        Command to run if mpv exits with code 3
-  --cmd-4
-        Command to run if mpv exits with code 4
-  --cmd-5
-        Command to run if mpv exits with code 5
-  --cmd-6
-        Command to run if mpv exits with code 6
-  --cmd-7
-        Command to run if mpv exits with code 7
-  --cmd-8
-        Command to run if mpv exits with code 8
-  --cmd-9
-        Command to run if mpv exits with code 9
-  --cmd-10
-        Command to run if mpv exits with code 10
-  --cmd-11
-        Command to run if mpv exits with code 11
-  --cmd-12
-        Command to run if mpv exits with code 12
-  --cmd-13
-        Command to run if mpv exits with code 13
-  --cmd-14
-        Command to run if mpv exits with code 14
-  --cmd-15
-        Command to run if mpv exits with code 15
-  --cmd-20
-        Command to run if mpv exits with code 20
-  --cmd-127
-        Command to run if mpv exits with code 127
-  -I, --interactive
-        Interactive decision making after playback
-  --trash
-        Trash files after action
-  --syncweb-url
-        Syncweb/Syncthing API URL
-  --syncweb-api-key
-        Syncweb/Syncthing API Key
-  --syncweb-home
-        Syncweb home directory
-  --post-action
-        Post-action: none, delete, mark-deleted, move, copy
-  --delete-files
-        Delete files after action
-  --delete-rows
-        Delete rows from database
-  --mark-deleted
-        Mark as deleted in database
-  --move-to
-        Move files to directory
-  --copy-to
-        Copy files to directory
-  --action-limit
-        Stop after N files
-  --action-size
-        Stop after N bytes (e.g., 10GB)
-  --track-history
-        Track playback history
-  -v, --verbose
-        Enable verbose logging
-  --simulate
-        Dry run; don't actually do anything
-  -y, --no-confirm
-        Don't ask for confirmation
-  -T, --timeout
-        Quit after N minutes/seconds
   --threads
         Use N threads for parallel processing
   -i, --ignore-errors
@@ -211,22 +117,20 @@ Check for missing files and mark as deleted
 $ disco check --help
 
 Flags:
-  -s, --include
-        Include paths matching pattern
-  -E, --exclude
-        Exclude paths matching pattern
+  -v, --verbose
+        Enable verbose logging
+  --simulate
+        Dry run; don't actually do anything
+  -y, --no-confirm
+        Don't ask for confirmation
+  -T, --timeout
+        Quit after N minutes/seconds
   --search
         Search terms (space-separated for AND, | for OR)
   --category
         Filter by category
   --genre
         Filter by genre
-  --regex
-        Filter paths by regex pattern
-  --path-contains
-        Path must contain all these strings
-  --paths
-        Exact paths to include
   -S, --size
         Size range (e.g., >100MB, 1GB%10)
   -d, --duration
@@ -235,22 +139,6 @@ Flags:
         Constrain media to duration of videos which match any size constraints
   -e, --ext
         Filter by extensions (e.g., .mp4,.mkv)
-  --created-after
-        Created after date (YYYY-MM-DD)
-  --created-before
-        Created before date (YYYY-MM-DD)
-  --modified-after
-        Modified after date (YYYY-MM-DD)
-  --modified-before
-        Modified before date (YYYY-MM-DD)
-  --deleted-after
-        Deleted after date (YYYY-MM-DD)
-  --deleted-before
-        Deleted before date (YYYY-MM-DD)
-  --played-after
-        Last played after date (YYYY-MM-DD)
-  --played-before
-        Last played before date (YYYY-MM-DD)
   --watched
         Filter by watched status (true/false)
   --unfinished
@@ -297,28 +185,10 @@ Flags:
         Exclude by mimetype substring
   --no-default-categories
         Disable default categories
-  --hide-deleted
-        Exclude deleted files from results
-  --only-deleted
-        Include only deleted files in results
   -o, --fetch-siblings
         Fetch siblings of matched files (each, all, if-audiobook)
   --fetch-siblings-max
         Maximum number of siblings to fetch
-  --syncweb-url
-        Syncweb/Syncthing API URL
-  --syncweb-api-key
-        Syncweb/Syncthing API Key
-  --syncweb-home
-        Syncweb home directory
-  -v, --verbose
-        Enable verbose logging
-  --simulate
-        Dry run; don't actually do anything
-  -y, --no-confirm
-        Don't ask for confirmation
-  -T, --timeout
-        Quit after N minutes/seconds
   --threads
         Use N threads for parallel processing
   -i, --ignore-errors
@@ -347,6 +217,14 @@ $ disco print my_videos.db --big-dirs -u count
 $ disco print --help
 
 Flags:
+  -v, --verbose
+        Enable verbose logging
+  --simulate
+        Dry run; don't actually do anything
+  -y, --no-confirm
+        Don't ask for confirmation
+  -T, --timeout
+        Quit after N minutes/seconds
   -q, --query
         Raw SQL query (overrides all query building)
   -L, --limit
@@ -459,8 +337,6 @@ Flags:
         Random order
   -c, --columns
         Columns to display
-  -B, --big-dirs
-        Aggregate by parent directory
   -j, --json
         Output results as JSON
   --summarize
@@ -469,30 +345,6 @@ Flags:
         Group statistics by time frequency (daily, weekly, monthly, yearly)
   --tui
         Interactive TUI mode
-  --file-counts
-        Filter by number of files in directory (e.g., >5, 10%1)
-  --group-by-extensions
-        Group by file extensions
-  --group-by-mime-types
-        Group by mimetypes
-  --group-by-size
-        Group by size buckets
-  -D, --depth
-        Aggregate at specific directory depth
-  --min-depth
-        Minimum depth for aggregation
-  --max-depth
-        Maximum depth for aggregation
-  --parents
-        Include parent directories in aggregation
-  --folders-only
-        Only show folders
-  --files-only
-        Only show files
-  --folder-sizes
-        Filter folders by total size
-  --folder-counts
-        Filter folders by number of subfolders
   --regex-sort
         Sort by splitting lines and sorting words
   --regexs
@@ -519,20 +371,6 @@ Flags:
         FTS table name
   -R, --related
         Find media related to the first result
-  --syncweb-url
-        Syncweb/Syncthing API URL
-  --syncweb-api-key
-        Syncweb/Syncthing API Key
-  --syncweb-home
-        Syncweb home directory
-  -v, --verbose
-        Enable verbose logging
-  --simulate
-        Dry run; don't actually do anything
-  -y, --no-confirm
-        Don't ask for confirmation
-  -T, --timeout
-        Quit after N minutes/seconds
   --threads
         Use N threads for parallel processing
   -i, --ignore-errors
@@ -558,6 +396,14 @@ $ disco search my_videos.db 'cyberpunk' --video-only
 $ disco search --help
 
 Flags:
+  -v, --verbose
+        Enable verbose logging
+  --simulate
+        Dry run; don't actually do anything
+  -y, --no-confirm
+        Don't ask for confirmation
+  -T, --timeout
+        Quit after N minutes/seconds
   -q, --query
         Raw SQL query (overrides all query building)
   -L, --limit
@@ -670,8 +516,6 @@ Flags:
         Random order
   -c, --columns
         Columns to display
-  -B, --big-dirs
-        Aggregate by parent directory
   -j, --json
         Output results as JSON
   --summarize
@@ -680,30 +524,6 @@ Flags:
         Group statistics by time frequency (daily, weekly, monthly, yearly)
   --tui
         Interactive TUI mode
-  --file-counts
-        Filter by number of files in directory (e.g., >5, 10%1)
-  --group-by-extensions
-        Group by file extensions
-  --group-by-mime-types
-        Group by mimetypes
-  --group-by-size
-        Group by size buckets
-  -D, --depth
-        Aggregate at specific directory depth
-  --min-depth
-        Minimum depth for aggregation
-  --max-depth
-        Maximum depth for aggregation
-  --parents
-        Include parent directories in aggregation
-  --folders-only
-        Only show folders
-  --files-only
-        Only show files
-  --folder-sizes
-        Filter folders by total size
-  --folder-counts
-        Filter folders by number of subfolders
   -k, --re-rank
         Add key/value pairs re-rank sorting by multiple attributes (COLUMN=WEIGHT)
   --fts
@@ -712,20 +532,6 @@ Flags:
         FTS table name
   -R, --related
         Find media related to the first result
-  --syncweb-url
-        Syncweb/Syncthing API URL
-  --syncweb-api-key
-        Syncweb/Syncthing API Key
-  --syncweb-home
-        Syncweb home directory
-  -v, --verbose
-        Enable verbose logging
-  --simulate
-        Dry run; don't actually do anything
-  -y, --no-confirm
-        Don't ask for confirmation
-  -T, --timeout
-        Quit after N minutes/seconds
   --threads
         Use N threads for parallel processing
   -i, --ignore-errors
@@ -744,6 +550,14 @@ Search captions using FTS
 $ disco search-captions --help
 
 Flags:
+  -v, --verbose
+        Enable verbose logging
+  --simulate
+        Dry run; don't actually do anything
+  -y, --no-confirm
+        Don't ask for confirmation
+  -T, --timeout
+        Quit after N minutes/seconds
   --fts
         Use full-text search if available
   --fts-table
@@ -786,26 +600,12 @@ Flags:
         Player arguments for videos with subtitles
   --player-args-no-sub
         Player arguments for videos without subtitles
-  --syncweb-url
-        Syncweb/Syncthing API URL
-  --syncweb-api-key
-        Syncweb/Syncthing API Key
-  --syncweb-home
-        Syncweb home directory
   --cast
         Cast to chromecast groups
   --cast-device
         Chromecast device name
   --cast-with-local
         Play music locally at the same time as chromecast
-  -v, --verbose
-        Enable verbose logging
-  --simulate
-        Dry run; don't actually do anything
-  -y, --no-confirm
-        Don't ask for confirmation
-  -T, --timeout
-        Quit after N minutes/seconds
   --threads
         Use N threads for parallel processing
   -i, --ignore-errors
@@ -828,48 +628,6 @@ List scan roots (playlists)
 $ disco playlists --help
 
 Flags:
-  -c, --columns
-        Columns to display
-  -B, --big-dirs
-        Aggregate by parent directory
-  -j, --json
-        Output results as JSON
-  --summarize
-        Print aggregate statistics
-  -f, --frequency
-        Group statistics by time frequency (daily, weekly, monthly, yearly)
-  --tui
-        Interactive TUI mode
-  --file-counts
-        Filter by number of files in directory (e.g., >5, 10%1)
-  --group-by-extensions
-        Group by file extensions
-  --group-by-mime-types
-        Group by mimetypes
-  --group-by-size
-        Group by size buckets
-  -D, --depth
-        Aggregate at specific directory depth
-  --min-depth
-        Minimum depth for aggregation
-  --max-depth
-        Maximum depth for aggregation
-  --parents
-        Include parent directories in aggregation
-  --folders-only
-        Only show folders
-  --files-only
-        Only show files
-  --folder-sizes
-        Filter folders by total size
-  --folder-counts
-        Filter folders by number of subfolders
-  --syncweb-url
-        Syncweb/Syncthing API URL
-  --syncweb-api-key
-        Syncweb/Syncthing API Key
-  --syncweb-home
-        Syncweb home directory
   -v, --verbose
         Enable verbose logging
   --simulate
@@ -878,6 +636,16 @@ Flags:
         Don't ask for confirmation
   -T, --timeout
         Quit after N minutes/seconds
+  -c, --columns
+        Columns to display
+  -j, --json
+        Output results as JSON
+  --summarize
+        Print aggregate statistics
+  -f, --frequency
+        Group statistics by time frequency (daily, weekly, monthly, yearly)
+  --tui
+        Interactive TUI mode
   --threads
         Use N threads for parallel processing
   -i, --ignore-errors
@@ -896,6 +664,14 @@ Search arbitrary database table
 $ disco search-db --help
 
 Flags:
+  -v, --verbose
+        Enable verbose logging
+  --simulate
+        Dry run; don't actually do anything
+  -y, --no-confirm
+        Don't ask for confirmation
+  -T, --timeout
+        Quit after N minutes/seconds
   -q, --query
         Raw SQL query (overrides all query building)
   -L, --limit
@@ -1000,8 +776,6 @@ Flags:
         Maximum number of siblings to fetch
   -c, --columns
         Columns to display
-  -B, --big-dirs
-        Aggregate by parent directory
   -j, --json
         Output results as JSON
   --summarize
@@ -1010,116 +784,6 @@ Flags:
         Group statistics by time frequency (daily, weekly, monthly, yearly)
   --tui
         Interactive TUI mode
-  --file-counts
-        Filter by number of files in directory (e.g., >5, 10%1)
-  --group-by-extensions
-        Group by file extensions
-  --group-by-mime-types
-        Group by mimetypes
-  --group-by-size
-        Group by size buckets
-  -D, --depth
-        Aggregate at specific directory depth
-  --min-depth
-        Minimum depth for aggregation
-  --max-depth
-        Maximum depth for aggregation
-  --parents
-        Include parent directories in aggregation
-  --folders-only
-        Only show folders
-  --files-only
-        Only show files
-  --folder-sizes
-        Filter folders by total size
-  --folder-counts
-        Filter folders by number of subfolders
-  --cmd-0
-        Command to run if mpv exits with code 0
-  --cmd-1
-        Command to run if mpv exits with code 1
-  --cmd-2
-        Command to run if mpv exits with code 2
-  --cmd-3
-        Command to run if mpv exits with code 3
-  --cmd-4
-        Command to run if mpv exits with code 4
-  --cmd-5
-        Command to run if mpv exits with code 5
-  --cmd-6
-        Command to run if mpv exits with code 6
-  --cmd-7
-        Command to run if mpv exits with code 7
-  --cmd-8
-        Command to run if mpv exits with code 8
-  --cmd-9
-        Command to run if mpv exits with code 9
-  --cmd-10
-        Command to run if mpv exits with code 10
-  --cmd-11
-        Command to run if mpv exits with code 11
-  --cmd-12
-        Command to run if mpv exits with code 12
-  --cmd-13
-        Command to run if mpv exits with code 13
-  --cmd-14
-        Command to run if mpv exits with code 14
-  --cmd-15
-        Command to run if mpv exits with code 15
-  --cmd-20
-        Command to run if mpv exits with code 20
-  --cmd-127
-        Command to run if mpv exits with code 127
-  -I, --interactive
-        Interactive decision making after playback
-  --trash
-        Trash files after action
-  --syncweb-url
-        Syncweb/Syncthing API URL
-  --syncweb-api-key
-        Syncweb/Syncthing API Key
-  --syncweb-home
-        Syncweb home directory
-  -t, --only-tables
-        Comma separated specific table(s)
-  --primary-keys
-        Comma separated primary keys
-  --business-keys
-        Comma separated business keys
-  --upsert
-        Upsert rows on conflict
-  --ignore
-        Ignore rows on conflict (only-new-rows)
-  --only-target-columns
-        Only copy columns that exist in target
-  --skip-columns
-        Columns to skip during merge
-  --post-action
-        Post-action: none, delete, mark-deleted, move, copy
-  --delete-files
-        Delete files after action
-  --delete-rows
-        Delete rows from database
-  --mark-deleted
-        Mark as deleted in database
-  --move-to
-        Move files to directory
-  --copy-to
-        Copy files to directory
-  --action-limit
-        Stop after N files
-  --action-size
-        Stop after N bytes (e.g., 10GB)
-  --track-history
-        Track playback history
-  -v, --verbose
-        Enable verbose logging
-  --simulate
-        Dry run; don't actually do anything
-  -y, --no-confirm
-        Don't ask for confirmation
-  -T, --timeout
-        Quit after N minutes/seconds
   --threads
         Use N threads for parallel processing
   -i, --ignore-errors
@@ -1138,6 +802,14 @@ Check media files for corruption
 $ disco media-check --help
 
 Flags:
+  -v, --verbose
+        Enable verbose logging
+  --simulate
+        Dry run; don't actually do anything
+  -y, --no-confirm
+        Don't ask for confirmation
+  -T, --timeout
+        Quit after N minutes/seconds
   -s, --include
         Include paths matching pattern
   -E, --exclude
@@ -1162,22 +834,6 @@ Flags:
         Constrain media to duration of videos which match any size constraints
   -e, --ext
         Filter by extensions (e.g., .mp4,.mkv)
-  --created-after
-        Created after date (YYYY-MM-DD)
-  --created-before
-        Created before date (YYYY-MM-DD)
-  --modified-after
-        Modified after date (YYYY-MM-DD)
-  --modified-before
-        Modified before date (YYYY-MM-DD)
-  --deleted-after
-        Deleted after date (YYYY-MM-DD)
-  --deleted-before
-        Deleted before date (YYYY-MM-DD)
-  --played-after
-        Last played after date (YYYY-MM-DD)
-  --played-before
-        Last played before date (YYYY-MM-DD)
   --watched
         Filter by watched status (true/false)
   --unfinished
@@ -1232,20 +888,6 @@ Flags:
         Fetch siblings of matched files (each, all, if-audiobook)
   --fetch-siblings-max
         Maximum number of siblings to fetch
-  --syncweb-url
-        Syncweb/Syncthing API URL
-  --syncweb-api-key
-        Syncweb/Syncthing API Key
-  --syncweb-home
-        Syncweb home directory
-  -v, --verbose
-        Enable verbose logging
-  --simulate
-        Dry run; don't actually do anything
-  -y, --no-confirm
-        Don't ask for confirmation
-  -T, --timeout
-        Quit after N minutes/seconds
   --threads
         Use N threads for parallel processing
   -i, --ignore-errors
@@ -1276,30 +918,22 @@ Show information about files
 $ disco files-info --help
 
 Flags:
-  -s, --include
-        Include paths matching pattern
-  -E, --exclude
-        Exclude paths matching pattern
+  -v, --verbose
+        Enable verbose logging
+  --simulate
+        Dry run; don't actually do anything
+  -y, --no-confirm
+        Don't ask for confirmation
+  -T, --timeout
+        Quit after N minutes/seconds
   --search
         Search terms (space-separated for AND, | for OR)
-  --category
-        Filter by category
-  --genre
-        Filter by genre
-  --regex
-        Filter paths by regex pattern
-  --path-contains
-        Path must contain all these strings
-  --paths
-        Exact paths to include
   -S, --size
         Size range (e.g., >100MB, 1GB%10)
   -d, --duration
         Duration range (e.g., >1hour, 30min%10)
   --duration-from-size
         Constrain media to duration of videos which match any size constraints
-  -e, --ext
-        Filter by extensions (e.g., .mp4,.mkv)
   --created-after
         Created after date (YYYY-MM-DD)
   --created-before
@@ -1332,22 +966,6 @@ Flags:
         Show only items in progress
   --with-captions
         Show only items with captions
-  --video-only
-        Only video files
-  --audio-only
-        Only audio files
-  --image-only
-        Only image files
-  --text-only
-        Only text/ebook files
-  --portrait
-        Only portrait orientation files
-  --scan-subtitles
-        Scan for external subtitles during import
-  --online-media-only
-        Exclude local media
-  --local-media-only
-        Exclude online media
   --flexible-search
         Flexible search (fuzzy)
   --exact
@@ -1356,24 +974,12 @@ Flags:
         SQL where clause(s)
   --exists
         Filter out non-existent files
-  --mime-type
-        Filter by mimetype substring (e.g., video, mp4)
-  --no-mime-type
-        Exclude by mimetype substring
-  --no-default-categories
-        Disable default categories
-  --hide-deleted
-        Exclude deleted files from results
-  --only-deleted
-        Include only deleted files in results
   -o, --fetch-siblings
         Fetch siblings of matched files (each, all, if-audiobook)
   --fetch-siblings-max
         Maximum number of siblings to fetch
   -c, --columns
         Columns to display
-  -B, --big-dirs
-        Aggregate by parent directory
   -j, --json
         Output results as JSON
   --summarize
@@ -1382,44 +988,6 @@ Flags:
         Group statistics by time frequency (daily, weekly, monthly, yearly)
   --tui
         Interactive TUI mode
-  --file-counts
-        Filter by number of files in directory (e.g., >5, 10%1)
-  --group-by-extensions
-        Group by file extensions
-  --group-by-mime-types
-        Group by mimetypes
-  --group-by-size
-        Group by size buckets
-  -D, --depth
-        Aggregate at specific directory depth
-  --min-depth
-        Minimum depth for aggregation
-  --max-depth
-        Maximum depth for aggregation
-  --parents
-        Include parent directories in aggregation
-  --folders-only
-        Only show folders
-  --files-only
-        Only show files
-  --folder-sizes
-        Filter folders by total size
-  --folder-counts
-        Filter folders by number of subfolders
-  --syncweb-url
-        Syncweb/Syncthing API URL
-  --syncweb-api-key
-        Syncweb/Syncthing API Key
-  --syncweb-home
-        Syncweb home directory
-  -v, --verbose
-        Enable verbose logging
-  --simulate
-        Dry run; don't actually do anything
-  -y, --no-confirm
-        Don't ask for confirmation
-  -T, --timeout
-        Quit after N minutes/seconds
   --threads
         Use N threads for parallel processing
   -i, --ignore-errors
@@ -1445,6 +1013,14 @@ $ disco du my_videos.db --depth 2
 $ disco disk-usage --help
 
 Flags:
+  -v, --verbose
+        Enable verbose logging
+  --simulate
+        Dry run; don't actually do anything
+  -y, --no-confirm
+        Don't ask for confirmation
+  -T, --timeout
+        Quit after N minutes/seconds
   -s, --include
         Include paths matching pattern
   -E, --exclude
@@ -1531,22 +1107,10 @@ Flags:
         Exclude by mimetype substring
   --no-default-categories
         Disable default categories
-  --hide-deleted
-        Exclude deleted files from results
-  --only-deleted
-        Include only deleted files in results
   -o, --fetch-siblings
         Fetch siblings of matched files (each, all, if-audiobook)
   --fetch-siblings-max
         Maximum number of siblings to fetch
-  -u, --sort-by
-        Sort by field
-  -V, --reverse
-        Reverse sort order
-  -n, --nat-sort
-        Use natural sorting
-  -r, --random
-        Random order
   -c, --columns
         Columns to display
   -B, --big-dirs
@@ -1583,22 +1147,6 @@ Flags:
         Filter folders by total size
   --folder-counts
         Filter folders by number of subfolders
-  -k, --re-rank
-        Add key/value pairs re-rank sorting by multiple attributes (COLUMN=WEIGHT)
-  --syncweb-url
-        Syncweb/Syncthing API URL
-  --syncweb-api-key
-        Syncweb/Syncthing API Key
-  --syncweb-home
-        Syncweb home directory
-  -v, --verbose
-        Enable verbose logging
-  --simulate
-        Dry run; don't actually do anything
-  -y, --no-confirm
-        Don't ask for confirmation
-  -T, --timeout
-        Quit after N minutes/seconds
   --threads
         Use N threads for parallel processing
   -i, --ignore-errors
@@ -1617,6 +1165,14 @@ Dedupe similar media
 $ disco dedupe --help
 
 Flags:
+  -v, --verbose
+        Enable verbose logging
+  --simulate
+        Dry run; don't actually do anything
+  -y, --no-confirm
+        Don't ask for confirmation
+  -T, --timeout
+        Quit after N minutes/seconds
   --audio
         Dedupe database by artist + album + title
   --extractor-id
@@ -1731,20 +1287,6 @@ Flags:
         Fetch siblings of matched files (each, all, if-audiobook)
   --fetch-siblings-max
         Maximum number of siblings to fetch
-  --syncweb-url
-        Syncweb/Syncthing API URL
-  --syncweb-api-key
-        Syncweb/Syncthing API Key
-  --syncweb-home
-        Syncweb home directory
-  -v, --verbose
-        Enable verbose logging
-  --simulate
-        Dry run; don't actually do anything
-  -y, --no-confirm
-        Don't ask for confirmation
-  -T, --timeout
-        Quit after N minutes/seconds
   --threads
         Use N threads for parallel processing
   -i, --ignore-errors
@@ -1763,6 +1305,14 @@ Show big directories aggregation
 $ disco big-dirs --help
 
 Flags:
+  -v, --verbose
+        Enable verbose logging
+  --simulate
+        Dry run; don't actually do anything
+  -y, --no-confirm
+        Don't ask for confirmation
+  -T, --timeout
+        Quit after N minutes/seconds
   -s, --include
         Include paths matching pattern
   -E, --exclude
@@ -1857,14 +1407,6 @@ Flags:
         Fetch siblings of matched files (each, all, if-audiobook)
   --fetch-siblings-max
         Maximum number of siblings to fetch
-  -u, --sort-by
-        Sort by field
-  -V, --reverse
-        Reverse sort order
-  -n, --nat-sort
-        Use natural sorting
-  -r, --random
-        Random order
   -c, --columns
         Columns to display
   -B, --big-dirs
@@ -1901,22 +1443,6 @@ Flags:
         Filter folders by total size
   --folder-counts
         Filter folders by number of subfolders
-  -k, --re-rank
-        Add key/value pairs re-rank sorting by multiple attributes (COLUMN=WEIGHT)
-  --syncweb-url
-        Syncweb/Syncthing API URL
-  --syncweb-api-key
-        Syncweb/Syncthing API Key
-  --syncweb-home
-        Syncweb home directory
-  -v, --verbose
-        Enable verbose logging
-  --simulate
-        Dry run; don't actually do anything
-  -y, --no-confirm
-        Don't ask for confirmation
-  -T, --timeout
-        Quit after N minutes/seconds
   --threads
         Use N threads for parallel processing
   -i, --ignore-errors
@@ -1935,6 +1461,14 @@ Auto-group media into categories
 $ disco categorize --help
 
 Flags:
+  -v, --verbose
+        Enable verbose logging
+  --simulate
+        Dry run; don't actually do anything
+  -y, --no-confirm
+        Don't ask for confirmation
+  -T, --timeout
+        Quit after N minutes/seconds
   -q, --query
         Raw SQL query (overrides all query building)
   -L, --limit
@@ -2037,52 +1571,8 @@ Flags:
         Fetch siblings of matched files (each, all, if-audiobook)
   --fetch-siblings-max
         Maximum number of siblings to fetch
-  --cmd-0
-        Command to run if mpv exits with code 0
-  --cmd-1
-        Command to run if mpv exits with code 1
-  --cmd-2
-        Command to run if mpv exits with code 2
-  --cmd-3
-        Command to run if mpv exits with code 3
-  --cmd-4
-        Command to run if mpv exits with code 4
-  --cmd-5
-        Command to run if mpv exits with code 5
-  --cmd-6
-        Command to run if mpv exits with code 6
-  --cmd-7
-        Command to run if mpv exits with code 7
-  --cmd-8
-        Command to run if mpv exits with code 8
-  --cmd-9
-        Command to run if mpv exits with code 9
-  --cmd-10
-        Command to run if mpv exits with code 10
-  --cmd-11
-        Command to run if mpv exits with code 11
-  --cmd-12
-        Command to run if mpv exits with code 12
-  --cmd-13
-        Command to run if mpv exits with code 13
-  --cmd-14
-        Command to run if mpv exits with code 14
-  --cmd-15
-        Command to run if mpv exits with code 15
-  --cmd-20
-        Command to run if mpv exits with code 20
-  --cmd-127
-        Command to run if mpv exits with code 127
-  -I, --interactive
-        Interactive decision making after playback
   --trash
         Trash files after action
-  --syncweb-url
-        Syncweb/Syncthing API URL
-  --syncweb-api-key
-        Syncweb/Syncthing API Key
-  --syncweb-home
-        Syncweb home directory
   --post-action
         Post-action: none, delete, mark-deleted, move, copy
   --delete-files
@@ -2101,14 +1591,6 @@ Flags:
         Stop after N bytes (e.g., 10GB)
   --track-history
         Track playback history
-  -v, --verbose
-        Enable verbose logging
-  --simulate
-        Dry run; don't actually do anything
-  -y, --no-confirm
-        Don't ask for confirmation
-  -T, --timeout
-        Quit after N minutes/seconds
   --threads
         Use N threads for parallel processing
   -i, --ignore-errors
@@ -2129,30 +1611,22 @@ Find similar files
 $ disco similar-files --help
 
 Flags:
-  -s, --include
-        Include paths matching pattern
-  -E, --exclude
-        Exclude paths matching pattern
+  -v, --verbose
+        Enable verbose logging
+  --simulate
+        Dry run; don't actually do anything
+  -y, --no-confirm
+        Don't ask for confirmation
+  -T, --timeout
+        Quit after N minutes/seconds
   --search
         Search terms (space-separated for AND, | for OR)
-  --category
-        Filter by category
-  --genre
-        Filter by genre
-  --regex
-        Filter paths by regex pattern
-  --path-contains
-        Path must contain all these strings
-  --paths
-        Exact paths to include
   -S, --size
         Size range (e.g., >100MB, 1GB%10)
   -d, --duration
         Duration range (e.g., >1hour, 30min%10)
   --duration-from-size
         Constrain media to duration of videos which match any size constraints
-  -e, --ext
-        Filter by extensions (e.g., .mp4,.mkv)
   --created-after
         Created after date (YYYY-MM-DD)
   --created-before
@@ -2185,22 +1659,6 @@ Flags:
         Show only items in progress
   --with-captions
         Show only items with captions
-  --video-only
-        Only video files
-  --audio-only
-        Only audio files
-  --image-only
-        Only image files
-  --text-only
-        Only text/ebook files
-  --portrait
-        Only portrait orientation files
-  --scan-subtitles
-        Scan for external subtitles during import
-  --online-media-only
-        Exclude local media
-  --local-media-only
-        Exclude online media
   --flexible-search
         Flexible search (fuzzy)
   --exact
@@ -2209,16 +1667,6 @@ Flags:
         SQL where clause(s)
   --exists
         Filter out non-existent files
-  --mime-type
-        Filter by mimetype substring (e.g., video, mp4)
-  --no-mime-type
-        Exclude by mimetype substring
-  --no-default-categories
-        Disable default categories
-  --hide-deleted
-        Exclude deleted files from results
-  --only-deleted
-        Include only deleted files in results
   -o, --fetch-siblings
         Fetch siblings of matched files (each, all, if-audiobook)
   --fetch-siblings-max
@@ -2233,8 +1681,6 @@ Flags:
         Random order
   -c, --columns
         Columns to display
-  -B, --big-dirs
-        Aggregate by parent directory
   -j, --json
         Output results as JSON
   --summarize
@@ -2243,30 +1689,6 @@ Flags:
         Group statistics by time frequency (daily, weekly, monthly, yearly)
   --tui
         Interactive TUI mode
-  --file-counts
-        Filter by number of files in directory (e.g., >5, 10%1)
-  --group-by-extensions
-        Group by file extensions
-  --group-by-mime-types
-        Group by mimetypes
-  --group-by-size
-        Group by size buckets
-  -D, --depth
-        Aggregate at specific directory depth
-  --min-depth
-        Minimum depth for aggregation
-  --max-depth
-        Maximum depth for aggregation
-  --parents
-        Include parent directories in aggregation
-  --folders-only
-        Only show folders
-  --files-only
-        Only show files
-  --folder-sizes
-        Filter folders by total size
-  --folder-counts
-        Filter folders by number of subfolders
   --similar
         Find similar files or folders
   --sizes-delta
@@ -2303,20 +1725,6 @@ Flags:
         Print clusters as JSON
   -k, --re-rank
         Add key/value pairs re-rank sorting by multiple attributes (COLUMN=WEIGHT)
-  --syncweb-url
-        Syncweb/Syncthing API URL
-  --syncweb-api-key
-        Syncweb/Syncthing API Key
-  --syncweb-home
-        Syncweb home directory
-  -v, --verbose
-        Enable verbose logging
-  --simulate
-        Dry run; don't actually do anything
-  -y, --no-confirm
-        Don't ask for confirmation
-  -T, --timeout
-        Quit after N minutes/seconds
   --threads
         Use N threads for parallel processing
   -i, --ignore-errors
@@ -2335,30 +1743,22 @@ Find similar folders
 $ disco similar-folders --help
 
 Flags:
-  -s, --include
-        Include paths matching pattern
-  -E, --exclude
-        Exclude paths matching pattern
+  -v, --verbose
+        Enable verbose logging
+  --simulate
+        Dry run; don't actually do anything
+  -y, --no-confirm
+        Don't ask for confirmation
+  -T, --timeout
+        Quit after N minutes/seconds
   --search
         Search terms (space-separated for AND, | for OR)
-  --category
-        Filter by category
-  --genre
-        Filter by genre
-  --regex
-        Filter paths by regex pattern
-  --path-contains
-        Path must contain all these strings
-  --paths
-        Exact paths to include
   -S, --size
         Size range (e.g., >100MB, 1GB%10)
   -d, --duration
         Duration range (e.g., >1hour, 30min%10)
   --duration-from-size
         Constrain media to duration of videos which match any size constraints
-  -e, --ext
-        Filter by extensions (e.g., .mp4,.mkv)
   --created-after
         Created after date (YYYY-MM-DD)
   --created-before
@@ -2391,22 +1791,6 @@ Flags:
         Show only items in progress
   --with-captions
         Show only items with captions
-  --video-only
-        Only video files
-  --audio-only
-        Only audio files
-  --image-only
-        Only image files
-  --text-only
-        Only text/ebook files
-  --portrait
-        Only portrait orientation files
-  --scan-subtitles
-        Scan for external subtitles during import
-  --online-media-only
-        Exclude local media
-  --local-media-only
-        Exclude online media
   --flexible-search
         Flexible search (fuzzy)
   --exact
@@ -2415,16 +1799,6 @@ Flags:
         SQL where clause(s)
   --exists
         Filter out non-existent files
-  --mime-type
-        Filter by mimetype substring (e.g., video, mp4)
-  --no-mime-type
-        Exclude by mimetype substring
-  --no-default-categories
-        Disable default categories
-  --hide-deleted
-        Exclude deleted files from results
-  --only-deleted
-        Include only deleted files in results
   -o, --fetch-siblings
         Fetch siblings of matched files (each, all, if-audiobook)
   --fetch-siblings-max
@@ -2439,8 +1813,6 @@ Flags:
         Random order
   -c, --columns
         Columns to display
-  -B, --big-dirs
-        Aggregate by parent directory
   -j, --json
         Output results as JSON
   --summarize
@@ -2449,30 +1821,6 @@ Flags:
         Group statistics by time frequency (daily, weekly, monthly, yearly)
   --tui
         Interactive TUI mode
-  --file-counts
-        Filter by number of files in directory (e.g., >5, 10%1)
-  --group-by-extensions
-        Group by file extensions
-  --group-by-mime-types
-        Group by mimetypes
-  --group-by-size
-        Group by size buckets
-  -D, --depth
-        Aggregate at specific directory depth
-  --min-depth
-        Minimum depth for aggregation
-  --max-depth
-        Maximum depth for aggregation
-  --parents
-        Include parent directories in aggregation
-  --folders-only
-        Only show folders
-  --files-only
-        Only show files
-  --folder-sizes
-        Filter folders by total size
-  --folder-counts
-        Filter folders by number of subfolders
   --similar
         Find similar files or folders
   --sizes-delta
@@ -2509,20 +1857,6 @@ Flags:
         Print clusters as JSON
   -k, --re-rank
         Add key/value pairs re-rank sorting by multiple attributes (COLUMN=WEIGHT)
-  --syncweb-url
-        Syncweb/Syncthing API URL
-  --syncweb-api-key
-        Syncweb/Syncthing API Key
-  --syncweb-home
-        Syncweb home directory
-  -v, --verbose
-        Enable verbose logging
-  --simulate
-        Dry run; don't actually do anything
-  -y, --no-confirm
-        Don't ask for confirmation
-  -T, --timeout
-        Quit after N minutes/seconds
   --threads
         Use N threads for parallel processing
   -i, --ignore-errors
@@ -2549,6 +1883,14 @@ $ disco watch my_videos.db --size '>1GB'
 $ disco watch --help
 
 Flags:
+  -v, --verbose
+        Enable verbose logging
+  --simulate
+        Dry run; don't actually do anything
+  -y, --no-confirm
+        Don't ask for confirmation
+  -T, --timeout
+        Quit after N minutes/seconds
   -q, --query
         Raw SQL query (overrides all query building)
   -L, --limit
@@ -2661,8 +2003,6 @@ Flags:
         Random order
   -c, --columns
         Columns to display
-  -B, --big-dirs
-        Aggregate by parent directory
   -j, --json
         Output results as JSON
   --summarize
@@ -2671,30 +2011,6 @@ Flags:
         Group statistics by time frequency (daily, weekly, monthly, yearly)
   --tui
         Interactive TUI mode
-  --file-counts
-        Filter by number of files in directory (e.g., >5, 10%1)
-  --group-by-extensions
-        Group by file extensions
-  --group-by-mime-types
-        Group by mimetypes
-  --group-by-size
-        Group by size buckets
-  -D, --depth
-        Aggregate at specific directory depth
-  --min-depth
-        Minimum depth for aggregation
-  --max-depth
-        Maximum depth for aggregation
-  --parents
-        Include parent directories in aggregation
-  --folders-only
-        Only show folders
-  --files-only
-        Only show files
-  --folder-sizes
-        Filter folders by total size
-  --folder-counts
-        Filter folders by number of subfolders
   -k, --re-rank
         Add key/value pairs re-rank sorting by multiple attributes (COLUMN=WEIGHT)
   --fts
@@ -2779,12 +2095,6 @@ Flags:
         Interactive decision making after playback
   --trash
         Trash files after action
-  --syncweb-url
-        Syncweb/Syncthing API URL
-  --syncweb-api-key
-        Syncweb/Syncthing API Key
-  --syncweb-home
-        Syncweb home directory
   --cast
         Cast to chromecast groups
   --cast-device
@@ -2809,14 +2119,6 @@ Flags:
         Stop after N bytes (e.g., 10GB)
   --track-history
         Track playback history
-  -v, --verbose
-        Enable verbose logging
-  --simulate
-        Dry run; don't actually do anything
-  -y, --no-confirm
-        Don't ask for confirmation
-  -T, --timeout
-        Quit after N minutes/seconds
   --threads
         Use N threads for parallel processing
   -i, --ignore-errors
@@ -2842,6 +2144,14 @@ $ disco listen my_music.db --random
 $ disco listen --help
 
 Flags:
+  -v, --verbose
+        Enable verbose logging
+  --simulate
+        Dry run; don't actually do anything
+  -y, --no-confirm
+        Don't ask for confirmation
+  -T, --timeout
+        Quit after N minutes/seconds
   -q, --query
         Raw SQL query (overrides all query building)
   -L, --limit
@@ -2954,8 +2264,6 @@ Flags:
         Random order
   -c, --columns
         Columns to display
-  -B, --big-dirs
-        Aggregate by parent directory
   -j, --json
         Output results as JSON
   --summarize
@@ -2964,30 +2272,6 @@ Flags:
         Group statistics by time frequency (daily, weekly, monthly, yearly)
   --tui
         Interactive TUI mode
-  --file-counts
-        Filter by number of files in directory (e.g., >5, 10%1)
-  --group-by-extensions
-        Group by file extensions
-  --group-by-mime-types
-        Group by mimetypes
-  --group-by-size
-        Group by size buckets
-  -D, --depth
-        Aggregate at specific directory depth
-  --min-depth
-        Minimum depth for aggregation
-  --max-depth
-        Maximum depth for aggregation
-  --parents
-        Include parent directories in aggregation
-  --folders-only
-        Only show folders
-  --files-only
-        Only show files
-  --folder-sizes
-        Filter folders by total size
-  --folder-counts
-        Filter folders by number of subfolders
   -k, --re-rank
         Add key/value pairs re-rank sorting by multiple attributes (COLUMN=WEIGHT)
   --fts
@@ -3072,12 +2356,6 @@ Flags:
         Interactive decision making after playback
   --trash
         Trash files after action
-  --syncweb-url
-        Syncweb/Syncthing API URL
-  --syncweb-api-key
-        Syncweb/Syncthing API Key
-  --syncweb-home
-        Syncweb home directory
   --cast
         Cast to chromecast groups
   --cast-device
@@ -3102,14 +2380,6 @@ Flags:
         Stop after N bytes (e.g., 10GB)
   --track-history
         Track playback history
-  -v, --verbose
-        Enable verbose logging
-  --simulate
-        Dry run; don't actually do anything
-  -y, --no-confirm
-        Don't ask for confirmation
-  -T, --timeout
-        Quit after N minutes/seconds
   --threads
         Use N threads for parallel processing
   -i, --ignore-errors
@@ -3128,6 +2398,14 @@ Show library statistics
 $ disco stats --help
 
 Flags:
+  -v, --verbose
+        Enable verbose logging
+  --simulate
+        Dry run; don't actually do anything
+  -y, --no-confirm
+        Don't ask for confirmation
+  -T, --timeout
+        Quit after N minutes/seconds
   -s, --include
         Include paths matching pattern
   -E, --exclude
@@ -3224,8 +2502,6 @@ Flags:
         Maximum number of siblings to fetch
   -c, --columns
         Columns to display
-  -B, --big-dirs
-        Aggregate by parent directory
   -j, --json
         Output results as JSON
   --summarize
@@ -3234,44 +2510,6 @@ Flags:
         Group statistics by time frequency (daily, weekly, monthly, yearly)
   --tui
         Interactive TUI mode
-  --file-counts
-        Filter by number of files in directory (e.g., >5, 10%1)
-  --group-by-extensions
-        Group by file extensions
-  --group-by-mime-types
-        Group by mimetypes
-  --group-by-size
-        Group by size buckets
-  -D, --depth
-        Aggregate at specific directory depth
-  --min-depth
-        Minimum depth for aggregation
-  --max-depth
-        Maximum depth for aggregation
-  --parents
-        Include parent directories in aggregation
-  --folders-only
-        Only show folders
-  --files-only
-        Only show files
-  --folder-sizes
-        Filter folders by total size
-  --folder-counts
-        Filter folders by number of subfolders
-  --syncweb-url
-        Syncweb/Syncthing API URL
-  --syncweb-api-key
-        Syncweb/Syncthing API Key
-  --syncweb-home
-        Syncweb home directory
-  -v, --verbose
-        Enable verbose logging
-  --simulate
-        Dry run; don't actually do anything
-  -y, --no-confirm
-        Don't ask for confirmation
-  -T, --timeout
-        Quit after N minutes/seconds
   --threads
         Use N threads for parallel processing
   -i, --ignore-errors
@@ -3297,6 +2535,14 @@ $ disco history my_videos.db --inprogress
 $ disco history --help
 
 Flags:
+  -v, --verbose
+        Enable verbose logging
+  --simulate
+        Dry run; don't actually do anything
+  -y, --no-confirm
+        Don't ask for confirmation
+  -T, --timeout
+        Quit after N minutes/seconds
   -s, --include
         Include paths matching pattern
   -E, --exclude
@@ -3401,8 +2647,6 @@ Flags:
         Random order
   -c, --columns
         Columns to display
-  -B, --big-dirs
-        Aggregate by parent directory
   -j, --json
         Output results as JSON
   --summarize
@@ -3411,78 +2655,10 @@ Flags:
         Group statistics by time frequency (daily, weekly, monthly, yearly)
   --tui
         Interactive TUI mode
-  --file-counts
-        Filter by number of files in directory (e.g., >5, 10%1)
-  --group-by-extensions
-        Group by file extensions
-  --group-by-mime-types
-        Group by mimetypes
-  --group-by-size
-        Group by size buckets
-  -D, --depth
-        Aggregate at specific directory depth
-  --min-depth
-        Minimum depth for aggregation
-  --max-depth
-        Maximum depth for aggregation
-  --parents
-        Include parent directories in aggregation
-  --folders-only
-        Only show folders
-  --files-only
-        Only show files
-  --folder-sizes
-        Filter folders by total size
-  --folder-counts
-        Filter folders by number of subfolders
   -k, --re-rank
         Add key/value pairs re-rank sorting by multiple attributes (COLUMN=WEIGHT)
-  --cmd-0
-        Command to run if mpv exits with code 0
-  --cmd-1
-        Command to run if mpv exits with code 1
-  --cmd-2
-        Command to run if mpv exits with code 2
-  --cmd-3
-        Command to run if mpv exits with code 3
-  --cmd-4
-        Command to run if mpv exits with code 4
-  --cmd-5
-        Command to run if mpv exits with code 5
-  --cmd-6
-        Command to run if mpv exits with code 6
-  --cmd-7
-        Command to run if mpv exits with code 7
-  --cmd-8
-        Command to run if mpv exits with code 8
-  --cmd-9
-        Command to run if mpv exits with code 9
-  --cmd-10
-        Command to run if mpv exits with code 10
-  --cmd-11
-        Command to run if mpv exits with code 11
-  --cmd-12
-        Command to run if mpv exits with code 12
-  --cmd-13
-        Command to run if mpv exits with code 13
-  --cmd-14
-        Command to run if mpv exits with code 14
-  --cmd-15
-        Command to run if mpv exits with code 15
-  --cmd-20
-        Command to run if mpv exits with code 20
-  --cmd-127
-        Command to run if mpv exits with code 127
-  -I, --interactive
-        Interactive decision making after playback
   --trash
         Trash files after action
-  --syncweb-url
-        Syncweb/Syncthing API URL
-  --syncweb-api-key
-        Syncweb/Syncthing API Key
-  --syncweb-home
-        Syncweb home directory
   --post-action
         Post-action: none, delete, mark-deleted, move, copy
   --delete-files
@@ -3501,14 +2677,6 @@ Flags:
         Stop after N bytes (e.g., 10GB)
   --track-history
         Track playback history
-  -v, --verbose
-        Enable verbose logging
-  --simulate
-        Dry run; don't actually do anything
-  -y, --no-confirm
-        Don't ask for confirmation
-  -T, --timeout
-        Quit after N minutes/seconds
   --threads
         Use N threads for parallel processing
   -i, --ignore-errors
@@ -3527,12 +2695,6 @@ Add paths to playback history
 $ disco history-add --help
 
 Flags:
-  --syncweb-url
-        Syncweb/Syncthing API URL
-  --syncweb-api-key
-        Syncweb/Syncthing API Key
-  --syncweb-home
-        Syncweb home directory
   -v, --verbose
         Enable verbose logging
   --simulate
@@ -3559,12 +2721,6 @@ Import mpv watchlater files to history
 $ disco mpv-watchlater --help
 
 Flags:
-  --syncweb-url
-        Syncweb/Syncthing API URL
-  --syncweb-api-key
-        Syncweb/Syncthing API Key
-  --syncweb-home
-        Syncweb home directory
   -v, --verbose
         Enable verbose logging
   --simulate
@@ -3573,6 +2729,100 @@ Flags:
         Don't ask for confirmation
   -T, --timeout
         Quit after N minutes/seconds
+  -s, --include
+        Include paths matching pattern
+  -E, --exclude
+        Exclude paths matching pattern
+  --search
+        Search terms (space-separated for AND, | for OR)
+  --category
+        Filter by category
+  --genre
+        Filter by genre
+  --regex
+        Filter paths by regex pattern
+  --path-contains
+        Path must contain all these strings
+  --paths
+        Exact paths to include
+  -S, --size
+        Size range (e.g., >100MB, 1GB%10)
+  -d, --duration
+        Duration range (e.g., >1hour, 30min%10)
+  --duration-from-size
+        Constrain media to duration of videos which match any size constraints
+  -e, --ext
+        Filter by extensions (e.g., .mp4,.mkv)
+  --created-after
+        Created after date (YYYY-MM-DD)
+  --created-before
+        Created before date (YYYY-MM-DD)
+  --modified-after
+        Modified after date (YYYY-MM-DD)
+  --modified-before
+        Modified before date (YYYY-MM-DD)
+  --deleted-after
+        Deleted after date (YYYY-MM-DD)
+  --deleted-before
+        Deleted before date (YYYY-MM-DD)
+  --played-after
+        Last played after date (YYYY-MM-DD)
+  --played-before
+        Last played before date (YYYY-MM-DD)
+  --watched
+        Filter by watched status (true/false)
+  --unfinished
+        Has playhead but not finished
+  -P, --partial
+        Filter by partial playback status
+  --play-count-min
+        Minimum play count
+  --play-count-max
+        Maximum play count
+  --completed
+        Show only completed items
+  --in-progress
+        Show only items in progress
+  --with-captions
+        Show only items with captions
+  --video-only
+        Only video files
+  --audio-only
+        Only audio files
+  --image-only
+        Only image files
+  --text-only
+        Only text/ebook files
+  --portrait
+        Only portrait orientation files
+  --scan-subtitles
+        Scan for external subtitles during import
+  --online-media-only
+        Exclude local media
+  --local-media-only
+        Exclude online media
+  --flexible-search
+        Flexible search (fuzzy)
+  --exact
+        Exact match for search
+  -w, --where
+        SQL where clause(s)
+  --exists
+        Filter out non-existent files
+  --mime-type
+        Filter by mimetype substring (e.g., video, mp4)
+  --no-mime-type
+        Exclude by mimetype substring
+  --no-default-categories
+        Disable default categories
+  --hide-deleted
+        Exclude deleted files from results
+  --only-deleted
+        Include only deleted files in results
+  -o, --fetch-siblings
+        Fetch siblings of matched files (each, all, if-audiobook)
+  --fetch-siblings-max
+        Maximum number of siblings to fetch
   --threads
         Use N threads for parallel processing
   -i, --ignore-errors
@@ -3598,12 +2848,6 @@ $ disco serve --trashcan my_videos.db
 $ disco serve --help
 
 Flags:
-  --syncweb-url
-        Syncweb/Syncthing API URL
-  --syncweb-api-key
-        Syncweb/Syncthing API Key
-  --syncweb-home
-        Syncweb home directory
   -v, --verbose
         Enable verbose logging
   --simulate
@@ -3646,12 +2890,6 @@ $ disco optimize my_videos.db
 $ disco optimize --help
 
 Flags:
-  --syncweb-url
-        Syncweb/Syncthing API URL
-  --syncweb-api-key
-        Syncweb/Syncthing API Key
-  --syncweb-home
-        Syncweb home directory
   -v, --verbose
         Enable verbose logging
   --simulate
@@ -3678,12 +2916,6 @@ Repair malformed database using sqlite3
 $ disco repair --help
 
 Flags:
-  --syncweb-url
-        Syncweb/Syncthing API URL
-  --syncweb-api-key
-        Syncweb/Syncthing API Key
-  --syncweb-home
-        Syncweb home directory
   -v, --verbose
         Enable verbose logging
   --simulate
@@ -3710,46 +2942,22 @@ Interactive TUI media picker
 $ disco tui --help
 
 Flags:
-  -s, --include
-        Include paths matching pattern
-  -E, --exclude
-        Exclude paths matching pattern
+  -v, --verbose
+        Enable verbose logging
+  --simulate
+        Dry run; don't actually do anything
+  -y, --no-confirm
+        Don't ask for confirmation
+  -T, --timeout
+        Quit after N minutes/seconds
   --search
         Search terms (space-separated for AND, | for OR)
-  --category
-        Filter by category
-  --genre
-        Filter by genre
-  --regex
-        Filter paths by regex pattern
-  --path-contains
-        Path must contain all these strings
-  --paths
-        Exact paths to include
   -S, --size
         Size range (e.g., >100MB, 1GB%10)
   -d, --duration
         Duration range (e.g., >1hour, 30min%10)
   --duration-from-size
         Constrain media to duration of videos which match any size constraints
-  -e, --ext
-        Filter by extensions (e.g., .mp4,.mkv)
-  --created-after
-        Created after date (YYYY-MM-DD)
-  --created-before
-        Created before date (YYYY-MM-DD)
-  --modified-after
-        Modified after date (YYYY-MM-DD)
-  --modified-before
-        Modified before date (YYYY-MM-DD)
-  --deleted-after
-        Deleted after date (YYYY-MM-DD)
-  --deleted-before
-        Deleted before date (YYYY-MM-DD)
-  --played-after
-        Last played after date (YYYY-MM-DD)
-  --played-before
-        Last played before date (YYYY-MM-DD)
   --watched
         Filter by watched status (true/false)
   --unfinished
@@ -3766,22 +2974,6 @@ Flags:
         Show only items in progress
   --with-captions
         Show only items with captions
-  --video-only
-        Only video files
-  --audio-only
-        Only audio files
-  --image-only
-        Only image files
-  --text-only
-        Only text/ebook files
-  --portrait
-        Only portrait orientation files
-  --scan-subtitles
-        Scan for external subtitles during import
-  --online-media-only
-        Exclude local media
-  --local-media-only
-        Exclude online media
   --flexible-search
         Flexible search (fuzzy)
   --exact
@@ -3790,16 +2982,6 @@ Flags:
         SQL where clause(s)
   --exists
         Filter out non-existent files
-  --mime-type
-        Filter by mimetype substring (e.g., video, mp4)
-  --no-mime-type
-        Exclude by mimetype substring
-  --no-default-categories
-        Disable default categories
-  --hide-deleted
-        Exclude deleted files from results
-  --only-deleted
-        Include only deleted files in results
   -o, --fetch-siblings
         Fetch siblings of matched files (each, all, if-audiobook)
   --fetch-siblings-max
@@ -3814,20 +2996,6 @@ Flags:
         Random order
   -k, --re-rank
         Add key/value pairs re-rank sorting by multiple attributes (COLUMN=WEIGHT)
-  --syncweb-url
-        Syncweb/Syncthing API URL
-  --syncweb-api-key
-        Syncweb/Syncthing API Key
-  --syncweb-home
-        Syncweb home directory
-  -v, --verbose
-        Enable verbose logging
-  --simulate
-        Dry run; don't actually do anything
-  -y, --no-confirm
-        Don't ask for confirmation
-  -T, --timeout
-        Quit after N minutes/seconds
   --threads
         Use N threads for parallel processing
   -i, --ignore-errors
@@ -3846,12 +3014,6 @@ Generate README.md content
 $ disco readme --help
 
 Flags:
-  --syncweb-url
-        Syncweb/Syncthing API URL
-  --syncweb-api-key
-        Syncweb/Syncthing API Key
-  --syncweb-home
-        Syncweb home directory
   -v, --verbose
         Enable verbose logging
   --simulate
@@ -3878,6 +3040,22 @@ Sort by splitting lines and sorting words
 $ disco regex-sort --help
 
 Flags:
+  -v, --verbose
+        Enable verbose logging
+  --simulate
+        Dry run; don't actually do anything
+  -y, --no-confirm
+        Don't ask for confirmation
+  -T, --timeout
+        Quit after N minutes/seconds
+  -u, --sort-by
+        Sort by field
+  -V, --reverse
+        Reverse sort order
+  -n, --nat-sort
+        Use natural sorting
+  -r, --random
+        Random order
   --regex-sort
         Sort by splitting lines and sorting words
   --regexs
@@ -3896,20 +3074,8 @@ Flags:
         Filter for duplicate words (true/false)
   --unique-only
         Filter for unique words (true/false)
-  --syncweb-url
-        Syncweb/Syncthing API URL
-  --syncweb-api-key
-        Syncweb/Syncthing API Key
-  --syncweb-home
-        Syncweb home directory
-  -v, --verbose
-        Enable verbose logging
-  --simulate
-        Dry run; don't actually do anything
-  -y, --no-confirm
-        Don't ask for confirmation
-  -T, --timeout
-        Quit after N minutes/seconds
+  -k, --re-rank
+        Add key/value pairs re-rank sorting by multiple attributes (COLUMN=WEIGHT)
   --threads
         Use N threads for parallel processing
   -i, --ignore-errors
@@ -3930,6 +3096,14 @@ Group items by similarity
 $ disco cluster-sort --help
 
 Flags:
+  -v, --verbose
+        Enable verbose logging
+  --simulate
+        Dry run; don't actually do anything
+  -y, --no-confirm
+        Don't ask for confirmation
+  -T, --timeout
+        Quit after N minutes/seconds
   --regex-sort
         Sort by splitting lines and sorting words
   --regexs
@@ -3982,20 +3156,6 @@ Flags:
         Move grouped files into separate directories
   --print-groups
         Print clusters as JSON
-  --syncweb-url
-        Syncweb/Syncthing API URL
-  --syncweb-api-key
-        Syncweb/Syncthing API Key
-  --syncweb-home
-        Syncweb home directory
-  -v, --verbose
-        Enable verbose logging
-  --simulate
-        Dry run; don't actually do anything
-  -y, --no-confirm
-        Don't ask for confirmation
-  -T, --timeout
-        Quit after N minutes/seconds
   --threads
         Use N threads for parallel processing
   -i, --ignore-errors
@@ -4016,18 +3176,6 @@ Calculate a hash based on small file segments
 $ disco sample-hash --help
 
 Flags:
-  --hash-gap
-        Gap between segments (0.0-1.0 as percentage of file size, or absolute bytes if >1)
-  --hash-chunk-size
-        Size of each segment to hash
-  --hash-threads
-        Number of threads to use for hashing a single file
-  --syncweb-url
-        Syncweb/Syncthing API URL
-  --syncweb-api-key
-        Syncweb/Syncthing API Key
-  --syncweb-home
-        Syncweb home directory
   -v, --verbose
         Enable verbose logging
   --simulate
@@ -4036,6 +3184,12 @@ Flags:
         Don't ask for confirmation
   -T, --timeout
         Quit after N minutes/seconds
+  --hash-gap
+        Gap between segments (0.0-1.0 as percentage of file size, or absolute bytes if >1)
+  --hash-chunk-size
+        Size of each segment to hash
+  --hash-threads
+        Number of threads to use for hashing a single file
   --threads
         Use N threads for parallel processing
   -i, --ignore-errors
@@ -4054,6 +3208,14 @@ Open files with default application
 $ disco open --help
 
 Flags:
+  -v, --verbose
+        Enable verbose logging
+  --simulate
+        Dry run; don't actually do anything
+  -y, --no-confirm
+        Don't ask for confirmation
+  -T, --timeout
+        Quit after N minutes/seconds
   -s, --include
         Include paths matching pattern
   -E, --exclude
@@ -4078,22 +3240,6 @@ Flags:
         Constrain media to duration of videos which match any size constraints
   -e, --ext
         Filter by extensions (e.g., .mp4,.mkv)
-  --created-after
-        Created after date (YYYY-MM-DD)
-  --created-before
-        Created before date (YYYY-MM-DD)
-  --modified-after
-        Modified after date (YYYY-MM-DD)
-  --modified-before
-        Modified before date (YYYY-MM-DD)
-  --deleted-after
-        Deleted after date (YYYY-MM-DD)
-  --deleted-before
-        Deleted before date (YYYY-MM-DD)
-  --played-after
-        Last played after date (YYYY-MM-DD)
-  --played-before
-        Last played before date (YYYY-MM-DD)
   --watched
         Filter by watched status (true/false)
   --unfinished
@@ -4140,10 +3286,6 @@ Flags:
         Exclude by mimetype substring
   --no-default-categories
         Disable default categories
-  --hide-deleted
-        Exclude deleted files from results
-  --only-deleted
-        Include only deleted files in results
   -o, --fetch-siblings
         Fetch siblings of matched files (each, all, if-audiobook)
   --fetch-siblings-max
@@ -4158,52 +3300,8 @@ Flags:
         Random order
   -k, --re-rank
         Add key/value pairs re-rank sorting by multiple attributes (COLUMN=WEIGHT)
-  --cmd-0
-        Command to run if mpv exits with code 0
-  --cmd-1
-        Command to run if mpv exits with code 1
-  --cmd-2
-        Command to run if mpv exits with code 2
-  --cmd-3
-        Command to run if mpv exits with code 3
-  --cmd-4
-        Command to run if mpv exits with code 4
-  --cmd-5
-        Command to run if mpv exits with code 5
-  --cmd-6
-        Command to run if mpv exits with code 6
-  --cmd-7
-        Command to run if mpv exits with code 7
-  --cmd-8
-        Command to run if mpv exits with code 8
-  --cmd-9
-        Command to run if mpv exits with code 9
-  --cmd-10
-        Command to run if mpv exits with code 10
-  --cmd-11
-        Command to run if mpv exits with code 11
-  --cmd-12
-        Command to run if mpv exits with code 12
-  --cmd-13
-        Command to run if mpv exits with code 13
-  --cmd-14
-        Command to run if mpv exits with code 14
-  --cmd-15
-        Command to run if mpv exits with code 15
-  --cmd-20
-        Command to run if mpv exits with code 20
-  --cmd-127
-        Command to run if mpv exits with code 127
-  -I, --interactive
-        Interactive decision making after playback
   --trash
         Trash files after action
-  --syncweb-url
-        Syncweb/Syncthing API URL
-  --syncweb-api-key
-        Syncweb/Syncthing API Key
-  --syncweb-home
-        Syncweb home directory
   --post-action
         Post-action: none, delete, mark-deleted, move, copy
   --delete-files
@@ -4222,14 +3320,6 @@ Flags:
         Stop after N bytes (e.g., 10GB)
   --track-history
         Track playback history
-  -v, --verbose
-        Enable verbose logging
-  --simulate
-        Dry run; don't actually do anything
-  -y, --no-confirm
-        Don't ask for confirmation
-  -T, --timeout
-        Quit after N minutes/seconds
   --threads
         Use N threads for parallel processing
   -i, --ignore-errors
@@ -4248,6 +3338,14 @@ Open URLs in browser
 $ disco browse --help
 
 Flags:
+  -v, --verbose
+        Enable verbose logging
+  --simulate
+        Dry run; don't actually do anything
+  -y, --no-confirm
+        Don't ask for confirmation
+  -T, --timeout
+        Quit after N minutes/seconds
   -s, --include
         Include paths matching pattern
   -E, --exclude
@@ -4272,22 +3370,6 @@ Flags:
         Constrain media to duration of videos which match any size constraints
   -e, --ext
         Filter by extensions (e.g., .mp4,.mkv)
-  --created-after
-        Created after date (YYYY-MM-DD)
-  --created-before
-        Created before date (YYYY-MM-DD)
-  --modified-after
-        Modified after date (YYYY-MM-DD)
-  --modified-before
-        Modified before date (YYYY-MM-DD)
-  --deleted-after
-        Deleted after date (YYYY-MM-DD)
-  --deleted-before
-        Deleted before date (YYYY-MM-DD)
-  --played-after
-        Last played after date (YYYY-MM-DD)
-  --played-before
-        Last played before date (YYYY-MM-DD)
   --watched
         Filter by watched status (true/false)
   --unfinished
@@ -4334,28 +3416,20 @@ Flags:
         Exclude by mimetype substring
   --no-default-categories
         Disable default categories
-  --hide-deleted
-        Exclude deleted files from results
-  --only-deleted
-        Include only deleted files in results
   -o, --fetch-siblings
         Fetch siblings of matched files (each, all, if-audiobook)
   --fetch-siblings-max
         Maximum number of siblings to fetch
-  --syncweb-url
-        Syncweb/Syncthing API URL
-  --syncweb-api-key
-        Syncweb/Syncthing API Key
-  --syncweb-home
-        Syncweb home directory
-  -v, --verbose
-        Enable verbose logging
-  --simulate
-        Dry run; don't actually do anything
-  -y, --no-confirm
-        Don't ask for confirmation
-  -T, --timeout
-        Quit after N minutes/seconds
+  -u, --sort-by
+        Sort by field
+  -V, --reverse
+        Reverse sort order
+  -n, --nat-sort
+        Use natural sorting
+  -r, --random
+        Random order
+  -k, --re-rank
+        Add key/value pairs re-rank sorting by multiple attributes (COLUMN=WEIGHT)
   --threads
         Use N threads for parallel processing
   -i, --ignore-errors
@@ -4476,12 +3550,14 @@ Merge multiple SQLite databases
 $ disco merge-dbs --help
 
 Flags:
-  --syncweb-url
-        Syncweb/Syncthing API URL
-  --syncweb-api-key
-        Syncweb/Syncthing API Key
-  --syncweb-home
-        Syncweb home directory
+  -v, --verbose
+        Enable verbose logging
+  --simulate
+        Dry run; don't actually do anything
+  -y, --no-confirm
+        Don't ask for confirmation
+  -T, --timeout
+        Quit after N minutes/seconds
   -t, --only-tables
         Comma separated specific table(s)
   --primary-keys
@@ -4496,46 +3572,6 @@ Flags:
         Only copy columns that exist in target
   --skip-columns
         Columns to skip during merge
-  -v, --verbose
-        Enable verbose logging
-  --simulate
-        Dry run; don't actually do anything
-  -y, --no-confirm
-        Don't ask for confirmation
-  -T, --timeout
-        Quit after N minutes/seconds
-  --threads
-        Use N threads for parallel processing
-  -i, --ignore-errors
-        Ignore errors and continue to next file
-```
-
-</details>
-
-### syncweb
-
-Syncweb: an offline-first distributed web
-
-<details><summary>All Options</summary>
-
-```bash
-$ disco syncweb --help
-
-Flags:
-  --syncweb-url
-        Syncweb/Syncthing API URL
-  --syncweb-api-key
-        Syncweb/Syncthing API Key
-  --syncweb-home
-        Syncweb home directory
-  -v, --verbose
-        Enable verbose logging
-  --simulate
-        Dry run; don't actually do anything
-  -y, --no-confirm
-        Don't ask for confirmation
-  -T, --timeout
-        Quit after N minutes/seconds
   --threads
         Use N threads for parallel processing
   -i, --ignore-errors

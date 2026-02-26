@@ -7,23 +7,54 @@ import (
 
 // Trait interfaces for dynamic help filtering
 type (
-	QueryTrait      interface{ IsQueryTrait() }
-	FilterTrait     interface{ IsFilterTrait() }
-	SortTrait       interface{ IsSortTrait() }
-	DisplayTrait    interface{ IsDisplayTrait() }
-	PlaybackTrait   interface{ IsPlaybackTrait() }
-	TextTrait       interface{ IsTextTrait() }
-	SimilarityTrait interface{ IsSimilarityTrait() }
-	MergeTrait      interface{ IsMergeTrait() }
-	ActionTrait     interface{ IsActionTrait() }
-	FTSTrait        interface{ IsFTSTrait() }
-	HashingTrait    interface{ IsHashingTrait() }
-	DedupeTrait     interface{ IsDedupeTrait() }
-	HistoryTrait    interface{ IsHistoryTrait() }
+	QueryTrait       interface{ IsQueryTrait() }
+	FilterTrait      interface{ IsFilterTrait() }
+	SortTrait        interface{ IsSortTrait() }
+	DisplayTrait     interface{ IsDisplayTrait() }
+	PlaybackTrait    interface{ IsPlaybackTrait() }
+	TextTrait        interface{ IsTextTrait() }
+	SimilarityTrait  interface{ IsSimilarityTrait() }
+	MergeTrait       interface{ IsMergeTrait() }
+	ActionTrait      interface{ IsActionTrait() }
+	FTSTrait         interface{ IsFTSTrait() }
+	HashingTrait     interface{ IsHashingTrait() }
+	DedupeTrait      interface{ IsDedupeTrait() }
+	HistoryTrait     interface{ IsHistoryTrait() }
+	SyncwebTrait     interface{ IsSyncwebTrait() }
+	TimeTrait        interface{ IsTimeTrait() }
+	PathFilterTrait  interface{ IsPathFilterTrait() }
+	MediaFilterTrait interface{ IsMediaFilterTrait() }
+	DeletedTrait     interface{ IsDeletedTrait() }
+	AggregateTrait   interface{ IsAggregateTrait() }
+	PostActionTrait  interface{ IsPostActionTrait() }
+	MpvActionTrait   interface{ IsMpvActionTrait() }
 )
 
-// GlobalFlags are flags available to core data commands (print, search, du, etc)
+// CoreFlags are essential flags shared across most binaries/commands
+type CoreFlags struct {
+	// Common options
+	Verbose   bool   `short:"v" help:"Enable verbose logging"`
+	Simulate  bool   `help:"Dry run; don't actually do anything"`
+	DryRun    bool   `kong:"-"` // Alias for Simulate
+	NoConfirm bool   `short:"y" help:"Don't ask for confirmation"`
+	Yes       bool   `kong:"-"` // Alias for NoConfirm
+	Timeout   string `short:"T" help:"Quit after N minutes/seconds"`
+}
+
+// SyncwebFlags are flags related to Syncweb configuration
+type SyncwebFlags struct {
+	SyncwebURL      string `help:"Syncweb/Syncthing API URL" group:"Syncweb" env:"SYNCWEB_URL"`
+	SyncwebAPIKey   string `help:"Syncweb/Syncthing API Key" group:"Syncweb" env:"SYNCWEB_API_KEY"`
+	SyncwebHome     string `help:"Syncweb home directory" group:"Syncweb" env:"SYNCWEB_HOME"`
+	SyncwebPublic_  string `kong:"-" env:"SYNCWEB_PUBLIC"`
+	SyncwebPrivate_ string `kong:"-" env:"SYNCWEB_PRIVATE"`
+}
+
+// GlobalFlags are flags available to disco data commands (print, search, du, etc)
 type GlobalFlags struct {
+	CoreFlags    `embed:""`
+	SyncwebFlags `embed:""`
+
 	Query  string `short:"q" help:"Raw SQL query (overrides all query building)" group:"Query"`
 	Limit  int    `short:"L" default:"100" help:"Limit results per database" group:"Query"`
 	All    bool   `short:"a" help:"Return all results (no limit)" group:"Query"`
@@ -44,30 +75,30 @@ type GlobalFlags struct {
 	DedupeCmd          string  `help:"Command to run for deduplication (rmlint-style: cmd duplicate keep)" group:"Dedupe"`
 
 	// Path filters
-	Include      []string `short:"s" help:"Include paths matching pattern" group:"Filter"`
-	Exclude      []string `short:"E" help:"Exclude paths matching pattern" group:"Filter"`
+	Include      []string `short:"s" help:"Include paths matching pattern" group:"PathFilter"`
+	Exclude      []string `short:"E" help:"Exclude paths matching pattern" group:"PathFilter"`
 	Search       []string `help:"Search terms (space-separated for AND, | for OR)" group:"Filter"`
-	Category     []string `help:"Filter by category" group:"Filter"`
-	Genre        string   `help:"Filter by genre" group:"Filter"`
-	Regex        string   `help:"Filter paths by regex pattern" group:"Filter"`
-	PathContains []string `help:"Path must contain all these strings" group:"Filter"`
-	Paths        []string `help:"Exact paths to include" group:"Filter"`
+	Category     []string `help:"Filter by category" group:"MediaFilter"`
+	Genre        string   `help:"Filter by genre" group:"MediaFilter"`
+	Regex        string   `help:"Filter paths by regex pattern" group:"PathFilter"`
+	PathContains []string `help:"Path must contain all these strings" group:"PathFilter"`
+	Paths        []string `help:"Exact paths to include" group:"PathFilter"`
 
 	// Size/Duration filters
 	Size             []string `short:"S" help:"Size range (e.g., >100MB, 1GB%10)" group:"Filter"`
 	Duration         []string `short:"d" help:"Duration range (e.g., >1hour, 30min%10)" group:"Filter"`
 	DurationFromSize string   `help:"Constrain media to duration of videos which match any size constraints" group:"Filter"`
-	Ext              []string `short:"e" help:"Filter by extensions (e.g., .mp4,.mkv)" group:"Filter"`
+	Ext              []string `short:"e" help:"Filter by extensions (e.g., .mp4,.mkv)" group:"MediaFilter"`
 
 	// Time filters
-	CreatedAfter   string `help:"Created after date (YYYY-MM-DD)" group:"Filter"`
-	CreatedBefore  string `help:"Created before date (YYYY-MM-DD)" group:"Filter"`
-	ModifiedAfter  string `help:"Modified after date (YYYY-MM-DD)" group:"Filter"`
-	ModifiedBefore string `help:"Modified before date (YYYY-MM-DD)" group:"Filter"`
-	DeletedAfter   string `help:"Deleted after date (YYYY-MM-DD)" group:"Filter"`
-	DeletedBefore  string `help:"Deleted before date (YYYY-MM-DD)" group:"Filter"`
-	PlayedAfter    string `help:"Last played after date (YYYY-MM-DD)" group:"Filter"`
-	PlayedBefore   string `help:"Last played before date (YYYY-MM-DD)" group:"Filter"`
+	CreatedAfter   string `help:"Created after date (YYYY-MM-DD)" group:"Time"`
+	CreatedBefore  string `help:"Created before date (YYYY-MM-DD)" group:"Time"`
+	ModifiedAfter  string `help:"Modified after date (YYYY-MM-DD)" group:"Time"`
+	ModifiedBefore string `help:"Modified before date (YYYY-MM-DD)" group:"Time"`
+	DeletedAfter   string `help:"Deleted after date (YYYY-MM-DD)" group:"Time"`
+	DeletedBefore  string `help:"Deleted before date (YYYY-MM-DD)" group:"Time"`
+	PlayedAfter    string `help:"Last played after date (YYYY-MM-DD)" group:"Time"`
+	PlayedBefore   string `help:"Last played before date (YYYY-MM-DD)" group:"Time"`
 
 	// Playback state filters
 	Watched      *bool  `help:"Filter by watched status (true/false)" group:"Filter"`
@@ -80,27 +111,27 @@ type GlobalFlags struct {
 	WithCaptions bool   `help:"Show only items with captions" group:"Filter"`
 
 	// Content type filters
-	VideoOnly       bool     `help:"Only video files" group:"Filter"`
-	AudioOnly       bool     `help:"Only audio files" group:"Filter"`
-	ImageOnly       bool     `help:"Only image files" group:"Filter"`
-	TextOnly        bool     `help:"Only text/ebook files" group:"Filter"`
-	Portrait        bool     `help:"Only portrait orientation files" group:"Filter"`
-	ScanSubtitles   bool     `help:"Scan for external subtitles during import" group:"Filter"`
-	OnlineMediaOnly bool     `help:"Exclude local media" group:"Filter"`
-	LocalMediaOnly  bool     `help:"Exclude online media" group:"Filter"`
+	VideoOnly       bool     `help:"Only video files" group:"MediaFilter"`
+	AudioOnly       bool     `help:"Only audio files" group:"MediaFilter"`
+	ImageOnly       bool     `help:"Only image files" group:"MediaFilter"`
+	TextOnly        bool     `help:"Only text/ebook files" group:"MediaFilter"`
+	Portrait        bool     `help:"Only portrait orientation files" group:"MediaFilter"`
+	ScanSubtitles   bool     `help:"Scan for external subtitles during import" group:"MediaFilter"`
+	OnlineMediaOnly bool     `help:"Exclude local media" group:"MediaFilter"`
+	LocalMediaOnly  bool     `help:"Exclude online media" group:"MediaFilter"`
 	FlexibleSearch  bool     `help:"Flexible search (fuzzy)" group:"Filter"`
 	Exact           bool     `help:"Exact match for search" group:"Filter"`
 	Where           []string `short:"w" help:"SQL where clause(s)" group:"Filter"`
 	Exists          bool     `help:"Filter out non-existent files" group:"Filter"`
 
-	MimeType   []string `help:"Filter by mimetype substring (e.g., video, mp4)" group:"Filter"`
-	NoMimeType []string `help:"Exclude by mimetype substring" group:"Filter"`
+	MimeType   []string `help:"Filter by mimetype substring (e.g., video, mp4)" group:"MediaFilter"`
+	NoMimeType []string `help:"Exclude by mimetype substring" group:"MediaFilter"`
 
-	NoDefaultCategories bool `help:"Disable default categories" group:"Filter"`
+	NoDefaultCategories bool `help:"Disable default categories" group:"MediaFilter"`
 
 	// Deleted status
-	HideDeleted bool `default:"true" help:"Exclude deleted files from results" group:"Filter"`
-	OnlyDeleted bool `help:"Include only deleted files in results" group:"Filter"`
+	HideDeleted bool `default:"true" help:"Exclude deleted files from results" group:"Deleted"`
+	OnlyDeleted bool `help:"Include only deleted files in results" group:"Deleted"`
 
 	// Siblings
 	FetchSiblings    string `short:"o" help:"Fetch siblings of matched files (each, all, if-audiobook)" group:"Filter"`
@@ -114,25 +145,25 @@ type GlobalFlags struct {
 
 	// Display
 	Columns   []string `short:"c" help:"Columns to display" group:"Display"`
-	BigDirs   bool     `short:"B" help:"Aggregate by parent directory" group:"Display"`
+	BigDirs   bool     `short:"B" help:"Aggregate by parent directory" group:"Aggregate"`
 	JSON      bool     `short:"j" help:"Output results as JSON" group:"Display"`
 	Summarize bool     `help:"Print aggregate statistics" group:"Display"`
 	Frequency string   `short:"f" help:"Group statistics by time frequency (daily, weekly, monthly, yearly)" group:"Display"`
 	TUI       bool     `help:"Interactive TUI mode" group:"Display"`
 
 	// Grouping
-	FileCounts        string   `help:"Filter by number of files in directory (e.g., >5, 10%1)" group:"Display"`
-	GroupByExtensions bool     `help:"Group by file extensions" group:"Display"`
-	GroupByMimeTypes  bool     `help:"Group by mimetypes" group:"Display"`
-	GroupBySize       bool     `help:"Group by size buckets" group:"Display"`
-	Depth             int      `short:"D" help:"Aggregate at specific directory depth" group:"Display"`
-	MinDepth          int      `default:"0" help:"Minimum depth for aggregation" group:"Display"`
-	MaxDepth          int      `help:"Maximum depth for aggregation" group:"Display"`
-	Parents           bool     `help:"Include parent directories in aggregation" group:"Display"`
-	FoldersOnly       bool     `help:"Only show folders" group:"Display"`
-	FilesOnly         bool     `help:"Only show files" group:"Display"`
-	FolderSizes       []string `help:"Filter folders by total size" group:"Display"`
-	FolderCounts      string   `help:"Filter folders by number of subfolders" group:"Display"`
+	FileCounts        string   `help:"Filter by number of files in directory (e.g., >5, 10%1)" group:"Aggregate"`
+	GroupByExtensions bool     `help:"Group by file extensions" group:"Aggregate"`
+	GroupByMimeTypes  bool     `help:"Group by mimetypes" group:"Aggregate"`
+	GroupBySize       bool     `help:"Group by size buckets" group:"Aggregate"`
+	Depth             int      `short:"D" help:"Aggregate at specific directory depth" group:"Aggregate"`
+	MinDepth          int      `default:"0" help:"Minimum depth for aggregation" group:"Aggregate"`
+	MaxDepth          int      `help:"Maximum depth for aggregation" group:"Aggregate"`
+	Parents           bool     `help:"Include parent directories in aggregation" group:"Aggregate"`
+	FoldersOnly       bool     `help:"Only show folders" group:"Aggregate"`
+	FilesOnly         bool     `help:"Only show files" group:"Aggregate"`
+	FolderSizes       []string `help:"Filter folders by total size" group:"Aggregate"`
+	FolderCounts      string   `help:"Filter folders by number of subfolders" group:"Aggregate"`
 
 	// Text processing and sorting (from regex_sort.py)
 	RegexSort  bool     `help:"Sort by splitting lines and sorting words" alias:"rs" group:"Text"`
@@ -195,39 +226,32 @@ type GlobalFlags struct {
 	PlayerArgsSub   []string `help:"Player arguments for videos with subtitles" group:"Playback"`
 	PlayerArgsNoSub []string `help:"Player arguments for videos without subtitles" group:"Playback"`
 
-	Cmd0   string `help:"Command to run if mpv exits with code 0" group:"Action"`
-	Cmd1   string `help:"Command to run if mpv exits with code 1" group:"Action"`
-	Cmd2   string `help:"Command to run if mpv exits with code 2" group:"Action"`
-	Cmd3   string `help:"Command to run if mpv exits with code 3" group:"Action"`
-	Cmd4   string `help:"Command to run if mpv exits with code 4" group:"Action"`
-	Cmd5   string `help:"Command to run if mpv exits with code 5" group:"Action"`
-	Cmd6   string `help:"Command to run if mpv exits with code 6" group:"Action"`
-	Cmd7   string `help:"Command to run if mpv exits with code 7" group:"Action"`
-	Cmd8   string `help:"Command to run if mpv exits with code 8" group:"Action"`
-	Cmd9   string `help:"Command to run if mpv exits with code 9" group:"Action"`
-	Cmd10  string `help:"Command to run if mpv exits with code 10" group:"Action"`
-	Cmd11  string `help:"Command to run if mpv exits with code 11" group:"Action"`
-	Cmd12  string `help:"Command to run if mpv exits with code 12" group:"Action"`
-	Cmd13  string `help:"Command to run if mpv exits with code 13" group:"Action"`
-	Cmd14  string `help:"Command to run if mpv exits with code 14" group:"Action"`
-	Cmd15  string `help:"Command to run if mpv exits with code 15" group:"Action"`
-	Cmd20  string `help:"Command to run if mpv exits with code 20" group:"Action"`
-	Cmd127 string `help:"Command to run if mpv exits with code 127" group:"Action"`
+	Cmd0   string `help:"Command to run if mpv exits with code 0" group:"MpvAction"`
+	Cmd1   string `help:"Command to run if mpv exits with code 1" group:"MpvAction"`
+	Cmd2   string `help:"Command to run if mpv exits with code 2" group:"MpvAction"`
+	Cmd3   string `help:"Command to run if mpv exits with code 3" group:"MpvAction"`
+	Cmd4   string `help:"Command to run if mpv exits with code 4" group:"MpvAction"`
+	Cmd5   string `help:"Command to run if mpv exits with code 5" group:"MpvAction"`
+	Cmd6   string `help:"Command to run if mpv exits with code 6" group:"MpvAction"`
+	Cmd7   string `help:"Command to run if mpv exits with code 7" group:"MpvAction"`
+	Cmd8   string `help:"Command to run if mpv exits with code 8" group:"MpvAction"`
+	Cmd9   string `help:"Command to run if mpv exits with code 9" group:"MpvAction"`
+	Cmd10  string `help:"Command to run if mpv exits with code 10" group:"MpvAction"`
+	Cmd11  string `help:"Command to run if mpv exits with code 11" group:"MpvAction"`
+	Cmd12  string `help:"Command to run if mpv exits with code 12" group:"MpvAction"`
+	Cmd13  string `help:"Command to run if mpv exits with code 13" group:"MpvAction"`
+	Cmd14  string `help:"Command to run if mpv exits with code 14" group:"MpvAction"`
+	Cmd15  string `help:"Command to run if mpv exits with code 15" group:"MpvAction"`
+	Cmd20  string `help:"Command to run if mpv exits with code 20" group:"MpvAction"`
+	Cmd127 string `help:"Command to run if mpv exits with code 127" group:"MpvAction"`
 
-	Interactive bool `short:"I" help:"Interactive decision making after playback" group:"Action"`
-	Trash       bool `help:"Trash files after action" group:"Action"`
+	Interactive bool `short:"I" help:"Interactive decision making after playback" group:"MpvAction"`
+	Trash       bool `help:"Trash files after action" group:"PostAction"`
 
 	// Hashing
 	HashGap       float64 `default:"0.1" help:"Gap between segments (0.0-1.0 as percentage of file size, or absolute bytes if >1)" group:"Hashing"`
 	HashChunkSize int64   `help:"Size of each segment to hash" group:"Hashing"`
 	HashThreads   int     `default:"1" help:"Number of threads to use for hashing a single file" group:"Hashing"`
-
-	// Syncweb
-	SyncwebURL      string `help:"Syncweb/Syncthing API URL" group:"Syncweb" env:"SYNCWEB_URL"`
-	SyncwebAPIKey   string `help:"Syncweb/Syncthing API Key" group:"Syncweb" env:"SYNCWEB_API_KEY"`
-	SyncwebHome     string `help:"Syncweb home directory" group:"Syncweb" env:"SYNCWEB_HOME"`
-	SyncwebPublic_  string `kong:"-" env:"SYNCWEB_PUBLIC"`
-	SyncwebPrivate_ string `kong:"-" env:"SYNCWEB_PRIVATE"`
 
 	// Chromecast
 	Cast          bool   `help:"Cast to chromecast groups" group:"Playback"`
@@ -245,25 +269,18 @@ type GlobalFlags struct {
 	SkipColumns       []string `help:"Columns to skip during merge" group:"Merge"`
 
 	// Actions
-	PostAction   string `help:"Post-action: none, delete, mark-deleted, move, copy" group:"Action"`
-	DeleteFiles  bool   `help:"Delete files after action" group:"Action"`
-	DeleteRows   bool   `help:"Delete rows from database" group:"Action"`
-	MarkDeleted  bool   `help:"Mark as deleted in database" group:"Action"`
-	MoveTo       string `help:"Move files to directory" group:"Action"`
-	CopyTo       string `help:"Copy files to directory" group:"Action"`
-	ActionLimit  int    `help:"Stop after N files" group:"Action"`
-	ActionSize   string `help:"Stop after N bytes (e.g., 10GB)" group:"Action"`
-	TrackHistory bool   `default:"true" help:"Track playback history" group:"Action"`
+	PostAction   string `help:"Post-action: none, delete, mark-deleted, move, copy" group:"PostAction"`
+	DeleteFiles  bool   `help:"Delete files after action" group:"PostAction"`
+	DeleteRows   bool   `help:"Delete rows from database" group:"PostAction"`
+	MarkDeleted  bool   `help:"Mark as deleted in database" group:"PostAction"`
+	MoveTo       string `help:"Move files to directory" group:"PostAction"`
+	CopyTo       string `help:"Copy files to directory" group:"PostAction"`
+	ActionLimit  int    `help:"Stop after N files" group:"PostAction"`
+	ActionSize   string `help:"Stop after N bytes (e.g., 10GB)" group:"PostAction"`
+	TrackHistory bool   `default:"true" help:"Track playback history" group:"PostAction"`
 
-	// Common options
-	Verbose      bool   `short:"v" help:"Enable verbose logging"`
-	Simulate     bool   `help:"Dry run; don't actually do anything"`
-	DryRun       bool   `kong:"-"` // Alias for Simulate
-	NoConfirm    bool   `short:"y" help:"Don't ask for confirmation"`
-	Yes          bool   `kong:"-"` // Alias for NoConfirm
-	Timeout      string `short:"T" help:"Quit after N minutes/seconds"`
-	Threads      int    `help:"Use N threads for parallel processing"`
-	IgnoreErrors bool   `short:"i" help:"Ignore errors and continue to next file"`
+	Threads      int  `help:"Use N threads for parallel processing"`
+	IgnoreErrors bool `short:"i" help:"Ignore errors and continue to next file"`
 }
 
 // ControlFlags are a subset of flags for simple control commands
@@ -273,12 +290,23 @@ type ControlFlags struct {
 	Verbose    bool   `short:"v" help:"Enable verbose logging"`
 }
 
-func (g *GlobalFlags) AfterApply() error {
-	if g.Simulate {
-		g.DryRun = true
+func (c *CoreFlags) AfterApply() error {
+	if c.Simulate {
+		c.DryRun = true
 	}
-	if g.NoConfirm {
-		g.Yes = true
+	if c.NoConfirm {
+		c.Yes = true
+	}
+	return nil
+}
+
+func (c *ControlFlags) AfterApply() error {
+	return nil
+}
+
+func (g *GlobalFlags) AfterApply() error {
+	if err := g.CoreFlags.AfterApply(); err != nil {
+		return err
 	}
 	if g.Ignore {
 		g.OnlyNewRows = true

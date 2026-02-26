@@ -1,0 +1,174 @@
+package query
+
+import (
+	"context"
+	"database/sql"
+	"fmt"
+	"os"
+	"strings"
+	"testing"
+
+	"github.com/chapmanjacobd/discotheque/internal/models"
+	_ "github.com/mattn/go-sqlite3"
+)
+
+func TestResolvePercentileFlags(t *testing.T) {
+	// Create a temporary database
+	f, _ := os.CreateTemp("", "percentile-test-*.db")
+	dbPath := f.Name()
+	f.Close()
+	defer os.Remove(dbPath)
+
+	dbConn, _ := sql.Open("sqlite3", dbPath)
+	defer dbConn.Close()
+
+	schema := `
+	CREATE TABLE media (
+		path TEXT PRIMARY KEY,
+		size INTEGER,
+		duration INTEGER,
+		time_deleted INTEGER DEFAULT 0
+	);
+	CREATE TABLE history (id INTEGER PRIMARY KEY AUTOINCREMENT, media_path TEXT NOT NULL, time_played INTEGER, playhead INTEGER, done INTEGER);
+	CREATE TABLE captions (media_path TEXT NOT NULL, time REAL, text TEXT);
+	`
+	dbConn.Exec(schema)
+
+	// Insert 100 items with increasing size and duration
+	for i := 1; i <= 100; i++ {
+		dbConn.Exec("INSERT INTO media (path, size, duration) VALUES (?, ?, ?)",
+			fmt.Sprintf("/dir%d/file%d.mp4", (i-1)/10, i), i*1000, i*10)
+	}
+
+	ctx := context.Background()
+	dbs := []string{dbPath}
+
+	t.Run("Size Percentile", func(t *testing.T) {
+		flags := models.GlobalFlags{
+			Size: []string{"p10-50"},
+		}
+		resolved, err := ResolvePercentileFlags(ctx, dbs, flags)
+		if err != nil {
+			t.Fatalf("ResolvePercentileFlags failed: %v", err)
+		}
+
+		// 10th percentile of 1000, 2000, ..., 100000 is approx 10000
+		// 50th percentile is approx 50000
+		// Our utils.Percentile uses index-based interpolation
+		// index = 10/100 * 99 = 9.9 -> sorted[9]*0.1 + sorted[10]*0.9 = 10000*0.1 + 11000*0.9 = 10900
+		// index = 50/100 * 99 = 49.5 -> sorted[49]*0.5 + sorted[50]*0.5 = 50000*0.5 + 51000*0.5 = 50500
+
+		foundMin := false
+		foundMax := false
+		for _, s := range resolved.Size {
+			if strings.HasPrefix(s, "+") {
+				foundMin = true
+			}
+			if strings.HasPrefix(s, "-") {
+				foundMax = true
+			}
+		}
+		if !foundMin || !foundMax {
+			t.Errorf("Expected min/max range in resolved flags, got %v", resolved.Size)
+		}
+
+		results, _ := MediaQuery(ctx, dbs, flags)
+		if len(results) == 0 {
+			t.Error("Expected results for percentile query")
+		}
+		for _, r := range results {
+			if *r.Size < 10000 || *r.Size > 51000 {
+				t.Errorf("Result size %d out of expected range", *r.Size)
+			}
+		}
+	})
+
+	t.Run("Duration Percentile", func(t *testing.T) {
+		flags := models.GlobalFlags{
+			Duration: []string{"p20-30"},
+		}
+		resolved, err := ResolvePercentileFlags(ctx, dbs, flags)
+		if err != nil {
+			t.Fatalf("ResolvePercentileFlags failed: %v", err)
+		}
+
+		foundMin := false
+		for _, d := range resolved.Duration {
+			if strings.HasPrefix(d, "+") {
+				foundMin = true
+			}
+		}
+		if !foundMin {
+			t.Errorf("Expected min range in resolved flags, got %v", resolved.Duration)
+		}
+	})
+
+	t.Run("Episodes Percentile", func(t *testing.T) {
+		// We have 10 directories with 10 files each
+		flags := models.GlobalFlags{
+			FileCounts: "p0-50",
+		}
+		resolved, err := ResolvePercentileFlags(ctx, dbs, flags)
+		if err != nil {
+			t.Fatalf("ResolvePercentileFlags failed: %v", err)
+		}
+
+		// All directories have count 10, so 0-50th percentile is still 10
+		if !strings.Contains(resolved.FileCounts, "10") {
+			t.Errorf("Expected count 10 in resolved FileCounts, got %s", resolved.FileCounts)
+		}
+
+		results, _ := MediaQuery(ctx, dbs, flags)
+		if len(results) != 100 {
+			t.Errorf("Expected 100 results (all match count 10), got %d", len(results))
+		}
+	})
+
+	t.Run("Specials Button (Absolute Count)", func(t *testing.T) {
+		flags := models.GlobalFlags{
+			FileCounts: "1",
+		}
+		// ResolvePercentileFlags should not change absolute values
+		resolved, err := ResolvePercentileFlags(ctx, dbs, flags)
+		if err != nil {
+			t.Fatalf("ResolvePercentileFlags failed: %v", err)
+		}
+
+		if resolved.FileCounts != "1" {
+			t.Errorf("Expected Specials absolute count '1', got %s", resolved.FileCounts)
+		}
+	})
+
+	t.Run("Stability Test (Global vs Dynamic)", func(t *testing.T) {
+		// Category filter that would change the distribution
+		flags := models.GlobalFlags{
+			Category: []string{"dir0"}, // only items 1-10
+			Size:     []string{"p0-100"},
+		}
+
+		// Resolved Size (p0-100) is currently kept as-is (dynamic at query builder time)
+		resolved, err := ResolvePercentileFlags(ctx, dbs, flags)
+		if err != nil {
+			t.Fatalf("ResolvePercentileFlags failed: %v", err)
+		}
+
+		t.Logf("Resolved p0-100 Size: %v", resolved.Size)
+
+		// Set (p10-50) -> Global
+		// Globally, size ranges from 1000 to 100000.
+		// p10 of global [1000, 2000, ..., 100000] is 10900.
+		flags.Size = []string{"p10-50"}
+		resolved, _ = ResolvePercentileFlags(ctx, dbs, flags)
+		t.Logf("Resolved p10-50 Size (Global): %v", resolved.Size)
+
+		has10900 := false
+		for _, s := range resolved.Size {
+			if s == "+10900" {
+				has10900 = true
+			}
+		}
+		if !has10900 {
+			t.Errorf("Expected global resolution for p10-50 (global p10 is 10900), got %v", resolved.Size)
+		}
+	})
+}

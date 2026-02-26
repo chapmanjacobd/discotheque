@@ -30,18 +30,19 @@ describe('Episodes View and Filter', () => {
     it('appends episodes filter to search query via sidebar', async () => {
         document.getElementById('details-episodes').open = true;
 
-        await vi.waitFor(() => {
-            const btn = document.querySelector('#episodes-list .category-btn');
-            expect(btn).not.toBeNull();
-        });
-
-        const btn = document.querySelector('#episodes-list .category-btn');
-        btn.click(); // Select "1 only"
+        // Test slider change
+        const minSlider = document.getElementById('episodes-min-slider');
+        const maxSlider = document.getElementById('episodes-max-slider');
+        
+        minSlider.value = 10;
+        maxSlider.value = 20;
+        minSlider.dispatchEvent(new Event('change'));
 
         await vi.waitFor(() => {
             const calls = global.fetch.mock.calls;
             const lastCall = calls[calls.length - 1];
-            expect(lastCall[0]).toContain('episodes=1');
+            // Now it should be percentile p10-20
+            expect(lastCall[0]).toContain('episodes=p10-20');
         });
     });
 });

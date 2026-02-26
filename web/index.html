@@ -72,21 +72,57 @@
 
             <details id="details-episodes">
                 <summary>Episodes</summary>
-                <div id="episodes-list" class="sidebar-buttons">
+                <div id="episodes-slider-container" class="sidebar-slider-container">
+                    <div class="slider-label"><span id="episodes-percentile-label"></span></div>
+                    <div class="range-slider">
+                        <div class="range-track"></div>
+                        <input type="range" id="episodes-min-slider" min="0" max="100" value="0">
+                        <input type="range" id="episodes-max-slider" min="0" max="100" value="100">
+                    </div>
+                    <div class="slider-footer">
+                        <span id="episodes-min-label"></span>
+                        <span id="episodes-max-label"></span>
+                    </div>
+                </div>
+                <div id="episodes-list" class="sidebar-buttons hidden">
                     <!-- Episode bins will be injected here -->
                 </div>
             </details>
 
             <details id="details-size">
                 <summary>File Size</summary>
-                <div id="size-list" class="sidebar-buttons">
+                <div id="size-slider-container" class="sidebar-slider-container">
+                    <div class="slider-label"><span id="size-percentile-label"></span></div>
+                    <div class="range-slider">
+                        <div class="range-track"></div>
+                        <input type="range" id="size-min-slider" min="0" max="100" value="0">
+                        <input type="range" id="size-max-slider" min="0" max="100" value="100">
+                    </div>
+                    <div class="slider-footer">
+                        <span id="size-min-label"></span>
+                        <span id="size-max-label"></span>
+                    </div>
+                </div>
+                <div id="size-list" class="sidebar-buttons hidden">
                     <!-- Size bins will be injected here -->
                 </div>
             </details>
 
             <details id="details-duration">
                 <summary>Duration</summary>
-                <div id="duration-list" class="sidebar-buttons">
+                <div id="duration-slider-container" class="sidebar-slider-container">
+                    <div class="slider-label"><span id="duration-percentile-label"></span></div>
+                    <div class="range-slider">
+                        <div class="range-track"></div>
+                        <input type="range" id="duration-min-slider" min="0" max="100" value="0">
+                        <input type="range" id="duration-max-slider" min="0" max="100" value="100">
+                    </div>
+                    <div class="slider-footer">
+                        <span id="duration-min-label"></span>
+                        <span id="duration-max-label"></span>
+                    </div>
+                </div>
+                <div id="duration-list" class="sidebar-buttons hidden">
                     <!-- Duration bins will be injected here -->
                 </div>
             </details>

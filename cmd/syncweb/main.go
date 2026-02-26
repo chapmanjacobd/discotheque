@@ -1,3 +1,5 @@
+//go:build syncweb
+
 package main
 
 import (
@@ -16,7 +18,8 @@ import (
 )
 
 type CLI struct {
-	models.GlobalFlags
+	models.CoreFlags
+	models.SyncwebFlags
 	Home string `help:"Base directory for syncweb metadata" env:"SYNCWEB_HOME" name:"home"`
 
 	Create    commands.SyncwebCreateCmd    `cmd:"" help:"Create a syncweb folder" aliases:"init,in,share"`
@@ -132,7 +135,8 @@ func main() {
 	}
 
 	// Update syncwebCmd with global flags from cli
-	syncwebCmd.GlobalFlags = cli.GlobalFlags
+	syncwebCmd.CoreFlags = cli.CoreFlags
+	syncwebCmd.SyncwebFlags = cli.SyncwebFlags
 	if cli.Home != "" {
 		syncwebCmd.SyncwebHome = cli.Home
 	}

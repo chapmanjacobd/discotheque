@@ -247,6 +247,123 @@ func (s *Syncweb) AddFolderDevice(folderID string, deviceID string) error {
 	return err
 }
 
+// AddFolderDevices shares a folder with multiple devices
+func (s *Syncweb) AddFolderDevices(folderID string, deviceIDs []string) error {
+	ids := make([]protocol.DeviceID, 0, len(deviceIDs))
+	for _, did := range deviceIDs {
+		id, err := protocol.DeviceIDFromString(did)
+		if err != nil {
+			return err
+		}
+		ids = append(ids, id)
+	}
+
+	_, err := s.Node.Cfg.Modify(func(cfg *config.Configuration) {
+		for i, fld := range cfg.Folders {
+			if fld.ID == folderID {
+				existing := make(map[protocol.DeviceID]bool)
+				for _, dev := range fld.Devices {
+					existing[dev.DeviceID] = true
+				}
+
+				for _, id := range ids {
+					if !existing[id] {
+						cfg.Folders[i].Devices = append(cfg.Folders[i].Devices, config.FolderDeviceConfiguration{
+							DeviceID: id,
+						})
+					}
+				}
+				return
+			}
+		}
+	})
+	return err
+}
+
+func (s *Syncweb) PauseFolder(id string) error {
+	_, err := s.Node.Cfg.Modify(func(cfg *config.Configuration) {
+		for i, f := range cfg.Folders {
+			if f.ID == id {
+				cfg.Folders[i].Paused = true
+				return
+			}
+		}
+	})
+	return err
+}
+
+func (s *Syncweb) ResumeFolder(id string) error {
+	_, err := s.Node.Cfg.Modify(func(cfg *config.Configuration) {
+		for i, f := range cfg.Folders {
+			if f.ID == id {
+				cfg.Folders[i].Paused = false
+				return
+			}
+		}
+	})
+	return err
+}
+
+func (s *Syncweb) DeleteFolder(id string) error {
+	_, err := s.Node.Cfg.Modify(func(cfg *config.Configuration) {
+		for i, f := range cfg.Folders {
+			if f.ID == id {
+				cfg.Folders = append(cfg.Folders[:i], cfg.Folders[i+1:]...)
+				return
+			}
+		}
+	})
+	return err
+}
+
+func (s *Syncweb) PauseDevice(id string) error {
+	devID, err := protocol.DeviceIDFromString(id)
+	if err != nil {
+		return err
+	}
+	_, err = s.Node.Cfg.Modify(func(cfg *config.Configuration) {
+		for i, d := range cfg.Devices {
+			if d.DeviceID == devID {
+				cfg.Devices[i].Paused = true
+				return
+			}
+		}
+	})
+	return err
+}
+
+func (s *Syncweb) ResumeDevice(id string) error {
+	devID, err := protocol.DeviceIDFromString(id)
+	if err != nil {
+		return err
+	}
+	_, err = s.Node.Cfg.Modify(func(cfg *config.Configuration) {
+		for i, d := range cfg.Devices {
+			if d.DeviceID == devID {
+				cfg.Devices[i].Paused = false
+				return
+			}
+		}
+	})
+	return err
+}
+
+func (s *Syncweb) DeleteDevice(id string) error {
+	devID, err := protocol.DeviceIDFromString(id)
+	if err != nil {
+		return err
+	}
+	_, err = s.Node.Cfg.Modify(func(cfg *config.Configuration) {
+		for i, d := range cfg.Devices {
+			if d.DeviceID == devID {
+				cfg.Devices = append(cfg.Devices[:i], cfg.Devices[i+1:]...)
+				return
+			}
+		}
+	})
+	return err
+}
+
 // GetFolders returns a map of folder ID to local path
 func (s *Syncweb) GetFolders() map[string]string {
 	folders := make(map[string]string)

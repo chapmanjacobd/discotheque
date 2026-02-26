@@ -43,12 +43,16 @@ type PrintCmd struct {
 	ScanPaths []string `kong:"-"`
 }
 
-func (c PrintCmd) IsQueryTrait()   {}
-func (c PrintCmd) IsFilterTrait()  {}
-func (c PrintCmd) IsSortTrait()    {}
-func (c PrintCmd) IsDisplayTrait() {}
-func (c PrintCmd) IsTextTrait()    {}
-func (c PrintCmd) IsFTSTrait()     {}
+func (c PrintCmd) IsQueryTrait()       {}
+func (c PrintCmd) IsFilterTrait()      {}
+func (c PrintCmd) IsTimeTrait()        {}
+func (c PrintCmd) IsMediaFilterTrait() {}
+func (c PrintCmd) IsPathFilterTrait()  {}
+func (c PrintCmd) IsDeletedTrait()     {}
+func (c PrintCmd) IsSortTrait()        {}
+func (c PrintCmd) IsDisplayTrait()     {}
+func (c PrintCmd) IsTextTrait()        {}
+func (c PrintCmd) IsFTSTrait()         {}
 
 func (c *PrintCmd) AfterApply() error {
 	if err := c.GlobalFlags.AfterApply(); err != nil {
@@ -168,9 +172,12 @@ type DiskUsageCmd struct {
 	ScanPaths []string `kong:"-"`
 }
 
-func (c DiskUsageCmd) IsFilterTrait()  {}
-func (c DiskUsageCmd) IsSortTrait()    {}
-func (c DiskUsageCmd) IsDisplayTrait() {}
+func (c DiskUsageCmd) IsFilterTrait()      {}
+func (c DiskUsageCmd) IsTimeTrait()        {}
+func (c DiskUsageCmd) IsMediaFilterTrait() {}
+func (c DiskUsageCmd) IsPathFilterTrait()  {}
+func (c DiskUsageCmd) IsAggregateTrait()   {}
+func (c DiskUsageCmd) IsDisplayTrait()     {}
 
 func (c *DiskUsageCmd) AfterApply() error {
 	if err := c.GlobalFlags.AfterApply(); err != nil {
@@ -257,6 +264,8 @@ type SimilarFilesCmd struct {
 }
 
 func (c SimilarFilesCmd) IsFilterTrait()     {}
+func (c SimilarFilesCmd) IsTimeTrait()       {}
+func (c SimilarFilesCmd) IsContentTrait()    {}
 func (c SimilarFilesCmd) IsSortTrait()       {}
 func (c SimilarFilesCmd) IsDisplayTrait()    {}
 func (c SimilarFilesCmd) IsSimilarityTrait() {}
@@ -297,6 +306,8 @@ type SimilarFoldersCmd struct {
 }
 
 func (c SimilarFoldersCmd) IsFilterTrait()     {}
+func (c SimilarFoldersCmd) IsTimeTrait()       {}
+func (c SimilarFoldersCmd) IsContentTrait()    {}
 func (c SimilarFoldersCmd) IsSortTrait()       {}
 func (c SimilarFoldersCmd) IsDisplayTrait()    {}
 func (c SimilarFoldersCmd) IsSimilarityTrait() {}
@@ -358,13 +369,18 @@ type WatchCmd struct {
 	Databases []string `arg:"" required:"" help:"SQLite database files" type:"existingfile"`
 }
 
-func (c WatchCmd) IsQueryTrait()    {}
-func (c WatchCmd) IsFilterTrait()   {}
-func (c WatchCmd) IsSortTrait()     {}
-func (c WatchCmd) IsDisplayTrait()  {}
-func (c WatchCmd) IsPlaybackTrait() {}
-func (c WatchCmd) IsActionTrait()   {}
-func (c WatchCmd) IsFTSTrait()      {}
+func (c WatchCmd) IsQueryTrait()       {}
+func (c WatchCmd) IsFilterTrait()      {}
+func (c WatchCmd) IsTimeTrait()        {}
+func (c WatchCmd) IsMediaFilterTrait() {}
+func (c WatchCmd) IsPathFilterTrait()  {}
+func (c WatchCmd) IsDeletedTrait()     {}
+func (c WatchCmd) IsSortTrait()        {}
+func (c WatchCmd) IsDisplayTrait()     {}
+func (c WatchCmd) IsPlaybackTrait()    {}
+func (c WatchCmd) IsPostActionTrait()  {}
+func (c WatchCmd) IsMpvActionTrait()   {}
+func (c WatchCmd) IsFTSTrait()         {}
 
 func (c *WatchCmd) Run(ctx *kong.Context) error {
 	models.SetupLogging(c.Verbose)
@@ -534,13 +550,18 @@ type ListenCmd struct {
 	Databases []string `arg:"" required:"" help:"SQLite database files" type:"existingfile"`
 }
 
-func (c ListenCmd) IsQueryTrait()    {}
-func (c ListenCmd) IsFilterTrait()   {}
-func (c ListenCmd) IsSortTrait()     {}
-func (c ListenCmd) IsDisplayTrait()  {}
-func (c ListenCmd) IsPlaybackTrait() {}
-func (c ListenCmd) IsActionTrait()   {}
-func (c ListenCmd) IsFTSTrait()      {}
+func (c ListenCmd) IsQueryTrait()       {}
+func (c ListenCmd) IsFilterTrait()      {}
+func (c ListenCmd) IsTimeTrait()        {}
+func (c ListenCmd) IsMediaFilterTrait() {}
+func (c ListenCmd) IsPathFilterTrait()  {}
+func (c ListenCmd) IsDeletedTrait()     {}
+func (c ListenCmd) IsSortTrait()        {}
+func (c ListenCmd) IsDisplayTrait()     {}
+func (c ListenCmd) IsPlaybackTrait()    {}
+func (c ListenCmd) IsPostActionTrait()  {}
+func (c ListenCmd) IsMpvActionTrait()   {}
+func (c ListenCmd) IsFTSTrait()         {}
 
 func (c *ListenCmd) Run(ctx *kong.Context) error {
 	models.SetupLogging(c.Verbose)
@@ -662,9 +683,11 @@ type OpenCmd struct {
 	Databases []string `arg:"" required:"" help:"SQLite database files" type:"existingfile"`
 }
 
-func (c OpenCmd) IsFilterTrait() {}
-func (c OpenCmd) IsSortTrait()   {}
-func (c OpenCmd) IsActionTrait() {}
+func (c OpenCmd) IsFilterTrait()      {}
+func (c OpenCmd) IsPathFilterTrait()  {}
+func (c OpenCmd) IsMediaFilterTrait() {}
+func (c OpenCmd) IsSortTrait()        {}
+func (c OpenCmd) IsPostActionTrait()  {}
 
 func (c *OpenCmd) Run(ctx *kong.Context) error {
 	models.SetupLogging(c.Verbose)
@@ -704,7 +727,10 @@ type BrowseCmd struct {
 	Browser   string   `help:"Browser to use"`
 }
 
-func (c BrowseCmd) IsFilterTrait() {}
+func (c BrowseCmd) IsFilterTrait()      {}
+func (c BrowseCmd) IsPathFilterTrait()  {}
+func (c BrowseCmd) IsMediaFilterTrait() {}
+func (c BrowseCmd) IsSortTrait()        {}
 
 func (c *BrowseCmd) Run(ctx *kong.Context) error {
 	models.SetupLogging(c.Verbose)
@@ -742,8 +768,12 @@ type StatsCmd struct {
 	Databases []string `arg:"" required:"" help:"SQLite database files" type:"existingfile"`
 }
 
-func (c StatsCmd) IsFilterTrait()  {}
-func (c StatsCmd) IsDisplayTrait() {}
+func (c StatsCmd) IsFilterTrait()      {}
+func (c StatsCmd) IsPathFilterTrait()  {}
+func (c StatsCmd) IsTimeTrait()        {}
+func (c StatsCmd) IsMediaFilterTrait() {}
+func (c StatsCmd) IsDeletedTrait()     {}
+func (c StatsCmd) IsDisplayTrait()     {}
 
 func (c *StatsCmd) Run(ctx *kong.Context) error {
 	models.SetupLogging(c.Verbose)
@@ -887,11 +917,15 @@ type SearchCmd struct {
 	Databases []string `arg:"" required:"" help:"SQLite database files" type:"existingfile"`
 }
 
-func (c SearchCmd) IsQueryTrait()   {}
-func (c SearchCmd) IsFilterTrait()  {}
-func (c SearchCmd) IsSortTrait()    {}
-func (c SearchCmd) IsDisplayTrait() {}
-func (c SearchCmd) IsFTSTrait()     {}
+func (c SearchCmd) IsQueryTrait()       {}
+func (c SearchCmd) IsFilterTrait()      {}
+func (c SearchCmd) IsTimeTrait()        {}
+func (c SearchCmd) IsMediaFilterTrait() {}
+func (c SearchCmd) IsPathFilterTrait()  {}
+func (c SearchCmd) IsDeletedTrait()     {}
+func (c SearchCmd) IsSortTrait()        {}
+func (c SearchCmd) IsDisplayTrait()     {}
+func (c SearchCmd) IsFTSTrait()         {}
 
 func (c *SearchCmd) Run(ctx *kong.Context) error {
 	models.SetupLogging(c.Verbose)
@@ -941,11 +975,15 @@ type HistoryCmd struct {
 	Databases []string `arg:"" required:"" help:"SQLite database files" type:"existingfile"`
 }
 
-func (c HistoryCmd) IsHistoryTrait() {}
-func (c HistoryCmd) IsFilterTrait()  {}
-func (c HistoryCmd) IsSortTrait()    {}
-func (c HistoryCmd) IsDisplayTrait() {}
-func (c HistoryCmd) IsActionTrait()  {}
+func (c HistoryCmd) IsHistoryTrait()     {}
+func (c HistoryCmd) IsFilterTrait()      {}
+func (c HistoryCmd) IsPathFilterTrait()  {}
+func (c HistoryCmd) IsTimeTrait()        {}
+func (c HistoryCmd) IsMediaFilterTrait() {}
+func (c HistoryCmd) IsDeletedTrait()     {}
+func (c HistoryCmd) IsSortTrait()        {}
+func (c HistoryCmd) IsDisplayTrait()     {}
+func (c HistoryCmd) IsPostActionTrait()  {}
 
 func HideRedundantFirstPlayed(media []models.MediaWithDB) {
 	for i := range media {
@@ -1122,8 +1160,8 @@ type AddCmd struct {
 	Database  string   `kong:"-"`
 }
 
-func (c AddCmd) IsFilterTrait() {}
-func (c AddCmd) IsActionTrait() {}
+func (c AddCmd) IsFilterTrait()      {}
+func (c AddCmd) IsMediaFilterTrait() {}
 
 func (c *AddCmd) AfterApply() error {
 	if err := c.GlobalFlags.AfterApply(); err != nil {
@@ -1367,7 +1405,8 @@ type CheckCmd struct {
 	Databases  []string `kong:"-"`
 }
 
-func (c CheckCmd) IsFilterTrait() {}
+func (c CheckCmd) IsFilterTrait()      {}
+func (c CheckCmd) IsMediaFilterTrait() {}
 
 func (c *CheckCmd) AfterApply() error {
 	if err := c.GlobalFlags.AfterApply(); err != nil {
@@ -1889,8 +1928,12 @@ type DedupeCmd struct {
 	Databases []string `arg:"" required:"" help:"SQLite database files" type:"existingfile"`
 }
 
-func (c DedupeCmd) IsFilterTrait() {}
-func (c DedupeCmd) IsDedupeTrait() {}
+func (c DedupeCmd) IsFilterTrait()      {}
+func (c DedupeCmd) IsTimeTrait()        {}
+func (c DedupeCmd) IsMediaFilterTrait() {}
+func (c DedupeCmd) IsPathFilterTrait()  {}
+func (c DedupeCmd) IsDeletedTrait()     {}
+func (c DedupeCmd) IsDedupeTrait()      {}
 
 type DedupeDuplicate struct {
 	KeepPath      string
@@ -2227,7 +2270,12 @@ type MpvWatchlaterCmd struct {
 	Databases []string `arg:"" required:"" help:"SQLite database files" type:"existingfile"`
 }
 
-func (c MpvWatchlaterCmd) IsHistoryTrait() {}
+func (c MpvWatchlaterCmd) IsHistoryTrait()     {}
+func (c MpvWatchlaterCmd) IsFilterTrait()      {}
+func (c MpvWatchlaterCmd) IsMediaFilterTrait() {}
+func (c MpvWatchlaterCmd) IsPathFilterTrait()  {}
+func (c MpvWatchlaterCmd) IsTimeTrait()        {}
+func (c MpvWatchlaterCmd) IsDeletedTrait()     {}
 
 func (c *MpvWatchlaterCmd) Run(ctx *kong.Context) error {
 	models.SetupLogging(c.Verbose)

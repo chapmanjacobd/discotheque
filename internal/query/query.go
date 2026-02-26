@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log/slog"
 	"math"
 	"math/rand"
 	"path/filepath"
@@ -444,7 +445,63 @@ func OverrideSort(s string) string {
 }
 
 // MediaQuery executes a query against multiple databases concurrently
+func GetGlobalParentCounts(ctx context.Context, dbs []string) (map[string]int64, error) {
+	counts := make(map[string]int64)
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+
+	for _, dbPath := range dbs {
+		wg.Add(1)
+		go func(path string) {
+			defer wg.Done()
+			sqlDB, err := db.Connect(path)
+			if err != nil {
+				return
+			}
+			defer sqlDB.Close()
+
+			rows, err := sqlDB.QueryContext(ctx, "SELECT path FROM media WHERE COALESCE(time_deleted, 0) = 0")
+			if err != nil {
+				return
+			}
+			defer rows.Close()
+
+			localCounts := make(map[string]int64)
+			for rows.Next() {
+				var p string
+				if err := rows.Scan(&p); err == nil {
+					localCounts[filepath.Dir(p)]++
+				}
+			}
+
+			mu.Lock()
+			for k, v := range localCounts {
+				counts[k] += v
+			}
+			mu.Unlock()
+		}(dbPath)
+	}
+	wg.Wait()
+	return counts, nil
+}
+
 func MediaQuery(ctx context.Context, dbs []string, flags models.GlobalFlags) ([]models.MediaWithDB, error) {
+	origLimit := flags.Limit
+	origOffset := flags.Offset
+	isEpisodic := flags.FileCounts != ""
+
+	if isEpisodic {
+		// Fetch everything matching other filters so we can count directories accurately
+		flags.All = true
+		flags.Limit = 0
+		flags.Offset = 0
+	}
+
+	resolvedFlags, err := ResolvePercentileFlags(ctx, dbs, flags)
+	if err == nil {
+		flags = resolvedFlags
+	}
+
 	qb := NewQueryBuilder(flags)
 	query, args := qb.Build()
 
@@ -484,8 +541,41 @@ func MediaQuery(ctx context.Context, dbs []string, flags models.GlobalFlags) ([]
 		return allMedia, fmt.Errorf("query errors: %v", errs)
 	}
 
-	if flags.FileCounts != "" {
-		allMedia = FilterEpisodic(allMedia, flags.FileCounts)
+	if isEpisodic {
+		// 1. Get total counts for ALL non-deleted files globally
+		globalParentCounts, err := GetGlobalParentCounts(ctx, dbs)
+		if err != nil {
+			return nil, err
+		}
+
+		r, err := utils.ParseRange(flags.FileCounts, func(s string) (int64, error) {
+			return strconv.ParseInt(s, 10, 64)
+		})
+
+		if err == nil {
+			var filtered []models.MediaWithDB
+			for _, m := range allMedia {
+				count := globalParentCounts[m.Parent()]
+				if r.Matches(count) {
+					filtered = append(filtered, m)
+				}
+			}
+			allMedia = filtered
+		}
+
+		// Apply sorting again because merging results from different DBs might break global order
+		SortMedia(allMedia, flags)
+
+		// Apply original limit/offset
+		if origOffset > 0 {
+			if origOffset >= len(allMedia) {
+				return []models.MediaWithDB{}, nil
+			}
+			allMedia = allMedia[origOffset:]
+		}
+		if origLimit > 0 && len(allMedia) > origLimit {
+			allMedia = allMedia[:origLimit]
+		}
 	}
 
 	if flags.FetchSiblings != "" {
@@ -499,8 +589,211 @@ func MediaQuery(ctx context.Context, dbs []string, flags models.GlobalFlags) ([]
 	return allMedia, nil
 }
 
+func ResolvePercentileFlags(ctx context.Context, dbs []string, flags models.GlobalFlags) (models.GlobalFlags, error) {
+	hasPSize := false
+	pSizeSet := false
+	for _, s := range flags.Size {
+		if min, max, ok := utils.ParsePercentileRange(s); ok {
+			hasPSize = true
+			if min != 0 || max != 100 {
+				pSizeSet = true
+			}
+		}
+	}
+
+	hasPDuration := false
+	pDurationSet := false
+	for _, d := range flags.Duration {
+		if min, max, ok := utils.ParsePercentileRange(d); ok {
+			hasPDuration = true
+			if min != 0 || max != 100 {
+				pDurationSet = true
+			}
+		}
+	}
+
+	hasPEpisodes := false
+	pEpisodesSet := false
+	if min, max, ok := utils.ParsePercentileRange(flags.FileCounts); ok {
+		hasPEpisodes = true
+		if min != 0 || max != 100 {
+			pEpisodesSet = true
+		}
+	}
+
+	if !hasPSize && !hasPDuration && !hasPEpisodes {
+		return flags, nil
+	}
+
+	// Helper to get values for a field
+	getValues := func(field string, global bool) ([]int64, error) {
+		var tempFlags models.GlobalFlags
+		if global {
+			tempFlags = models.GlobalFlags{
+				HideDeleted: flags.HideDeleted,
+				OnlyDeleted: flags.OnlyDeleted,
+			}
+		} else {
+			tempFlags = flags
+			// Clear all percentile filters to avoid nested resolution or circular dependencies
+			var cleanSize []string
+			for _, s := range flags.Size {
+				if _, _, ok := utils.ParsePercentileRange(s); !ok {
+					cleanSize = append(cleanSize, s)
+				}
+			}
+			tempFlags.Size = cleanSize
+
+			var cleanDuration []string
+			for _, d := range flags.Duration {
+				if _, _, ok := utils.ParsePercentileRange(d); !ok {
+					cleanDuration = append(cleanDuration, d)
+				}
+			}
+			tempFlags.Duration = cleanDuration
+
+			if _, _, ok := utils.ParsePercentileRange(flags.FileCounts); ok {
+				tempFlags.FileCounts = ""
+			}
+		}
+		// We need to disable limits to get the full distribution
+		tempFlags.All = true
+		tempFlags.Limit = 0
+
+		qb := NewQueryBuilder(tempFlags)
+		var sqlQuery string
+		var args []any
+		if field == "episodes" {
+			sqlQuery, args = qb.BuildSelect("path")
+		} else {
+			sqlQuery, args = qb.BuildSelect(field)
+		}
+
+		var values []int64
+		var mu sync.Mutex
+		var wg sync.WaitGroup
+		for _, dbPath := range dbs {
+			wg.Add(1)
+			go func(path string) {
+				defer wg.Done()
+				sqlDB, err := db.Connect(path)
+				if err != nil {
+					return
+				}
+				defer sqlDB.Close()
+
+				rows, err := sqlDB.QueryContext(ctx, sqlQuery, args...)
+				if err != nil {
+					return
+				}
+				defer rows.Close()
+
+				if field == "episodes" {
+					var gCounts map[string]int64
+					var err error
+					if global {
+						gCounts, err = GetGlobalParentCounts(ctx, dbs)
+					} else {
+						// Filtered counts
+						gCounts = make(map[string]int64)
+						for rows.Next() {
+							var p string
+							if err := rows.Scan(&p); err == nil {
+								gCounts[filepath.Dir(p)]++
+							}
+						}
+					}
+
+					if err == nil {
+						mu.Lock()
+						for _, c := range gCounts {
+							values = append(values, c)
+						}
+						mu.Unlock()
+					}
+				} else {
+					var localValues []int64
+					for rows.Next() {
+						var v sql.NullInt64
+						if err := rows.Scan(&v); err == nil && v.Valid {
+							localValues = append(localValues, v.Int64)
+						}
+					}
+					mu.Lock()
+					values = append(values, localValues...)
+					mu.Unlock()
+				}
+			}(dbPath)
+		}
+		wg.Wait()
+		return values, nil
+	}
+
+	if hasPSize {
+		values, err := getValues("size", pSizeSet)
+		if err == nil && len(values) > 0 {
+			var newSize []string
+			for _, s := range flags.Size {
+				if min, max, ok := utils.ParsePercentileRange(s); ok {
+					minVal := int64(utils.Percentile(values, min))
+					maxVal := int64(utils.Percentile(values, max))
+					newSize = append(newSize, fmt.Sprintf("+%d", minVal))
+					newSize = append(newSize, fmt.Sprintf("-%d", maxVal))
+				} else {
+					newSize = append(newSize, s)
+				}
+			}
+			flags.Size = newSize
+		}
+	}
+
+	if hasPDuration {
+		values, err := getValues("duration", pDurationSet)
+		if err == nil && len(values) > 0 {
+			var newDuration []string
+			for _, d := range flags.Duration {
+				if min, max, ok := utils.ParsePercentileRange(d); ok {
+					minVal := int64(utils.Percentile(values, min))
+					maxVal := int64(utils.Percentile(values, max))
+					newDuration = append(newDuration, fmt.Sprintf("+%d", minVal))
+					newDuration = append(newDuration, fmt.Sprintf("-%d", maxVal))
+				} else {
+					newDuration = append(newDuration, d)
+				}
+			}
+			flags.Duration = newDuration
+		}
+	}
+
+	if hasPEpisodes {
+		values, err := getValues("episodes", pEpisodesSet)
+		if err == nil && len(values) > 0 {
+			if min, max, ok := utils.ParsePercentileRange(flags.FileCounts); ok {
+				minVal := int64(utils.Percentile(values, min))
+				maxVal := int64(utils.Percentile(values, max))
+				flags.FileCounts = fmt.Sprintf("+%d,-%d", minVal, maxVal)
+			}
+		}
+	}
+
+	return flags, nil
+}
+
 // MediaQueryCount executes a count query against multiple databases concurrently
 func MediaQueryCount(ctx context.Context, dbs []string, flags models.GlobalFlags) (int64, error) {
+	if flags.FileCounts != "" {
+		// We must fetch all results to count episodic matches across multiple DBs correctly
+		tempFlags := flags
+		tempFlags.All = true
+		tempFlags.Limit = 0
+		tempFlags.Offset = 0
+		allMedia, err := MediaQuery(ctx, dbs, tempFlags)
+		if err != nil {
+			return 0, err
+		}
+		return int64(len(allMedia)), nil
+	}
+
 	qb := NewQueryBuilder(flags)
 	query, args := qb.BuildCount()
 
@@ -628,47 +921,6 @@ func FetchSiblings(ctx context.Context, media []models.MediaWithDB, flags models
 	}
 
 	return allSiblings, nil
-}
-
-// FilterEpisodic filters media based on the number of files in its directory
-func FilterEpisodic(media []models.MediaWithDB, criteria string) []models.MediaWithDB {
-	parts := strings.Split(criteria, ",")
-	var ranges []utils.Range
-
-	for _, p := range parts {
-		r, err := utils.ParseRange(p, func(s string) (int64, error) {
-			return strconv.ParseInt(s, 10, 64)
-		})
-		if err == nil {
-			ranges = append(ranges, r)
-		}
-	}
-
-	if len(ranges) == 0 {
-		return media
-	}
-
-	counts := make(map[string]int64)
-	for _, m := range media {
-		parent := m.Parent()
-		counts[parent]++
-	}
-
-	filtered := []models.MediaWithDB{}
-	for _, m := range media {
-		count := counts[m.Parent()]
-		matched := false
-		for _, r := range ranges {
-			if r.Matches(count) {
-				matched = true
-				break
-			}
-		}
-		if matched {
-			filtered = append(filtered, m)
-		}
-	}
-	return filtered
 }
 
 func QueryDatabase(ctx context.Context, dbPath, query string, args []any) ([]models.MediaWithDB, error) {

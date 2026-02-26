@@ -61,7 +61,9 @@ func TestFullHashFile(t *testing.T) {
 }
 
 func TestSimulationFunctions(t *testing.T) {
-	flags := models.GlobalFlags{Simulate: true}
+	flags := models.GlobalFlags{
+		CoreFlags: models.CoreFlags{Simulate: true},
+	}
 	if err := Rename(flags, "src", "dst"); err != nil {
 		t.Errorf("Rename failed in simulation: %v", err)
 	}

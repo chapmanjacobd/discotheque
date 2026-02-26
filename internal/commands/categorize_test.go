@@ -23,6 +23,9 @@ func TestCategorizeCmd_Run(t *testing.T) {
 	sqlDB.Exec("INSERT INTO media (path, title) VALUES (?, ?)", f1, "Football Match")
 	sqlDB.Exec("INSERT INTO media (path, title) VALUES (?, ?)", f2, "Go Programming")
 	sqlDB.Exec("INSERT INTO media (path, title) VALUES (?, ?)", f3, "Just a file")
+
+	// Add custom keyword since default categories are now disabled by default
+	sqlDB.Exec("INSERT INTO custom_keywords (category, keyword) VALUES (?, ?)", "sports", "football")
 	sqlDB.Close()
 
 	t.Run("ApplyCategories", func(t *testing.T) {
@@ -36,12 +39,12 @@ func TestCategorizeCmd_Run(t *testing.T) {
 		// Verify categorization
 		sqlDB, _ = sql.Open("sqlite3", dbPath)
 		defer sqlDB.Close()
-		var cat string
+		var cat sql.NullString
 		err := sqlDB.QueryRow("SELECT categories FROM media WHERE path = ?", f1).Scan(&cat)
 		if err != nil {
 			t.Fatalf("Query failed: %v", err)
 		}
-		if cat == "" {
+		if !cat.Valid || cat.String == "" {
 			t.Error("Expected categories for football_match.mp4")
 		}
 	})

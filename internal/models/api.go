@@ -56,6 +56,17 @@ type FilterBinsResponse struct {
 	Episodes []FilterBin `json:"episodes"`
 	Size     []FilterBin `json:"size"`
 	Duration []FilterBin `json:"duration"`
+
+	EpisodesMin int64 `json:"episodes_min"`
+	EpisodesMax int64 `json:"episodes_max"`
+	SizeMin     int64 `json:"size_min"`
+	SizeMax     int64 `json:"size_max"`
+	DurationMin int64 `json:"duration_min"`
+	DurationMax int64 `json:"duration_max"`
+
+	EpisodesPercentiles []int64 `json:"episodes_percentiles"`
+	SizePercentiles     []int64 `json:"size_percentiles"`
+	DurationPercentiles []int64 `json:"duration_percentiles"`
 }
 
 type PlaylistResponse []string

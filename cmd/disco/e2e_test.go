@@ -238,10 +238,13 @@ Another caption here.
 
 	// 2. Run AddCmd with ScanSubtitles enabled
 	addCmd := &commands.AddCmd{
-		GlobalFlags: models.GlobalFlags{ScanSubtitles: true, Verbose: true},
-		Database:    fixture.DBPath,
-		Args:        []string{fixture.DBPath, videoPath},
-		Parallel:    1,
+		GlobalFlags: models.GlobalFlags{
+			CoreFlags:     models.CoreFlags{Verbose: true},
+			ScanSubtitles: true,
+		},
+		Database: fixture.DBPath,
+		Args:     []string{fixture.DBPath, videoPath},
+		Parallel: 1,
 	}
 	// We need to call AfterApply to set up Internal fields correctly
 	if err := addCmd.AfterApply(); err != nil {

@@ -27,8 +27,8 @@ func TestDedupeCmd_Run(t *testing.T) {
 		cmd := &DedupeCmd{
 			Databases: []string{dbPath},
 			GlobalFlags: models.GlobalFlags{
+				CoreFlags: models.CoreFlags{NoConfirm: true},
 				TitleOnly: true,
-				NoConfirm: true,
 			},
 		}
 		if err := cmd.Run(nil); err != nil {
@@ -40,8 +40,8 @@ func TestDedupeCmd_Run(t *testing.T) {
 		cmd := &DedupeCmd{
 			Databases: []string{dbPath},
 			GlobalFlags: models.GlobalFlags{
+				CoreFlags:    models.CoreFlags{NoConfirm: true},
 				DurationOnly: true,
-				NoConfirm:    true,
 			},
 		}
 		if err := cmd.Run(nil); err != nil {

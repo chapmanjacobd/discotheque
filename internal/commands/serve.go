@@ -24,30 +24,37 @@ import (
 	database "github.com/chapmanjacobd/discotheque/internal/db"
 	"github.com/chapmanjacobd/discotheque/internal/models"
 	"github.com/chapmanjacobd/discotheque/internal/query"
-	"github.com/chapmanjacobd/discotheque/internal/syncweb"
 	"github.com/chapmanjacobd/discotheque/internal/utils"
 	"github.com/chapmanjacobd/discotheque/web"
 )
 
+type LsEntry struct {
+	Name  string `json:"name"`
+	Path  string `json:"path"`
+	IsDir bool   `json:"is_dir"`
+	Type  string `json:"type,omitempty"`
+	Local bool   `json:"local"`
+}
+
 type ServeCmd struct {
 	models.GlobalFlags
-	Databases            []string         `arg:"" required:"" help:"SQLite database files" type:"existingfile"`
-	Port                 int              `short:"p" default:"5555" help:"Port to listen on"`
-	PublicDir            string           `help:"Override embedded web assets with local directory"`
-	Dev                  bool             `help:"Enable development mode (auto-reload)"`
-	Trashcan             bool             `help:"Enable trash/recycle page and empty bin functionality"`
-	ReadOnly             bool             `help:"Disable server-side progress tracking and playlist modifications"`
-	ApplicationStartTime int64            `kong:"-"`
-	thumbnailCache       sync.Map         `kong:"-"`
-	dbCache              sync.Map         `kong:"-"`
-	hasFfmpeg            bool             `kong:"-"`
-	swInstance           *syncweb.Syncweb `kong:"-"`
+	Databases            []string `arg:"" required:"" help:"SQLite database files" type:"existingfile"`
+	Port                 int      `short:"p" default:"5555" help:"Port to listen on"`
+	PublicDir            string   `help:"Override embedded web assets with local directory"`
+	Dev                  bool     `help:"Enable development mode (auto-reload)"`
+	Trashcan             bool     `help:"Enable trash/recycle page and empty bin functionality"`
+	ReadOnly             bool     `help:"Disable server-side progress tracking and playlist modifications"`
+	ApplicationStartTime int64    `kong:"-"`
+	thumbnailCache       sync.Map `kong:"-"`
+	dbCache              sync.Map `kong:"-"`
+	hasFfmpeg            bool     `kong:"-"`
 }
 
 func (c *ServeCmd) IsQueryTrait()    {}
 func (c *ServeCmd) IsFilterTrait()   {}
 func (c *ServeCmd) IsSortTrait()     {}
 func (c *ServeCmd) IsPlaybackTrait() {}
+func (c *ServeCmd) IsSyncwebTrait()  {}
 
 func (c *ServeCmd) Mux() http.Handler {
 	mux := http.NewServeMux()
@@ -163,17 +170,7 @@ func (c *ServeCmd) Run(ctx *kong.Context) error {
 	c.ApplicationStartTime = time.Now().UnixNano()
 
 	// Initialize internal Syncweb instance
-	sw, err := syncweb.NewSyncweb(c.SyncwebHome, "disco-syncweb", c.SyncwebPublic_, c.SyncwebPrivate_, "")
-	if err != nil {
-		slog.Warn("Failed to initialize Syncweb instance", "error", err)
-	} else {
-		c.swInstance = sw
-		if err := sw.Start(); err != nil {
-			slog.Error("Failed to start Syncweb instance", "error", err)
-		} else {
-			slog.Info("Syncweb instance started", "myID", sw.Node.MyID())
-		}
-	}
+	c.setupSyncweb()
 
 	for _, dbPath := range c.Databases {
 		sqlDB, err := database.Connect(dbPath)
@@ -266,16 +263,7 @@ func (c *ServeCmd) handleCategories(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// 3. Add default categories if they don't exist yet and not disabled
-	if !c.NoDefaultCategories {
-		for cat := range models.DefaultCategories {
-			if _, ok := counts[cat]; !ok {
-				counts[cat] = 0
-			}
-		}
-	}
-
-	// 4. Add Uncategorized count
+	// 3. Add Uncategorized count
 	for _, dbPath := range c.Databases {
 		c.execDB(r.Context(), dbPath, func(sqlDB *sql.DB) error {
 			var count int64
@@ -289,11 +277,6 @@ func (c *ServeCmd) handleCategories(w http.ResponseWriter, r *http.Request) {
 
 	var res []models.CatStat
 	for k, v := range counts {
-		if c.NoDefaultCategories && !isCustom[k] {
-			if _, isDefault := models.DefaultCategories[k]; isDefault {
-				continue
-			}
-		}
 		res = append(res, models.CatStat{Category: k, Count: v})
 	}
 
@@ -421,6 +404,9 @@ func (c *ServeCmd) parseFlags(r *http.Request) models.GlobalFlags {
 	if durations := q["duration"]; len(durations) > 0 {
 		flags.Duration = append(flags.Duration, durations...)
 	}
+	if episodes := q.Get("episodes"); episodes != "" {
+		flags.FileCounts = episodes
+	}
 	if minScore := q.Get("min_score"); minScore != "" {
 		flags.Where = append(flags.Where, "score >= "+minScore)
 	}
@@ -492,6 +478,12 @@ func (c *ServeCmd) handleQuery(w http.ResponseWriter, r *http.Request) {
 
 	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
 	defer cancel()
+
+	// Pre-resolve percentiles so Count matches Query results
+	resolvedFlags, err := query.ResolvePercentileFlags(ctx, c.Databases, flags)
+	if err == nil {
+		flags = resolvedFlags
+	}
 
 	if q.Get("view") == "captions" {
 		var media []models.MediaWithDB
@@ -897,27 +889,10 @@ func (c *ServeCmd) handleLs(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	type LsEntry struct {
-		Name  string `json:"name"`
-		Path  string `json:"path"`
-		IsDir bool   `json:"is_dir"`
-		Type  string `json:"type,omitempty"`
-	}
-
 	resultsMap := make(map[string]LsEntry)
 	counts := make(map[string]int)
 
-	if c.swInstance != nil && (path == "/" || path == "") {
-		for id, localPath := range c.swInstance.GetFolders() {
-			entryPath := fmt.Sprintf("syncweb://%s/", id)
-			resultsMap[entryPath] = LsEntry{
-				Name:  id + " (" + filepath.Base(localPath) + ")",
-				Path:  entryPath,
-				IsDir: true,
-			}
-			counts[entryPath] = 1000 // High priority for roots
-		}
-	}
+	c.addSyncwebRoots(resultsMap, counts, path)
 
 	for _, dbPath := range c.Databases {
 		err := c.execDB(r.Context(), dbPath, func(sqlDB *sql.DB) error {
@@ -1172,17 +1147,25 @@ func (c *ServeCmd) handleFilterBins(w http.ResponseWriter, r *http.Request) {
 	var mu sync.Mutex
 	resp := models.FilterBinsResponse{}
 
-	calculateBins := func(filterToIgnore string) ([]int64, []int64, map[string]int64) {
-		tempFlags := flags
-		// Deep copy Where slice to avoid side effects
-		tempFlags.Where = append([]string{}, flags.Where...)
+	calculateBins := func(filterToIgnore string, isGlobal bool) ([]int64, []int64, map[string]int64) {
+		var tempFlags models.GlobalFlags
+		if isGlobal {
+			tempFlags = models.GlobalFlags{
+				HideDeleted: flags.HideDeleted,
+				OnlyDeleted: flags.OnlyDeleted,
+			}
+		} else {
+			tempFlags = flags
+			// Deep copy Where slice to avoid side effects
+			tempFlags.Where = append([]string{}, flags.Where...)
 
-		if filterToIgnore == "size" {
-			tempFlags.Size = nil
-		} else if filterToIgnore == "duration" {
-			tempFlags.Duration = nil
-		} else if filterToIgnore == "episodes" {
-			tempFlags.FileCounts = ""
+			if filterToIgnore == "size" {
+				tempFlags.Size = nil
+			} else if filterToIgnore == "duration" {
+				tempFlags.Duration = nil
+			} else if filterToIgnore == "episodes" {
+				tempFlags.FileCounts = ""
+			}
 		}
 
 		var sizes []int64
@@ -1238,116 +1221,130 @@ func (c *ServeCmd) handleFilterBins(w http.ResponseWriter, r *http.Request) {
 		return sizes, durations, parentCounts
 	}
 
-	// 1. Episodes Bins (6 quantiles)
-	if !q.Has("episodes") {
-		_, _, parentCounts := calculateBins("episodes")
-		var epsGT1 []int64
-		for _, c := range parentCounts {
-			if c > 1 {
-				epsGT1 = append(epsGT1, c)
+	// 1. Episodes Bins
+	epSet := q.Has("episodes")
+	_, _, parentCounts := calculateBins("episodes", epSet)
+	var allEps []int64
+	var epsGT1 []int64
+	for _, c := range parentCounts {
+		allEps = append(allEps, c)
+		if c > 1 {
+			epsGT1 = append(epsGT1, c)
+		}
+	}
+	if len(allEps) > 0 {
+		resp.EpisodesMin = slices.Min(allEps)
+		resp.EpisodesMax = slices.Max(allEps)
+	}
+
+	resp.Episodes = append(resp.Episodes, models.FilterBin{Label: "Specials", Value: 1})
+	if len(epsGT1) > 0 {
+		q1 := int64(utils.Percentile(epsGT1, 16.6))
+		q2 := int64(utils.Percentile(epsGT1, 33.3))
+		q3 := int64(utils.Percentile(epsGT1, 50.0))
+		q4 := int64(utils.Percentile(epsGT1, 66.6))
+		q5 := int64(utils.Percentile(epsGT1, 83.3))
+		maxEps := int64(utils.Percentile(epsGT1, 100))
+
+		rawBins := []int64{2, q1, q2, q3, q4, q5, maxEps}
+		slices.Sort(rawBins)
+
+		uniqueBins := []int64{rawBins[0]}
+		for i := 1; i < len(rawBins); i++ {
+			if rawBins[i] > uniqueBins[len(uniqueBins)-1] {
+				uniqueBins = append(uniqueBins, rawBins[i])
 			}
 		}
 
-		resp.Episodes = append(resp.Episodes, models.FilterBin{Label: "Specials", Value: 1})
-		if len(epsGT1) > 0 {
-			q1 := int64(utils.Percentile(epsGT1, 16.6))
-			q2 := int64(utils.Percentile(epsGT1, 33.3))
-			q3 := int64(utils.Percentile(epsGT1, 50.0))
-			q4 := int64(utils.Percentile(epsGT1, 66.6))
-			q5 := int64(utils.Percentile(epsGT1, 83.3))
-			maxEps := int64(utils.Percentile(epsGT1, 100))
-
-			rawBins := []int64{2, q1, q2, q3, q4, q5, maxEps}
-			slices.Sort(rawBins)
-
-			uniqueBins := []int64{rawBins[0]}
-			for i := 1; i < len(rawBins); i++ {
-				if rawBins[i] > uniqueBins[len(uniqueBins)-1] {
-					uniqueBins = append(uniqueBins, rawBins[i])
-				}
+		for i := 0; i < len(uniqueBins)-1; i++ {
+			minE := uniqueBins[i]
+			maxE := uniqueBins[i+1]
+			displayMin := minE
+			if i > 0 {
+				displayMin = uniqueBins[i] + 1
 			}
+			if displayMin > maxE {
+				continue
+			}
+			if displayMin == maxE {
+				resp.Episodes = append(resp.Episodes, models.FilterBin{Label: fmt.Sprintf("%d", displayMin), Value: displayMin})
+			} else {
+				resp.Episodes = append(resp.Episodes, models.FilterBin{Label: fmt.Sprintf("%d-%d", displayMin, maxE), Min: displayMin, Max: maxE})
+			}
+		}
+		lastMax := uniqueBins[len(uniqueBins)-1]
+		alreadyAdded := false
+		if len(resp.Episodes) > 0 {
+			lastBin := resp.Episodes[len(resp.Episodes)-1]
+			if lastBin.Max == lastMax || lastBin.Value == lastMax {
+				alreadyAdded = true
+			}
+		}
+		if !alreadyAdded {
+			resp.Episodes = append(resp.Episodes, models.FilterBin{Label: fmt.Sprintf("%d+", lastMax), Min: lastMax})
+		}
+	}
 
-			for i := 0; i < len(uniqueBins)-1; i++ {
-				minE := uniqueBins[i]
-				maxE := uniqueBins[i+1]
-				displayMin := minE
-				if i > 0 {
-					displayMin = uniqueBins[i] + 1
-				}
-				if displayMin > maxE {
-					continue
-				}
-				if displayMin == maxE {
-					resp.Episodes = append(resp.Episodes, models.FilterBin{Label: fmt.Sprintf("%d", displayMin), Value: displayMin})
-				} else {
-					resp.Episodes = append(resp.Episodes, models.FilterBin{Label: fmt.Sprintf("%d-%d", displayMin, maxE), Min: displayMin, Max: maxE})
-				}
-			}
-			lastMax := uniqueBins[len(uniqueBins)-1]
-			alreadyAdded := false
-			if len(resp.Episodes) > 0 {
-				lastBin := resp.Episodes[len(resp.Episodes)-1]
-				if lastBin.Max == lastMax || lastBin.Value == lastMax {
-					alreadyAdded = true
-				}
-			}
-			if !alreadyAdded {
-				resp.Episodes = append(resp.Episodes, models.FilterBin{Label: fmt.Sprintf("%d+", lastMax), Min: lastMax})
+	// 2. File Size Bins
+	sizeSet := q.Has("size") || q.Has("min_size") || q.Has("max_size")
+	sizes, _, _ := calculateBins("size", sizeSet)
+	if len(sizes) > 0 {
+		resp.SizeMin = slices.Min(sizes)
+		resp.SizeMax = slices.Max(sizes)
+
+		p16 := int64(utils.Percentile(sizes, 16.6))
+		p33 := int64(utils.Percentile(sizes, 33.3))
+		p50 := int64(utils.Percentile(sizes, 50.0))
+		p66 := int64(utils.Percentile(sizes, 66.6))
+		p83 := int64(utils.Percentile(sizes, 83.3))
+		maxS := int64(utils.Percentile(sizes, 100))
+
+		sbins := []int64{0, p16, p33, p50, p66, p83, maxS}
+		for i := 0; i < len(sbins)-1; i++ {
+			minS := sbins[i]
+			maxS := sbins[i+1]
+			if i == 0 {
+				resp.Size = append(resp.Size, models.FilterBin{Label: "less than " + utils.FormatSize(maxS), Max: maxS})
+			} else if i == len(sbins)-2 {
+				resp.Size = append(resp.Size, models.FilterBin{Label: utils.FormatSize(minS) + "+", Min: minS})
+			} else {
+				resp.Size = append(resp.Size, models.FilterBin{Label: utils.FormatSize(minS) + " - " + utils.FormatSize(maxS), Min: minS, Max: maxS})
 			}
 		}
 	}
 
-	// 2. File Size Bins (6 quantiles)
-	if !q.Has("size") {
-		sizes, _, _ := calculateBins("size")
-		if len(sizes) > 0 {
-			p16 := int64(utils.Percentile(sizes, 16.6))
-			p33 := int64(utils.Percentile(sizes, 33.3))
-			p50 := int64(utils.Percentile(sizes, 50.0))
-			p66 := int64(utils.Percentile(sizes, 66.6))
-			p83 := int64(utils.Percentile(sizes, 83.3))
-			maxS := int64(utils.Percentile(sizes, 100))
+	// 3. Duration Bins
+	durSet := q.Has("duration") || q.Has("min_duration") || q.Has("max_duration")
+	_, durations, _ := calculateBins("duration", durSet)
+	if len(durations) > 0 {
+		resp.DurationMin = slices.Min(durations)
+		resp.DurationMax = slices.Max(durations)
 
-			sbins := []int64{0, p16, p33, p50, p66, p83, maxS}
-			for i := 0; i < len(sbins)-1; i++ {
-				minS := sbins[i]
-				maxS := sbins[i+1]
-				if i == 0 {
-					resp.Size = append(resp.Size, models.FilterBin{Label: "less than " + utils.FormatSize(maxS), Max: maxS})
-				} else if i == len(sbins)-2 {
-					resp.Size = append(resp.Size, models.FilterBin{Label: utils.FormatSize(minS) + "+", Min: minS})
-				} else {
-					resp.Size = append(resp.Size, models.FilterBin{Label: utils.FormatSize(minS) + " - " + utils.FormatSize(maxS), Min: minS, Max: maxS})
-				}
+		p16 := int64(utils.Percentile(durations, 16.6))
+		p33 := int64(utils.Percentile(durations, 33.3))
+		p50 := int64(utils.Percentile(durations, 50.0))
+		p66 := int64(utils.Percentile(durations, 66.6))
+		p83 := int64(utils.Percentile(durations, 83.3))
+		maxD := int64(utils.Percentile(durations, 100))
+
+		dbins := []int64{0, p16, p33, p50, p66, p83, maxD}
+		for i := 0; i < len(dbins)-1; i++ {
+			minD := dbins[i]
+			maxD := dbins[i+1]
+			if i == 0 {
+				resp.Duration = append(resp.Duration, models.FilterBin{Label: "under " + utils.FormatDuration(int(maxD)), Max: maxD})
+			} else if i == len(dbins)-2 {
+				resp.Duration = append(resp.Duration, models.FilterBin{Label: utils.FormatDuration(int(minD)) + "+", Min: minD})
+			} else {
+				resp.Duration = append(resp.Duration, models.FilterBin{Label: utils.FormatDuration(int(minD)) + " - " + utils.FormatDuration(int(maxD)), Min: minD, Max: maxD})
 			}
 		}
 	}
 
-	// 3. Duration Bins (6 quantiles)
-	if !q.Has("duration") {
-		_, durations, _ := calculateBins("duration")
-		if len(durations) > 0 {
-			p16 := int64(utils.Percentile(durations, 16.6))
-			p33 := int64(utils.Percentile(durations, 33.3))
-			p50 := int64(utils.Percentile(durations, 50.0))
-			p66 := int64(utils.Percentile(durations, 66.6))
-			p83 := int64(utils.Percentile(durations, 83.3))
-			maxD := int64(utils.Percentile(durations, 100))
-
-			dbins := []int64{0, p16, p33, p50, p66, p83, maxD}
-			for i := 0; i < len(dbins)-1; i++ {
-				minD := dbins[i]
-				maxD := dbins[i+1]
-				if i == 0 {
-					resp.Duration = append(resp.Duration, models.FilterBin{Label: "under " + utils.FormatDuration(int(maxD)), Max: maxD})
-				} else if i == len(dbins)-2 {
-					resp.Duration = append(resp.Duration, models.FilterBin{Label: utils.FormatDuration(int(minD)) + "+", Min: minD})
-				} else {
-					resp.Duration = append(resp.Duration, models.FilterBin{Label: utils.FormatDuration(int(minD)) + " - " + utils.FormatDuration(int(maxD)), Min: minD, Max: maxD})
-				}
-			}
-		}
-	}
+	// 4. Percentile Mappings for Sliders
+	resp.EpisodesPercentiles = utils.CalculatePercentiles(allEps)
+	resp.SizePercentiles = utils.CalculatePercentiles(sizes)
+	resp.DurationPercentiles = utils.CalculatePercentiles(durations)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(resp)
@@ -1745,6 +1742,12 @@ func (c *ServeCmd) handleCategorizeApply(w http.ResponseWriter, r *http.Request)
 	}
 	compiled := cmd.CompileRegexes()
 
+	if len(compiled) == 0 {
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprintf(w, `{"count": 0}`)
+		return
+	}
+
 	count := 0
 	for _, m := range allMedia {
 		foundCategories := []string{}
@@ -1816,12 +1819,8 @@ func (c *ServeCmd) handleRaw(w http.ResponseWriter, r *http.Request) {
 	var folderID string
 
 	if isSyncweb {
-		if c.swInstance == nil {
-			http.Error(w, "Syncweb not configured", http.StatusInternalServerError)
-			return
-		}
 		var err error
-		localPath, folderID, err = c.swInstance.ResolveLocalPath(path)
+		localPath, folderID, err = c.resolveSyncwebPath(path)
 		if err != nil {
 			slog.Error("Failed to resolve syncweb path", "path", path, "error", err)
 			http.Error(w, "Invalid syncweb path", http.StatusBadRequest)
@@ -1890,14 +1889,7 @@ func (c *ServeCmd) handleRaw(w http.ResponseWriter, r *http.Request) {
 		slog.Debug("Serving local file", "path", localPath)
 		http.ServeFile(w, r, localPath)
 	} else {
-		slog.Info("Serving remote Syncweb file via block pulling", "path", path)
-		rs, err := c.swInstance.NewReadSeeker(r.Context(), folderID, strings.TrimPrefix(path, "syncweb://"+folderID+"/"))
-		if err != nil {
-			slog.Error("Failed to create SyncwebReadSeeker", "path", path, "error", err)
-			http.Error(w, "Failed to stream remote file", http.StatusInternalServerError)
-			return
-		}
-		http.ServeContent(w, r, filepath.Base(localPath), time.Now(), rs)
+		c.serveSyncwebContent(w, r, folderID, path, localPath)
 	}
 }
 
@@ -2881,123 +2873,4 @@ func (c *ServeCmd) handleHLSSegment(w http.ResponseWriter, r *http.Request) {
 			slog.Error("HLS transcoding failed", "path", path, "index", index, "error", err)
 		}
 	}
-}
-
-func (c *ServeCmd) handleSyncwebFolders(w http.ResponseWriter, r *http.Request) {
-	if c.swInstance == nil {
-		http.Error(w, "Syncweb not configured", http.StatusServiceUnavailable)
-		return
-	}
-
-	folders := make([]map[string]string, 0)
-	for id, path := range c.swInstance.GetFolders() {
-		folders = append(folders, map[string]string{
-			"id":   id,
-			"path": path,
-		})
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(folders)
-}
-
-func (c *ServeCmd) handleSyncwebLs(w http.ResponseWriter, r *http.Request) {
-	if c.swInstance == nil {
-		http.Error(w, "Syncweb not configured", http.StatusServiceUnavailable)
-		return
-	}
-
-	folderID := r.URL.Query().Get("folder")
-	prefix := r.URL.Query().Get("prefix")
-	if prefix != "" && !strings.HasSuffix(prefix, "/") {
-		prefix += "/"
-	}
-
-	seq, cancel := c.swInstance.Node.App.Internals.AllGlobalFiles(folderID)
-	defer cancel()
-
-	type LsEntry struct {
-		Name  string `json:"name"`
-		Path  string `json:"path"`
-		IsDir bool   `json:"is_dir"`
-		Type  string `json:"type,omitempty"`
-		Local bool   `json:"local"`
-	}
-
-	resultsMap := make(map[string]LsEntry)
-	for meta := range seq {
-		name := meta.Name
-		if !strings.HasPrefix(name, prefix) || name == prefix {
-			continue
-		}
-
-		rel := strings.TrimPrefix(name, prefix)
-		parts := strings.Split(rel, "/")
-		entryName := parts[0]
-		isDir := len(parts) > 1
-
-		fullSyncwebPath := fmt.Sprintf("syncweb://%s/%s", folderID, filepath.Join(prefix, entryName))
-		if _, ok := resultsMap[fullSyncwebPath]; ok {
-			continue
-		}
-
-		localPath, _, _ := c.swInstance.ResolveLocalPath(fullSyncwebPath)
-		isLocal := utils.FileExists(localPath)
-
-		entry := LsEntry{
-			Name:  entryName,
-			Path:  fullSyncwebPath,
-			IsDir: isDir,
-			Local: isLocal,
-		}
-		if !isDir {
-			entry.Type = utils.DetectMimeType(entryName)
-		}
-		resultsMap[fullSyncwebPath] = entry
-	}
-
-	results := make([]LsEntry, 0, len(resultsMap))
-	for _, entry := range resultsMap {
-		results = append(results, entry)
-	}
-
-	sort.Slice(results, func(i, j int) bool {
-		if results[i].IsDir != results[j].IsDir {
-			return results[i].IsDir
-		}
-		return results[i].Name < results[j].Name
-	})
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(results)
-}
-
-func (c *ServeCmd) handleSyncwebDownload(w http.ResponseWriter, r *http.Request) {
-	if c.swInstance == nil {
-		http.Error(w, "Syncweb not configured", http.StatusServiceUnavailable)
-		return
-	}
-
-	path := r.URL.Query().Get("path")
-	if path == "" {
-		http.Error(w, "Path required", http.StatusBadRequest)
-		return
-	}
-
-	localPath, folderID, err := c.swInstance.ResolveLocalPath(path)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	relativePath, _ := filepath.Rel(c.swInstance.GetFolders()[folderID], localPath)
-
-	if err := c.swInstance.Unignore(folderID, relativePath); err != nil {
-		slog.Error("Syncweb download trigger failed", "path", path, "error", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	w.WriteHeader(http.StatusAccepted)
-	fmt.Fprintln(w, "Download triggered")
 }

@@ -86,4 +86,40 @@ describe('Smart Seek (Duration Growing)', () => {
 
         vi.useRealTimers();
     });
+
+    it('mutes during seek and restores after', async () => {
+        const video = document.createElement('video');
+        let currentDuration = 10;
+        const targetPos = 50;
+
+        Object.defineProperty(video, 'duration', { get: () => currentDuration });
+        
+        video.muted = false; // Initial state
+        window.disco.state.playback.muted = false;
+
+        vi.useFakeTimers();
+        window.disco.seekToProgress(video, targetPos);
+
+        // Should be muted immediately
+        expect(video.muted).toBe(true);
+
+        // Advance to completion
+        currentDuration = 60;
+        await vi.advanceTimersByTimeAsync(334);
+
+        // Should be unmuted (restored to false)
+        expect(video.muted).toBe(false);
+
+        // Test restoration to TRUE if it was already true
+        video.muted = true;
+        window.disco.state.playback.muted = true;
+        currentDuration = 10;
+        window.disco.seekToProgress(video, targetPos);
+        expect(video.muted).toBe(true);
+        currentDuration = 60;
+        await vi.advanceTimersByTimeAsync(334);
+        expect(video.muted).toBe(true);
+
+        vi.useRealTimers();
+    });
 });

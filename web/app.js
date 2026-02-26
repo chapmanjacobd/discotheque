@@ -48,6 +48,28 @@ document.addEventListener('DOMContentLoaded', () => {
     const syncwebList = document.getElementById('syncweb-list');
     const detailsSyncweb = document.getElementById('details-syncweb');
 
+    // Percentile Sliders
+    const episodesMinSlider = document.getElementById('episodes-min-slider');
+    const episodesMaxSlider = document.getElementById('episodes-max-slider');
+    const episodesLabel = document.getElementById('episodes-percentile-label');
+
+    const sizeMinSlider = document.getElementById('size-min-slider');
+    const sizeMaxSlider = document.getElementById('size-max-slider');
+    const sizeLabel = document.getElementById('size-percentile-label');
+
+    const durationMinSlider = document.getElementById('duration-min-slider');
+    const durationMaxSlider = document.getElementById('duration-max-slider');
+    const durationLabel = document.getElementById('duration-percentile-label');
+
+    const epMinLabel = document.getElementById('episodes-min-label');
+    const epMaxLabel = document.getElementById('episodes-max-label');
+    const sizeMinLabel = document.getElementById('size-min-label');
+    const sizeMaxLabel = document.getElementById('size-max-label');
+    const durMinLabel = document.getElementById('duration-min-label');
+    const durMaxLabel = document.getElementById('duration-max-label');
+
+    const settingTrackShuffleDuration = document.getElementById('setting-track-shuffle-duration');
+
     const pipSpeedBtn = document.getElementById('pip-speed');
     const pipSpeedMenu = document.getElementById('pip-speed-menu');
     const filterBrowseCol = document.getElementById('filter-browse-col');
@@ -115,15 +137,21 @@ document.addEventListener('DOMContentLoaded', () => {
         categories: [],
         genres: [],
         ratings: [],
-        filterBins: null,
+        filterBins: {
+            episodes: [], size: [], duration: [],
+            episodes_min: 0, episodes_max: 100,
+            size_min: 0, size_max: 100 * 1024 * 1024,
+            duration_min: 0, duration_max: 3600
+        },
         playlists: [], // String array of titles
         playlistItems: [], // Cache for client-side filtering
-        sidebarState: JSON.parse(localStorage.getItem('disco-sidebar-state') || '{"details-categories": true}'),
+        sidebarState: JSON.parse(localStorage.getItem('disco-sidebar-state') || '{}'),
         lastSuggestions: [],
         playback: {
             item: null,
             timer: null,
             slideshowTimer: null,
+            surfTimer: null,
             startTime: null,
             lastUpdate: 0,
             lastLocalUpdate: 0,
@@ -133,9 +161,129 @@ document.addEventListener('DOMContentLoaded', () => {
             skipTimeout: null,
             lastSkipTime: 0,
             hlsInstance: null,
-            toastTimer: null
+            toastTimer: null,
+            muted: localStorage.getItem('disco-muted') === 'true'
         }
     };
+
+    function formatSliderValue(type, val) {
+        return Math.round(val).toString() + '%';
+    }
+
+        function updateSliderLabels() {
+            const updateRange = (minSlider, maxSlider, label, minF, maxF, type) => {
+            if (!minSlider || !state.filterBins) return;
+            
+            const minP = parseInt(minSlider.value);
+            const maxP = parseInt(maxSlider.value);
+            
+            const percentiles = state.filterBins[`${type}_percentiles`] || [];
+            const getVal = (p) => {
+                if (percentiles.length > p) return percentiles[p];
+                
+                // Fallback to linear if percentiles missing
+                let minTotal = 0, maxTotal = 0;
+                if (type === 'episodes') { minTotal = state.filterBins.episodes_min; maxTotal = state.filterBins.episodes_max; }
+                else if (type === 'size') { minTotal = state.filterBins.size_min; maxTotal = state.filterBins.size_max; }
+                else if (type === 'duration') { minTotal = state.filterBins.duration_min; maxTotal = state.filterBins.duration_max; }
+                return minTotal + (maxTotal - minTotal) * (p / 100);
+            };
+
+            const valMin = getVal(minP);
+            const valMax = getVal(maxP);
+
+            const format = (v) => {
+                if (type === 'size') return formatSize(v);
+                if (type === 'duration') return formatDuration(v);
+                return Math.round(v).toString();
+            };
+
+            if (label) label.textContent = `${format(valMin)} - ${format(valMax)}`;
+            
+            if (minF) minF.textContent = format(getVal(0));
+            if (maxF) maxF.textContent = format(getVal(100));
+
+            const track = minSlider.parentElement.querySelector('.range-track');
+            if (track) {
+                track.style.background = `linear-gradient(to right,
+                    var(--border-color) ${minP}%,
+                    var(--accent-color) ${minP}%,
+                    var(--accent-color) ${maxP}%,
+                    var(--border-color) ${maxP}%)`;
+            }
+        };
+
+        updateRange(episodesMinSlider, episodesMaxSlider, episodesLabel, epMinLabel, epMaxLabel, 'episodes');
+        updateRange(sizeMinSlider, sizeMaxSlider, sizeLabel, sizeMinLabel, sizeMaxLabel, 'size');
+        updateRange(durationMinSlider, durationMaxSlider, durationLabel, durMinLabel, durMaxLabel, 'duration');
+    }
+
+    function handleSliderChange(type, minP, maxP) {
+        let filterKey = '';
+        let lsKey = '';
+
+        if (!state.filterBins) return;
+
+        if (type === 'episodes') { filterKey = 'episodes'; lsKey = 'disco-filter-episodes'; }
+        else if (type === 'size') { filterKey = 'sizes'; lsKey = 'disco-filter-sizes'; }
+        else if (type === 'duration') { filterKey = 'durations'; lsKey = 'disco-filter-durations'; }
+
+        if (!filterKey) return;
+
+        // Use percentiles for population weighting and correct filtering
+        state.filters[filterKey] = [{
+            label: `${minP}-${maxP}%`,
+            value: `@p`,
+            min: parseInt(minP),
+            max: parseInt(maxP)
+        }];
+
+        localStorage.setItem(lsKey, JSON.stringify(state.filters[filterKey]));
+        updateSliderLabels();
+        performSearch();
+    }
+
+    const initSlider = (minSlider, maxSlider, type, filterKey, isEpisodes = false) => {
+        if (!minSlider) return;
+
+        // Restore from state
+        const filter = state.filters[filterKey] && state.filters[filterKey].find(f => f.value === '@p' || f.value === '@abs');
+        if (filter) {
+            if (filter.value === '@p') {
+                minSlider.value = filter.min;
+                maxSlider.value = filter.max;
+            }
+            // @abs is handled in fetchFilterBins because we need the current distribution
+        }
+
+        const onInput = (e) => {
+            let min = parseInt(minSlider.value);
+            let max = parseInt(maxSlider.value);
+
+            if (min > max) {
+                if (e.target === minSlider) {
+                    maxSlider.value = min;
+                } else {
+                    minSlider.value = max;
+                }
+            }
+            updateSliderLabels();
+        };
+
+        minSlider.oninput = onInput;
+        maxSlider.oninput = onInput;
+        minSlider.onchange = () => {
+            handleSliderChange(type, minSlider.value, maxSlider.value);
+        };
+        maxSlider.onchange = () => {
+            handleSliderChange(type, minSlider.value, maxSlider.value);
+        };
+    };
+
+    initSlider(episodesMinSlider, episodesMaxSlider, 'episodes', 'episodes', true);
+    initSlider(sizeMinSlider, sizeMaxSlider, 'size', 'sizes');
+    initSlider(durationMinSlider, durationMaxSlider, 'duration', 'durations');
+    updateSliderLabels();
 
     // Initialize UI from state
     document.getElementById('setting-player').value = state.player;
@@ -150,7 +298,6 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('setting-default-video-rate').value = state.defaultVideoRate;
     document.getElementById('setting-default-audio-rate').value = state.defaultAudioRate;
     document.getElementById('setting-slideshow-delay').value = state.slideshowDelay;
-    const settingTrackShuffleDuration = document.getElementById('setting-track-shuffle-duration');
     if (settingTrackShuffleDuration) settingTrackShuffleDuration.value = state.trackShuffleDuration;
     if (limitInput) limitInput.value = state.filters.limit;
     if (limitAll) limitAll.checked = state.filters.all;
@@ -175,7 +322,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (currentType.startsWith('video')) type = 'video';
                     else if (currentType.startsWith('audio')) type = 'audio';
                     else if (currentType.startsWith('image')) type = 'image';
-                    else if (currentType.startsWith('text')) type = 'text';
+                    else if (currentType.startsWith('text') || currentType.includes('pdf') || currentType.includes('epub') || currentType.includes('mobi')) type = 'text';
                 }
 
                 const params = new URLSearchParams();
@@ -186,8 +333,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 params.append('duration', duration);
 
                 const resp = await fetch(`/api/random-clip?${params.toString()}`);
-                if (!resp.ok) throw new Error('Failed to fetch random clip');
+                if (!resp.ok) {
+                    if (resp.status === 404) {
+                        showToast(`No more ${type || 'media'} found to surf.`, 'ℹ️');
+                        return;
+                    }
+                    throw new Error('Failed to fetch random clip');
+                }
                 const data = await resp.json();
+                if (!data || !data.path) {
+                    showToast(`No more ${type || 'media'} found to surf.`, 'ℹ️');
+                    return;
+                }
 
                 // Show toast about what's playing
                 const filename = data.path.split('/').pop();
@@ -215,13 +372,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 } else {
                     // Handle images
                     const img = pipViewer.querySelector('img');
-                    if (img && duration > 0) {
-                        // Use a timeout for images
+                    if (img) {
+                        // Use slideshow delay for images when surfing
+                        const delay = state.slideshowDelay || 5;
                         if (state.playback.surfTimer) clearTimeout(state.playback.surfTimer);
                         state.playback.surfTimer = setTimeout(() => {
                             state.playback.surfTimer = null;
                             if (channelSurfBtn) channelSurfBtn.click();
-                        }, duration * 1000);
+                        }, delay * 1000);
                     }
                 }
             } catch (err) {
@@ -332,10 +490,43 @@ document.addEventListener('DOMContentLoaded', () => {
             state.filterBins = {
                 episodes: data.episodes || [],
                 size: data.size || [],
-                duration: data.duration || []
+                duration: data.duration || [],
+                episodes_min: data.episodes_min !== undefined && data.episodes_min !== null ? data.episodes_min : 0,
+                episodes_max: data.episodes_max !== undefined && data.episodes_max !== null ? data.episodes_max : 100,
+                size_min: data.size_min !== undefined && data.size_min !== null ? data.size_min : 0,
+                size_max: data.size_max !== undefined && data.size_max !== null ? data.size_max : (100 * 1024 * 1024),
+                duration_min: data.duration_min !== undefined && data.duration_min !== null ? data.duration_min : 0,
+                duration_max: data.duration_max !== undefined && data.duration_max !== null ? data.duration_max : 3600,
+                episodes_percentiles: data.episodes_percentiles || [],
+                size_percentiles: data.size_percentiles || [],
+                duration_percentiles: data.duration_percentiles || []
             };
+
+            // Recalculate slider positions if we have absolute filters
+            const updateSliderPos = (type, filterKey, minSlider, maxSlider) => {
+                const filter = state.filters[filterKey] && state.filters[filterKey].find(f => f.value === '@abs');
+                if (filter && minSlider && state.filterBins) {
+                    let minTotal = 0, maxTotal = 0;
+                    if (type === 'episodes') { minTotal = state.filterBins.episodes_min; maxTotal = state.filterBins.episodes_max; }
+                    else if (type === 'size') { minTotal = state.filterBins.size_min; maxTotal = state.filterBins.size_max; }
+                    else if (type === 'duration') { minTotal = state.filterBins.duration_min; maxTotal = state.filterBins.duration_max; }
+
+                    if (maxTotal > minTotal) {
+                        const minP = Math.max(0, Math.min(100, ((filter.min - minTotal) / (maxTotal - minTotal)) * 100));
+                        const maxP = Math.max(0, Math.min(100, ((filter.max - minTotal) / (maxTotal - minTotal)) * 100));
+                        minSlider.value = Math.round(minP);
+                        maxSlider.value = Math.round(maxP);
+                    }
+                }
+            };
+
+            updateSliderPos('episodes', 'episodes', episodesMinSlider, episodesMaxSlider);
+            updateSliderPos('size', 'sizes', sizeMinSlider, sizeMaxSlider);
+            updateSliderPos('duration', 'durations', durationMinSlider, durationMaxSlider);
+
             renderMediaTypeList();
             renderFilterBins();
+            updateSliderLabels();
         } catch (err) {
             console.error('Failed to fetch filter bins', err);
         }
@@ -376,62 +567,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function renderFilterBins() {
-        if (!state.filterBins) return;
-
-        const isBinActive = (selectedBins, bin) => {
-            return selectedBins.some(b =>
-                b.value === bin.value &&
-                b.min === bin.min &&
-                b.max === bin.max
-            );
-        };
-
-        const renderSection = (id, data, filterKey, localStorageKey) => {
-            const container = document.getElementById(id);
-            if (!container || !data || data.length === 0) return;
-
-            const newHtml = data.map((bin, idx) => {
-                const isActive = isBinActive(state.filters[filterKey], bin);
-                return `
-                    <button class="category-btn ${isActive ? 'active' : ''}" data-index="${idx}">
-                        ${bin.label}
-                    </button>
-                `;
-            }).join('');
-
-            container.innerHTML = newHtml;
-
-            container.querySelectorAll('button').forEach(btn => {
-                btn.onclick = () => {
-                    const idx = btn.dataset.index;
-                    const bin = data[idx];
-                    const existingIdx = state.filters[filterKey].findIndex(b =>
-                        b.value === bin.value &&
-                        b.min === bin.min &&
-                        b.max === bin.max
-                    );
-
-                    if (existingIdx !== -1) {
-                        state.filters[filterKey].splice(existingIdx, 1);
-                    } else {
-                        state.filters[filterKey].push(bin);
-                    }
-
-                    localStorage.setItem(localStorageKey, JSON.stringify(state.filters[filterKey]));
-                    btn.classList.toggle('active');
-                    performSearch();
-                };
-            });
-        };
-
-        renderSection('episodes-list', state.filterBins.episodes, 'episodes', 'disco-filter-episodes');
-        renderSection('size-list', state.filterBins.size, 'sizes', 'disco-filter-sizes');
-        renderSection('duration-list', state.filterBins.duration, 'durations', 'disco-filter-durations');
+        // Sliders are static in index.html, no need to render bins here.
     }
 
     function resetSidebar() {
         const details = document.querySelectorAll('.sidebar details');
-        state.sidebarState = { "details-categories": true };
+        state.sidebarState = {};
         state.filters.categories = [];
         state.filters.genre = '';
         state.filters.ratings = [];
@@ -439,19 +580,22 @@ document.addEventListener('DOMContentLoaded', () => {
         state.filters.sizes = [];
         state.filters.durations = [];
         state.filters.episodes = [];
+        state.filters.types = [];
 
         details.forEach(det => {
             const id = det.id;
             if (!id) return;
-            if (id === 'details-categories') {
-                det.open = true;
-            } else {
-                det.open = false;
-                state.sidebarState[id] = false;
-            }
+            det.open = false;
+            state.sidebarState[id] = false;
         });
 
         localStorage.setItem('disco-sidebar-state', JSON.stringify(state.sidebarState));
+        localStorage.setItem('disco-filter-categories', '[]');
+        localStorage.setItem('disco-filter-ratings', '[]');
+        localStorage.setItem('disco-filter-sizes', '[]');
+        localStorage.setItem('disco-filter-durations', '[]');
+        localStorage.setItem('disco-filter-episodes', '[]');
+        localStorage.setItem('disco-types', '[]');
         updateNavActiveStates();
     }
 
@@ -466,6 +610,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Navigation & URL ---
     function getBinQueryParam(bin) {
+        if (bin.value === '@p') return `p${bin.min}-${bin.max}`;
+        if (bin.value === '@abs') return `+${bin.min},-${bin.max}`;
         if (bin.value !== undefined) return bin.value.toString();
         if (bin.min !== undefined && bin.max !== undefined) return `${bin.min}-${bin.max}`;
         if (bin.min !== undefined) return `+${bin.min}`;
@@ -549,7 +695,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function readUrl() {
+    function readUrl(openSections = false) {
         // Support both hash and search params, preferring hash for the new system
         const hash = window.location.hash.substring(1);
         const params = hash ? new URLSearchParams(hash) : new URLSearchParams(window.location.search);
@@ -603,6 +749,10 @@ document.addEventListener('DOMContentLoaded', () => {
             state.filters.completed = params.get('completed') === 'true';
 
             state.filters.episodes = params.getAll('episodes').map(val => {
+                if (val.startsWith('p')) {
+                    const [min, max] = val.substring(1).split('-').map(Number);
+                    return { label: `${min}-${max}%`, value: '@p', min, max };
+                }
                 if (val.includes('-')) {
                     const [min, max] = val.split('-').map(Number);
                     return { label: val, min, max };
@@ -612,6 +762,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 return { label: val, value: Number(val) };
             });
             state.filters.sizes = params.getAll('size').map(val => {
+                if (val.startsWith('p')) {
+                    const [min, max] = val.substring(1).split('-').map(Number);
+                    return { label: `${min}-${max}%`, value: '@p', min, max };
+                }
                 if (val.includes('-')) {
                     const [min, max] = val.split('-').map(Number);
                     return { label: val, min, max };
@@ -621,6 +775,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 return { label: val, value: Number(val) };
             });
             state.filters.durations = params.getAll('duration').map(val => {
+                if (val.startsWith('p')) {
+                    const [min, max] = val.substring(1).split('-').map(Number);
+                    return { label: `${min}-${max}%`, value: '@p', min, max };
+                }
                 if (val.includes('-')) {
                     const [min, max] = val.split('-').map(Number);
                     return { label: val, min, max };
@@ -629,6 +787,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (val.startsWith('-')) return { label: val, max: Number(val.substring(1)) };
                 return { label: val, value: Number(val) };
             });
+
+            if (openSections) {
+                if (state.filters.categories.length > 0) state.sidebarState['details-categories'] = true;
+                if (state.filters.genre) state.sidebarState['details-browse'] = true;
+                if (state.filters.ratings.length > 0) state.sidebarState['details-ratings'] = true;
+                if (state.filters.episodes.length > 0) state.sidebarState['details-episodes'] = true;
+                if (state.filters.sizes.length > 0) state.sidebarState['details-size'] = true;
+                if (state.filters.durations.length > 0) state.sidebarState['details-duration'] = true;
+            }
 
             // Restoration of complex filters from URL is tricky since we only have labels in bins
             // For now, we rely on state persistence in localStorage which is already happening
@@ -2476,12 +2643,28 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function seekToProgress(el, targetPos, retryCount = 0) {
         if (!el || !targetPos || targetPos <= 0) return;
-        if (retryCount > 60) return; // 20 seconds limit
+
+        // Mute during seek to prevent stuttering artifacts
+        if (retryCount === 0) {
+            el._systemMute = true;
+            el.muted = true;
+        }
+
+        const restoreMute = () => {
+            el._systemMute = false;
+            el.muted = state.playback.muted;
+        };
+
+        if (retryCount > 60) {
+            restoreMute();
+            return;
+        }
 
         const duration = el.duration;
 
         if (!isNaN(duration) && duration >= targetPos) {
             el.currentTime = targetPos;
+            restoreMute();
             return;
         }
 
@@ -2548,6 +2731,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (state.playback.slideshowTimer) {
             clearTimeout(state.playback.slideshowTimer);
             state.playback.slideshowTimer = null;
+        }
+        if (state.playback.surfTimer) {
+            clearTimeout(state.playback.surfTimer);
+            state.playback.surfTimer = null;
         }
 
         const wasFullscreen = !!document.fullscreenElement;
@@ -2673,6 +2860,13 @@ document.addEventListener('DOMContentLoaded', () => {
             el = document.createElement('video');
             el.controls = true;
             el.autoplay = true;
+            el.muted = state.playback.muted;
+
+            el.onvolumechange = () => {
+                if (el._systemMute) return;
+                state.playback.muted = el.muted;
+                localStorage.setItem('disco-muted', el.muted);
+            };
 
             // Loop short videos/GIFs (under 8s)
             if (item.duration > 0 && item.duration < 8) {
@@ -2777,6 +2971,13 @@ document.addEventListener('DOMContentLoaded', () => {
             el.autoplay = true;
             el.src = url;
             el.playbackRate = state.playbackRate;
+            el.muted = state.playback.muted;
+
+            el.onvolumechange = () => {
+                if (el._systemMute) return;
+                state.playback.muted = el.muted;
+                localStorage.setItem('disco-muted', el.muted);
+            };
 
             el.onerror = () => handleMediaError(item);
 
@@ -3476,7 +3677,7 @@ document.addEventListener('DOMContentLoaded', () => {
         currentMedia.forEach(item => {
             const row = document.createElement('div');
             row.className = 'caption-row';
-            
+
             const basename = item.path.split('/').pop();
             const captionTime = item.caption_time || 0;
             const timeStr = formatDuration(captionTime);
@@ -3787,9 +3988,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 ${c.category} <small>(${c.count})</small>
             </button>
         `).join('') + `
-            <div class="sidebar-separator" style="margin: 0.5rem 0; opacity: 0.3;"></div>
             <button id="categorization-link-btn" class="category-btn ${state.page === 'curation' ? 'active' : ''}" style="width: 100%; text-align: left;">
-                🏷️ Categorization
+                Categorization <small>🏷️</small>
             </button>
         `;
 
@@ -4003,8 +4203,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 break;
             case 'm':
-                if (ws) ws.setMuted(!ws.getMuted());
-                else media.muted = !media.muted;
+                media.muted = !media.muted;
                 break;
             case 'j':
                 setTime(Math.max(0, currentTime - 10));
@@ -4560,6 +4759,35 @@ document.addEventListener('DOMContentLoaded', () => {
             btn.classList.toggle('active', isActive);
         });
 
+        // Update Sliders
+        const epFilter = state.filters.episodes.find(f => f.value === '@p');
+        if (epFilter && episodesMinSlider) {
+            episodesMinSlider.value = epFilter.min;
+            episodesMaxSlider.value = epFilter.max;
+        } else if (episodesMinSlider) {
+            episodesMinSlider.value = 0;
+            episodesMaxSlider.value = 100;
+        }
+
+        const sizeFilter = state.filters.sizes.find(f => f.value === '@p');
+        if (sizeFilter && sizeMinSlider) {
+            sizeMinSlider.value = sizeFilter.min;
+            sizeMaxSlider.value = sizeFilter.max;
+        } else if (sizeMinSlider) {
+            sizeMinSlider.value = 0;
+            sizeMaxSlider.value = 100;
+        }
+
+        const durFilter = state.filters.durations.find(f => f.value === '@p');
+        if (durFilter && durationMinSlider) {
+            durationMinSlider.value = durFilter.min;
+            durationMaxSlider.value = durFilter.max;
+        } else if (durationMinSlider) {
+            durationMinSlider.value = 0;
+            durationMaxSlider.value = 100;
+        }
+        updateSliderLabels();
+
         // Update Bins
         if (state.filterBins) {
             document.querySelectorAll('#episodes-list .category-btn').forEach(btn => {
@@ -4928,7 +5156,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Initial load
-    readUrl();
+    readUrl(true);
     fetchDatabases();
     fetchSyncwebFolders();
     fetchCategories();
@@ -4957,6 +5185,7 @@ document.addEventListener('DOMContentLoaded', () => {
         getPlayCount,
         markMediaPlayed,
         updateNavActiveStates,
+        showToast,
         state
     };
 });

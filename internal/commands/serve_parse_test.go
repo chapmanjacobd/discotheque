@@ -111,6 +111,26 @@ func TestServeCmd_ParseFlags(t *testing.T) {
 			},
 		},
 		{
+			name: "Percentiles",
+			query: url.Values{
+				"size":     {"p10-50"},
+				"duration": {"p20-30"},
+				"episodes": {"p1-1"},
+			},
+			validate: func(t *testing.T, c *ServeCmd, r *http.Request) {
+				flags := c.parseFlags(r)
+				if len(flags.Size) == 0 || flags.Size[0] != "p10-50" {
+					t.Errorf("Unexpected size percentile: %v", flags.Size)
+				}
+				if len(flags.Duration) == 0 || flags.Duration[0] != "p20-30" {
+					t.Errorf("Unexpected duration percentile: %v", flags.Duration)
+				}
+				if flags.FileCounts != "p1-1" {
+					t.Errorf("Unexpected episodes percentile: %s", flags.FileCounts)
+				}
+			},
+		},
+		{
 			name: "Ranges",
 			query: url.Values{
 				"min_size":     {"100"},

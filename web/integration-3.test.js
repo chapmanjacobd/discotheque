@@ -112,18 +112,16 @@ describe('Advanced Integration Tests', () => {
         // Open details to ensure visibility
         document.getElementById('details-episodes').open = true;
 
-        await vi.waitFor(() => {
-            const epBtn = document.querySelector('#episodes-list .category-btn');
-            expect(epBtn).not.toBeNull();
-        });
-
-        const epBtn = document.querySelector('#episodes-list .category-btn');
-        epBtn.click(); // Select "1 only" (value: 1)
+        const minSlider = document.getElementById('episodes-min-slider');
+        const maxSlider = document.getElementById('episodes-max-slider');
+        minSlider.value = 10;
+        maxSlider.value = 50;
+        minSlider.dispatchEvent(new Event('change'));
 
         await vi.waitFor(() => {
             const calls = global.fetch.mock.calls;
             const lastCall = calls[calls.length - 1];
-            expect(lastCall[0]).toContain('episodes=1');
+            expect(lastCall[0]).toContain('episodes=p10-50');
         });
     });
 

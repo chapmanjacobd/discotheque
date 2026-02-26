@@ -20,11 +20,13 @@ type SearchDBCmd struct {
 	Search   []string `arg:"" required:"" help:"Search terms"`
 }
 
-func (c SearchDBCmd) IsQueryTrait()   {}
-func (c SearchDBCmd) IsFilterTrait()  {}
-func (c SearchDBCmd) IsMergeTrait()   {}
-func (c SearchDBCmd) IsActionTrait()  {}
-func (c SearchDBCmd) IsDisplayTrait() {}
+func (c SearchDBCmd) IsQueryTrait()       {}
+func (c SearchDBCmd) IsFilterTrait()      {}
+func (c SearchDBCmd) IsPathFilterTrait()  {}
+func (c SearchDBCmd) IsTimeTrait()        {}
+func (c SearchDBCmd) IsMediaFilterTrait() {}
+func (c SearchDBCmd) IsDeletedTrait()     {}
+func (c SearchDBCmd) IsDisplayTrait()     {}
 
 func (c *SearchDBCmd) Run(ctx *kong.Context) error {
 	models.SetupLogging(c.Verbose)

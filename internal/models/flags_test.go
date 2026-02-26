@@ -7,10 +7,12 @@ import (
 
 func TestGlobalFlags_AfterApply(t *testing.T) {
 	flags := GlobalFlags{
-		Ext:       []string{"mp4", ".mkv"},
-		Simulate:  true,
-		NoConfirm: true,
-		Ignore:    true,
+		CoreFlags: CoreFlags{
+			Simulate:  true,
+			NoConfirm: true,
+		},
+		Ext:    []string{"mp4", ".mkv"},
+		Ignore: true,
 	}
 	err := flags.AfterApply()
 	if err != nil {

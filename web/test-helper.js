@@ -2,7 +2,7 @@ import { vi } from 'vitest';
 import fs from 'fs';
 import path from 'path';
 
-export async function setupTestEnvironment() {
+export async function setupTestEnvironment(initialLocalStorage) {
     // Mock CSS.escape (missing in JSDOM)
     global.CSS = {
         escape: (s) => s.replace(/([!"#$%&'()*+,.\/:;<=>?@\[\\\]^`{|}~])/g, "\\$1")
@@ -31,7 +31,12 @@ export async function setupTestEnvironment() {
         } else if (url.includes('/api/playlists')) {
             data = mocks.playlists || ['My Playlist'];
         } else if (url.includes('/api/filter-bins')) {
-            data = mocks.filter_bins || { episodes: [], size: [], duration: [] };
+            data = mocks.filter_bins || { 
+                episodes: [], size: [], duration: [],
+                episodes_min: 0, episodes_max: 100,
+                size_min: 0, size_max: 100 * 1024 * 1024,
+                duration_min: 0, duration_max: 3600
+            };
         } else if (url.includes('/api/query')) {
             data = mocks.media || [
                 { path: 'video1.mp4', type: 'video/mp4', size: 1024, duration: 60, db: 'test.db', caption_text: 'sample caption', caption_time: 10.5 },
@@ -116,7 +121,13 @@ export async function setupTestEnvironment() {
     document.body.innerHTML = html;
 
     window.location.hash = '';
-    localStorage.clear();
+    if (typeof initialLocalStorage === 'object') {
+        Object.keys(initialLocalStorage).forEach(key => {
+            localStorage.setItem(key, initialLocalStorage[key]);
+        });
+    } else {
+        localStorage.clear();
+    }
     vi.resetModules();
 
     await import('./app.js');

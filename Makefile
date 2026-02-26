@@ -2,13 +2,16 @@
 
 BINARY_NAME=disco
 SYNCWEB_BINARY=syncweb
-BUILD_TAGS=fts5,noassets
+
+MIN_TAGS=noassets
+BUILD_TAGS=noassets,fts5
+SYNCWEB_TAGS=$(BUILD_TAGS),syncweb
 
 all: fmt lint sql test webtest build readme
 
 build:
 	go build -tags "$(BUILD_TAGS)" -o $(BINARY_NAME) ./cmd/disco
-	go build -tags "$(BUILD_TAGS)" -o $(SYNCWEB_BINARY) ./cmd/syncweb
+	go build -tags "$(SYNCWEB_TAGS)" -o $(SYNCWEB_BINARY) ./cmd/syncweb
 
 dev:
 	(sleep 2 && xdg-open http://localhost:5555) &
@@ -18,9 +21,12 @@ readme: build
 	./$(BINARY_NAME) readme > README.md
 
 test:
-	go test -tags "$(BUILD_TAGS)" -coverprofile=coverage.out ./...
+	go test -tags "$(MIN_TAGS)" ./...
+	go test -tags "$(BUILD_TAGS)" ./...
+	go test -tags "$(SYNCWEB_TAGS)" ./...
 
-cover: test
+cover:
+	go test -tags "$(SYNCWEB_TAGS)" -coverprofile=coverage.out ./...
 	go tool cover -func=coverage.out | awk '{n=split($$NF,a,"%%"); if (a[1] < 85) print $$0}' | sort -k3 -n
 
 webtest:

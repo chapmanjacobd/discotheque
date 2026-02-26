@@ -230,6 +230,42 @@ func ParseRange(s string, humanToX func(string) (int64, error)) (Range, error) {
 		return Range{}, nil
 	}
 
+	if strings.Contains(s, ",") {
+		parts := strings.Split(s, ",")
+		var merged Range
+		for _, p := range parts {
+			r, err := ParseRange(p, humanToX)
+			if err != nil {
+				return Range{}, err
+			}
+			if r.Min != nil {
+				merged.Min = r.Min
+			}
+			if r.Max != nil {
+				merged.Max = r.Max
+			}
+			if r.Value != nil {
+				merged.Value = r.Value
+			}
+		}
+		return merged, nil
+	}
+
+	if strings.Contains(s, "-") && !strings.HasPrefix(s, "-") {
+		parts := strings.Split(s, "-")
+		if len(parts) == 2 {
+			min, err := humanToX(parts[0])
+			if err != nil {
+				return Range{}, err
+			}
+			max, err := humanToX(parts[1])
+			if err != nil {
+				return Range{}, err
+			}
+			return Range{Min: &min, Max: &max}, nil
+		}
+	}
+
 	if strings.Contains(s, "%") {
 		parts := strings.Split(s, "%")
 		base, err := humanToX(parts[0])
@@ -284,6 +320,26 @@ func ParseRange(s string, humanToX func(string) (int64, error)) (Range, error) {
 	return Range{Value: &val}, nil
 }
 
+func CalculatePercentiles(values []int64) []int64 {
+	if len(values) == 0 {
+		return make([]int64, 101)
+	}
+	sort.Slice(values, func(i, j int) bool {
+		return values[i] < values[j]
+	})
+
+	res := make([]int64, 101)
+	for i := 0; i <= 100; i++ {
+		index := (float64(i) / 100.0) * float64(len(values)-1)
+		lower := int(math.Floor(index))
+		upper := int(math.Ceil(index))
+		weight := index - float64(lower)
+		val := float64(values[lower])*(1.0-weight) + float64(values[upper])*weight
+		res[i] = int64(math.Round(val))
+	}
+	return res
+}
+
 func Percent(value, total float64) float64 {
 	if total == 0 {
 		return 0
@@ -307,6 +363,27 @@ func PercentageDifference(v1, v2 float64) float64 {
 		return 100.0
 	}
 	return math.Abs((v1-v2)/((v1+v2)/2)) * 100
+}
+
+func ParsePercentileRange(s string) (min, max float64, ok bool) {
+	if !strings.HasPrefix(s, "p") {
+		return 0, 0, false
+	}
+	s = s[1:]
+	parts := strings.Split(s, "-")
+	if len(parts) != 2 {
+		return 0, 0, false
+	}
+	var err error
+	min, err = strconv.ParseFloat(parts[0], 64)
+	if err != nil {
+		return 0, 0, false
+	}
+	max, err = strconv.ParseFloat(parts[1], 64)
+	if err != nil {
+		return 0, 0, false
+	}
+	return min, max, true
 }
 
 func CalculateSegments(total float64, chunk float64, gap float64) []float64 {

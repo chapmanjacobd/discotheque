@@ -24,6 +24,8 @@ type FilesInfoCmd struct {
 }
 
 func (c FilesInfoCmd) IsFilterTrait()  {}
+func (c FilesInfoCmd) IsTimeTrait()    {}
+func (c FilesInfoCmd) IsContentTrait() {}
 func (c FilesInfoCmd) IsDisplayTrait() {}
 
 func (c *FilesInfoCmd) AfterApply() error {

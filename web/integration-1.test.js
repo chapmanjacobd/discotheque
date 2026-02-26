@@ -313,13 +313,14 @@ describe('Integration Test', () => {
         const catDetails = document.getElementById('details-categories');
         const playlistDetails = document.getElementById('details-playlists');
 
-        // Initially categories is open, playlists is closed
-        expect(catDetails.open).toBe(true);
+        // Initially categories is closed, playlists is closed
+        expect(catDetails.open).toBe(false);
         expect(playlistDetails.open).toBe(false);
 
-        // Toggle playlists
+        // Set some filters
         playlistDetails.open = true;
         playlistDetails.dispatchEvent(new Event('toggle'));
+        window.disco.state.filters.types = ['video', 'audio'];
         expect(window.disco.state.sidebarState['details-playlists']).toBe(true);
 
         // Click logo
@@ -327,9 +328,10 @@ describe('Integration Test', () => {
         const allMediaBtn = document.getElementById('all-media-btn');
         logo.click();
 
-        expect(catDetails.open).toBe(true);
+        expect(catDetails.open).toBe(false);
         expect(playlistDetails.open).toBe(false);
         expect(window.disco.state.sidebarState['details-playlists']).toBe(false);
+        expect(window.disco.state.filters.types.length).toBe(0);
         expect(allMediaBtn.classList.contains('active')).toBe(true);
     });
 
@@ -440,16 +442,21 @@ describe('Integration Test', () => {
         document.getElementById('details-size').open = true;
 
         await vi.waitFor(() => {
-            const sizeBtn = document.querySelector('#size-list .category-btn');
-            expect(sizeBtn).not.toBeNull();
+            const minSlider = document.getElementById('size-min-slider');
+            const maxSlider = document.getElementById('size-max-slider');
+            expect(minSlider).not.toBeNull();
+            expect(maxSlider).not.toBeNull();
         });
 
-        const sizeBtn = document.querySelector('#size-list .category-btn');
-        sizeBtn.click();
+        const minSlider = document.getElementById('size-min-slider');
+        const maxSlider = document.getElementById('size-max-slider');
+        minSlider.value = 0;
+        maxSlider.value = 10;
+        minSlider.dispatchEvent(new Event('change'));
 
         await vi.waitFor(() => {
             expect(global.fetch).toHaveBeenCalledWith(
-                expect.stringContaining('size=-104857600'), // "less than 100MB" uses max: 104857600
+                expect.stringContaining('size=p0-10'),
                 expect.any(Object)
             );
         });

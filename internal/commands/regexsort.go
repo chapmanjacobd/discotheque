@@ -23,6 +23,7 @@ type RegexSortCmd struct {
 }
 
 func (c RegexSortCmd) IsTextTrait() {}
+func (c RegexSortCmd) IsSortTrait() {}
 
 func (c *RegexSortCmd) Run(ctx *kong.Context) error {
 	models.SetupLogging(c.Verbose)
