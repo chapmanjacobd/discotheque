@@ -59,7 +59,7 @@ path/to/video3.mp4
 
 		cmd := &ClusterSortCmd{
 			InputPath: tmpFile.Name(),
-			GlobalFlags: models.GlobalFlags{
+			SimilarityFlags: models.SimilarityFlags{
 				PrintGroups: true,
 			},
 		}

@@ -36,28 +36,36 @@ import (
 var schemaFS embed.FS
 
 type PrintCmd struct {
-	models.GlobalFlags
+	models.CoreFlags        `embed:""`
+	models.QueryFlags       `embed:""`
+	models.PathFilterFlags  `embed:""`
+	models.FilterFlags      `embed:""`
+	models.MediaFilterFlags `embed:""`
+	models.TimeFilterFlags  `embed:""`
+	models.DeletedFlags     `embed:""`
+	models.SortFlags        `embed:""`
+	models.DisplayFlags     `embed:""`
+	models.AggregateFlags   `embed:""`
+	models.TextFlags        `embed:""`
+	models.FTSFlags         `embed:""`
+
 	Args []string `arg:"" required:"" help:"Database file(s) or files/directories to scan"`
 
 	Databases []string `kong:"-"`
 	ScanPaths []string `kong:"-"`
 }
 
-func (c PrintCmd) IsQueryTrait()       {}
-func (c PrintCmd) IsFilterTrait()      {}
-func (c PrintCmd) IsTimeTrait()        {}
-func (c PrintCmd) IsMediaFilterTrait() {}
-func (c PrintCmd) IsPathFilterTrait()  {}
-func (c PrintCmd) IsDeletedTrait()     {}
-func (c PrintCmd) IsSortTrait()        {}
-func (c PrintCmd) IsDisplayTrait()     {}
-func (c PrintCmd) IsTextTrait()        {}
-func (c PrintCmd) IsFTSTrait()         {}
-
 func (c *PrintCmd) AfterApply() error {
-	if err := c.GlobalFlags.AfterApply(); err != nil {
+	flags := models.GlobalFlags{
+		CoreFlags:        c.CoreFlags,
+		MediaFilterFlags: c.MediaFilterFlags,
+	}
+	if err := flags.AfterApply(); err != nil {
 		return err
 	}
+	// Copy back modified flags if any (like extensions normalization)
+	c.MediaFilterFlags = flags.MediaFilterFlags
+
 	for _, arg := range c.Args {
 		if strings.HasSuffix(arg, ".db") && utils.IsSQLite(arg) {
 			c.Databases = append(c.Databases, arg)
@@ -70,12 +78,26 @@ func (c *PrintCmd) AfterApply() error {
 
 func (c *PrintCmd) Run(ctx *kong.Context) error {
 	models.SetupLogging(c.Verbose)
+	flags := models.GlobalFlags{
+		CoreFlags:        c.CoreFlags,
+		QueryFlags:       c.QueryFlags,
+		PathFilterFlags:  c.PathFilterFlags,
+		FilterFlags:      c.FilterFlags,
+		MediaFilterFlags: c.MediaFilterFlags,
+		TimeFilterFlags:  c.TimeFilterFlags,
+		DeletedFlags:     c.DeletedFlags,
+		SortFlags:        c.SortFlags,
+		DisplayFlags:     c.DisplayFlags,
+		AggregateFlags:   c.AggregateFlags,
+		TextFlags:        c.TextFlags,
+		FTSFlags:         c.FTSFlags,
+	}
 
 	var allMedia []models.MediaWithDB
 
 	// Handle databases
 	if len(c.Databases) > 0 {
-		dbMedia, err := query.MediaQuery(context.Background(), c.Databases, c.GlobalFlags)
+		dbMedia, err := query.MediaQuery(context.Background(), c.Databases, flags)
 		if err != nil {
 			return err
 		}
@@ -92,7 +114,7 @@ func (c *PrintCmd) Run(ctx *kong.Context) error {
 				return nil
 			}
 
-			meta, err := metadata.Extract(context.Background(), path, c.ScanSubtitles)
+			meta, err := metadata.Extract(context.Background(), path, flags.ScanSubtitles)
 			if err != nil {
 				return nil
 			}
@@ -115,14 +137,14 @@ func (c *PrintCmd) Run(ctx *kong.Context) error {
 	}
 
 	var media []models.MediaWithDB
-	media = query.FilterMedia(allMedia, c.GlobalFlags)
+	media = query.FilterMedia(allMedia, flags)
 	HideRedundantFirstPlayed(media)
 
 	isAggregated := c.BigDirs || c.GroupByExtensions || c.GroupByMimeTypes || c.GroupBySize || c.Depth > 0 || c.Parents
 
 	if c.JSON {
 		if isAggregated {
-			folders := query.AggregateMedia(media, c.GlobalFlags)
+			folders := query.AggregateMedia(media, flags)
 			query.SortFolders(folders, c.SortBy, c.Reverse)
 			encoder := json.NewEncoder(os.Stdout)
 			encoder.SetIndent("", "  ")
@@ -151,36 +173,41 @@ func (c *PrintCmd) Run(ctx *kong.Context) error {
 	}
 
 	if isAggregated {
-		folders := query.AggregateMedia(media, c.GlobalFlags)
+		folders := query.AggregateMedia(media, flags)
 		query.SortFolders(folders, c.SortBy, c.Reverse)
 		return PrintFolders(c.Columns, folders)
 	}
 
 	if c.RegexSort {
-		media = query.RegexSortMedia(media, c.GlobalFlags)
+		media = query.RegexSortMedia(media, flags)
 	} else {
-		query.SortMedia(media, c.GlobalFlags)
+		query.SortMedia(media, flags)
 	}
 	return PrintMedia(c.Columns, media)
 }
 
 type DiskUsageCmd struct {
-	models.GlobalFlags
+	models.CoreFlags        `embed:""`
+	models.PathFilterFlags  `embed:""`
+	models.FilterFlags      `embed:""`
+	models.MediaFilterFlags `embed:""`
+	models.TimeFilterFlags  `embed:""`
+	models.DeletedFlags     `embed:""`
+	models.SortFlags        `embed:""`
+	models.DisplayFlags     `embed:""`
+	models.AggregateFlags   `embed:""`
+
 	Args []string `arg:"" required:"" help:"Database file(s) or files/directories to scan"`
 
 	Databases []string `kong:"-"`
 	ScanPaths []string `kong:"-"`
 }
 
-func (c DiskUsageCmd) IsFilterTrait()      {}
-func (c DiskUsageCmd) IsTimeTrait()        {}
-func (c DiskUsageCmd) IsMediaFilterTrait() {}
-func (c DiskUsageCmd) IsPathFilterTrait()  {}
-func (c DiskUsageCmd) IsAggregateTrait()   {}
-func (c DiskUsageCmd) IsDisplayTrait()     {}
-
 func (c *DiskUsageCmd) AfterApply() error {
-	if err := c.GlobalFlags.AfterApply(); err != nil {
+	if err := c.CoreFlags.AfterApply(); err != nil {
+		return err
+	}
+	if err := c.MediaFilterFlags.AfterApply(); err != nil {
 		return err
 	}
 	for _, arg := range c.Args {
@@ -195,12 +222,23 @@ func (c *DiskUsageCmd) AfterApply() error {
 
 func (c *DiskUsageCmd) Run(ctx *kong.Context) error {
 	models.SetupLogging(c.Verbose)
+	flags := models.GlobalFlags{
+		CoreFlags:        c.CoreFlags,
+		PathFilterFlags:  c.PathFilterFlags,
+		FilterFlags:      c.FilterFlags,
+		MediaFilterFlags: c.MediaFilterFlags,
+		TimeFilterFlags:  c.TimeFilterFlags,
+		DeletedFlags:     c.DeletedFlags,
+		SortFlags:        c.SortFlags,
+		DisplayFlags:     c.DisplayFlags,
+		AggregateFlags:   c.AggregateFlags,
+	}
 
 	var allMedia []models.MediaWithDB
 
 	// Handle databases
 	if len(c.Databases) > 0 {
-		dbMedia, err := query.MediaQuery(context.Background(), c.Databases, c.GlobalFlags)
+		dbMedia, err := query.MediaQuery(context.Background(), c.Databases, flags)
 		if err != nil {
 			return err
 		}
@@ -217,7 +255,7 @@ func (c *DiskUsageCmd) Run(ctx *kong.Context) error {
 				return nil
 			}
 
-			meta, err := metadata.Extract(context.Background(), path, c.ScanSubtitles)
+			meta, err := metadata.Extract(context.Background(), path, flags.ScanSubtitles)
 			if err != nil {
 				return nil
 			}
@@ -244,7 +282,7 @@ func (c *DiskUsageCmd) Run(ctx *kong.Context) error {
 			return fmt.Errorf("no media found")
 		}
 
-		m := tui.NewDUModel(allMedia, c.GlobalFlags)
+		m := tui.NewDUModel(allMedia, flags)
 		p := tea.NewProgram(m, tea.WithAltScreen())
 		_, err := p.Run()
 		return err
@@ -254,30 +292,53 @@ func (c *DiskUsageCmd) Run(ctx *kong.Context) error {
 	if !c.BigDirs && !c.GroupByExtensions && !c.GroupByMimeTypes && !c.GroupBySize && c.Depth == 0 && !c.Parents {
 		c.BigDirs = true
 	}
-	printCmd := PrintCmd{GlobalFlags: c.GlobalFlags, Databases: c.Databases, ScanPaths: c.ScanPaths}
+	printCmd := PrintCmd{
+		CoreFlags:        c.CoreFlags,
+		PathFilterFlags:  c.PathFilterFlags,
+		FilterFlags:      c.FilterFlags,
+		MediaFilterFlags: c.MediaFilterFlags,
+		TimeFilterFlags:  c.TimeFilterFlags,
+		DeletedFlags:     c.DeletedFlags,
+		SortFlags:        c.SortFlags,
+		DisplayFlags:     c.DisplayFlags,
+		AggregateFlags:   c.AggregateFlags,
+		Databases:        c.Databases,
+		ScanPaths:        c.ScanPaths,
+	}
 	return printCmd.Run(ctx)
 }
 
 type SimilarFilesCmd struct {
-	models.GlobalFlags
+	models.CoreFlags        `embed:""`
+	models.PathFilterFlags  `embed:""`
+	models.FilterFlags      `embed:""`
+	models.MediaFilterFlags `embed:""`
+	models.TimeFilterFlags  `embed:""`
+	models.SortFlags        `embed:""`
+	models.DisplayFlags     `embed:""`
+	models.SimilarityFlags  `embed:""`
+
 	Databases []string `arg:"" required:"" help:"SQLite database files" type:"existingfile"`
 }
 
-func (c SimilarFilesCmd) IsFilterTrait()     {}
-func (c SimilarFilesCmd) IsTimeTrait()       {}
-func (c SimilarFilesCmd) IsContentTrait()    {}
-func (c SimilarFilesCmd) IsSortTrait()       {}
-func (c SimilarFilesCmd) IsDisplayTrait()    {}
-func (c SimilarFilesCmd) IsSimilarityTrait() {}
-
 func (c *SimilarFilesCmd) Run(ctx *kong.Context) error {
 	models.SetupLogging(c.Verbose)
-	media, err := query.MediaQuery(context.Background(), c.Databases, c.GlobalFlags)
+	flags := models.GlobalFlags{
+		CoreFlags:        c.CoreFlags,
+		PathFilterFlags:  c.PathFilterFlags,
+		FilterFlags:      c.FilterFlags,
+		MediaFilterFlags: c.MediaFilterFlags,
+		TimeFilterFlags:  c.TimeFilterFlags,
+		SortFlags:        c.SortFlags,
+		DisplayFlags:     c.DisplayFlags,
+		SimilarityFlags:  c.SimilarityFlags,
+	}
+	media, err := query.MediaQuery(context.Background(), c.Databases, flags)
 	if err != nil {
 		return err
 	}
 
-	media = query.FilterMedia(media, c.GlobalFlags)
+	media = query.FilterMedia(media, flags)
 
 	// Defaults for similar files
 	if !c.FilterSizes && !c.FilterDurations && !c.FilterNames {
@@ -285,7 +346,7 @@ func (c *SimilarFilesCmd) Run(ctx *kong.Context) error {
 		c.FilterDurations = true
 	}
 
-	groups := aggregate.ClusterByNumbers(c.GlobalFlags, media)
+	groups := aggregate.ClusterByNumbers(flags, media)
 
 	if c.OnlyOriginals || c.OnlyDuplicates {
 		for i, g := range groups {
@@ -301,25 +362,36 @@ func (c *SimilarFilesCmd) Run(ctx *kong.Context) error {
 }
 
 type SimilarFoldersCmd struct {
-	models.GlobalFlags
+	models.CoreFlags        `embed:""`
+	models.PathFilterFlags  `embed:""`
+	models.FilterFlags      `embed:""`
+	models.MediaFilterFlags `embed:""`
+	models.TimeFilterFlags  `embed:""`
+	models.SortFlags        `embed:""`
+	models.DisplayFlags     `embed:""`
+	models.SimilarityFlags  `embed:""`
+
 	Databases []string `arg:"" required:"" help:"SQLite database files" type:"existingfile"`
 }
 
-func (c SimilarFoldersCmd) IsFilterTrait()     {}
-func (c SimilarFoldersCmd) IsTimeTrait()       {}
-func (c SimilarFoldersCmd) IsContentTrait()    {}
-func (c SimilarFoldersCmd) IsSortTrait()       {}
-func (c SimilarFoldersCmd) IsDisplayTrait()    {}
-func (c SimilarFoldersCmd) IsSimilarityTrait() {}
-
 func (c *SimilarFoldersCmd) Run(ctx *kong.Context) error {
 	models.SetupLogging(c.Verbose)
-	media, err := query.MediaQuery(context.Background(), c.Databases, c.GlobalFlags)
+	flags := models.GlobalFlags{
+		CoreFlags:        c.CoreFlags,
+		PathFilterFlags:  c.PathFilterFlags,
+		FilterFlags:      c.FilterFlags,
+		MediaFilterFlags: c.MediaFilterFlags,
+		TimeFilterFlags:  c.TimeFilterFlags,
+		SortFlags:        c.SortFlags,
+		DisplayFlags:     c.DisplayFlags,
+		SimilarityFlags:  c.SimilarityFlags,
+	}
+	media, err := query.MediaQuery(context.Background(), c.Databases, flags)
 	if err != nil {
 		return err
 	}
 
-	media = query.FilterMedia(media, c.GlobalFlags)
+	media = query.FilterMedia(media, flags)
 
 	// Defaults for similar folders
 	if !c.FilterSizes && !c.FilterDurations && !c.FilterNames && !c.FilterCounts {
@@ -327,12 +399,12 @@ func (c *SimilarFoldersCmd) Run(ctx *kong.Context) error {
 		c.FilterSizes = true
 	}
 
-	folders := query.AggregateMedia(media, c.GlobalFlags)
+	folders := query.AggregateMedia(media, flags)
 
 	var groups []models.FolderStats
 	if c.FilterNames {
 		// First pass: group by name
-		groups = aggregate.ClusterFoldersByName(c.GlobalFlags, folders)
+		groups = aggregate.ClusterFoldersByName(flags, folders)
 
 		if c.FilterSizes || c.FilterCounts || c.FilterDurations {
 			// Second pass: filter each group by numerical similarity
@@ -342,15 +414,15 @@ func (c *SimilarFoldersCmd) Run(ctx *kong.Context) error {
 					continue
 				}
 				// Break this merged group back into individual folders
-				subFolders := query.AggregateMedia(group.Files, c.GlobalFlags)
+				subFolders := query.AggregateMedia(group.Files, flags)
 				// Apply numerical clustering within this group
-				subGroups := aggregate.ClusterFoldersByNumbers(c.GlobalFlags, subFolders)
+				subGroups := aggregate.ClusterFoldersByNumbers(flags, subFolders)
 				refinedGroups = append(refinedGroups, subGroups...)
 			}
 			groups = refinedGroups
 		}
 	} else {
-		groups = aggregate.ClusterFoldersByNumbers(c.GlobalFlags, folders)
+		groups = aggregate.ClusterFoldersByNumbers(flags, folders)
 	}
 
 	// Filter for only duplicates/originals if requested
@@ -365,34 +437,49 @@ func (c *SimilarFoldersCmd) Run(ctx *kong.Context) error {
 }
 
 type WatchCmd struct {
-	models.GlobalFlags
+	models.CoreFlags        `embed:""`
+	models.QueryFlags       `embed:""`
+	models.PathFilterFlags  `embed:""`
+	models.FilterFlags      `embed:""`
+	models.MediaFilterFlags `embed:""`
+	models.TimeFilterFlags  `embed:""`
+	models.DeletedFlags     `embed:""`
+	models.SortFlags        `embed:""`
+	models.DisplayFlags     `embed:""`
+	models.FTSFlags         `embed:""`
+	models.PlaybackFlags    `embed:""`
+	models.MpvActionFlags   `embed:""`
+	models.PostActionFlags  `embed:""`
+
 	Databases []string `arg:"" required:"" help:"SQLite database files" type:"existingfile"`
 }
 
-func (c WatchCmd) IsQueryTrait()       {}
-func (c WatchCmd) IsFilterTrait()      {}
-func (c WatchCmd) IsTimeTrait()        {}
-func (c WatchCmd) IsMediaFilterTrait() {}
-func (c WatchCmd) IsPathFilterTrait()  {}
-func (c WatchCmd) IsDeletedTrait()     {}
-func (c WatchCmd) IsSortTrait()        {}
-func (c WatchCmd) IsDisplayTrait()     {}
-func (c WatchCmd) IsPlaybackTrait()    {}
-func (c WatchCmd) IsPostActionTrait()  {}
-func (c WatchCmd) IsMpvActionTrait()   {}
-func (c WatchCmd) IsFTSTrait()         {}
-
 func (c *WatchCmd) Run(ctx *kong.Context) error {
 	models.SetupLogging(c.Verbose)
-	media, err := query.MediaQuery(context.Background(), c.Databases, c.GlobalFlags)
+	flags := models.GlobalFlags{
+		CoreFlags:        c.CoreFlags,
+		QueryFlags:       c.QueryFlags,
+		PathFilterFlags:  c.PathFilterFlags,
+		FilterFlags:      c.FilterFlags,
+		MediaFilterFlags: c.MediaFilterFlags,
+		TimeFilterFlags:  c.TimeFilterFlags,
+		DeletedFlags:     c.DeletedFlags,
+		SortFlags:        c.SortFlags,
+		DisplayFlags:     c.DisplayFlags,
+		FTSFlags:         c.FTSFlags,
+		PlaybackFlags:    c.PlaybackFlags,
+		MpvActionFlags:   c.MpvActionFlags,
+		PostActionFlags:  c.PostActionFlags,
+	}
+	media, err := query.MediaQuery(context.Background(), c.Databases, flags)
 	if err != nil {
 		return err
 	}
 
-	media = query.FilterMedia(media, c.GlobalFlags)
-	query.SortMedia(media, c.GlobalFlags)
+	media = query.FilterMedia(media, flags)
+	query.SortMedia(media, flags)
 	if c.ReRank != "" {
-		media = query.ReRankMedia(media, c.GlobalFlags)
+		media = query.ReRankMedia(media, flags)
 	}
 
 	if len(media) == 0 {
@@ -475,7 +562,7 @@ func (c *WatchCmd) Run(ctx *kong.Context) error {
 		if c.Cast {
 			// CastPlay handles its own loop, but we want to handle one by one for Cable?
 			// For now, let's just call it with the single item
-			if err := CastPlay(c.GlobalFlags, []models.MediaWithDB{m}, false); err != nil {
+			if err := CastPlay(flags, []models.MediaWithDB{m}, false); err != nil {
 				slog.Error("Cast failed", "path", m.Path, "error", err)
 			}
 			continue
@@ -500,7 +587,7 @@ func (c *WatchCmd) Run(ctx *kong.Context) error {
 			if m.Playhead != nil {
 				existingPlayhead = int(*m.Playhead)
 			}
-			playhead := utils.GetPlayhead(c.GlobalFlags, m.Path, startTime, existingPlayhead, mediaDuration)
+			playhead := utils.GetPlayhead(flags, m.Path, startTime, existingPlayhead, mediaDuration)
 
 			if err := history.UpdateHistorySimple(m.DB, []string{m.Path}, playhead, false); err != nil {
 				slog.Error("Warning: failed to update history", "path", m.Path, "error", err)
@@ -521,19 +608,19 @@ func (c *WatchCmd) Run(ctx *kong.Context) error {
 			return nil
 		}
 
-		if err := RunExitCommand(c.GlobalFlags, exitCode, m.Path); err != nil {
+		if err := RunExitCommand(flags, exitCode, m.Path); err != nil {
 			slog.Error("Exit command failed", "code", exitCode, "error", err)
 		}
 
 		// Interactive decision
 		if c.Interactive {
-			if err := InteractiveDecision(c.GlobalFlags, m); err != nil {
+			if err := InteractiveDecision(flags, m); err != nil {
 				slog.Error("Interactive decision failed", "error", err)
 			}
 		}
 
 		// Execute post action for this item
-		if err := ExecutePostAction(c.GlobalFlags, []models.MediaWithDB{m}); err != nil {
+		if err := ExecutePostAction(flags, []models.MediaWithDB{m}); err != nil {
 			slog.Error("Post action failed", "path", m.Path, "error", err)
 		}
 
@@ -546,34 +633,49 @@ func (c *WatchCmd) Run(ctx *kong.Context) error {
 }
 
 type ListenCmd struct {
-	models.GlobalFlags
+	models.CoreFlags        `embed:""`
+	models.QueryFlags       `embed:""`
+	models.PathFilterFlags  `embed:""`
+	models.FilterFlags      `embed:""`
+	models.MediaFilterFlags `embed:""`
+	models.TimeFilterFlags  `embed:""`
+	models.DeletedFlags     `embed:""`
+	models.SortFlags        `embed:""`
+	models.DisplayFlags     `embed:""`
+	models.FTSFlags         `embed:""`
+	models.PlaybackFlags    `embed:""`
+	models.MpvActionFlags   `embed:""`
+	models.PostActionFlags  `embed:""`
+
 	Databases []string `arg:"" required:"" help:"SQLite database files" type:"existingfile"`
 }
 
-func (c ListenCmd) IsQueryTrait()       {}
-func (c ListenCmd) IsFilterTrait()      {}
-func (c ListenCmd) IsTimeTrait()        {}
-func (c ListenCmd) IsMediaFilterTrait() {}
-func (c ListenCmd) IsPathFilterTrait()  {}
-func (c ListenCmd) IsDeletedTrait()     {}
-func (c ListenCmd) IsSortTrait()        {}
-func (c ListenCmd) IsDisplayTrait()     {}
-func (c ListenCmd) IsPlaybackTrait()    {}
-func (c ListenCmd) IsPostActionTrait()  {}
-func (c ListenCmd) IsMpvActionTrait()   {}
-func (c ListenCmd) IsFTSTrait()         {}
-
 func (c *ListenCmd) Run(ctx *kong.Context) error {
 	models.SetupLogging(c.Verbose)
-	media, err := query.MediaQuery(context.Background(), c.Databases, c.GlobalFlags)
+	flags := models.GlobalFlags{
+		CoreFlags:        c.CoreFlags,
+		QueryFlags:       c.QueryFlags,
+		PathFilterFlags:  c.PathFilterFlags,
+		FilterFlags:      c.FilterFlags,
+		MediaFilterFlags: c.MediaFilterFlags,
+		TimeFilterFlags:  c.TimeFilterFlags,
+		DeletedFlags:     c.DeletedFlags,
+		SortFlags:        c.SortFlags,
+		DisplayFlags:     c.DisplayFlags,
+		FTSFlags:         c.FTSFlags,
+		PlaybackFlags:    c.PlaybackFlags,
+		MpvActionFlags:   c.MpvActionFlags,
+		PostActionFlags:  c.PostActionFlags,
+	}
+	media, err := query.MediaQuery(context.Background(), c.Databases, flags)
 	if err != nil {
 		return err
 	}
 
-	media = query.FilterMedia(media, c.GlobalFlags)
-	query.SortMedia(media, c.GlobalFlags)
+	media = query.FilterMedia(media, flags)
+	query.SortMedia(media, flags)
 	if c.ReRank != "" {
-		media = query.ReRankMedia(media, c.GlobalFlags)
+		media = query.ReRankMedia(media, flags)
 	}
 
 	if len(media) == 0 {
@@ -629,7 +731,7 @@ func (c *ListenCmd) Run(ctx *kong.Context) error {
 		args = append(args, m.Path)
 
 		if c.Cast {
-			if err := CastPlay(c.GlobalFlags, []models.MediaWithDB{m}, true); err != nil {
+			if err := CastPlay(flags, []models.MediaWithDB{m}, true); err != nil {
 				slog.Error("Cast failed", "path", m.Path, "error", err)
 			}
 			continue
@@ -651,7 +753,7 @@ func (c *ListenCmd) Run(ctx *kong.Context) error {
 			if m.Playhead != nil {
 				existingPlayhead = int(*m.Playhead)
 			}
-			playhead := utils.GetPlayhead(c.GlobalFlags, m.Path, startTime, existingPlayhead, mediaDuration)
+			playhead := utils.GetPlayhead(flags, m.Path, startTime, existingPlayhead, mediaDuration)
 			history.UpdateHistorySimple(m.DB, []string{m.Path}, playhead, false)
 		}
 
@@ -666,37 +768,45 @@ func (c *ListenCmd) Run(ctx *kong.Context) error {
 			return nil
 		}
 
-		RunExitCommand(c.GlobalFlags, exitCode, m.Path)
+		RunExitCommand(flags, exitCode, m.Path)
 
 		if c.Interactive {
-			InteractiveDecision(c.GlobalFlags, m)
+			InteractiveDecision(flags, m)
 		}
 
-		ExecutePostAction(c.GlobalFlags, []models.MediaWithDB{m})
+		ExecutePostAction(flags, []models.MediaWithDB{m})
 	}
 
 	return nil
 }
 
 type OpenCmd struct {
-	models.GlobalFlags
+	models.CoreFlags        `embed:""`
+	models.PathFilterFlags  `embed:""`
+	models.FilterFlags      `embed:""`
+	models.MediaFilterFlags `embed:""`
+	models.SortFlags        `embed:""`
+	models.PostActionFlags  `embed:""`
+
 	Databases []string `arg:"" required:"" help:"SQLite database files" type:"existingfile"`
 }
 
-func (c OpenCmd) IsFilterTrait()      {}
-func (c OpenCmd) IsPathFilterTrait()  {}
-func (c OpenCmd) IsMediaFilterTrait() {}
-func (c OpenCmd) IsSortTrait()        {}
-func (c OpenCmd) IsPostActionTrait()  {}
-
 func (c *OpenCmd) Run(ctx *kong.Context) error {
 	models.SetupLogging(c.Verbose)
-	media, err := query.MediaQuery(context.Background(), c.Databases, c.GlobalFlags)
+	flags := models.GlobalFlags{
+		CoreFlags:        c.CoreFlags,
+		PathFilterFlags:  c.PathFilterFlags,
+		FilterFlags:      c.FilterFlags,
+		MediaFilterFlags: c.MediaFilterFlags,
+		SortFlags:        c.SortFlags,
+		PostActionFlags:  c.PostActionFlags,
+	}
+	media, err := query.MediaQuery(context.Background(), c.Databases, flags)
 	if err != nil {
 		return err
 	}
 
-	media = query.FilterMedia(media, c.GlobalFlags)
+	media = query.FilterMedia(media, flags)
 
 	for _, m := range media {
 		if !utils.FileExists(m.Path) {
@@ -718,28 +828,35 @@ func (c *OpenCmd) Run(ctx *kong.Context) error {
 		}
 	}
 
-	return ExecutePostAction(c.GlobalFlags, media)
+	return ExecutePostAction(flags, media)
 }
 
 type BrowseCmd struct {
-	models.GlobalFlags
+	models.CoreFlags        `embed:""`
+	models.PathFilterFlags  `embed:""`
+	models.FilterFlags      `embed:""`
+	models.MediaFilterFlags `embed:""`
+	models.SortFlags        `embed:""`
+
 	Databases []string `arg:"" required:"" help:"SQLite database files" type:"existingfile"`
 	Browser   string   `help:"Browser to use"`
 }
 
-func (c BrowseCmd) IsFilterTrait()      {}
-func (c BrowseCmd) IsPathFilterTrait()  {}
-func (c BrowseCmd) IsMediaFilterTrait() {}
-func (c BrowseCmd) IsSortTrait()        {}
-
 func (c *BrowseCmd) Run(ctx *kong.Context) error {
 	models.SetupLogging(c.Verbose)
-	media, err := query.MediaQuery(context.Background(), c.Databases, c.GlobalFlags)
+	flags := models.GlobalFlags{
+		CoreFlags:        c.CoreFlags,
+		PathFilterFlags:  c.PathFilterFlags,
+		FilterFlags:      c.FilterFlags,
+		MediaFilterFlags: c.MediaFilterFlags,
+		SortFlags:        c.SortFlags,
+	}
+	media, err := query.MediaQuery(context.Background(), c.Databases, flags)
 	if err != nil {
 		return err
 	}
 
-	media = query.FilterMedia(media, c.GlobalFlags)
+	media = query.FilterMedia(media, flags)
 
 	browser := c.Browser
 	if browser == "" {
@@ -763,26 +880,35 @@ func (c *BrowseCmd) Run(ctx *kong.Context) error {
 }
 
 type StatsCmd struct {
-	models.GlobalFlags
+	models.CoreFlags        `embed:""`
+	models.PathFilterFlags  `embed:""`
+	models.FilterFlags      `embed:""`
+	models.MediaFilterFlags `embed:""`
+	models.TimeFilterFlags  `embed:""`
+	models.DeletedFlags     `embed:""`
+	models.DisplayFlags     `embed:""`
+
 	Facet     string   `arg:"" required:"" help:"One of: watched, deleted, created, modified"`
 	Databases []string `arg:"" required:"" help:"SQLite database files" type:"existingfile"`
 }
 
-func (c StatsCmd) IsFilterTrait()      {}
-func (c StatsCmd) IsPathFilterTrait()  {}
-func (c StatsCmd) IsTimeTrait()        {}
-func (c StatsCmd) IsMediaFilterTrait() {}
-func (c StatsCmd) IsDeletedTrait()     {}
-func (c StatsCmd) IsDisplayTrait()     {}
-
 func (c *StatsCmd) Run(ctx *kong.Context) error {
 	models.SetupLogging(c.Verbose)
+	flags := models.GlobalFlags{
+		CoreFlags:        c.CoreFlags,
+		PathFilterFlags:  c.PathFilterFlags,
+		FilterFlags:      c.FilterFlags,
+		MediaFilterFlags: c.MediaFilterFlags,
+		TimeFilterFlags:  c.TimeFilterFlags,
+		DeletedFlags:     c.DeletedFlags,
+		DisplayFlags:     c.DisplayFlags,
+	}
 
 	timeCol := "time_last_played"
 	switch c.Facet {
 	case "deleted":
 		timeCol = "time_deleted"
-		c.MarkDeleted = true // Ensure we don't hide deleted in query
+		flags.MarkDeleted = true // Ensure we don't hide deleted in query
 	case "created":
 		timeCol = "time_created"
 	case "modified":
@@ -873,11 +999,10 @@ func (c *StatsCmd) Run(ctx *kong.Context) error {
 }
 
 type PlaylistsCmd struct {
-	models.GlobalFlags
-	Databases []string `arg:"" required:"" help:"SQLite database files" type:"existingfile"`
+	models.CoreFlags    `embed:""`
+	models.DisplayFlags `embed:""`
+	Databases           []string `arg:"" required:"" help:"SQLite database files" type:"existingfile"`
 }
-
-func (c PlaylistsCmd) IsDisplayTrait() {}
 
 func (c *PlaylistsCmd) Run(ctx *kong.Context) error {
 	models.SetupLogging(c.Verbose)
@@ -913,22 +1038,34 @@ func (c *PlaylistsCmd) Run(ctx *kong.Context) error {
 }
 
 type SearchCmd struct {
-	models.GlobalFlags
+	models.CoreFlags        `embed:""`
+	models.QueryFlags       `embed:""`
+	models.PathFilterFlags  `embed:""`
+	models.FilterFlags      `embed:""`
+	models.MediaFilterFlags `embed:""`
+	models.TimeFilterFlags  `embed:""`
+	models.DeletedFlags     `embed:""`
+	models.SortFlags        `embed:""`
+	models.DisplayFlags     `embed:""`
+	models.FTSFlags         `embed:""`
+
 	Databases []string `arg:"" required:"" help:"SQLite database files" type:"existingfile"`
 }
 
-func (c SearchCmd) IsQueryTrait()       {}
-func (c SearchCmd) IsFilterTrait()      {}
-func (c SearchCmd) IsTimeTrait()        {}
-func (c SearchCmd) IsMediaFilterTrait() {}
-func (c SearchCmd) IsPathFilterTrait()  {}
-func (c SearchCmd) IsDeletedTrait()     {}
-func (c SearchCmd) IsSortTrait()        {}
-func (c SearchCmd) IsDisplayTrait()     {}
-func (c SearchCmd) IsFTSTrait()         {}
-
 func (c *SearchCmd) Run(ctx *kong.Context) error {
 	models.SetupLogging(c.Verbose)
+	flags := models.GlobalFlags{
+		CoreFlags:        c.CoreFlags,
+		QueryFlags:       c.QueryFlags,
+		PathFilterFlags:  c.PathFilterFlags,
+		FilterFlags:      c.FilterFlags,
+		MediaFilterFlags: c.MediaFilterFlags,
+		TimeFilterFlags:  c.TimeFilterFlags,
+		DeletedFlags:     c.DeletedFlags,
+		SortFlags:        c.SortFlags,
+		DisplayFlags:     c.DisplayFlags,
+		FTSFlags:         c.FTSFlags,
+	}
 	// We prefer FTS if not specified
 	if !c.FTS {
 		// Check if FTS table exists in first database
@@ -944,13 +1081,13 @@ func (c *SearchCmd) Run(ctx *kong.Context) error {
 		}
 	}
 
-	media, err := query.MediaQuery(context.Background(), c.Databases, c.GlobalFlags)
+	media, err := query.MediaQuery(context.Background(), c.Databases, flags)
 	if err != nil {
 		return err
 	}
 
-	media = query.FilterMedia(media, c.GlobalFlags)
-	query.SortMedia(media, c.GlobalFlags)
+	media = query.FilterMedia(media, flags)
+	query.SortMedia(media, flags)
 
 	if c.JSON {
 		encoder := json.NewEncoder(os.Stdout)
@@ -971,19 +1108,18 @@ func PrintFrequencyStats(stats []query.FrequencyStats) error {
 }
 
 type HistoryCmd struct {
-	models.GlobalFlags
+	models.CoreFlags        `embed:""`
+	models.PathFilterFlags  `embed:""`
+	models.FilterFlags      `embed:""`
+	models.MediaFilterFlags `embed:""`
+	models.TimeFilterFlags  `embed:""`
+	models.DeletedFlags     `embed:""`
+	models.SortFlags        `embed:""`
+	models.DisplayFlags     `embed:""`
+	models.PostActionFlags  `embed:""`
+
 	Databases []string `arg:"" required:"" help:"SQLite database files" type:"existingfile"`
 }
-
-func (c HistoryCmd) IsHistoryTrait()     {}
-func (c HistoryCmd) IsFilterTrait()      {}
-func (c HistoryCmd) IsPathFilterTrait()  {}
-func (c HistoryCmd) IsTimeTrait()        {}
-func (c HistoryCmd) IsMediaFilterTrait() {}
-func (c HistoryCmd) IsDeletedTrait()     {}
-func (c HistoryCmd) IsSortTrait()        {}
-func (c HistoryCmd) IsDisplayTrait()     {}
-func (c HistoryCmd) IsPostActionTrait()  {}
 
 func HideRedundantFirstPlayed(media []models.MediaWithDB) {
 	for i := range media {
@@ -995,41 +1131,52 @@ func HideRedundantFirstPlayed(media []models.MediaWithDB) {
 
 func (c *HistoryCmd) Run(ctx *kong.Context) error {
 	models.SetupLogging(c.Verbose)
+	flags := models.GlobalFlags{
+		CoreFlags:        c.CoreFlags,
+		PathFilterFlags:  c.PathFilterFlags,
+		FilterFlags:      c.FilterFlags,
+		MediaFilterFlags: c.MediaFilterFlags,
+		TimeFilterFlags:  c.TimeFilterFlags,
+		DeletedFlags:     c.DeletedFlags,
+		SortFlags:        c.SortFlags,
+		DisplayFlags:     c.DisplayFlags,
+		PostActionFlags:  c.PostActionFlags,
+	}
 	// Set default sort for history
-	if c.SortBy == "path" || c.SortBy == "" {
-		c.SortBy = "time_last_played"
-		c.Reverse = true
+	if flags.SortBy == "path" || flags.SortBy == "" {
+		flags.SortBy = "time_last_played"
+		flags.Reverse = true
 	}
 
-	media, err := query.MediaQuery(context.Background(), c.Databases, c.GlobalFlags)
+	media, err := query.MediaQuery(context.Background(), c.Databases, flags)
 	if err != nil {
 		return err
 	}
 
 	// Filter for only watched items if not otherwise specified
-	if c.Watched == nil && !c.InProgress && !c.Completed {
+	if flags.Watched == nil && !flags.InProgress && !flags.Completed {
 		watched := true
-		c.Watched = &watched
+		flags.Watched = &watched
 	}
 
-	media = query.FilterMedia(media, c.GlobalFlags)
+	media = query.FilterMedia(media, flags)
 	HideRedundantFirstPlayed(media)
 
-	if c.JSON {
+	if flags.JSON {
 		encoder := json.NewEncoder(os.Stdout)
 		encoder.SetIndent("", "  ")
 		return encoder.Encode(media)
 	}
 
-	if c.Completed {
+	if flags.Completed {
 		fmt.Println("Completed:")
-	} else if c.InProgress {
+	} else if flags.InProgress {
 		fmt.Println("In progress:")
 	} else {
 		fmt.Println("History:")
 	}
 
-	if c.DeleteRows {
+	if flags.DeleteRows {
 		for _, dbPath := range c.Databases {
 			var paths []string
 			for _, m := range media {
@@ -1047,24 +1194,24 @@ func (c *HistoryCmd) Run(ctx *kong.Context) error {
 		return nil
 	}
 
-	if c.Partial != "" {
-		query.SortHistory(media, c.Partial, c.Reverse)
+	if flags.Partial != "" {
+		query.SortHistory(media, flags.Partial, flags.Reverse)
 	} else {
-		query.SortMedia(media, c.GlobalFlags)
+		query.SortMedia(media, flags)
 	}
-	return PrintMedia(c.Columns, media)
+	return PrintMedia(flags.Columns, media)
 }
 
 type HistoryAddCmd struct {
-	models.GlobalFlags
-	Args []string `arg:"" name:"args" required:"" help:"Database file followed by paths to mark as played"`
+	models.CoreFlags `embed:""`
+	Args             []string `arg:"" name:"args" required:"" help:"Database file followed by paths to mark as played"`
 
 	Paths    []string `kong:"-"`
 	Database string   `kong:"-"`
 }
 
 func (c *HistoryAddCmd) AfterApply() error {
-	if err := c.GlobalFlags.AfterApply(); err != nil {
+	if err := c.CoreFlags.AfterApply(); err != nil {
 		return err
 	}
 	if len(c.Args) < 2 {
@@ -1096,8 +1243,8 @@ func (c *HistoryAddCmd) Run(ctx *kong.Context) error {
 }
 
 type OptimizeCmd struct {
-	models.GlobalFlags
-	Databases []string `arg:"" required:"" help:"SQLite database files" type:"existingfile"`
+	models.CoreFlags `embed:""`
+	Databases        []string `arg:"" required:"" help:"SQLite database files" type:"existingfile"`
 }
 
 func (c *OptimizeCmd) Run(ctx *kong.Context) error {
@@ -1132,16 +1279,19 @@ func (c *OptimizeCmd) Run(ctx *kong.Context) error {
 }
 
 type SampleHashCmd struct {
-	models.GlobalFlags
-	Paths []string `arg:"" required:"" help:"Files to hash" type:"existingfile"`
+	models.CoreFlags    `embed:""`
+	models.HashingFlags `embed:""`
+	Paths               []string `arg:"" required:"" help:"Files to hash" type:"existingfile"`
 }
-
-func (c SampleHashCmd) IsHashingTrait() {}
 
 func (c *SampleHashCmd) Run(ctx *kong.Context) error {
 	models.SetupLogging(c.Verbose)
+	flags := models.GlobalFlags{
+		CoreFlags:    c.CoreFlags,
+		HashingFlags: c.HashingFlags,
+	}
 	for _, path := range c.Paths {
-		h, err := utils.SampleHashFile(path, c.HashThreads, c.HashGap, c.HashChunkSize)
+		h, err := utils.SampleHashFile(path, flags.HashThreads, flags.HashGap, flags.HashChunkSize)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error hashing %s: %v\n", path, err)
 			continue
@@ -1152,7 +1302,10 @@ func (c *SampleHashCmd) Run(ctx *kong.Context) error {
 }
 
 type AddCmd struct {
-	models.GlobalFlags
+	models.CoreFlags        `embed:""`
+	models.PathFilterFlags  `embed:""`
+	models.MediaFilterFlags `embed:""`
+
 	Args     []string `arg:"" name:"args" required:"" help:"Database file followed by paths to scan"`
 	Parallel int      `short:"p" help:"Number of parallel extractors (default: CPU count * 4)"`
 
@@ -1160,11 +1313,11 @@ type AddCmd struct {
 	Database  string   `kong:"-"`
 }
 
-func (c AddCmd) IsFilterTrait()      {}
-func (c AddCmd) IsMediaFilterTrait() {}
-
 func (c *AddCmd) AfterApply() error {
-	if err := c.GlobalFlags.AfterApply(); err != nil {
+	if err := c.CoreFlags.AfterApply(); err != nil {
+		return err
+	}
+	if err := c.MediaFilterFlags.AfterApply(); err != nil {
 		return err
 	}
 	if len(c.Args) < 2 {
@@ -1188,6 +1341,11 @@ func (c *AddCmd) AfterApply() error {
 
 func (c *AddCmd) Run(ctx *kong.Context) error {
 	models.SetupLogging(c.Verbose)
+	flags := models.GlobalFlags{
+		CoreFlags:        c.CoreFlags,
+		PathFilterFlags:  c.PathFilterFlags,
+		MediaFilterFlags: c.MediaFilterFlags,
+	}
 	dbPath := c.Database
 	c.ScanPaths = utils.ExpandStdin(c.ScanPaths)
 
@@ -1322,7 +1480,7 @@ func (c *AddCmd) Run(ctx *kong.Context) error {
 		for i := 0; i < c.Parallel; i++ {
 			wg.Go(func() {
 				for path := range jobs {
-					res, err := metadata.Extract(context.Background(), path, c.ScanSubtitles)
+					res, err := metadata.Extract(context.Background(), path, flags.ScanSubtitles)
 					if err != nil {
 						slog.Error("Metadata extraction failed", "path", path, "error", err)
 						continue
@@ -1397,7 +1555,10 @@ func (c *AddCmd) Run(ctx *kong.Context) error {
 }
 
 type CheckCmd struct {
-	models.GlobalFlags
+	models.CoreFlags        `embed:""`
+	models.PathFilterFlags  `embed:""`
+	models.MediaFilterFlags `embed:""`
+
 	Args   []string `arg:"" required:"" help:"Database file followed by optional paths to check"`
 	DryRun bool     `help:"Don't actually mark files as deleted"`
 
@@ -1405,11 +1566,11 @@ type CheckCmd struct {
 	Databases  []string `kong:"-"`
 }
 
-func (c CheckCmd) IsFilterTrait()      {}
-func (c CheckCmd) IsMediaFilterTrait() {}
-
 func (c *CheckCmd) AfterApply() error {
-	if err := c.GlobalFlags.AfterApply(); err != nil {
+	if err := c.CoreFlags.AfterApply(); err != nil {
+		return err
+	}
+	if err := c.MediaFilterFlags.AfterApply(); err != nil {
 		return err
 	}
 	if len(c.Args) < 1 {
@@ -1924,16 +2085,18 @@ func CastPlay(flags models.GlobalFlags, media []models.MediaWithDB, audioOnly bo
 }
 
 type DedupeCmd struct {
-	models.GlobalFlags
+	models.CoreFlags        `embed:""`
+	models.PathFilterFlags  `embed:""`
+	models.FilterFlags      `embed:""`
+	models.MediaFilterFlags `embed:""`
+	models.TimeFilterFlags  `embed:""`
+	models.DeletedFlags     `embed:""`
+	models.DedupeFlags      `embed:""`
+	models.PostActionFlags  `embed:""`
+	models.HashingFlags     `embed:""`
+
 	Databases []string `arg:"" required:"" help:"SQLite database files" type:"existingfile"`
 }
-
-func (c DedupeCmd) IsFilterTrait()      {}
-func (c DedupeCmd) IsTimeTrait()        {}
-func (c DedupeCmd) IsMediaFilterTrait() {}
-func (c DedupeCmd) IsPathFilterTrait()  {}
-func (c DedupeCmd) IsDeletedTrait()     {}
-func (c DedupeCmd) IsDedupeTrait()      {}
 
 type DedupeDuplicate struct {
 	KeepPath      string
@@ -1943,6 +2106,17 @@ type DedupeDuplicate struct {
 
 func (c *DedupeCmd) Run(ctx *kong.Context) error {
 	models.SetupLogging(c.Verbose)
+	flags := models.GlobalFlags{
+		CoreFlags:        c.CoreFlags,
+		PathFilterFlags:  c.PathFilterFlags,
+		FilterFlags:      c.FilterFlags,
+		MediaFilterFlags: c.MediaFilterFlags,
+		TimeFilterFlags:  c.TimeFilterFlags,
+		DeletedFlags:     c.DeletedFlags,
+		DedupeFlags:      c.DedupeFlags,
+		PostActionFlags:  c.PostActionFlags,
+		HashingFlags:     c.HashingFlags,
+	}
 
 	var duplicates []DedupeDuplicate
 	var err error
@@ -1958,7 +2132,7 @@ func (c *DedupeCmd) Run(ctx *kong.Context) error {
 		} else if c.DurationOnly {
 			dbDups, err = c.getDurationDuplicates(dbPath)
 		} else if c.Filesystem {
-			dbDups, err = c.getFSDuplicates(dbPath)
+			dbDups, err = c.getFSDuplicates(dbPath, flags)
 		} else {
 			return fmt.Errorf("profile not set. Use --audio, --id, --title, --duration, or --fs")
 		}
@@ -2028,8 +2202,8 @@ func (c *DedupeCmd) Run(ctx *kong.Context) error {
 			cmdStr := strings.ReplaceAll(c.DedupeCmd, "{}", fmt.Sprintf("'%s'", d.DuplicatePath))
 			// rmlint style is cmd duplicate keep
 			exec.Command("bash", "-c", cmdStr+" "+fmt.Sprintf("'%s'", d.DuplicatePath)+" "+fmt.Sprintf("'%s'", d.KeepPath)).Run()
-		} else if c.Trash {
-			utils.Trash(c.GlobalFlags, d.DuplicatePath)
+		} else if flags.Trash {
+			utils.Trash(flags, d.DuplicatePath)
 		} else {
 			os.Remove(d.DuplicatePath)
 		}
@@ -2184,7 +2358,7 @@ func (c *DedupeCmd) getDurationDuplicates(dbPath string) ([]DedupeDuplicate, err
 	return dups, nil
 }
 
-func (c *DedupeCmd) getFSDuplicates(dbPath string) ([]DedupeDuplicate, error) {
+func (c *DedupeCmd) getFSDuplicates(dbPath string, flags models.GlobalFlags) ([]DedupeDuplicate, error) {
 	sqlDB, err := db.Connect(dbPath)
 	if err != nil {
 		return nil, err
@@ -2223,7 +2397,7 @@ func (c *DedupeCmd) getFSDuplicates(dbPath string) ([]DedupeDuplicate, error) {
 	// 2. Sample Hash
 	sampleHashes := make(map[string][]string)
 	for _, p := range candidates {
-		h, err := utils.SampleHashFile(p, c.HashThreads, c.HashGap, c.HashChunkSize)
+		h, err := utils.SampleHashFile(p, flags.HashThreads, flags.HashGap, flags.HashChunkSize)
 		if err == nil && h != "" {
 			sampleHashes[h] = append(sampleHashes[h], p)
 		}
@@ -2266,19 +2440,26 @@ func (c *DedupeCmd) getFSDuplicates(dbPath string) ([]DedupeDuplicate, error) {
 }
 
 type MpvWatchlaterCmd struct {
-	models.GlobalFlags
+	models.CoreFlags        `embed:""`
+	models.MediaFilterFlags `embed:""`
+	models.PathFilterFlags  `embed:""`
+	models.TimeFilterFlags  `embed:""`
+	models.DeletedFlags     `embed:""`
+	models.PlaybackFlags    `embed:""`
+
 	Databases []string `arg:"" required:"" help:"SQLite database files" type:"existingfile"`
 }
 
-func (c MpvWatchlaterCmd) IsHistoryTrait()     {}
-func (c MpvWatchlaterCmd) IsFilterTrait()      {}
-func (c MpvWatchlaterCmd) IsMediaFilterTrait() {}
-func (c MpvWatchlaterCmd) IsPathFilterTrait()  {}
-func (c MpvWatchlaterCmd) IsTimeTrait()        {}
-func (c MpvWatchlaterCmd) IsDeletedTrait()     {}
-
 func (c *MpvWatchlaterCmd) Run(ctx *kong.Context) error {
 	models.SetupLogging(c.Verbose)
+	flags := models.GlobalFlags{
+		CoreFlags:        c.CoreFlags,
+		MediaFilterFlags: c.MediaFilterFlags,
+		PathFilterFlags:  c.PathFilterFlags,
+		TimeFilterFlags:  c.TimeFilterFlags,
+		DeletedFlags:     c.DeletedFlags,
+		PlaybackFlags:    c.PlaybackFlags,
+	}
 
 	watchLaterDir := c.WatchLaterDir
 	if watchLaterDir == "" {
@@ -2290,7 +2471,7 @@ func (c *MpvWatchlaterCmd) Run(ctx *kong.Context) error {
 	}
 
 	// 1. Get all media from databases
-	media, err := query.MediaQuery(context.Background(), c.Databases, c.GlobalFlags)
+	media, err := query.MediaQuery(context.Background(), c.Databases, flags)
 	if err != nil {
 		return err
 	}

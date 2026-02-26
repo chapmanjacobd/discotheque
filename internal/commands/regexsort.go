@@ -13,7 +13,10 @@ import (
 )
 
 type RegexSortCmd struct {
-	models.GlobalFlags
+	models.CoreFlags `embed:""`
+	models.SortFlags `embed:""`
+	models.TextFlags `embed:""`
+
 	InputPath  string `arg:"" optional:"" help:"Input file path (default stdin)" default:"-"`
 	OutputPath string `help:"Output file path (default stdout)"`
 
@@ -22,11 +25,13 @@ type RegexSortCmd struct {
 	Writer io.Writer `kong:"-"`
 }
 
-func (c RegexSortCmd) IsTextTrait() {}
-func (c RegexSortCmd) IsSortTrait() {}
-
 func (c *RegexSortCmd) Run(ctx *kong.Context) error {
 	models.SetupLogging(c.Verbose)
+	flags := models.GlobalFlags{
+		CoreFlags: c.CoreFlags,
+		SortFlags: c.SortFlags,
+		TextFlags: c.TextFlags,
+	}
 
 	var lines []string
 	var scanner *bufio.Scanner
@@ -65,12 +70,12 @@ func (c *RegexSortCmd) Run(ctx *kong.Context) error {
 			mapping[sentence] = line
 		}
 
-		sortedSentences := utils.TextProcessor(c.GlobalFlags, sentenceStrings)
+		sortedSentences := utils.TextProcessor(flags, sentenceStrings)
 		for _, s := range sortedSentences {
 			processedLines = append(processedLines, mapping[s])
 		}
 	} else {
-		processedLines = utils.TextProcessor(c.GlobalFlags, lines)
+		processedLines = utils.TextProcessor(flags, lines)
 	}
 
 	var writer *bufio.Writer

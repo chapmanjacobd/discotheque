@@ -16,19 +16,25 @@ import (
 )
 
 type FilesInfoCmd struct {
-	models.GlobalFlags
+	models.CoreFlags        `embed:""`
+	models.FilterFlags      `embed:""`
+	models.TimeFilterFlags  `embed:""`
+	models.MediaFilterFlags `embed:""`
+	models.DisplayFlags     `embed:""`
+
 	Args []string `arg:"" required:"" help:"Database file(s) or files/directories to scan"`
 
 	Databases []string `kong:"-"`
 	ScanPaths []string `kong:"-"`
 }
 
-func (c FilesInfoCmd) IsFilterTrait()  {}
-func (c FilesInfoCmd) IsTimeTrait()    {}
-func (c FilesInfoCmd) IsContentTrait() {}
-func (c FilesInfoCmd) IsDisplayTrait() {}
-
 func (c *FilesInfoCmd) AfterApply() error {
+	if err := c.CoreFlags.AfterApply(); err != nil {
+		return err
+	}
+	if err := c.MediaFilterFlags.AfterApply(); err != nil {
+		return err
+	}
 	for _, arg := range c.Args {
 		if strings.HasSuffix(arg, ".db") && utils.IsSQLite(arg) {
 			c.Databases = append(c.Databases, arg)
@@ -41,12 +47,19 @@ func (c *FilesInfoCmd) AfterApply() error {
 
 func (c *FilesInfoCmd) Run(ctx *kong.Context) error {
 	models.SetupLogging(c.Verbose)
+	flags := models.GlobalFlags{
+		CoreFlags:        c.CoreFlags,
+		FilterFlags:      c.FilterFlags,
+		TimeFilterFlags:  c.TimeFilterFlags,
+		MediaFilterFlags: c.MediaFilterFlags,
+		DisplayFlags:     c.DisplayFlags,
+	}
 
 	var allMedia []models.MediaWithDB
 
 	// Handle databases
 	if len(c.Databases) > 0 {
-		media, err := query.MediaQuery(context.Background(), c.Databases, c.GlobalFlags)
+		media, err := query.MediaQuery(context.Background(), c.Databases, flags)
 		if err != nil {
 			return err
 		}

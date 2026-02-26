@@ -13,12 +13,13 @@ import (
 )
 
 type MergeDBsCmd struct {
-	models.GlobalFlags
+	models.CoreFlags   `embed:""`
+	models.FilterFlags `embed:""`
+	models.MergeFlags  `embed:""`
+
 	TargetDB  string   `arg:"" required:"" help:"Target SQLite database file"`
 	SourceDBs []string `arg:"" required:"" help:"Source SQLite database files" type:"existingfile"`
 }
-
-func (c MergeDBsCmd) IsMergeTrait() {}
 
 func (c *MergeDBsCmd) Run(ctx *kong.Context) error {
 	models.SetupLogging(c.Verbose)

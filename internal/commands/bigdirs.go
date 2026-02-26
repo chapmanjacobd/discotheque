@@ -6,21 +6,31 @@ import (
 )
 
 type BigDirsCmd struct {
-	models.GlobalFlags
+	models.CoreFlags        `embed:""`
+	models.PathFilterFlags  `embed:""`
+	models.FilterFlags      `embed:""`
+	models.MediaFilterFlags `embed:""`
+	models.TimeFilterFlags  `embed:""`
+	models.DeletedFlags     `embed:""`
+	models.AggregateFlags   `embed:""`
+	models.DisplayFlags     `embed:""`
+
 	Databases []string `arg:"" required:"" help:"SQLite database files" type:"existingfile"`
 }
-
-func (c BigDirsCmd) IsFilterTrait()      {}
-func (c BigDirsCmd) IsPathFilterTrait()  {}
-func (c BigDirsCmd) IsTimeTrait()        {}
-func (c BigDirsCmd) IsMediaFilterTrait() {}
-func (c BigDirsCmd) IsDeletedTrait()     {}
-func (c BigDirsCmd) IsAggregateTrait()   {}
-func (c BigDirsCmd) IsDisplayTrait()     {}
 
 func (c *BigDirsCmd) Run(ctx *kong.Context) error {
 	// Bigdirs is Essentially Print with BigDirs enabled by default
 	c.BigDirs = true
-	printCmd := PrintCmd{GlobalFlags: c.GlobalFlags, Databases: c.Databases}
+	printCmd := PrintCmd{
+		CoreFlags:        c.CoreFlags,
+		PathFilterFlags:  c.PathFilterFlags,
+		FilterFlags:      c.FilterFlags,
+		MediaFilterFlags: c.MediaFilterFlags,
+		TimeFilterFlags:  c.TimeFilterFlags,
+		DeletedFlags:     c.DeletedFlags,
+		AggregateFlags:   c.AggregateFlags,
+		DisplayFlags:     c.DisplayFlags,
+		Databases:        c.Databases,
+	}
 	return printCmd.Run(ctx)
 }

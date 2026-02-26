@@ -81,7 +81,9 @@ func TestGetPlayhead(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	flags := models.GlobalFlags{
-		WatchLaterDir: tmpDir,
+		PlaybackFlags: models.PlaybackFlags{
+			WatchLaterDir: tmpDir,
+		},
 	}
 	path := "/home/runner/work/library/library/tests/data/test.mp4"
 	md5Hash := PathToMpvWatchLaterMD5(path)

@@ -60,8 +60,8 @@ func TestFilesInfoCmd_Run(t *testing.T) {
 	os.Stdout = w
 
 	cmd := &FilesInfoCmd{
-		GlobalFlags: models.GlobalFlags{JSON: true},
-		Args:        []string{f.Name()},
+		DisplayFlags: models.DisplayFlags{JSON: true},
+		Args:         []string{f.Name()},
 	}
 	if err := cmd.AfterApply(); err != nil {
 		t.Fatalf("AfterApply failed: %v", err)
@@ -98,10 +98,10 @@ func TestSearchDBCmd_Run(t *testing.T) {
 
 	t.Run("FuzzyTableMatching", func(t *testing.T) {
 		cmd := &SearchDBCmd{
-			GlobalFlags: models.GlobalFlags{JSON: true},
-			Database:    dbPath,
-			Table:       "tes", // fuzzy match for 'test'
-			Search:      []string{"apple"},
+			DisplayFlags: models.DisplayFlags{JSON: true},
+			Database:     dbPath,
+			Table:        "tes", // fuzzy match for 'test'
+			Search:       []string{"apple"},
 		}
 		if err := cmd.Run(nil); err != nil {
 			t.Fatalf("SearchDBCmd failed: %v", err)
@@ -110,7 +110,7 @@ func TestSearchDBCmd_Run(t *testing.T) {
 
 	t.Run("DeleteRows", func(t *testing.T) {
 		cmd := &SearchDBCmd{
-			GlobalFlags: models.GlobalFlags{
+			PostActionFlags: models.PostActionFlags{
 				DeleteRows: true,
 			},
 			Database: dbPath,
@@ -138,7 +138,7 @@ func TestSearchDBCmd_Run(t *testing.T) {
 		dbConn.Close()
 
 		cmd := &SearchDBCmd{
-			GlobalFlags: models.GlobalFlags{
+			PostActionFlags: models.PostActionFlags{
 				MarkDeleted: true,
 			},
 			Database: dbPath,
@@ -226,7 +226,7 @@ func TestRegexSortCmd_Run(t *testing.T) {
 	t.Run("LineSortDup", func(t *testing.T) {
 		var out strings.Builder
 		cmd := &RegexSortCmd{
-			GlobalFlags: models.GlobalFlags{
+			TextFlags: models.TextFlags{
 				LineSorts: []string{"dup", "natural"},
 			},
 			Reader: strings.NewReader(input),
@@ -265,9 +265,9 @@ func TestStatsCmd_Run(t *testing.T) {
 
 	t.Run("JSONStats", func(t *testing.T) {
 		cmd := &StatsCmd{
-			GlobalFlags: models.GlobalFlags{JSON: true},
-			Facet:       "watched",
-			Databases:   []string{fixture.DBPath},
+			DisplayFlags: models.DisplayFlags{JSON: true},
+			Facet:        "watched",
+			Databases:    []string{fixture.DBPath},
 		}
 		if err := cmd.Run(nil); err != nil {
 			t.Fatalf("StatsCmd failed: %v", err)
@@ -308,8 +308,9 @@ func TestPrintCmd_Run(t *testing.T) {
 
 	t.Run("PrintJSONAggregated", func(t *testing.T) {
 		cmd := &PrintCmd{
-			GlobalFlags: models.GlobalFlags{JSON: true, BigDirs: true},
-			Args:        []string{fixture.DBPath},
+			DisplayFlags:   models.DisplayFlags{JSON: true},
+			AggregateFlags: models.AggregateFlags{BigDirs: true},
+			Args:           []string{fixture.DBPath},
 		}
 		cmd.AfterApply()
 		if err := cmd.Run(nil); err != nil {
@@ -347,7 +348,7 @@ func TestHistoryCmd_Run(t *testing.T) {
 
 	t.Run("DeleteHistory", func(t *testing.T) {
 		cmd := &HistoryCmd{
-			GlobalFlags: models.GlobalFlags{
+			PostActionFlags: models.PostActionFlags{
 				DeleteRows: true,
 			},
 			Databases: []string{fixture.DBPath},
@@ -587,7 +588,7 @@ func TestSearchCmd_Run(t *testing.T) {
 	dbConn.Close()
 
 	cmd := &SearchCmd{
-		GlobalFlags: models.GlobalFlags{Search: []string{"Secret"}},
+		FilterFlags: models.FilterFlags{Search: []string{"Secret"}},
 		Databases:   []string{fixture.DBPath},
 	}
 	if err := cmd.Run(nil); err != nil {
@@ -677,7 +678,9 @@ func TestExecutePostAction(t *testing.T) {
 
 	// Test mark-deleted
 	flags := models.GlobalFlags{
-		PostAction: "mark-deleted",
+		PostActionFlags: models.PostActionFlags{
+			PostAction: "mark-deleted",
+		},
 	}
 	// Manually init DB
 	dbConn := fixture.GetDB()

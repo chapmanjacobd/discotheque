@@ -16,7 +16,12 @@ import (
 )
 
 type MediaCheckCmd struct {
-	models.GlobalFlags
+	models.CoreFlags        `embed:""`
+	models.PathFilterFlags  `embed:""`
+	models.FilterFlags      `embed:""`
+	models.MediaFilterFlags `embed:""`
+	models.DeletedFlags     `embed:""`
+
 	Databases []string `arg:"" required:"" help:"SQLite database files" type:"existingfile"`
 
 	ChunkSize         float64 `help:"Chunk size in seconds. If set, recommended to use >0.1 seconds" default:"0.5"`
@@ -27,19 +32,21 @@ type MediaCheckCmd struct {
 	AudioScan         bool    `help:"Count errors in audio track only"`
 }
 
-func (c MediaCheckCmd) IsFilterTrait()      {}
-func (c MediaCheckCmd) IsPathFilterTrait()  {}
-func (c MediaCheckCmd) IsMediaFilterTrait() {}
-func (c MediaCheckCmd) IsDeletedTrait()     {}
-
 func (c *MediaCheckCmd) Run(ctx *kong.Context) error {
 	models.SetupLogging(c.Verbose)
+	flags := models.GlobalFlags{
+		CoreFlags:        c.CoreFlags,
+		PathFilterFlags:  c.PathFilterFlags,
+		FilterFlags:      c.FilterFlags,
+		MediaFilterFlags: c.MediaFilterFlags,
+		DeletedFlags:     c.DeletedFlags,
+	}
 
-	media, err := query.MediaQuery(context.Background(), c.Databases, c.GlobalFlags)
+	media, err := query.MediaQuery(context.Background(), c.Databases, flags)
 	if err != nil {
 		return err
 	}
-	media = query.FilterMedia(media, c.GlobalFlags)
+	media = query.FilterMedia(media, flags)
 
 	if len(media) == 0 {
 		return fmt.Errorf("no media found")
@@ -83,7 +90,7 @@ func (c *MediaCheckCmd) Run(ctx *kong.Context) error {
 
 		if deleteThreshold > 0 && corruption >= deleteThreshold {
 			slog.Warn("Deleting corrupt file", "path", m.Path, "corruption", corruption)
-			if !c.DryRun {
+			if !c.Simulate {
 				if err := os.Remove(m.Path); err != nil {
 					slog.Error("Failed to delete corrupt file", "path", m.Path, "error", err)
 				} else {

@@ -629,8 +629,10 @@ func ResolvePercentileFlags(ctx context.Context, dbs []string, flags models.Glob
 		var tempFlags models.GlobalFlags
 		if global {
 			tempFlags = models.GlobalFlags{
-				HideDeleted: flags.HideDeleted,
-				OnlyDeleted: flags.OnlyDeleted,
+				DeletedFlags: models.DeletedFlags{
+					HideDeleted: flags.HideDeleted,
+					OnlyDeleted: flags.OnlyDeleted,
+				},
 			}
 		} else {
 			tempFlags = flags

@@ -184,8 +184,8 @@ func TestIntegration_FilterSortAggregate(t *testing.T) {
 
 	// Filter: Large video files (> 450MB) that are not samples
 	flags := models.GlobalFlags{
-		Size:    []string{">450MB"},
-		Exclude: []string{"*sample*"},
+		FilterFlags:     models.FilterFlags{Size: []string{">450MB"}},
+		PathFilterFlags: models.PathFilterFlags{Exclude: []string{"*sample*"}},
 	}
 	filtered := query.FilterMedia(allMedia, flags)
 
@@ -195,7 +195,7 @@ func TestIntegration_FilterSortAggregate(t *testing.T) {
 
 	// Sort by natural order (important for TV shows)
 	query.SortMedia(filtered, models.GlobalFlags{
-		SortBy: "path", NatSort: true,
+		SortFlags: models.SortFlags{SortBy: "path", NatSort: true},
 	})
 
 	// Verify S01E01 comes before S01E10
@@ -213,7 +213,7 @@ func TestIntegration_FilterSortAggregate(t *testing.T) {
 	}
 
 	// Aggregate by folder
-	folders := query.AggregateMedia(filtered, models.GlobalFlags{BigDirs: true})
+	folders := query.AggregateMedia(filtered, models.GlobalFlags{AggregateFlags: models.AggregateFlags{BigDirs: true}})
 
 	// Find TV show folder
 	var tvFolder *models.FolderStats
@@ -323,8 +323,10 @@ func TestIntegration_UnwatchedHDContent(t *testing.T) {
 
 	// Filter for unwatched files > 500MB and longer than 1 hour
 	flags := models.GlobalFlags{
-		Size:     []string{">500MB"},
-		Duration: []string{">1hour"},
+		FilterFlags: models.FilterFlags{
+			Size:     []string{">500MB"},
+			Duration: []string{">1hour"},
+		},
 	}
 	hdUnwatched := query.FilterMedia(unwatched, flags)
 
@@ -363,8 +365,8 @@ func TestIntegration_RegexNaturalSortSize(t *testing.T) {
 
 	// Find all Season 1 episodes using regex
 	flags := models.GlobalFlags{
-		Regex: `S01E\d+`,
-		Size:  []string{">400MB"}, // Exclude samples
+		PathFilterFlags: models.PathFilterFlags{Regex: `S01E\d+`},
+		FilterFlags:     models.FilterFlags{Size: []string{">400MB"}}, // Exclude samples
 	}
 	season1 := query.FilterMedia(allMedia, flags)
 
@@ -374,7 +376,7 @@ func TestIntegration_RegexNaturalSortSize(t *testing.T) {
 
 	// Natural sort to get correct episode order
 	query.SortMedia(season1, models.GlobalFlags{
-		SortBy: "path", NatSort: true,
+		SortFlags: models.SortFlags{SortBy: "path", NatSort: true},
 	})
 
 	// Verify episode order
@@ -437,7 +439,7 @@ func TestIntegration_MultiDatabaseScenario(t *testing.T) {
 
 	// Filter for videos only (exclude audiobooks)
 	flags := models.GlobalFlags{
-		Exclude: []string{"*.m4a", "*.mp3", "*.flac"},
+		PathFilterFlags: models.PathFilterFlags{Exclude: []string{"*.m4a", "*.mp3", "*.flac"}},
 	}
 	videos := query.FilterMedia(allMedia, flags)
 
@@ -447,7 +449,7 @@ func TestIntegration_MultiDatabaseScenario(t *testing.T) {
 	}
 
 	// Aggregate by folder across both databases
-	folders := query.AggregateMedia(videos, models.GlobalFlags{BigDirs: true})
+	folders := query.AggregateMedia(videos, models.GlobalFlags{AggregateFlags: models.AggregateFlags{BigDirs: true}})
 
 	// Sort by total size
 	query.SortFolders(folders, "size", true)
@@ -485,8 +487,10 @@ func TestIntegration_CompleteWatchWorkflow(t *testing.T) {
 
 	// Step 2: Filter for short content (easier to "watch" in test)
 	flags := models.GlobalFlags{
-		Duration: []string{"<1hour"},
-		Size:     []string{">100MB"},
+		FilterFlags: models.FilterFlags{
+			Duration: []string{"<1hour"},
+			Size:     []string{">100MB"},
+		},
 	}
 	toWatch := query.FilterMedia(unwatched, flags)
 
@@ -496,7 +500,7 @@ func TestIntegration_CompleteWatchWorkflow(t *testing.T) {
 
 	// Step 3: Natural sort (watch in order)
 	query.SortMedia(toWatch, models.GlobalFlags{
-		SortBy: "path", NatSort: true,
+		SortFlags: models.SortFlags{SortBy: "path", NatSort: true},
 	})
 
 	// Step 4: "Watch" first item
@@ -568,7 +572,7 @@ func TestIntegration_FolderStatsAccuracy(t *testing.T) {
 	}
 
 	// Aggregate by folder
-	folders := query.AggregateMedia(allMedia, models.GlobalFlags{BigDirs: true})
+	folders := query.AggregateMedia(allMedia, models.GlobalFlags{AggregateFlags: models.AggregateFlags{BigDirs: true}})
 
 	// Find action movies folder
 	var actionFolder *models.FolderStats
@@ -624,15 +628,15 @@ func BenchmarkIntegration_FilterSort(b *testing.B) {
 	}
 
 	flags := models.GlobalFlags{
-		Size:    []string{">400MB"},
-		Exclude: []string{"*sample*"},
+		FilterFlags:     models.FilterFlags{Size: []string{">400MB"}},
+		PathFilterFlags: models.PathFilterFlags{Exclude: []string{"*sample*"}},
 	}
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		filtered := query.FilterMedia(allMedia, flags)
 		query.SortMedia(filtered, models.GlobalFlags{
-			SortBy: "path", NatSort: true,
+			SortFlags: models.SortFlags{SortBy: "path", NatSort: true},
 		})
 	}
 }

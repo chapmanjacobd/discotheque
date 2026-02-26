@@ -72,13 +72,13 @@ func TestAggregateByDepth(t *testing.T) {
 	}
 
 	// Depth 3: /home/user/vids and /home/user/music
-	got := AggregateByDepth(media, models.GlobalFlags{Depth: 3})
+	got := AggregateByDepth(media, models.GlobalFlags{AggregateFlags: models.AggregateFlags{Depth: 3}})
 	if len(got) != 2 {
 		t.Errorf("Expected 2 groups at depth 3, got %d", len(got))
 	}
 
 	// Parents mode
-	got = AggregateByDepth(media, models.GlobalFlags{Parents: true, MinDepth: 1})
+	got = AggregateByDepth(media, models.GlobalFlags{AggregateFlags: models.AggregateFlags{Parents: true, MinDepth: 1}})
 	// Should have: /home, /home/user, /home/user/vids, /home/user/vids/v1.mp4, /home/user/vids/v2.mp4, /home/user/music, /home/user/music/a1.mp3
 	if len(got) != 7 {
 		t.Errorf("Expected 7 groups in parents mode, got %d", len(got))
@@ -95,7 +95,7 @@ func TestAggregateByDepthExtended(t *testing.T) {
 		{Media: models.Media{Path: "/dir2/f3.mp4", Size: &size300}},
 	}
 
-	got := AggregateByDepth(media, models.GlobalFlags{Depth: 1})
+	got := AggregateByDepth(media, models.GlobalFlags{AggregateFlags: models.AggregateFlags{Depth: 1}})
 	if len(got) != 2 {
 		t.Errorf("Expected 2 groups, got %d", len(got))
 	}
@@ -123,19 +123,19 @@ func TestAggregateMediaAllModes(t *testing.T) {
 	}
 
 	// Extensions
-	got := AggregateMedia(media, models.GlobalFlags{GroupByExtensions: true})
+	got := AggregateMedia(media, models.GlobalFlags{AggregateFlags: models.AggregateFlags{GroupByExtensions: true}})
 	if len(got) != 1 || got[0].Path != ".mp4" {
 		t.Errorf("Extensions mode failed: %v", got)
 	}
 
 	// MimeTypes
-	got = AggregateMedia(media, models.GlobalFlags{GroupByMimeTypes: true})
+	got = AggregateMedia(media, models.GlobalFlags{AggregateFlags: models.AggregateFlags{GroupByMimeTypes: true}})
 	if len(got) != 1 || got[0].Path != video {
 		t.Errorf("MimeTypes mode failed: %v", got)
 	}
 
 	// Size
-	got = AggregateMedia(media, models.GlobalFlags{GroupBySize: true})
+	got = AggregateMedia(media, models.GlobalFlags{AggregateFlags: models.AggregateFlags{GroupBySize: true}})
 	if len(got) != 1 {
 		t.Errorf("Size mode failed: %v", got)
 	}
@@ -150,13 +150,13 @@ func TestAggregatePostFilteringExtra(t *testing.T) {
 	}
 
 	// Filter by FileCounts > 1
-	got := AggregateMedia(media, models.GlobalFlags{Depth: 1, FileCounts: ">1"})
+	got := AggregateMedia(media, models.GlobalFlags{AggregateFlags: models.AggregateFlags{Depth: 1, FileCounts: ">1"}})
 	if len(got) != 1 || got[0].Path != "/dir1" {
 		t.Errorf("FileCounts filtering failed: %v", got)
 	}
 
 	// Filter by FoldersOnly
-	got = AggregateMedia(media, models.GlobalFlags{Depth: 1, FoldersOnly: true})
+	got = AggregateMedia(media, models.GlobalFlags{AggregateFlags: models.AggregateFlags{Depth: 1, FoldersOnly: true}})
 	if len(got) != 2 {
 		t.Errorf("FoldersOnly failed: %v", got)
 	}

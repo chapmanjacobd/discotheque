@@ -15,16 +15,17 @@ import (
 )
 
 type SearchCaptionsCmd struct {
-	models.GlobalFlags
+	models.CoreFlags     `embed:""`
+	models.QueryFlags    `embed:""`
+	models.FTSFlags      `embed:""`
+	models.PlaybackFlags `embed:""`
+
 	Database string   `arg:"" required:"" help:"SQLite database file" type:"existingfile"`
 	Search   []string `arg:"" required:"" help:"Search terms"`
 
 	Open    bool `help:"Open results in media player"`
 	Overlap int  `help:"Overlap in seconds for merging captions" default:"8"`
 }
-
-func (c SearchCaptionsCmd) IsPlaybackTrait() {}
-func (c SearchCaptionsCmd) IsFTSTrait()      {}
 
 type MergedCaption struct {
 	Path  string

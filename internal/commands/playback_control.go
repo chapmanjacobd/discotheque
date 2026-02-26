@@ -12,10 +12,8 @@ import (
 )
 
 type MpvControlBase struct {
-	models.ControlFlags
+	models.ControlFlags `embed:""`
 }
-
-func (c MpvControlBase) IsPlaybackTrait() {}
 
 type NowCmd struct {
 	MpvControlBase

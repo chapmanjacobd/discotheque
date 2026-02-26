@@ -7,8 +7,8 @@ import (
 )
 
 type RepairCmd struct {
-	models.GlobalFlags
-	Database string `arg:"" required:"" help:"Database file to repair" type:"existingfile"`
+	models.CoreFlags `embed:""`
+	Database         string `arg:"" required:"" help:"Database file to repair" type:"existingfile"`
 }
 
 func (c *RepairCmd) Run(ctx *kong.Context) error {

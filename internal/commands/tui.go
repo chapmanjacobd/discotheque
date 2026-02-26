@@ -15,17 +15,36 @@ import (
 )
 
 type TuiCmd struct {
-	models.GlobalFlags
+	models.CoreFlags        `embed:""`
+	models.QueryFlags       `embed:""`
+	models.PathFilterFlags  `embed:""`
+	models.FilterFlags      `embed:""`
+	models.MediaFilterFlags `embed:""`
+	models.TimeFilterFlags  `embed:""`
+	models.DeletedFlags     `embed:""`
+	models.SortFlags        `embed:""`
+	models.DisplayFlags     `embed:""`
+	models.FTSFlags         `embed:""`
+
 	Databases []string `arg:"" required:"" help:"SQLite database files" type:"existingfile"`
 }
 
-func (c TuiCmd) IsFilterTrait() {}
-func (c TuiCmd) IsSortTrait()   {}
-
 func (c *TuiCmd) Run(ctx *kong.Context) error {
 	models.SetupLogging(c.Verbose)
+	flags := models.GlobalFlags{
+		CoreFlags:        c.CoreFlags,
+		QueryFlags:       c.QueryFlags,
+		PathFilterFlags:  c.PathFilterFlags,
+		FilterFlags:      c.FilterFlags,
+		MediaFilterFlags: c.MediaFilterFlags,
+		TimeFilterFlags:  c.TimeFilterFlags,
+		DeletedFlags:     c.DeletedFlags,
+		SortFlags:        c.SortFlags,
+		DisplayFlags:     c.DisplayFlags,
+		FTSFlags:         c.FTSFlags,
+	}
 
-	media, err := query.MediaQuery(context.Background(), c.Databases, c.GlobalFlags)
+	media, err := query.MediaQuery(context.Background(), c.Databases, flags)
 	if err != nil {
 		return err
 	}
@@ -34,7 +53,7 @@ func (c *TuiCmd) Run(ctx *kong.Context) error {
 		return fmt.Errorf("no media found")
 	}
 
-	query.SortMedia(media, c.GlobalFlags)
+	query.SortMedia(media, flags)
 
 	var customCats []string
 	for _, dbPath := range c.Databases {
@@ -49,7 +68,7 @@ func (c *TuiCmd) Run(ctx *kong.Context) error {
 		}
 	}
 
-	m := tui.NewModel(media, c.Databases, c.GlobalFlags, customCats)
+	m := tui.NewModel(media, c.Databases, flags, customCats)
 	p := tea.NewProgram(m, tea.WithAltScreen())
 
 	finalModel, err := p.Run()

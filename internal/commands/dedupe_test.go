@@ -26,8 +26,8 @@ func TestDedupeCmd_Run(t *testing.T) {
 	t.Run("TitleDedupe", func(t *testing.T) {
 		cmd := &DedupeCmd{
 			Databases: []string{dbPath},
-			GlobalFlags: models.GlobalFlags{
-				CoreFlags: models.CoreFlags{NoConfirm: true},
+			CoreFlags: models.CoreFlags{NoConfirm: true},
+			DedupeFlags: models.DedupeFlags{
 				TitleOnly: true,
 			},
 		}
@@ -39,8 +39,8 @@ func TestDedupeCmd_Run(t *testing.T) {
 	t.Run("DurationDedupe", func(t *testing.T) {
 		cmd := &DedupeCmd{
 			Databases: []string{dbPath},
-			GlobalFlags: models.GlobalFlags{
-				CoreFlags:    models.CoreFlags{NoConfirm: true},
+			CoreFlags: models.CoreFlags{NoConfirm: true},
+			DedupeFlags: models.DedupeFlags{
 				DurationOnly: true,
 			},
 		}

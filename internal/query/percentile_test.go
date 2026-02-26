@@ -45,7 +45,7 @@ func TestResolvePercentileFlags(t *testing.T) {
 
 	t.Run("Size Percentile", func(t *testing.T) {
 		flags := models.GlobalFlags{
-			Size: []string{"p10-50"},
+			FilterFlags: models.FilterFlags{Size: []string{"p10-50"}},
 		}
 		resolved, err := ResolvePercentileFlags(ctx, dbs, flags)
 		if err != nil {
@@ -85,7 +85,7 @@ func TestResolvePercentileFlags(t *testing.T) {
 
 	t.Run("Duration Percentile", func(t *testing.T) {
 		flags := models.GlobalFlags{
-			Duration: []string{"p20-30"},
+			FilterFlags: models.FilterFlags{Duration: []string{"p20-30"}},
 		}
 		resolved, err := ResolvePercentileFlags(ctx, dbs, flags)
 		if err != nil {
@@ -106,7 +106,7 @@ func TestResolvePercentileFlags(t *testing.T) {
 	t.Run("Episodes Percentile", func(t *testing.T) {
 		// We have 10 directories with 10 files each
 		flags := models.GlobalFlags{
-			FileCounts: "p0-50",
+			AggregateFlags: models.AggregateFlags{FileCounts: "p0-50"},
 		}
 		resolved, err := ResolvePercentileFlags(ctx, dbs, flags)
 		if err != nil {
@@ -126,7 +126,7 @@ func TestResolvePercentileFlags(t *testing.T) {
 
 	t.Run("Specials Button (Absolute Count)", func(t *testing.T) {
 		flags := models.GlobalFlags{
-			FileCounts: "1",
+			AggregateFlags: models.AggregateFlags{FileCounts: "1"},
 		}
 		// ResolvePercentileFlags should not change absolute values
 		resolved, err := ResolvePercentileFlags(ctx, dbs, flags)
@@ -142,8 +142,8 @@ func TestResolvePercentileFlags(t *testing.T) {
 	t.Run("Stability Test (Global vs Dynamic)", func(t *testing.T) {
 		// Category filter that would change the distribution
 		flags := models.GlobalFlags{
-			Category: []string{"dir0"}, // only items 1-10
-			Size:     []string{"p0-100"},
+			MediaFilterFlags: models.MediaFilterFlags{Category: []string{"dir0"}}, // only items 1-10
+			FilterFlags:      models.FilterFlags{Size: []string{"p0-100"}},
 		}
 
 		// Resolved Size (p0-100) is currently kept as-is (dynamic at query builder time)
@@ -157,7 +157,7 @@ func TestResolvePercentileFlags(t *testing.T) {
 		// Set (p10-50) -> Global
 		// Globally, size ranges from 1000 to 100000.
 		// Our density-aware CalculatePercentiles maps p10 of [1000, 2000, ..., 100000] to 11000.
-		flags.Size = []string{"p10-50"}
+		flags.FilterFlags.Size = []string{"p10-50"}
 		resolved, _ = ResolvePercentileFlags(ctx, dbs, flags)
 		t.Logf("Resolved p10-50 Size (Global): %v", resolved.Size)
 

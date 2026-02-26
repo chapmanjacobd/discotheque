@@ -37,7 +37,20 @@ type LsEntry struct {
 }
 
 type ServeCmd struct {
-	models.GlobalFlags
+	models.CoreFlags        `embed:""`
+	models.SyncwebFlags     `embed:""`
+	models.QueryFlags       `embed:""`
+	models.PathFilterFlags  `embed:""`
+	models.FilterFlags      `embed:""`
+	models.MediaFilterFlags `embed:""`
+	models.TimeFilterFlags  `embed:""`
+	models.DeletedFlags     `embed:""`
+	models.SortFlags        `embed:""`
+	models.DisplayFlags     `embed:""`
+	models.AggregateFlags   `embed:""`
+	models.PlaybackFlags    `embed:""`
+	models.PostActionFlags  `embed:""`
+
 	Databases            []string `arg:"" required:"" help:"SQLite database files" type:"existingfile"`
 	Port                 int      `short:"p" default:"5555" help:"Port to listen on"`
 	PublicDir            string   `help:"Override embedded web assets with local directory"`
@@ -49,12 +62,6 @@ type ServeCmd struct {
 	dbCache              sync.Map `kong:"-"`
 	hasFfmpeg            bool     `kong:"-"`
 }
-
-func (c *ServeCmd) IsQueryTrait()    {}
-func (c *ServeCmd) IsFilterTrait()   {}
-func (c *ServeCmd) IsSortTrait()     {}
-func (c *ServeCmd) IsPlaybackTrait() {}
-func (c *ServeCmd) IsSyncwebTrait()  {}
 
 func (c *ServeCmd) Mux() http.Handler {
 	mux := http.NewServeMux()
@@ -206,6 +213,24 @@ func (c *ServeCmd) Run(ctx *kong.Context) error {
 	return server.ListenAndServe()
 }
 
+func (c *ServeCmd) GetGlobalFlags() models.GlobalFlags {
+	return models.GlobalFlags{
+		CoreFlags:        c.CoreFlags,
+		SyncwebFlags:     c.SyncwebFlags,
+		QueryFlags:       c.QueryFlags,
+		PathFilterFlags:  c.PathFilterFlags,
+		FilterFlags:      c.FilterFlags,
+		MediaFilterFlags: c.MediaFilterFlags,
+		TimeFilterFlags:  c.TimeFilterFlags,
+		DeletedFlags:     c.DeletedFlags,
+		SortFlags:        c.SortFlags,
+		DisplayFlags:     c.DisplayFlags,
+		AggregateFlags:   c.AggregateFlags,
+		PlaybackFlags:    c.PlaybackFlags,
+		PostActionFlags:  c.PostActionFlags,
+	}
+}
+
 func (c *ServeCmd) handleDatabases(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	resp := models.DatabaseInfo{
@@ -332,7 +357,7 @@ func (c *ServeCmd) handleRatings(w http.ResponseWriter, r *http.Request) {
 }
 
 func (c *ServeCmd) parseFlags(r *http.Request) models.GlobalFlags {
-	flags := c.GlobalFlags
+	flags := c.GetGlobalFlags()
 	q := r.URL.Query()
 	if search := q.Get("search"); search != "" {
 		flags.Search = strings.Fields(search)
@@ -1151,8 +1176,10 @@ func (c *ServeCmd) handleFilterBins(w http.ResponseWriter, r *http.Request) {
 		var tempFlags models.GlobalFlags
 		if isGlobal {
 			tempFlags = models.GlobalFlags{
-				HideDeleted: flags.HideDeleted,
-				OnlyDeleted: flags.OnlyDeleted,
+				DeletedFlags: models.DeletedFlags{
+					HideDeleted: flags.HideDeleted,
+					OnlyDeleted: flags.OnlyDeleted,
+				},
 			}
 		} else {
 			tempFlags = flags
@@ -1645,8 +1672,14 @@ func (c *ServeCmd) handleCategorizeSuggest(w http.ResponseWriter, r *http.Reques
 	}
 
 	cmd := CategorizeCmd{
-		GlobalFlags: c.GlobalFlags,
-		Databases:   c.Databases,
+		CoreFlags:        c.CoreFlags,
+		PathFilterFlags:  c.PathFilterFlags,
+		FilterFlags:      c.FilterFlags,
+		MediaFilterFlags: c.MediaFilterFlags,
+		TimeFilterFlags:  c.TimeFilterFlags,
+		DeletedFlags:     c.DeletedFlags,
+		PostActionFlags:  c.PostActionFlags,
+		Databases:        c.Databases,
 	}
 	// Note: mineCategories and applyCategories need to be exported or called through a wrapper
 	// Since I'm in the same package 'commands', I can call them directly.
@@ -1737,8 +1770,14 @@ func (c *ServeCmd) handleCategorizeApply(w http.ResponseWriter, r *http.Request)
 	}
 
 	cmd := CategorizeCmd{
-		GlobalFlags: c.GlobalFlags,
-		Databases:   c.Databases,
+		CoreFlags:        c.CoreFlags,
+		PathFilterFlags:  c.PathFilterFlags,
+		FilterFlags:      c.FilterFlags,
+		MediaFilterFlags: c.MediaFilterFlags,
+		TimeFilterFlags:  c.TimeFilterFlags,
+		DeletedFlags:     c.DeletedFlags,
+		PostActionFlags:  c.PostActionFlags,
+		Databases:        c.Databases,
 	}
 	compiled := cmd.CompileRegexes()
 
@@ -2168,7 +2207,7 @@ func (c *ServeCmd) handleThumbnail(w http.ResponseWriter, r *http.Request) {
 }
 
 func (c *ServeCmd) handleTrash(w http.ResponseWriter, r *http.Request) {
-	flags := c.GlobalFlags
+	flags := c.GetGlobalFlags()
 	flags.OnlyDeleted = true
 	flags.HideDeleted = false
 	flags.All = true
@@ -2212,7 +2251,7 @@ func (c *ServeCmd) handleEmptyBin(w http.ResponseWriter, r *http.Request) {
 		}
 	} else {
 		// Fallback: Delete everything in trash if no paths provided
-		flags := c.GlobalFlags
+		flags := c.GetGlobalFlags()
 		flags.OnlyDeleted = true
 		flags.HideDeleted = false
 		flags.All = true
@@ -2259,7 +2298,7 @@ func (c *ServeCmd) handleEmptyBin(w http.ResponseWriter, r *http.Request) {
 }
 
 func (c *ServeCmd) handleOPDS(w http.ResponseWriter, r *http.Request) {
-	flags := c.GlobalFlags
+	flags := c.GetGlobalFlags()
 	flags.TextOnly = true
 	flags.All = true
 

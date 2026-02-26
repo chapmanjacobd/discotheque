@@ -27,7 +27,7 @@ func TestFileCountsFiltering(t *testing.T) {
 	dbs := []string{dbPath}
 
 	// Filter for directories with > 1 file
-	got, err := MediaQuery(ctx, dbs, models.GlobalFlags{FileCounts: ">1"})
+	got, err := MediaQuery(ctx, dbs, models.GlobalFlags{AggregateFlags: models.AggregateFlags{FileCounts: ">1"}})
 	if err != nil {
 		t.Fatalf("MediaQuery failed: %v", err)
 	}
@@ -36,7 +36,7 @@ func TestFileCountsFiltering(t *testing.T) {
 	}
 
 	// Filter for directories with 1 file (Specials)
-	got, err = MediaQuery(ctx, dbs, models.GlobalFlags{FileCounts: "1"})
+	got, err = MediaQuery(ctx, dbs, models.GlobalFlags{AggregateFlags: models.AggregateFlags{FileCounts: "1"}})
 	if err != nil {
 		t.Fatalf("MediaQuery failed: %v", err)
 	}
@@ -67,7 +67,10 @@ func TestFileCountsMediaQueryCount(t *testing.T) {
 	dbs := []string{dbPath}
 
 	// Total matching count should be 3 (show files)
-	flags := models.GlobalFlags{FileCounts: "3", Limit: 1}
+	flags := models.GlobalFlags{
+		AggregateFlags: models.AggregateFlags{FileCounts: "3"},
+		QueryFlags:     models.QueryFlags{Limit: 1},
+	}
 	count, err := MediaQueryCount(ctx, dbs, flags)
 	if err != nil {
 		t.Fatalf("MediaQueryCount failed: %v", err)
@@ -105,7 +108,7 @@ func TestFetchSiblings(t *testing.T) {
 	}
 
 	// Fetch all siblings in the same directory
-	got, err := FetchSiblings(context.Background(), media, models.GlobalFlags{FetchSiblings: "all"})
+	got, err := FetchSiblings(context.Background(), media, models.GlobalFlags{FilterFlags: models.FilterFlags{FetchSiblings: "all"}})
 	if err != nil {
 		t.Fatalf("FetchSiblings failed: %v", err)
 	}

@@ -15,7 +15,9 @@ func TestTextProcessor(t *testing.T) {
 
 	t.Run("LineSortAlpha", func(t *testing.T) {
 		flags := models.GlobalFlags{
-			LineSorts: []string{"line"},
+			TextFlags: models.TextFlags{
+				LineSorts: []string{"line"},
+			},
 		}
 		got := TextProcessor(flags, lines)
 		// apple banana cherry, banana apple apple, cherry cherry cherry
@@ -26,8 +28,10 @@ func TestTextProcessor(t *testing.T) {
 
 	t.Run("WordSortAlpha", func(t *testing.T) {
 		flags := models.GlobalFlags{
-			WordSorts: []string{"alpha"},
-			LineSorts: []string{"line"},
+			TextFlags: models.TextFlags{
+				WordSorts: []string{"alpha"},
+				LineSorts: []string{"line"},
+			},
 		}
 		// This should sort lines by original string, but word sorting happens internally.
 		// Since we only get original lines back, it's hard to verify word sorting unless it affects line sorting.

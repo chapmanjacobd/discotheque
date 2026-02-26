@@ -13,16 +13,21 @@ import (
 )
 
 type ClusterSortCmd struct {
-	models.GlobalFlags
+	models.CoreFlags       `embed:""`
+	models.SimilarityFlags `embed:""`
+	models.TextFlags       `embed:""`
+
 	InputPath  string `arg:"" optional:"" help:"Input file path (default stdin)" default:"-"`
 	OutputPath string `help:"Output file path (default stdout)"`
 }
 
-func (c ClusterSortCmd) IsSimilarityTrait() {}
-func (c ClusterSortCmd) IsTextTrait()       {}
-
 func (c *ClusterSortCmd) Run(ctx *kong.Context) error {
 	models.SetupLogging(c.Verbose)
+	flags := models.GlobalFlags{
+		CoreFlags:       c.CoreFlags,
+		SimilarityFlags: c.SimilarityFlags,
+		TextFlags:       c.TextFlags,
+	}
 
 	var lines []string
 	var scanner *bufio.Scanner
@@ -49,7 +54,7 @@ func (c *ClusterSortCmd) Run(ctx *kong.Context) error {
 		return nil
 	}
 
-	groups := aggregate.ClusterPaths(c.GlobalFlags, lines)
+	groups := aggregate.ClusterPaths(flags, lines)
 
 	if c.Duplicates != nil && *c.Duplicates {
 		groups = aggregate.FilterNearDuplicates(groups)

@@ -16,28 +16,38 @@ import (
 )
 
 type CategorizeCmd struct {
-	models.GlobalFlags
+	models.CoreFlags        `embed:""`
+	models.QueryFlags       `embed:""`
+	models.PathFilterFlags  `embed:""`
+	models.FilterFlags      `embed:""`
+	models.MediaFilterFlags `embed:""`
+	models.TimeFilterFlags  `embed:""`
+	models.DeletedFlags     `embed:""`
+	models.PostActionFlags  `embed:""`
+
 	Databases []string `arg:"" required:"" help:"SQLite database files" type:"existingfile"`
 
 	Other bool `help:"Analyze 'other' category to find potential new categories"`
 }
 
-func (c CategorizeCmd) IsQueryTrait()       {}
-func (c CategorizeCmd) IsFilterTrait()      {}
-func (c CategorizeCmd) IsMediaFilterTrait() {}
-func (c CategorizeCmd) IsPathFilterTrait()  {}
-func (c CategorizeCmd) IsTimeTrait()        {}
-func (c CategorizeCmd) IsDeletedTrait()     {}
-func (c CategorizeCmd) IsPostActionTrait()  {}
-
 func (c *CategorizeCmd) Run(ctx *kong.Context) error {
 	models.SetupLogging(c.Verbose)
+	flags := models.GlobalFlags{
+		CoreFlags:        c.CoreFlags,
+		QueryFlags:       c.QueryFlags,
+		PathFilterFlags:  c.PathFilterFlags,
+		FilterFlags:      c.FilterFlags,
+		MediaFilterFlags: c.MediaFilterFlags,
+		TimeFilterFlags:  c.TimeFilterFlags,
+		DeletedFlags:     c.DeletedFlags,
+		PostActionFlags:  c.PostActionFlags,
+	}
 
-	media, err := query.MediaQuery(context.Background(), c.Databases, c.GlobalFlags)
+	media, err := query.MediaQuery(context.Background(), c.Databases, flags)
 	if err != nil {
 		return err
 	}
-	media = query.FilterMedia(media, c.GlobalFlags)
+	media = query.FilterMedia(media, flags)
 
 	if len(media) == 0 {
 		return fmt.Errorf("no media found")

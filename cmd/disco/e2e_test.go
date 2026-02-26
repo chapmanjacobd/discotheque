@@ -26,10 +26,10 @@ func TestE2E_AddAndCheck(t *testing.T) {
 	dummyPath := fixture.CreateDummyFile("video.mp4")
 
 	addCmd := &commands.AddCmd{
-		GlobalFlags: models.GlobalFlags{ScanSubtitles: false},
-		Database:    fixture.DBPath,
-		ScanPaths:   []string{dummyPath},
-		Parallel:    1,
+		MediaFilterFlags: models.MediaFilterFlags{ScanSubtitles: false},
+		Database:         fixture.DBPath,
+		ScanPaths:        []string{dummyPath},
+		Parallel:         1,
 	}
 
 	if err := addCmd.Run(nil); err != nil {
@@ -89,10 +89,10 @@ func TestE2E_HistoryAdd(t *testing.T) {
 
 	// 1. Add to media
 	addCmd := &commands.AddCmd{
-		GlobalFlags: models.GlobalFlags{ScanSubtitles: false},
-		Database:    fixture.DBPath,
-		ScanPaths:   []string{dummyPath},
-		Parallel:    1,
+		MediaFilterFlags: models.MediaFilterFlags{ScanSubtitles: false},
+		Database:         fixture.DBPath,
+		ScanPaths:        []string{dummyPath},
+		Parallel:         1,
 	}
 	addCmd.Run(nil)
 
@@ -173,10 +173,10 @@ func TestE2E_Stats(t *testing.T) {
 
 	// 1. Add to media
 	addCmd := &commands.AddCmd{
-		GlobalFlags: models.GlobalFlags{ScanSubtitles: false},
-		Database:    fixture.DBPath,
-		ScanPaths:   []string{dummyPath},
-		Parallel:    1,
+		MediaFilterFlags: models.MediaFilterFlags{ScanSubtitles: false},
+		Database:         fixture.DBPath,
+		ScanPaths:        []string{dummyPath},
+		Parallel:         1,
 	}
 	addCmd.Run(nil)
 
@@ -238,8 +238,8 @@ Another caption here.
 
 	// 2. Run AddCmd with ScanSubtitles enabled
 	addCmd := &commands.AddCmd{
-		GlobalFlags: models.GlobalFlags{
-			CoreFlags:     models.CoreFlags{Verbose: true},
+		CoreFlags: models.CoreFlags{Verbose: true},
+		MediaFilterFlags: models.MediaFilterFlags{
 			ScanSubtitles: true,
 		},
 		Database: fixture.DBPath,

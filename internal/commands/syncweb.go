@@ -47,8 +47,6 @@ func (c *SyncwebCmd) AfterApply() error {
 	return nil
 }
 
-func (c *SyncwebCmd) IsSyncwebTrait() {}
-
 func (c *SyncwebCmd) WithSyncweb(fn func(s *syncweb.Syncweb) error) error {
 	s, err := syncweb.NewSyncweb(c.SyncwebHome, "disco-syncweb", c.SyncwebPublic_, c.SyncwebPrivate_, "")
 	if err != nil {

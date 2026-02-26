@@ -12,7 +12,7 @@ import (
 )
 
 func TestNewQueryBuilder(t *testing.T) {
-	flags := models.GlobalFlags{Query: "SELECT 1"}
+	flags := models.GlobalFlags{QueryFlags: models.QueryFlags{Query: "SELECT 1"}}
 	qb := NewQueryBuilder(flags)
 	if qb.Flags.Query != "SELECT 1" {
 		t.Errorf("Expected query SELECT 1, got %s", qb.Flags.Query)
@@ -27,112 +27,198 @@ func TestQueryBuilder_Build(t *testing.T) {
 	}{
 		{
 			"Raw Query",
-			models.GlobalFlags{Query: "SELECT * FROM test"},
+			models.GlobalFlags{QueryFlags: models.QueryFlags{Query: "SELECT * FROM test"}},
 			"SELECT * FROM test",
 		},
 		{
 			"Default Query",
-			models.GlobalFlags{SortBy: "path", Limit: 100, HideDeleted: true},
+			models.GlobalFlags{
+				SortFlags:    models.SortFlags{SortBy: "path"},
+				QueryFlags:   models.QueryFlags{Limit: 100},
+				DeletedFlags: models.DeletedFlags{HideDeleted: true},
+			},
 			"SELECT * FROM media WHERE COALESCE(time_deleted, 0) = 0 ORDER BY path ASC LIMIT 100",
 		},
 		{
 			"Search Query",
-			models.GlobalFlags{Search: []string{"term"}, SortBy: "path", Limit: 100, HideDeleted: true},
+			models.GlobalFlags{
+				FilterFlags:  models.FilterFlags{Search: []string{"term"}},
+				SortFlags:    models.SortFlags{SortBy: "path"},
+				QueryFlags:   models.QueryFlags{Limit: 100},
+				DeletedFlags: models.DeletedFlags{HideDeleted: true},
+			},
 			"SELECT * FROM media WHERE COALESCE(time_deleted, 0) = 0 AND ((path LIKE ? OR title LIKE ?)) ORDER BY path ASC LIMIT 100",
 		},
 		{
 			"Video Only",
-			models.GlobalFlags{VideoOnly: true, SortBy: "path", Limit: 100, HideDeleted: true},
+			models.GlobalFlags{
+				MediaFilterFlags: models.MediaFilterFlags{VideoOnly: true},
+				SortFlags:        models.SortFlags{SortBy: "path"},
+				QueryFlags:       models.QueryFlags{Limit: 100},
+				DeletedFlags:     models.DeletedFlags{HideDeleted: true},
+			},
 			"SELECT * FROM media WHERE COALESCE(time_deleted, 0) = 0 AND (type = 'video') ORDER BY path ASC LIMIT 100",
 		},
 		{
 			"Reverse Sort",
-			models.GlobalFlags{SortBy: "path", Reverse: true, Limit: 10, HideDeleted: true},
+			models.GlobalFlags{
+				SortFlags:    models.SortFlags{SortBy: "path", Reverse: true},
+				QueryFlags:   models.QueryFlags{Limit: 10},
+				DeletedFlags: models.DeletedFlags{HideDeleted: true},
+			},
 			"SELECT * FROM media WHERE COALESCE(time_deleted, 0) = 0 ORDER BY path DESC LIMIT 10",
 		},
 		{
 			"Random Sort",
-			models.GlobalFlags{Random: true, Limit: 10, HideDeleted: true},
+			models.GlobalFlags{
+				SortFlags:    models.SortFlags{Random: true},
+				QueryFlags:   models.QueryFlags{Limit: 10},
+				DeletedFlags: models.DeletedFlags{HideDeleted: true},
+			},
 			"SELECT * FROM media WHERE COALESCE(time_deleted, 0) = 0 AND rowid IN (SELECT rowid FROM media WHERE COALESCE(time_deleted, 0) = 0 ORDER BY RANDOM() LIMIT 160) ORDER BY RANDOM() LIMIT 10",
 		},
 		{
 			"FTS Search",
-			models.GlobalFlags{FTS: true, Search: []string{"term"}, FTSTable: "media_fts", Limit: 10, HideDeleted: true},
+			models.GlobalFlags{
+				FTSFlags:     models.FTSFlags{FTS: true, FTSTable: "media_fts"},
+				FilterFlags:  models.FilterFlags{Search: []string{"term"}},
+				QueryFlags:   models.QueryFlags{Limit: 10},
+				DeletedFlags: models.DeletedFlags{HideDeleted: true},
+			},
 			"SELECT * FROM media WHERE COALESCE(time_deleted, 0) = 0 AND rowid IN (SELECT rowid FROM media_fts WHERE media_fts MATCH ?) LIMIT 10",
 		},
 		{
 			"Only Deleted",
-			models.GlobalFlags{OnlyDeleted: true, Limit: 10},
+			models.GlobalFlags{
+				DeletedFlags: models.DeletedFlags{OnlyDeleted: true},
+				QueryFlags:   models.QueryFlags{Limit: 10},
+			},
 			"SELECT * FROM media WHERE COALESCE(time_deleted, 0) > 0 LIMIT 10",
 		},
 		{
 			"Multiple Categories",
-			models.GlobalFlags{Category: []string{"comedy", "music"}, Limit: 10, HideDeleted: true},
+			models.GlobalFlags{
+				MediaFilterFlags: models.MediaFilterFlags{Category: []string{"comedy", "music"}},
+				QueryFlags:       models.QueryFlags{Limit: 10},
+				DeletedFlags:     models.DeletedFlags{HideDeleted: true},
+			},
 			"SELECT * FROM media WHERE COALESCE(time_deleted, 0) = 0 AND (categories LIKE '%' || ? || '%' OR categories LIKE '%' || ? || '%') LIMIT 10",
 		},
 		{
 			"Portrait",
-			models.GlobalFlags{Portrait: true, Limit: 10, HideDeleted: true},
+			models.GlobalFlags{
+				MediaFilterFlags: models.MediaFilterFlags{Portrait: true},
+				QueryFlags:       models.QueryFlags{Limit: 10},
+				DeletedFlags:     models.DeletedFlags{HideDeleted: true},
+			},
 			"SELECT * FROM media WHERE COALESCE(time_deleted, 0) = 0 AND width < height LIMIT 10",
 		},
 		{
 			"Online Only",
-			models.GlobalFlags{OnlineMediaOnly: true, Limit: 10, HideDeleted: true},
+			models.GlobalFlags{
+				MediaFilterFlags: models.MediaFilterFlags{OnlineMediaOnly: true},
+				QueryFlags:       models.QueryFlags{Limit: 10},
+				DeletedFlags:     models.DeletedFlags{HideDeleted: true},
+			},
 			"SELECT * FROM media WHERE COALESCE(time_deleted, 0) = 0 AND path LIKE 'http%' LIMIT 10",
 		},
 		{
 			"Custom Where",
-			models.GlobalFlags{Where: []string{"play_count > 5"}, Limit: 10, HideDeleted: true},
+			models.GlobalFlags{
+				FilterFlags:  models.FilterFlags{Where: []string{"play_count > 5"}},
+				QueryFlags:   models.QueryFlags{Limit: 10},
+				DeletedFlags: models.DeletedFlags{HideDeleted: true},
+			},
 			"SELECT * FROM media WHERE COALESCE(time_deleted, 0) = 0 AND play_count > 5 LIMIT 10",
 		},
 		{
 			"Partial Skip",
-			models.GlobalFlags{Partial: "s", Limit: 10, HideDeleted: true},
+			models.GlobalFlags{
+				FilterFlags:  models.FilterFlags{Partial: "s"},
+				QueryFlags:   models.QueryFlags{Limit: 10},
+				DeletedFlags: models.DeletedFlags{HideDeleted: true},
+			},
 			"SELECT * FROM media WHERE COALESCE(time_deleted, 0) = 0 AND COALESCE(time_first_played, 0) = 0 LIMIT 10",
 		},
 		{
 			"Duration filter",
-			models.GlobalFlags{Duration: []string{">1h"}, Limit: 10, HideDeleted: true},
+			models.GlobalFlags{
+				FilterFlags:  models.FilterFlags{Duration: []string{">1h"}},
+				QueryFlags:   models.QueryFlags{Limit: 10},
+				DeletedFlags: models.DeletedFlags{HideDeleted: true},
+			},
 			"SELECT * FROM media WHERE COALESCE(time_deleted, 0) = 0 AND duration >= ? LIMIT 10",
 		},
 		{
 			"Size filter",
-			models.GlobalFlags{Size: []string{"<100MB"}, Limit: 10, HideDeleted: true},
+			models.GlobalFlags{
+				FilterFlags:  models.FilterFlags{Size: []string{"<100MB"}},
+				QueryFlags:   models.QueryFlags{Limit: 10},
+				DeletedFlags: models.DeletedFlags{HideDeleted: true},
+			},
 			"SELECT * FROM media WHERE COALESCE(time_deleted, 0) = 0 AND size <= ? LIMIT 10",
 		},
 		{
 			"Modified after",
-			models.GlobalFlags{ModifiedAfter: "2024-01-01", Limit: 10, HideDeleted: true},
+			models.GlobalFlags{
+				TimeFilterFlags: models.TimeFilterFlags{ModifiedAfter: "2024-01-01"},
+				QueryFlags:      models.QueryFlags{Limit: 10},
+				DeletedFlags:    models.DeletedFlags{HideDeleted: true},
+			},
 			"SELECT * FROM media WHERE COALESCE(time_deleted, 0) = 0 AND time_modified >= ? LIMIT 10",
 		},
 		{
 			"Created before",
-			models.GlobalFlags{CreatedBefore: "2024-01-01", Limit: 10, HideDeleted: true},
+			models.GlobalFlags{
+				TimeFilterFlags: models.TimeFilterFlags{CreatedBefore: "2024-01-01"},
+				QueryFlags:      models.QueryFlags{Limit: 10},
+				DeletedFlags:    models.DeletedFlags{HideDeleted: true},
+			},
 			"SELECT * FROM media WHERE COALESCE(time_deleted, 0) = 0 AND time_created <= ? LIMIT 10",
 		},
 		{
 			"Audio Only",
-			models.GlobalFlags{AudioOnly: true, Limit: 10, HideDeleted: true},
+			models.GlobalFlags{
+				MediaFilterFlags: models.MediaFilterFlags{AudioOnly: true},
+				QueryFlags:       models.QueryFlags{Limit: 10},
+				DeletedFlags:     models.DeletedFlags{HideDeleted: true},
+			},
 			"SELECT * FROM media WHERE COALESCE(time_deleted, 0) = 0 AND (type = 'audio' OR type = 'audiobook') LIMIT 10",
 		},
 		{
 			"Text Only",
-			models.GlobalFlags{TextOnly: true, Limit: 10, HideDeleted: true},
+			models.GlobalFlags{
+				MediaFilterFlags: models.MediaFilterFlags{TextOnly: true},
+				QueryFlags:       models.QueryFlags{Limit: 10},
+				DeletedFlags:     models.DeletedFlags{HideDeleted: true},
+			},
 			"SELECT * FROM media WHERE COALESCE(time_deleted, 0) = 0 AND (type = 'text') LIMIT 10",
 		},
 		{
 			"Image Only",
-			models.GlobalFlags{ImageOnly: true, Limit: 10, HideDeleted: true},
+			models.GlobalFlags{
+				MediaFilterFlags: models.MediaFilterFlags{ImageOnly: true},
+				QueryFlags:       models.QueryFlags{Limit: 10},
+				DeletedFlags:     models.DeletedFlags{HideDeleted: true},
+			},
 			"SELECT * FROM media WHERE COALESCE(time_deleted, 0) = 0 AND (type = 'image') LIMIT 10",
 		},
 		{
 			"Path-like Search (absolute)",
-			models.GlobalFlags{Search: []string{"/home/"}, Limit: 10, HideDeleted: true},
+			models.GlobalFlags{
+				FilterFlags:  models.FilterFlags{Search: []string{"/home/"}},
+				QueryFlags:   models.QueryFlags{Limit: 10},
+				DeletedFlags: models.DeletedFlags{HideDeleted: true},
+			},
 			"SELECT * FROM media WHERE COALESCE(time_deleted, 0) = 0 AND path LIKE ? LIMIT 10",
 		},
 		{
 			"Path-like Search (relative)",
-			models.GlobalFlags{Search: []string{"./home/"}, Limit: 10, HideDeleted: true},
+			models.GlobalFlags{
+				FilterFlags:  models.FilterFlags{Search: []string{"./home/"}},
+				QueryFlags:   models.QueryFlags{Limit: 10},
+				DeletedFlags: models.DeletedFlags{HideDeleted: true},
+			},
 			"SELECT * FROM media WHERE COALESCE(time_deleted, 0) = 0 AND path LIKE ? LIMIT 10",
 		},
 	}
@@ -162,9 +248,9 @@ func TestFilterMedia(t *testing.T) {
 		expected int
 	}{
 		{"No filters", models.GlobalFlags{}, 2},
-		{"Include filter", models.GlobalFlags{Include: []string{"%.mp4"}}, 1},
-		{"Exclude filter", models.GlobalFlags{Exclude: []string{"%.mp4"}}, 1},
-		{"Size filter", models.GlobalFlags{Size: []string{">150B"}}, 1},
+		{"Include filter", models.GlobalFlags{PathFilterFlags: models.PathFilterFlags{Include: []string{"%.mp4"}}}, 1},
+		{"Exclude filter", models.GlobalFlags{PathFilterFlags: models.PathFilterFlags{Exclude: []string{"%.mp4"}}}, 1},
+		{"Size filter", models.GlobalFlags{FilterFlags: models.FilterFlags{Size: []string{">150B"}}}, 1},
 	}
 
 	for _, tt := range tests {
@@ -182,42 +268,43 @@ func TestSortMedia(t *testing.T) {
 	var size200 int64 = 200
 	var dur10 int64 = 10
 	var dur20 int64 = 20
+	pc5 := int64(5)
+	pc10 := int64(10)
 	media := []models.MediaWithDB{
-		{Media: models.Media{Path: "b.mp4", Size: &size200, Duration: &dur10, PlayCount: new(int64(5))}},
-		{Media: models.Media{Path: "a.mp4", Size: &size100, Duration: &dur20, PlayCount: new(int64(10))}},
+		{Media: models.Media{Path: "b.mp4", Size: &size200, Duration: &dur10, PlayCount: &pc5}},
+		{Media: models.Media{Path: "a.mp4", Size: &size100, Duration: &dur20, PlayCount: &pc10}},
 	}
 
 	SortMedia(media, models.GlobalFlags{
-		SortBy: "path",
+		SortFlags: models.SortFlags{SortBy: "path"},
 	})
 	if media[0].Path != "a.mp4" {
 		t.Errorf("SortMedia by path failed, got %s", media[0].Path)
 	}
 
 	SortMedia(media, models.GlobalFlags{
-		SortBy: "size",
+		SortFlags: models.SortFlags{SortBy: "size"},
 	})
 	if *media[0].Size != 100 {
 		t.Errorf("SortMedia by size failed, got %d", *media[0].Size)
 	}
 
 	SortMedia(media, models.GlobalFlags{
-		SortBy: "duration",
+		SortFlags: models.SortFlags{SortBy: "duration"},
 	})
 	if *media[0].Duration != 10 {
 		t.Errorf("SortMedia by duration failed, got %d", *media[0].Duration)
 	}
 
 	SortMedia(media, models.GlobalFlags{
-		SortBy: "play_count",
+		SortFlags: models.SortFlags{SortBy: "play_count"},
 	})
 	if *media[0].PlayCount != 5 {
 		t.Errorf("SortMedia by play_count failed, got %d", *media[0].PlayCount)
 	}
 
 	SortMedia(media, models.GlobalFlags{
-		SortBy:  "path",
-		Reverse: true,
+		SortFlags: models.SortFlags{SortBy: "path", Reverse: true},
 	})
 	if media[0].Path != "b.mp4" {
 		t.Errorf("SortMedia by path reverse failed, got %s", media[0].Path)
@@ -229,8 +316,8 @@ func TestSortMedia(t *testing.T) {
 		{Media: models.Media{Path: "b.mp4", Size: &size100}},
 	}
 	SortMedia(media, models.GlobalFlags{
-		SortBy:      "size",
-		PlayInOrder: "natural_ps",
+		SortFlags:     models.SortFlags{SortBy: "size"},
+		PlaybackFlags: models.PlaybackFlags{PlayInOrder: "natural_ps"},
 	})
 	if *media[0].Size != 100 {
 		t.Errorf("SortMedia by size with natural_ps failed, got %d", *media[0].Size)
@@ -276,7 +363,7 @@ func TestQueryDatabase(t *testing.T) {
 	f.Close()
 	defer os.Remove(dbPath)
 
-	database, err := sql.Open("sqlite3", dbPath)
+	dbConn, err := sql.Open("sqlite3", dbPath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -310,15 +397,15 @@ func TestQueryDatabase(t *testing.T) {
 		text TEXT
 	);
 	`
-	if _, err := database.Exec(schema); err != nil {
-		database.Close()
+	if _, err := dbConn.Exec(schema); err != nil {
+		dbConn.Close()
 		t.Fatal(err)
 	}
 
 	// Insert test data
 	insert := `INSERT INTO media (path, title, duration, size, type) VALUES (?, ?, ?, ?, ?)`
-	database.Exec(insert, "/test/movie.mp4", "Test Movie", 7200, 1000000, "video")
-	database.Close()
+	dbConn.Exec(insert, "/test/movie.mp4", "Test Movie", 7200, 1000000, "video")
+	dbConn.Close()
 
 	ctx := context.Background()
 	results, err := QueryDatabase(ctx, dbPath, "SELECT * FROM media", nil)
@@ -382,14 +469,17 @@ func TestMediaQuery(t *testing.T) {
 	CREATE TABLE captions (media_path TEXT NOT NULL, time REAL, text TEXT);
 	`
 	for _, dbPath := range []string{dbPath1, dbPath2} {
-		db, _ := sql.Open("sqlite3", dbPath)
-		db.Exec(schema)
-		db.Exec("INSERT INTO media (path) VALUES (?)", dbPath)
-		db.Close()
+		dbConn, _ := sql.Open("sqlite3", dbPath)
+		dbConn.Exec(schema)
+		dbConn.Exec("INSERT INTO media (path) VALUES (?)", dbPath)
+		dbConn.Close()
 	}
 
 	ctx := context.Background()
-	flags := models.GlobalFlags{Limit: 10, SortBy: "path"}
+	flags := models.GlobalFlags{
+		QueryFlags: models.QueryFlags{Limit: 10},
+		SortFlags:  models.SortFlags{SortBy: "path"},
+	}
 	results, err := MediaQuery(ctx, []string{dbPath1, dbPath2}, flags)
 	if err != nil {
 		t.Fatalf("MediaQuery failed: %v", err)
@@ -411,7 +501,7 @@ func TestReRankMedia(t *testing.T) {
 	}
 
 	// Re-rank by size (desc) and duration (asc)
-	flags := models.GlobalFlags{ReRank: "-size=1 duration=1"}
+	flags := models.GlobalFlags{SortFlags: models.SortFlags{ReRank: "-size=1 duration=1"}}
 	got := ReRankMedia(media, flags)
 	if len(got) != 2 {
 		t.Errorf("Expected 2 results, got %d", len(got))
@@ -438,7 +528,7 @@ func TestRegexSortMedia(t *testing.T) {
 		{Media: models.Media{Path: "movie_part1.mp4"}},
 	}
 
-	got := RegexSortMedia(media, models.GlobalFlags{RegexSort: true})
+	got := RegexSortMedia(media, models.GlobalFlags{TextFlags: models.TextFlags{RegexSort: true}})
 	if len(got) != 2 {
 		t.Errorf("Expected 2 results, got %d", len(got))
 	}

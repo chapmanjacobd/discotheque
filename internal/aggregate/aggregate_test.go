@@ -14,10 +14,12 @@ func TestIsSameGroup(t *testing.T) {
 	d10 := int64(10)
 
 	flags := models.GlobalFlags{
-		FilterSizes:     true,
-		FilterDurations: true,
-		SizesDelta:      5.0,
-		DurationsDelta:  5.0,
+		SimilarityFlags: models.SimilarityFlags{
+			FilterSizes:     true,
+			FilterDurations: true,
+			SizesDelta:      5.0,
+			DurationsDelta:  5.0,
+		},
 	}
 
 	m0 := models.MediaWithDB{Media: models.Media{Size: &s100, Duration: &d5}}
@@ -35,8 +37,10 @@ func TestIsSameGroup(t *testing.T) {
 
 func TestIsSameFolderGroup(t *testing.T) {
 	flags := models.GlobalFlags{
-		FilterCounts: true,
-		CountsDelta:  5.0,
+		SimilarityFlags: models.SimilarityFlags{
+			FilterCounts: true,
+			CountsDelta:  5.0,
+		},
 	}
 
 	f0 := models.FolderStats{ExistsCount: 100}
@@ -59,11 +63,13 @@ func TestClusterByNumbers(t *testing.T) {
 	d108 := int64(108)
 
 	flags := models.GlobalFlags{
-		FilterSizes:     true,
-		FilterDurations: true,
-		SizesDelta:      5.0,
-		DurationsDelta:  5.0,
-		Similar:         true,
+		SimilarityFlags: models.SimilarityFlags{
+			FilterSizes:     true,
+			FilterDurations: true,
+			SizesDelta:      5.0,
+			DurationsDelta:  5.0,
+			Similar:         true,
+		},
 	}
 
 	media := []models.MediaWithDB{
@@ -90,9 +96,11 @@ func TestClusterByNumbers(t *testing.T) {
 
 func TestClusterFoldersByNumbers(t *testing.T) {
 	flags := models.GlobalFlags{
-		FilterCounts: true,
-		CountsDelta:  5.0,
-		Similar:      true,
+		SimilarityFlags: models.SimilarityFlags{
+			FilterCounts: true,
+			CountsDelta:  5.0,
+			Similar:      true,
+		},
 	}
 
 	folders := []models.FolderStats{
@@ -162,7 +170,7 @@ func TestClusterFoldersByName(t *testing.T) {
 		{Path: "/path/to/completely_different_thing", Count: 1},
 	}
 
-	got := ClusterFoldersByName(models.GlobalFlags{Similar: false}, folders)
+	got := ClusterFoldersByName(models.GlobalFlags{SimilarityFlags: models.SimilarityFlags{Similar: false}}, folders)
 	if len(got) != 2 {
 		t.Errorf("Expected 2 groups, got %d", len(got))
 	}
@@ -177,7 +185,7 @@ func TestClusterPaths(t *testing.T) {
 		"/other/completely/different/file.txt",
 	}
 
-	got := ClusterPaths(models.GlobalFlags{Clusters: 2}, lines)
+	got := ClusterPaths(models.GlobalFlags{SimilarityFlags: models.SimilarityFlags{Clusters: 2}}, lines)
 	if len(got) < 1 {
 		t.Error("ClusterPaths returned no groups")
 	}
