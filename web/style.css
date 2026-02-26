@@ -1179,6 +1179,7 @@ main {
 #media-viewer audio {
     width: 100%;
     padding: 1.5rem;
+    box-sizing: border-box;
 }
 
 #lyrics-display {
@@ -1782,4 +1783,30 @@ body.is-dragging .sidebar .category-btn * {
 
 [data-theme="dark"] .folder-thumb, [data-theme="dark"] .remote-thumb {
     background: #111 !important;
+}
+
+/* Mobile Native Video Controls Styling */
+@media (max-width: 768px) {
+    #media-viewer audio {
+        padding: 0 !important;
+        box-sizing: border-box;
+    }
+
+    video::-webkit-media-controls-time-remaining-display,
+    audio::-webkit-media-controls-time-remaining-display {
+        display: none !important;
+    }
+
+    video::-webkit-media-controls-current-time-display,
+    audio::-webkit-media-controls-current-time-display {
+        font-size: 12px !important;
+        padding: 0 5px !important;
+        margin: 0 !important;
+    }
+    
+    video::-webkit-media-controls-timeline,
+    audio::-webkit-media-controls-timeline {
+        padding: 0 10px !important;
+        margin: 0 !important;
+    }
 }

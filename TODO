@@ -1,0 +1,22 @@
+when media is initially loading and/or smart seeking, never save progress nor mark as played
+
+on mobile, the pip player blocks scrolling down and seeing the full sidebar. also the collapsed sidebar still shows up a bit--would be better to move to the left more and display none while outside the viewport
+
+history in progress page, group view is blank. write a test to prevent this
+
+clicking an active history page should unactive it and send us back to search page
+
+
+disable image autoplay setting by default
+
+hide the playback speed button on images
+
+preload the next two images so that swiping next is smooth
+
+clicking the channel surf button again should stop it
+
+tests for channel surf images that it will not autoplay video
+
+multiple subtitle languages support, modal to select primary and secondary subtitles
+
+allow drag to zoom on fullscreen images

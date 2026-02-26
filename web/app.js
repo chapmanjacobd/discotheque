@@ -351,7 +351,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 showToast(`Channel Surf: ${filename} (${formatDuration(data.start)})`, '🔀');
 
                 // Open in PiP
-                await openInPiP(data, true);
+                await openInPiP(data, true, true);
 
                 // Seek to the random start time
                 const media = pipViewer.querySelector('video, audio');
@@ -1026,7 +1026,16 @@ document.addEventListener('DOMContentLoaded', () => {
     async function fetchMediaByPaths(paths) {
         if (!paths || paths.length === 0) return [];
         try {
-            const resp = await fetch(`/api/query?all=true&paths=${encodeURIComponent(paths.join(','))}`);
+            const p = new URLSearchParams();
+            appendFilterParams(p);
+            p.delete('unplayed');
+            p.delete('unfinished');
+            p.delete('completed');
+            
+            p.append('all', 'true');
+            p.append('paths', paths.join(','));
+
+            const resp = await fetch(`/api/query?${p.toString()}`);
             if (!resp.ok) throw new Error('Failed to fetch media by paths');
             return await resp.json() || [];
         } catch (err) {
@@ -2166,13 +2175,19 @@ document.addEventListener('DOMContentLoaded', () => {
             // Client-side DB filtering
             currentMedia = data.filter(item => !state.filters.excludedDbs.includes(item.db));
 
-            // Client-side unplayed filtering (in case server is slightly behind or for local counts)
+            // Client-side progress filtering (in case server is slightly behind or for local counts)
             if (state.filters.unplayed) {
                 currentMedia = currentMedia.filter(item => getPlayCount(item) === 0);
+            } else if (state.filters.unfinished) {
+                currentMedia = currentMedia.filter(item => getPlayCount(item) === 0 && (item.playhead || 0) > 0);
+            } else if (state.filters.completed) {
+                currentMedia = currentMedia.filter(item => getPlayCount(item) > 0);
+            } else if (state.page === 'history') {
+                currentMedia = currentMedia.filter(item => (item.time_last_played || 0) > 0);
             }
 
             // Update total count after client-side filtering
-            if (state.filters.unplayed || state.filters.excludedDbs.length > 0) {
+            if (state.filters.unplayed || state.filters.unfinished || state.filters.completed || state.page === 'history' || state.filters.excludedDbs.length > 0) {
                 state.totalCount = currentMedia.length;
             }
 
@@ -2380,6 +2395,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function updateProgress(item, playhead, duration, isComplete = false) {
+        if (state.playback.isSurfing) return state.playback.pendingUpdate;
+
         const now = Date.now();
 
         if (isComplete) {
@@ -2732,7 +2749,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    async function openInPiP(item, isNewSession = false) {
+    async function openInPiP(item, isNewSession = false, isSurfing = false) {
+        state.playback.isSurfing = isSurfing;
+
         if (state.playback.slideshowTimer) {
             clearTimeout(state.playback.slideshowTimer);
             state.playback.slideshowTimer = null;
