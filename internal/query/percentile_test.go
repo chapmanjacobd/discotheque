@@ -156,19 +156,19 @@ func TestResolvePercentileFlags(t *testing.T) {
 
 		// Set (p10-50) -> Global
 		// Globally, size ranges from 1000 to 100000.
-		// p10 of global [1000, 2000, ..., 100000] is 10900.
+		// Our density-aware CalculatePercentiles maps p10 of [1000, 2000, ..., 100000] to 11000.
 		flags.Size = []string{"p10-50"}
 		resolved, _ = ResolvePercentileFlags(ctx, dbs, flags)
 		t.Logf("Resolved p10-50 Size (Global): %v", resolved.Size)
 
-		has10900 := false
+		has11000 := false
 		for _, s := range resolved.Size {
-			if s == "+10900" {
-				has10900 = true
+			if s == "+11000" {
+				has11000 = true
 			}
 		}
-		if !has10900 {
-			t.Errorf("Expected global resolution for p10-50 (global p10 is 10900), got %v", resolved.Size)
+		if !has11000 {
+			t.Errorf("Expected global resolution for p10-50 (global p10 is 11000), got %v", resolved.Size)
 		}
 	})
 }

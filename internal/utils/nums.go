@@ -324,19 +324,62 @@ func CalculatePercentiles(values []int64) []int64 {
 	if len(values) == 0 {
 		return make([]int64, 101)
 	}
-	sort.Slice(values, func(i, j int) bool {
-		return values[i] < values[j]
+
+	// 1. Collect frequencies
+	counts := make(map[int64]int)
+	for _, v := range values {
+		counts[v]++
+	}
+
+	type valFreq struct {
+		val  int64
+		freq float64
+	}
+	unique := make([]valFreq, 0, len(counts))
+	for v, c := range counts {
+		unique = append(unique, valFreq{val: v, freq: float64(c) / float64(len(values))})
+	}
+	sort.Slice(unique, func(i, j int) bool {
+		return unique[i].val < unique[j].val
 	})
 
-	res := make([]int64, 101)
-	for i := 0; i <= 100; i++ {
-		index := (float64(i) / 100.0) * float64(len(values)-1)
-		lower := int(math.Floor(index))
-		upper := int(math.Ceil(index))
-		weight := index - float64(lower)
-		val := float64(values[lower])*(1.0-weight) + float64(values[upper])*weight
-		res[i] = int64(math.Round(val))
+	nUnique := float64(len(unique))
+	uFreq := 1.0 / nUnique
+
+	// 2. Calculate lambda to satisfy the 5% cap (0.05)
+	// We want lambda*freq + (1-lambda)*uFreq <= 0.05
+	lambda := 1.0
+	for _, f := range unique {
+		if f.freq > 0.05 {
+			if f.freq > uFreq {
+				l := (0.05 - uFreq) / (f.freq - uFreq)
+				if l < lambda {
+					lambda = l
+				}
+			}
+		}
 	}
+	if lambda < 0 {
+		lambda = 0
+	}
+
+	// 3. Apply lambda and calculate cumulative distribution
+	for i := range unique {
+		unique[i].freq = lambda*unique[i].freq + (1.0-lambda)*uFreq
+	}
+
+	res := make([]int64, 101)
+	cum := 0.0
+	uIdx := 0
+	for i := 0; i <= 100; i++ {
+		target := float64(i) / 100.0
+		for uIdx < len(unique)-1 && cum+unique[uIdx].freq < target {
+			cum += unique[uIdx].freq
+			uIdx++
+		}
+		res[i] = unique[uIdx].val
+	}
+
 	return res
 }
 

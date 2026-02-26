@@ -731,11 +731,12 @@ func ResolvePercentileFlags(ctx context.Context, dbs []string, flags models.Glob
 	if hasPSize {
 		values, err := getValues("size", pSizeSet)
 		if err == nil && len(values) > 0 {
+			mapping := utils.CalculatePercentiles(values)
 			var newSize []string
 			for _, s := range flags.Size {
 				if min, max, ok := utils.ParsePercentileRange(s); ok {
-					minVal := int64(utils.Percentile(values, min))
-					maxVal := int64(utils.Percentile(values, max))
+					minVal := mapping[int(min)]
+					maxVal := mapping[int(max)]
 					newSize = append(newSize, fmt.Sprintf("+%d", minVal))
 					newSize = append(newSize, fmt.Sprintf("-%d", maxVal))
 				} else {
@@ -749,11 +750,12 @@ func ResolvePercentileFlags(ctx context.Context, dbs []string, flags models.Glob
 	if hasPDuration {
 		values, err := getValues("duration", pDurationSet)
 		if err == nil && len(values) > 0 {
+			mapping := utils.CalculatePercentiles(values)
 			var newDuration []string
 			for _, d := range flags.Duration {
 				if min, max, ok := utils.ParsePercentileRange(d); ok {
-					minVal := int64(utils.Percentile(values, min))
-					maxVal := int64(utils.Percentile(values, max))
+					minVal := mapping[int(min)]
+					maxVal := mapping[int(max)]
 					newDuration = append(newDuration, fmt.Sprintf("+%d", minVal))
 					newDuration = append(newDuration, fmt.Sprintf("-%d", maxVal))
 				} else {
@@ -767,9 +769,10 @@ func ResolvePercentileFlags(ctx context.Context, dbs []string, flags models.Glob
 	if hasPEpisodes {
 		values, err := getValues("episodes", pEpisodesSet)
 		if err == nil && len(values) > 0 {
+			mapping := utils.CalculatePercentiles(values)
 			if min, max, ok := utils.ParsePercentileRange(flags.FileCounts); ok {
-				minVal := int64(utils.Percentile(values, min))
-				maxVal := int64(utils.Percentile(values, max))
+				minVal := mapping[int(min)]
+				maxVal := mapping[int(max)]
 				flags.FileCounts = fmt.Sprintf("+%d,-%d", minVal, maxVal)
 			}
 		}
