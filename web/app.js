@@ -581,6 +581,11 @@ document.addEventListener('DOMContentLoaded', () => {
         state.filters.durations = [];
         state.filters.episodes = [];
         state.filters.types = [];
+        state.filters.search = '';
+        state.filters.unplayed = false;
+        state.filters.unfinished = false;
+        state.filters.completed = false;
+        if (searchInput) searchInput.value = '';
 
         details.forEach(det => {
             const id = det.id;
@@ -4849,22 +4854,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (allMediaBtn) {
         allMediaBtn.onclick = () => {
             state.page = 'search';
-            state.filters.categories = [];
-            state.filters.genre = '';
-            state.filters.ratings = [];
-            state.filters.playlist = null;
-            state.filters.search = '';
-            state.filters.unplayed = false;
-            state.filters.unfinished = false;
-            state.filters.completed = false;
-            state.filters.sizes = [];
-            state.filters.durations = [];
-            state.filters.episodes = [];
-            searchInput.value = '';
             state.currentPage = 1;
 
-            // Remove active from other categories
-            categoryList.querySelectorAll('.category-btn').forEach(b => b.classList.remove('active'));
             updateNavActiveStates();
             performSearch();
         };
@@ -5123,7 +5114,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (logoReset) {
         logoReset.style.cursor = 'pointer';
         logoReset.onclick = () => {
-            searchInput.value = '';
             state.page = 'search';
             state.currentPage = 1;
             resetSidebar();
