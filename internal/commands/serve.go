@@ -93,6 +93,9 @@ func (c *ServeCmd) Mux() http.Handler {
 	mux.HandleFunc("/api/categorize/keyword", c.handleCategorizeKeyword)
 	mux.HandleFunc("/api/raw", c.handleRaw)
 
+	mux.HandleFunc("/api/zim/view", c.handleZimView)
+	mux.HandleFunc("/api/zim/proxy/{port}/{rest...}", c.handleZimProxy)
+
 	mux.HandleFunc("/api/syncweb/folders", c.handleSyncwebFolders)
 	mux.HandleFunc("/api/syncweb/ls", c.handleSyncwebLs)
 	mux.HandleFunc("/api/syncweb/download", c.handleSyncwebDownload)

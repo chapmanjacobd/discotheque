@@ -643,7 +643,8 @@ document.addEventListener('DOMContentLoaded', () => {
             { id: 'video', label: 'Video', icon: '🎬' },
             { id: 'audio', label: 'Audio', icon: '🎵' },
             { id: 'text', label: 'Text', icon: '📖' },
-            { id: 'image', label: 'Image', icon: '🖼️' }
+            { id: 'image', label: 'Image', icon: '🖼️' },
+            { id: 'app', label: 'App', icon: '📱' }
         ];
 
         const newHtml = types.map(t => `
@@ -3755,6 +3756,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
 
+                if (item.path.toLowerCase().endsWith('.zim')) {
+                    window.open(`/api/zim/view?path=${encodeURIComponent(item.path)}`, '_blank');
+                    return;
+                }
+
                 if (item.path.startsWith('syncweb://') && !item.local) {
                     triggerSyncwebDownload(item.path);
                     return;
@@ -3840,6 +3846,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div class="media-title" title="${item.path}">${title}</div>
                     <div class="media-meta">
                         <span>${size}</span>
+                        ${item.type === 'app' && item.artist ? `<span>v${item.artist}</span>` : ''}
+                        ${item.type === 'app' && item.language ? `<span>SDK ${item.language}</span>` : ''}
                         <span title="${item.path}">${displayPath}</span>
                         ${plays > 0 ? `<span title="Play count">▶️ ${plays}</span>` : ''}
                         ${isSyncweb && !item.local ? `<span style="color:var(--accent-color)">Remote</span>` : ''}
@@ -4140,7 +4148,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 <td>
                     <div class="table-cell-title" title="${item.path}">
                         <span class="table-icon">${getIcon(item.type)}</span>
-                        <span class="media-title-span">${title}</span>
+                        <div style="display: flex; flex-direction: column;">
+                            <span class="media-title-span">${title}</span>
+                            ${item.type === 'app' ? `<span style="font-size: 0.7rem; color: var(--text-muted);">${item.artist ? `v${item.artist}` : ''} ${item.language ? `(SDK ${item.language})` : ''}</span>` : ''}
+                        </div>
                     </div>
                 </td>
                 <td>${formatSize(item.size)}</td>
@@ -5521,6 +5532,7 @@ function getIcon(type) {
     if (type.includes('video')) return '🎬';
     if (type.includes('audio')) return '🎵';
     if (type.includes('image')) return '🖼️';
+    if (type.includes('app')) return '📱';
     if (type.includes('epub') || type.includes('pdf') || type.includes('mobi')) return '📚';
     return '📄';
 }

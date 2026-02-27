@@ -207,6 +207,14 @@ func IsFileOpen(path string) bool {
 
 // DetectMimeType returns the mimetype of a file
 func DetectMimeType(path string) string {
+	ext := strings.ToLower(filepath.Ext(path))
+	if ext == ".apk" {
+		return "application/vnd.android.package-archive"
+	}
+	if ext == ".zim" {
+		return "application/x-zim"
+	}
+
 	mime, err := mimetype.DetectFile(path)
 	if err != nil {
 		return ""

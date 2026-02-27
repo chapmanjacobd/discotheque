@@ -66,8 +66,10 @@ func Extract(ctx context.Context, path string, scanSubtitles bool) (*MediaMetada
 	mediaType := ""
 	if strings.HasPrefix(mimeStr, "image/") {
 		mediaType = "image"
-	} else if strings.HasPrefix(mimeStr, "text/") || mimeStr == "application/pdf" || mimeStr == "application/epub+zip" {
+	} else if strings.HasPrefix(mimeStr, "text/") || mimeStr == "application/pdf" || mimeStr == "application/epub+zip" || mimeStr == "application/x-zim" {
 		mediaType = "text"
+	} else if mimeStr == "application/vnd.android.package-archive" {
+		mediaType = "app"
 	} else if mimeStr != "" {
 		// Fallback to coarse mimetype category
 		parts := strings.Split(mimeStr, "/")
@@ -84,6 +86,22 @@ func Extract(ctx context.Context, path string, scanSubtitles bool) (*MediaMetada
 
 	result := &MediaMetadata{
 		Media: params,
+	}
+
+	if mediaType == "app" {
+		// Extract APK metadata
+		if aaptPath, err := exec.LookPath("aapt"); err == nil {
+			cmd := exec.CommandContext(ctx, aaptPath, "dump", "badging", path)
+			if output, err := cmd.Output(); err == nil {
+				params.Title = utils.ToNullString(extractAapt(string(output), `application-label:'([^']*)'`))
+				if params.Title.String == "" {
+					params.Title = utils.ToNullString(extractAapt(string(output), `package: name='([^']*)'`))
+				}
+				params.Artist = utils.ToNullString(extractAapt(string(output), `package: .*versionName='([^']*)'`))
+				params.Language = utils.ToNullString(extractAapt(string(output), `sdkVersion:'([^']*)'`)) // Hack: use language for sdk version
+				params.Description = utils.ToNullString(extractAapt(string(output), `package: name='([^']*)' versionCode='([^']*)' versionName='([^']*)' platformBuildVersionName='([^']*)'`))
+			}
+		}
 	}
 
 	var duration int64
@@ -241,6 +259,15 @@ func Extract(ctx context.Context, path string, scanSubtitles bool) (*MediaMetada
 
 	result.Media = params
 	return result, nil
+}
+
+func extractAapt(output, regex string) string {
+	re := regexp.MustCompile(regex)
+	matches := re.FindStringSubmatch(output)
+	if len(matches) > 1 {
+		return matches[1]
+	}
+	return ""
 }
 
 func parseFPS(s string) float64 {
