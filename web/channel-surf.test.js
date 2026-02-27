@@ -142,4 +142,75 @@ describe('Channel Surf', () => {
 
         vi.useRealTimers();
     });
+
+    it('stops channel surf if clicked again', async () => {
+        vi.useFakeTimers();
+        const channelSurfBtn = document.getElementById('channel-surf-btn');
+        const state = window.disco.state;
+        state.slideshowDelay = 3;
+
+        global.fetch = vi.fn().mockImplementation((url) => {
+            if (url.includes('/api/random-clip')) {
+                return Promise.resolve({
+                    ok: true,
+                    json: () => Promise.resolve({
+                        path: '/path/to/image1.jpg',
+                        type: 'image/jpeg'
+                    })
+                });
+            }
+            return Promise.resolve({ ok: true });
+        });
+
+        // Start surfing
+        channelSurfBtn.click();
+        await vi.waitFor(() => {
+            expect(state.playback.isSurfing).toBe(true);
+            expect(channelSurfBtn.classList.contains('active')).toBe(true);
+        });
+
+        // Click again to stop (simulating manual click via detail.isManual)
+        const event = new CustomEvent('click', { detail: { isManual: true } });
+        channelSurfBtn.dispatchEvent(event);
+
+        expect(state.playback.isSurfing).toBe(false);
+        expect(channelSurfBtn.classList.contains('active')).toBe(false);
+
+        // Advance timers - should NOT trigger another fetch
+        vi.advanceTimersByTime(4000);
+        expect(global.fetch).toHaveBeenCalledTimes(1);
+
+        vi.useRealTimers();
+    });
+
+    it('image channel surf does not conflict with regular slideshow autoplay', async () => {
+        vi.useFakeTimers();
+        const channelSurfBtn = document.getElementById('channel-surf-btn');
+        const state = window.disco.state;
+        state.imageAutoplay = true; // Regular slideshow is ON
+        state.slideshowDelay = 3;
+
+        global.fetch = vi.fn().mockImplementation((url) => {
+            if (url.includes('/api/random-clip')) {
+                return Promise.resolve({
+                    ok: true,
+                    json: () => Promise.resolve({
+                        path: '/path/to/image1.jpg',
+                        type: 'image/jpeg'
+                    })
+                });
+            }
+            return Promise.resolve({ ok: true });
+        });
+
+        channelSurfBtn.click();
+        
+        await vi.waitFor(() => {
+            expect(state.playback.isSurfing).toBe(true);
+            expect(state.playback.surfTimer).toBeTruthy();
+            expect(state.playback.slideshowTimer).toBeFalsy(); // Should NOT have been started
+        });
+
+        vi.useRealTimers();
+    });
 });

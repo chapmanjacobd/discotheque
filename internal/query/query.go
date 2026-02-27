@@ -266,7 +266,7 @@ func (qb *QueryBuilder) BuildSelect(columns string) (string, []any) {
 
 	// Unfinished (has playhead but presumably not done)
 	if qb.Flags.Unfinished || qb.Flags.InProgress {
-		whereClauses = append(whereClauses, "COALESCE(play_count, 0) = 0 AND COALESCE(playhead, 0) > 0")
+		whereClauses = append(whereClauses, "COALESCE(playhead, 0) > 0")
 	}
 
 	if qb.Flags.Partial != "" {

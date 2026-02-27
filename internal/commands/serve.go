@@ -74,6 +74,7 @@ func (c *ServeCmd) Mux() http.Handler {
 	mux.HandleFunc("/api/delete", c.handleDelete)
 	mux.HandleFunc("/api/progress", c.handleProgress)
 	mux.HandleFunc("/api/mark-played", c.handleMarkPlayed)
+	mux.HandleFunc("/api/mark-unplayed", c.handleMarkUnplayed)
 	mux.HandleFunc("/api/rate", c.handleRate)
 	mux.HandleFunc("/api/playlists", c.handlePlaylists)
 	mux.HandleFunc("/api/playlists/items", c.handlePlaylistItems)
@@ -766,6 +767,45 @@ func (c *ServeCmd) handleProgress(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+func (c *ServeCmd) handleMarkUnplayed(w http.ResponseWriter, r *http.Request) {
+	if c.ReadOnly {
+		http.Error(w, "Read-only mode", http.StatusForbidden)
+		return
+	}
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		Path string `json:"path"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	for _, dbPath := range c.Databases {
+		err := c.execDB(r.Context(), dbPath, func(sqlDB *sql.DB) error {
+			if _, err := sqlDB.ExecContext(r.Context(), `
+			UPDATE media
+			SET play_count = 0,
+			    playhead = 0,
+			    time_last_played = 0
+			WHERE path = ?`,
+				req.Path); err != nil {
+				return err
+			}
+			return nil
+		})
+		if err != nil {
+			slog.Error("Failed to mark as unplayed", "db", dbPath, "error", err)
+		}
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
 func (c *ServeCmd) handleMarkPlayed(w http.ResponseWriter, r *http.Request) {
 	if c.ReadOnly {
 		http.Error(w, "Read-only mode", http.StatusForbidden)
@@ -1146,8 +1186,10 @@ func (c *ServeCmd) handleDU(w http.ResponseWriter, r *http.Request) {
 
 func (c *ServeCmd) handleEpisodes(w http.ResponseWriter, r *http.Request) {
 	flags := c.parseFlags(r)
-	flags.All = true
-	flags.Limit = 1000000
+	if flags.Limit <= 0 {
+		flags.All = true
+		flags.Limit = 1000000
+	}
 
 	allMedia, err := query.MediaQuery(r.Context(), c.Databases, flags)
 	if err != nil {

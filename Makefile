@@ -10,7 +10,7 @@ SYNCWEB_TAGS=$(BUILD_TAGS),syncweb
 all: fmt lint sql test webtest build readme
 
 build:
-	go build -tags "$(BUILD_TAGS)" -o $(BINARY_NAME) ./cmd/disco
+	go build -tags "$(SYNCWEB_TAGS)" -o $(BINARY_NAME) ./cmd/disco
 	go build -tags "$(SYNCWEB_TAGS)" -o $(SYNCWEB_BINARY) ./cmd/syncweb
 
 dev:

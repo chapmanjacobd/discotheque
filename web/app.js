@@ -16,11 +16,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const nextPageBtn = document.getElementById('next-page');
     const pageInfo = document.getElementById('page-info');
 
-    const detailView = document.getElementById('detail-view');
-    const searchView = document.querySelector('.content:not(#detail-view)');
-    const backToResultsBtn = document.getElementById('back-to-results');
-    const detailContent = document.getElementById('detail-content');
-
     const menuToggle = document.getElementById('menu-toggle');
     const sidebarOverlay = document.getElementById('sidebar-overlay');
     const sidebar = document.querySelector('.sidebar');
@@ -34,7 +29,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const pipPlayer = document.getElementById('pip-player');
     const pipViewer = document.getElementById('media-viewer');
     const pipTitle = document.getElementById('media-title');
+    if (pipTitle) {
+        pipTitle.onclick = () => {
+            const range = document.createRange();
+            range.selectNodeContents(pipTitle);
+            const selection = window.getSelection();
+            selection.removeAllRanges();
+            selection.addRange(range);
+        };
+    }
     const lyricsDisplay = document.getElementById('lyrics-display');
+    const secondarySubtitle = document.getElementById('secondary-subtitle');
     const searchSuggestions = document.getElementById('search-suggestions');
 
     const viewGroup = document.getElementById('view-group');
@@ -72,6 +77,76 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const pipSpeedBtn = document.getElementById('pip-speed');
     const pipSpeedMenu = document.getElementById('pip-speed-menu');
+    const pipSubtitlesBtn = document.getElementById('pip-subtitles');
+
+    if (pipSubtitlesBtn) {
+        pipSubtitlesBtn.onclick = () => {
+            renderSubtitleList();
+            openModal('subtitle-modal');
+        };
+    }
+
+    function renderSubtitleList() {
+        const list = document.getElementById('subtitle-list');
+        if (!list) return;
+        list.innerHTML = '';
+
+        const media = pipViewer.querySelector('video, audio');
+        if (!media || !media.textTracks || media.textTracks.length === 0) {
+            list.innerHTML = '<p style="text-align: center; padding: 1rem; color: var(--text-muted);">No subtitle tracks found.</p>';
+            return;
+        }
+
+        const tracks = Array.from(media.textTracks);
+
+        // Add "None" option
+        const noneBtn = document.createElement('button');
+        noneBtn.className = 'category-btn';
+        noneBtn.style.width = '100%';
+        noneBtn.style.marginBottom = '0.5rem';
+        noneBtn.textContent = 'Disable All';
+        noneBtn.onclick = () => {
+            tracks.forEach(t => t.mode = 'disabled');
+            renderSubtitleList();
+        };
+        list.appendChild(noneBtn);
+
+        tracks.forEach((track, index) => {
+            const row = document.createElement('div');
+            row.style.display = 'flex';
+            row.style.gap = '0.5rem';
+            row.style.alignItems = 'center';
+
+            const primaryBtn = document.createElement('button');
+            primaryBtn.className = 'category-btn' + (track.mode === 'showing' ? ' active' : '');
+            primaryBtn.style.flex = '1';
+            primaryBtn.style.textAlign = 'left';
+            primaryBtn.textContent = track.label || `Track ${index + 1}`;
+            primaryBtn.onclick = () => {
+                const currentMode = track.mode;
+                tracks.forEach(t => { if (t.mode === 'showing') t.mode = 'disabled'; });
+                track.mode = (currentMode === 'showing') ? 'disabled' : 'showing';
+                renderSubtitleList();
+            };
+
+            const secondaryBtn = document.createElement('button');
+            secondaryBtn.className = 'category-btn' + (track.mode === 'hidden' ? ' active' : '');
+            secondaryBtn.textContent = '2nd';
+            secondaryBtn.title = 'Show as secondary subtitle (at top of player)';
+            secondaryBtn.style.padding = '0.5rem';
+            secondaryBtn.onclick = () => {
+                const currentMode = track.mode;
+                tracks.forEach(t => { if (t.mode === 'hidden') t.mode = 'disabled'; });
+                track.mode = (currentMode === 'hidden') ? 'disabled' : 'hidden';
+                renderSubtitleList();
+            };
+
+            row.appendChild(primaryBtn);
+            row.appendChild(secondaryBtn);
+            list.appendChild(row);
+        });
+    }
+
     const filterBrowseCol = document.getElementById('filter-browse-col');
     const filterBrowseVal = document.getElementById('filter-browse-val');
     const filterBrowseValContainer = document.getElementById('filter-browse-val-container');
@@ -123,7 +198,7 @@ document.addEventListener('DOMContentLoaded', () => {
         postPlaybackAction: localStorage.getItem('disco-post-playback') || 'nothing',
         defaultView: localStorage.getItem('disco-default-view') || 'pip',
         autoplay: localStorage.getItem('disco-autoplay') !== 'false',
-        imageAutoplay: localStorage.getItem('disco-image-autoplay') !== 'false',
+        imageAutoplay: localStorage.getItem('disco-image-autoplay') === 'true',
         localResume: localStorage.getItem('disco-local-resume') !== 'false',
         defaultVideoRate: parseFloat(localStorage.getItem('disco-default-video-rate')) || 1.0,
         defaultAudioRate: parseFloat(localStorage.getItem('disco-default-audio-rate')) || 1.0,
@@ -170,17 +245,17 @@ document.addEventListener('DOMContentLoaded', () => {
         return Math.round(val).toString() + '%';
     }
 
-        function updateSliderLabels() {
-            const updateRange = (minSlider, maxSlider, label, minF, maxF, type) => {
+    function updateSliderLabels() {
+        const updateRange = (minSlider, maxSlider, label, minF, maxF, type) => {
             if (!minSlider || !state.filterBins) return;
-            
+
             const minP = parseInt(minSlider.value);
             const maxP = parseInt(maxSlider.value);
-            
+
             const percentiles = state.filterBins[`${type}_percentiles`] || [];
             const getVal = (p) => {
                 if (percentiles.length > p) return percentiles[p];
-                
+
                 // Fallback to linear if percentiles missing
                 let minTotal = 0, maxTotal = 0;
                 if (type === 'episodes') { minTotal = state.filterBins.episodes_min; maxTotal = state.filterBins.episodes_max; }
@@ -199,7 +274,7 @@ document.addEventListener('DOMContentLoaded', () => {
             };
 
             if (label) label.textContent = `${format(valMin)} - ${format(valMax)}`;
-            
+
             if (minF) minF.textContent = format(getVal(0));
             if (maxF) maxF.textContent = format(getVal(100));
 
@@ -313,7 +388,26 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (channelSurfBtn) {
-        channelSurfBtn.onclick = async () => {
+        channelSurfBtn.onclick = async (e) => {
+            const isAutomated = e && e.detail && e.detail.isAutomated;
+            const isManual = e && (e.isTrusted || e.detail?.isManual);
+
+            if (state.playback.isSurfing) {
+                if (isManual) {
+                    state.playback.isSurfing = false;
+                    if (state.playback.surfTimer) {
+                        clearTimeout(state.playback.surfTimer);
+                        state.playback.surfTimer = null;
+                    }
+                    showToast('Channel Surf Stopped', 'ℹ️');
+                    channelSurfBtn.classList.remove('active');
+                    return;
+                }
+            } else {
+                if (isAutomated) return;
+                state.playback.isSurfing = true;
+            }
+
             try {
                 // Determine filter type based on current media
                 let type = '';
@@ -350,6 +444,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 const filename = data.path.split('/').pop();
                 showToast(`Channel Surf: ${filename} (${formatDuration(data.start)})`, '🔀');
 
+                channelSurfBtn.classList.add('active');
+
                 // Open in PiP
                 await openInPiP(data, true, true);
 
@@ -361,10 +457,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     // Add listener for end of clip
                     if (data.end && data.end > data.start) {
                         const checkTime = () => {
+                            if (!state.playback.isSurfing) {
+                                media.removeEventListener('timeupdate', checkTime);
+                                return;
+                            }
                             if (media.currentTime >= data.end) {
                                 media.removeEventListener('timeupdate', checkTime);
                                 // Trigger next surf
-                                if (channelSurfBtn) channelSurfBtn.click();
+                                if (channelSurfBtn) channelSurfBtn.dispatchEvent(new CustomEvent('click', { detail: { isAutomated: true } }));
                             }
                         };
                         media.addEventListener('timeupdate', checkTime);
@@ -378,13 +478,16 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (state.playback.surfTimer) clearTimeout(state.playback.surfTimer);
                         state.playback.surfTimer = setTimeout(() => {
                             state.playback.surfTimer = null;
-                            if (channelSurfBtn) channelSurfBtn.click();
+                            if (!state.playback.isSurfing) return;
+                            if (channelSurfBtn) channelSurfBtn.dispatchEvent(new CustomEvent('click', { detail: { isAutomated: true } }));
                         }, delay * 1000);
                     }
                 }
             } catch (err) {
                 console.error('Channel surf failed:', err);
                 showToast('Channel surf failed');
+                state.playback.isSurfing = false;
+                channelSurfBtn.classList.remove('active');
             }
         };
     }
@@ -1002,7 +1105,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         state.filters.isSyncweb = true;
                         state.filters.search = `syncweb://${f.id}/`;
                         searchInput.value = state.filters.search;
-                        handleSearch();
+                        performSearch();
                     };
                     syncwebList.appendChild(btn);
                 });
@@ -1031,7 +1134,7 @@ document.addEventListener('DOMContentLoaded', () => {
             p.delete('unplayed');
             p.delete('unfinished');
             p.delete('completed');
-            
+
             p.append('all', 'true');
             p.append('paths', paths.join(','));
 
@@ -1564,6 +1667,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const params = new URLSearchParams();
             appendFilterParams(params);
 
+            if (state.filters.all) {
+                params.append('all', 'true');
+            } else {
+                params.append('limit', state.filters.limit);
+            }
+
             if (state.page === 'trash') {
                 params.append('trash', 'true');
             } else if (state.page === 'history') {
@@ -1574,7 +1683,79 @@ document.addEventListener('DOMContentLoaded', () => {
                 signal: searchAbortController.signal
             });
             if (!resp.ok) throw new Error('Failed to fetch episodes');
-            state.similarityData = await resp.json();
+            let groups = await resp.json();
+            if (!groups) groups = [];
+
+            // Merge local progress if enabled
+            if (state.localResume) {
+                const localProgress = JSON.parse(localStorage.getItem('disco-progress') || '{}');
+
+                if (state.page === 'history' || state.filters.unfinished || state.filters.completed) {
+                    const serverFiles = [];
+                    groups.forEach(g => { if (g.files) serverFiles.push(...g.files); });
+                    const serverPaths = new Set(serverFiles.map(m => m.path));
+
+                    let missingPaths = Object.keys(localProgress).filter(p => !serverPaths.has(p));
+
+                    if (missingPaths.length > 0) {
+                        let missingData = await fetchMediaByPaths(missingPaths);
+
+                        // Client-side filtering for merged items
+                        if (state.filters.unfinished) {
+                            missingData = missingData.filter(item => getPlayCount(item) === 0 && (localProgress[item.path]?.pos > 0));
+                        } else if (state.filters.completed) {
+                            missingData = missingData.filter(item => getPlayCount(item) > 0);
+                        } else if (state.page === 'history') {
+                            missingData = missingData.filter(item => (localProgress[item.path]?.last > 0));
+                        }
+
+                        if (missingData.length > 0) {
+                            missingData.forEach(m => {
+                                const parent = m.path.substring(0, m.path.lastIndexOf('/')) || '/';
+                                const existing = groups.find(g => g.path === parent);
+                                if (existing) {
+                                    if (!existing.files.some(f => f.path === m.path)) {
+                                        existing.files.push(m);
+                                        existing.count++;
+                                    }
+                                } else {
+                                    groups.push({
+                                        path: parent,
+                                        files: [m],
+                                        count: 1
+                                    });
+                                }
+                            });
+                            groups.sort((a, b) => a.path.localeCompare(b.path));
+                        }
+                    }
+                }
+            }
+
+            // Update playhead and time_last_played from localStorage for all items in groups
+            if (state.localResume) {
+                const localProgress = JSON.parse(localStorage.getItem('disco-progress') || '{}');
+                groups.forEach(group => {
+                    if (group.files) {
+                        group.files.forEach(item => {
+                            const local = localProgress[item.path];
+                            if (local) {
+                                const localPlayhead = typeof local === 'object' ? local.pos : local;
+                                const localTime = typeof local === 'object' ? local.last / 1000 : 0;
+
+                                if (localTime > (item.time_last_played || 0)) {
+                                    item.playhead = localPlayhead;
+                                    item.time_last_played = localTime;
+                                } else if (localPlayhead > (item.playhead || 0)) {
+                                    item.playhead = localPlayhead;
+                                }
+                            }
+                        });
+                    }
+                });
+            }
+
+            state.similarityData = groups;
             renderEpisodes(state.similarityData);
         } catch (err) {
             if (err.name === 'AbortError') return;
@@ -1605,6 +1786,17 @@ document.addEventListener('DOMContentLoaded', () => {
                     const path = (f.path || '').toLowerCase();
                     const title = (f.title || '').toLowerCase();
                     if (!path.includes(query) && !title.includes(query)) return false;
+                }
+
+                // Client-side progress filtering
+                if (state.filters.unplayed) {
+                    if (getPlayCount(f) > 0 || (f.playhead || 0) > 0) return false;
+                } else if (state.filters.unfinished) {
+                    if (getPlayCount(f) > 0 || (f.playhead || 0) === 0) return false;
+                } else if (state.filters.completed) {
+                    if (getPlayCount(f) === 0) return false;
+                } else if (state.page === 'history') {
+                    if ((f.time_last_played || 0) === 0) return false;
                 }
 
                 return true;
@@ -1641,7 +1833,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 card.className = 'media-card';
                 card.onclick = () => playMedia(item);
 
-                const title = truncateString(item.title || item.path.split('/').pop());
+                const title = item.title || item.path.split('/').pop();
                 const thumbUrl = `/api/thumbnail?path=${encodeURIComponent(item.path)}`;
 
                 card.innerHTML = `
@@ -1650,13 +1842,14 @@ document.addEventListener('DOMContentLoaded', () => {
                         <span class="media-duration">${formatDuration(item.duration)}</span>
                     </div>
                     <div class="media-info">
-                        <div class="media-title">${title}</div>
+                        <div class="media-title" title="${item.path}">${title}</div>
                         <div class="media-meta">
                             <span>${formatSize(item.size)}</span>
                             <span>${item.video_codecs || ''}</span>
                         </div>
                     </div>
                 `;
+
                 filesGrid.appendChild(card);
             });
 
@@ -2397,6 +2590,11 @@ document.addEventListener('DOMContentLoaded', () => {
     async function updateProgress(item, playhead, duration, isComplete = false) {
         if (state.playback.isSurfing) return state.playback.pendingUpdate;
 
+        const media = pipViewer.querySelector('video, audio');
+        if (!isComplete && media && (media.seeking || media.readyState < 3)) {
+            return state.playback.pendingUpdate;
+        }
+
         const now = Date.now();
 
         if (isComplete) {
@@ -2663,6 +2861,53 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    async function markMediaUnplayed(item) {
+        if (state.readOnly) {
+            // Local update for read-only mode
+            const counts = JSON.parse(localStorage.getItem('disco-play-counts') || '{}');
+            counts[item.path] = 0;
+            localStorage.setItem('disco-play-counts', JSON.stringify(counts));
+
+            const progress = JSON.parse(localStorage.getItem('disco-progress') || '{}');
+            delete progress[item.path];
+            localStorage.setItem('disco-progress', JSON.stringify(progress));
+
+            showToast('Marked as unplayed (Local)', '⭕');
+        } else {
+            try {
+                const resp = await fetch('/api/mark-unplayed', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ path: item.path })
+                });
+                if (!resp.ok) throw new Error('Action failed');
+                showToast('Marked as unplayed', '⭕');
+            } catch (err) {
+                console.error('Failed to mark as unplayed:', err);
+                showToast('Action failed');
+                return;
+            }
+        }
+
+        // Update current state and re-render
+        const updated = (m) => {
+            if (m.path === item.path) {
+                m.play_count = 0;
+                m.playhead = 0;
+                m.time_last_played = 0;
+            }
+            return m;
+        };
+        currentMedia = currentMedia.map(updated);
+        if (state.playlistItems) state.playlistItems = state.playlistItems.map(updated);
+
+        if (state.filters.completed) {
+            performSearch();
+        } else {
+            renderResults();
+        }
+    }
+
     function seekToProgress(el, targetPos, retryCount = 0) {
         if (!el || !targetPos || targetPos <= 0) return;
 
@@ -2765,7 +3010,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (isNewSession) {
             // New explicit request: reset state.imageAutoplay to user preference
-            state.imageAutoplay = localStorage.getItem('disco-image-autoplay') !== 'false';
+            state.imageAutoplay = localStorage.getItem('disco-image-autoplay') === 'true';
         }
 
         const type = item.type || "";
@@ -2797,17 +3042,32 @@ document.addEventListener('DOMContentLoaded', () => {
         state.playback.hasMarkedComplete = false;
         state.playback.lastPlayedIndex = currentMedia.findIndex(m => m.path === item.path);
 
+        // Preload next 2 images
+        if (state.playback.lastPlayedIndex !== -1) {
+            let count = 0;
+            for (let i = state.playback.lastPlayedIndex + 1; i < currentMedia.length && count < 2; i++) {
+                const nextItem = currentMedia[i];
+                if (nextItem.type && nextItem.type.includes('image')) {
+                    const img = new Image();
+                    img.src = `/api/raw?path=${encodeURIComponent(nextItem.path)}`;
+                    count++;
+                }
+            }
+        }
+
         if (prevItem && prevItem.path !== item.path && state.filters.unplayed && wasPlayed) {
             if (state.playback.pendingUpdate) await state.playback.pendingUpdate;
             performSearch();
         }
 
         const path = item.path;
-        pipTitle.textContent = truncateString(path.split('/').pop());
+        pipTitle.textContent = path.split('/').pop();
         pipTitle.title = path;
         pipViewer.innerHTML = '';
         lyricsDisplay.classList.add('hidden');
         lyricsDisplay.textContent = '';
+        secondarySubtitle.classList.add('hidden');
+        secondarySubtitle.textContent = '';
 
         // Apply mode
         const theatreAnchor = document.getElementById('theatre-anchor');
@@ -2815,7 +3075,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (state.playerMode === 'theatre') {
             pipPlayer.classList.add('theatre');
-            pipPlayer.classList.remove('minimized');
+            document.body.classList.remove('has-pip');
             if (pipPlayer.parentElement !== theatreAnchor) {
                 theatreAnchor.appendChild(pipPlayer);
             }
@@ -2825,6 +3085,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } else {
             pipPlayer.classList.remove('theatre');
+            document.body.classList.add('has-pip');
             if (pipPlayer.parentElement !== document.body) {
                 document.body.appendChild(pipPlayer);
             }
@@ -2835,9 +3096,18 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         pipPlayer.classList.remove('hidden');
-        pipPlayer.classList.remove('minimized');
 
         const slideshowBtn = document.getElementById('pip-slideshow');
+        const speedBtn = document.getElementById('pip-speed');
+        if (speedBtn) {
+            if (type.includes('image')) {
+                speedBtn.classList.add('hidden');
+                if (pipSpeedMenu) pipSpeedMenu.classList.add('hidden');
+            } else {
+                speedBtn.classList.remove('hidden');
+            }
+        }
+
         if (slideshowBtn) {
             if (type.includes('image')) {
                 slideshowBtn.classList.remove('hidden');
@@ -2931,9 +3201,21 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             el.ontimeupdate = () => {
-
                 const isComplete = (el.duration > 90) && (el.duration - el.currentTime < 90) && (el.currentTime / el.duration > 0.95);
                 updateProgress(item, el.currentTime, el.duration, isComplete);
+
+                // Handle secondary subtitles
+                const tracks = Array.from(el.textTracks);
+                const secondary = tracks.find(t => t.mode === 'hidden');
+                if (secondary && secondary.activeCues && secondary.activeCues.length > 0) {
+                    const cue = Array.from(secondary.activeCues).pop();
+                    if (cue) {
+                        secondarySubtitle.classList.remove('hidden');
+                        secondarySubtitle.textContent = cue.text;
+                    }
+                } else {
+                    secondarySubtitle.classList.add('hidden');
+                }
             };
 
             el.onended = async () => {
@@ -3011,14 +3293,29 @@ document.addEventListener('DOMContentLoaded', () => {
                 const isComplete = (el.duration > 90) && (el.duration - el.currentTime < 90) && (el.currentTime / el.duration > 0.95);
                 updateProgress(item, el.currentTime, el.duration, isComplete);
 
-                // Handle lyrics
-                const textTrack = el.textTracks[0];
-                if (textTrack && textTrack.activeCues && textTrack.activeCues.length > 0) {
-                    const cue = Array.from(textTrack.activeCues).pop();
+                // Handle lyrics/subtitles
+                const tracks = Array.from(el.textTracks);
+                const primary = tracks.find(t => t.mode === 'showing') || tracks[0];
+                const secondary = tracks.find(t => t.mode === 'hidden');
+
+                if (primary && primary.activeCues && primary.activeCues.length > 0) {
+                    const cue = Array.from(primary.activeCues).pop();
                     if (cue) {
                         lyricsDisplay.classList.remove('hidden');
                         lyricsDisplay.textContent = cue.text;
                     }
+                } else {
+                    lyricsDisplay.classList.add('hidden');
+                }
+
+                if (secondary && secondary.activeCues && secondary.activeCues.length > 0) {
+                    const cue = Array.from(secondary.activeCues).pop();
+                    if (cue) {
+                        secondarySubtitle.classList.remove('hidden');
+                        secondarySubtitle.textContent = cue.text;
+                    }
+                } else {
+                    secondarySubtitle.classList.add('hidden');
                 }
             };
 
@@ -3047,11 +3344,70 @@ document.addEventListener('DOMContentLoaded', () => {
             el.src = url;
             el.onerror = () => handleMediaError(item);
             el.onload = () => {
-                if (state.imageAutoplay) {
+                if (state.imageAutoplay && !state.playback.isSurfing) {
                     startSlideshow();
                 }
             };
             el.ondblclick = () => toggleFullscreen(pipViewer, pipViewer);
+
+            // Zoom/Pan logic for fullscreen
+            let scale = 1;
+            let translateX = 0;
+            let translateY = 0;
+            let isDragging = false;
+            let lastX, lastY;
+
+            el.addEventListener('wheel', (e) => {
+                if (!document.fullscreenElement) return;
+                e.preventDefault();
+                const delta = e.deltaY > 0 ? 0.9 : 1.1;
+                const newScale = Math.min(Math.max(1, scale * delta), 10);
+
+                if (newScale !== scale) {
+                    scale = newScale;
+                    if (scale === 1) {
+                        translateX = 0;
+                        translateY = 0;
+                    }
+                    el.style.transform = `scale(${scale}) translate(${translateX}px, ${translateY}px)`;
+                }
+            }, { passive: false });
+
+            el.addEventListener('mousedown', (e) => {
+                if (!document.fullscreenElement || scale <= 1) return;
+                isDragging = true;
+                lastX = e.clientX;
+                lastY = e.clientY;
+                el.style.cursor = 'grabbing';
+            });
+
+            window.addEventListener('mousemove', (e) => {
+                if (!isDragging || !document.fullscreenElement) return;
+                const dx = (e.clientX - lastX) / scale;
+                const dy = (e.clientY - lastY) / scale;
+                translateX += dx;
+                translateY += dy;
+                lastX = e.clientX;
+                lastY = e.clientY;
+                el.style.transform = `scale(${scale}) translate(${translateX}px, ${translateY}px)`;
+            });
+
+            window.addEventListener('mouseup', () => {
+                isDragging = false;
+                if (el) el.style.cursor = '';
+            });
+
+            document.addEventListener('fullscreenchange', () => {
+                if (!document.fullscreenElement) {
+                    scale = 1;
+                    translateX = 0;
+                    translateY = 0;
+                    if (el) {
+                        el.style.transform = '';
+                        el.style.cursor = '';
+                    }
+                }
+            });
         } else {
             showToast('Unsupported media format');
             return;
@@ -3273,6 +3629,7 @@ document.addEventListener('DOMContentLoaded', () => {
         lyricsDisplay.classList.add('hidden');
         lyricsDisplay.textContent = '';
         pipPlayer.classList.add('hidden');
+        document.body.classList.remove('has-pip');
 
         // Reset mode to default preference
         state.playerMode = state.defaultView;
@@ -3296,100 +3653,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         prevPageBtn.disabled = state.currentPage === 1;
         nextPageBtn.disabled = state.currentPage >= totalPages;
-    }
-
-    function showDetailView(item) {
-        state.page = 'detail';
-        searchView.classList.add('hidden');
-        detailView.classList.remove('hidden');
-
-        const title = truncateString(item.title || item.path.split('/').pop());
-        const displayPath = formatParents(item.path);
-        const thumbUrl = `/api/thumbnail?path=${encodeURIComponent(item.path)}`;
-        const size = formatSize(item.size);
-        const duration = formatDuration(item.duration);
-        const plays = getPlayCount(item);
-
-        detailContent.innerHTML = `
-            <div class="detail-container">
-                <div class="detail-header">
-                    <img src="${thumbUrl}" class="detail-hero-thumb">
-                    <div class="detail-main-info">
-                        <h1>${title}</h1>
-                        <p class="detail-path" title="${item.path}">${displayPath}</p>
-                        <div class="detail-stats">
-                            <span>${size}</span>
-                            <span>${duration}</span>
-                            <span>${item.type || 'Unknown'}</span>
-                            <span>▶️ ${plays} plays</span>
-                        </div>
-                        <div class="detail-actions">
-                            <button class="category-btn play-now-btn">▶ Play</button>
-                            <button class="category-btn mark-seen-btn">✅ Mark Seen</button>
-                            ${!state.readOnly ? `<button class="category-btn add-playlist-btn">+ Add to Playlist</button>` : ''}
-                            <button class="category-btn delete-item-btn">🗑 Trash</button>
-                        </div>
-                    </div>
-                </div>
-                <div class="detail-metadata">
-                    <h3>Metadata</h3>
-                    <div class="metadata-grid">
-                        ${Object.keys(item).sort().filter(k => {
-            const val = item[k];
-            if (val === null || val === undefined || val === '') return false;
-            if (k === 'db' || k === 'transcode' || k === 'track_number') return false;
-
-            // Hide 0 values for timestamps and other numeric fields where 0 means "unset"
-            if (val === 0 || val === 0.0 || val === '0') {
-                if (k.startsWith('time_') || k === 'playhead' || k === 'play_count' || k === 'score' || k === 'upvote_ratio') return false;
-            }
-            return true;
-        }).map(k => {
-            const label = k.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-            const formatValue = (key, val) => {
-                if (val === null || val === undefined || val === '') return '-';
-                if (key.startsWith('time_') || key.endsWith('_played') || key.includes('_uploaded') || key.includes('_downloaded')) {
-                    return new Date(val * 1000).toLocaleString();
-                }
-                if (key === 'size') return formatSize(val);
-                if (key === 'duration') return formatDuration(val);
-                if (typeof val === 'number') return val.toLocaleString();
-                return val;
-            };
-            return `<div>${label}</div><div>${formatValue(k, item[k])}</div>`;
-        }).join('')}
-                    </div>
-                </div>
-            </div>
-        `;
-
-        detailContent.querySelector('.play-now-btn').onclick = () => playMedia(item);
-        const markSeenBtn = detailContent.querySelector('.mark-seen-btn');
-        if (markSeenBtn) {
-            markSeenBtn.onclick = () => markMediaPlayed(item);
-        }
-        const addPlaylistBtn = detailContent.querySelector('.add-playlist-btn');
-        if (addPlaylistBtn) {
-            addPlaylistBtn.onclick = () => {
-                if (state.playlists.length === 0) {
-                    showToast('Create a playlist first');
-                    return;
-                }
-                const names = state.playlists.map((title, i) => `${i + 1}: ${title}`).join('\n');
-                const choice = prompt(`Add to which playlist?\n${names}`);
-                const idx = parseInt(choice) - 1;
-                if (state.playlists[idx]) {
-                    addToPlaylist(state.playlists[idx], item);
-                }
-            };
-        }
-        detailContent.querySelector('.delete-item-btn').onclick = () => {
-            if (confirm('Move to trash?')) {
-                deleteMedia(item.path);
-                searchView.classList.remove('hidden');
-                detailView.classList.add('hidden');
-            }
-        };
     }
 
     function showSkeletons() {
@@ -3508,7 +3771,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             };
 
-            const title = truncateString(item.title || item.path.split('/').pop());
+            const title = item.title || item.path.split('/').pop();
             const displayPath = formatParents(item.path);
             const size = formatSize(item.size);
             const duration = formatDuration(item.duration);
@@ -3545,7 +3808,10 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 actionBtns = `
                     ${!state.readOnly ? `<button class="media-action-btn add-playlist" title="Add to Playlist">+</button>` : ''}
-                    <button class="media-action-btn mark-played" title="Mark as Seen">✅</button>
+                    ${plays > 0 ?
+                        `<button class="media-action-btn mark-unplayed" title="Mark as Unplayed">⭕</button>` :
+                        `<button class="media-action-btn mark-played" title="Mark as Seen">✅</button>`
+                    }
                     ${!state.readOnly ? `<button class="media-action-btn delete" title="Move to Trash">🗑️</button>` : ''}
                 `;
             }
@@ -3673,6 +3939,12 @@ document.addEventListener('DOMContentLoaded', () => {
             if (btnMarkPlayed) btnMarkPlayed.onclick = (e) => {
                 e.stopPropagation();
                 markMediaPlayed(item);
+            };
+
+            const btnMarkUnplayed = card.querySelector('.media-action-btn.mark-unplayed');
+            if (btnMarkUnplayed) btnMarkUnplayed.onclick = (e) => {
+                e.stopPropagation();
+                markMediaUnplayed(item);
             };
 
             const btnRemovePlaylist = card.querySelector('.media-action-btn.remove-playlist');
@@ -3831,8 +4103,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
             }
 
-            const title = truncateString(item.title || item.path.split('/').pop());
-
+            const title = item.title || item.path.split('/').pop();
             let actions = '';
             if (isTrash) {
                 actions = `
@@ -3842,10 +4113,14 @@ document.addEventListener('DOMContentLoaded', () => {
             } else if (isPlaylist) {
                 actions = !state.readOnly ? `<button class="table-action-btn remove-btn" title="Remove from Playlist">&times;</button>` : '';
             } else {
+                const plays = getPlayCount(item);
                 actions = `
                     <div class="playlist-item-actions">
                         ${!state.readOnly ? `<button class="table-action-btn add-btn" title="Add to Playlist">+</button>` : ''}
-                        <button class="table-action-btn mark-played-btn" title="Mark as Played">✅</button>
+                        ${plays > 0 ?
+                        `<button class="table-action-btn mark-unplayed-btn" title="Mark as Unplayed">⭕</button>` :
+                        `<button class="table-action-btn mark-played-btn" title="Mark as Played">✅</button>`
+                    }
                         ${!state.readOnly ? `<button class="table-action-btn delete-btn" title="Move to Trash">🗑️</button>` : ''}
                     </div>
                 `;
@@ -3865,7 +4140,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <td>
                     <div class="table-cell-title" title="${item.path}">
                         <span class="table-icon">${getIcon(item.type)}</span>
-                        ${title}
+                        <span class="media-title-span">${title}</span>
                     </div>
                 </td>
                 <td>${formatSize(item.size)}</td>
@@ -3889,6 +4164,12 @@ document.addEventListener('DOMContentLoaded', () => {
             if (btnMarkPlayed) btnMarkPlayed.onclick = (e) => {
                 e.stopPropagation();
                 markMediaPlayed(item);
+            };
+
+            const btnMarkUnplayed = tr.querySelector('.mark-unplayed-btn');
+            if (btnMarkUnplayed) btnMarkUnplayed.onclick = (e) => {
+                e.stopPropagation();
+                markMediaUnplayed(item);
             };
 
             const btnDelete = tr.querySelector('.delete-btn');
@@ -4104,15 +4385,6 @@ document.addEventListener('DOMContentLoaded', () => {
                         } else {
                             closeModal('metadata-modal');
                         }
-                    }
-                    return;
-                case 'd':
-                    if (state.page === 'detail') {
-                        searchView.classList.remove('hidden');
-                        detailView.classList.add('hidden');
-                        state.page = 'search';
-                    } else if (state.playback.item) {
-                        showDetailView(state.playback.item);
                     }
                     return;
                 case '?':
@@ -4525,11 +4797,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (pipSpeedMenu) pipSpeedMenu.classList.add('hidden');
     });
 
-    const pipMinimizeBtn = document.getElementById('pip-minimize');
-    if (pipMinimizeBtn) pipMinimizeBtn.onclick = () => {
-        pipPlayer.classList.toggle('minimized');
-    };
-
     const pipStreamTypeBtn = document.getElementById('pip-stream-type');
     if (pipStreamTypeBtn) pipStreamTypeBtn.onclick = () => {
         if (!state.playback.item) return;
@@ -4572,7 +4839,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (state.playerMode === 'pip') {
             state.playerMode = 'theatre';
             pipPlayer.classList.add('theatre');
-            pipPlayer.classList.remove('minimized'); // Ensure it's expanded
             if (pipPlayer.parentElement !== theatreAnchor) {
                 theatreAnchor.appendChild(pipPlayer);
             }
@@ -4642,17 +4908,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         playSibling(1, true);
                     }
                 } else if (diffY > 80 && Math.abs(diffX) < 60) {
-                    // Swipe Down -> Minimize/Close
-                    if (pipPlayer.classList.contains('minimized')) {
-                        closePiP();
-                    } else {
-                        pipPlayer.classList.add('minimized');
-                    }
-                } else if (diffY < -80 && Math.abs(diffX) < 60) {
-                    // Swipe Up -> Expand
-                    if (pipPlayer.classList.contains('minimized')) {
-                        pipPlayer.classList.remove('minimized');
-                    }
+                    // Swipe Down -> Close
+                    closePiP();
                 }
             }
             touchStartTime = 0;
@@ -4922,10 +5179,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (historyInProgressBtn) {
         historyInProgressBtn.onclick = () => {
-            state.page = 'search';
-            state.filters.unfinished = true;
-            state.filters.completed = false;
-            state.filters.unplayed = false;
+            if (state.filters.unfinished) {
+                state.filters.unfinished = false;
+            } else {
+                state.page = 'search';
+                state.filters.unfinished = true;
+                state.filters.completed = false;
+                state.filters.unplayed = false;
+            }
             updateNavActiveStates();
             performSearch();
         };
@@ -4933,10 +5194,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (historyUnplayedBtn) {
         historyUnplayedBtn.onclick = () => {
-            state.page = 'search';
-            state.filters.unplayed = true;
-            state.filters.unfinished = false;
-            state.filters.completed = false;
+            if (state.filters.unplayed) {
+                state.filters.unplayed = false;
+            } else {
+                state.page = 'search';
+                state.filters.unplayed = true;
+                state.filters.unfinished = false;
+                state.filters.completed = false;
+            }
             updateNavActiveStates();
             performSearch();
         };
@@ -4944,10 +5209,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (historyCompletedBtn) {
         historyCompletedBtn.onclick = () => {
-            state.page = 'search';
-            state.filters.completed = true;
-            state.filters.unfinished = false;
-            state.filters.unplayed = false;
+            if (state.filters.completed) {
+                state.filters.completed = false;
+            } else {
+                state.page = 'search';
+                state.filters.completed = true;
+                state.filters.unfinished = false;
+                state.filters.unplayed = false;
+            }
             updateNavActiveStates();
             performSearch();
         };
@@ -5097,12 +5366,6 @@ document.addEventListener('DOMContentLoaded', () => {
         resultsContainer.scrollTo(0, 0);
     };
 
-    if (backToResultsBtn) backToResultsBtn.onclick = () => {
-        state.page = 'search';
-        detailView.classList.add('hidden');
-        searchView.classList.remove('hidden');
-    };
-
     // --- Inactivity Tracking ---
     const logoText = document.querySelector('.logo-text');
     const activityEvents = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart'];
@@ -5188,6 +5451,7 @@ document.addEventListener('DOMContentLoaded', () => {
         formatRelativeDate,
         formatParents,
         openInPiP,
+        performSearch,
         updateProgress,
         seekToProgress,
         closePiP,

@@ -159,10 +159,6 @@
         <section class="content">
             <div id="theatre-anchor"></div>
             <div id="toolbar">
-                <div class="filter-group">
-                    <!-- Media type buttons moved to sidebar -->
-                </div>
-
                 <div class="sort-group">
                     <select id="sort-by">
                         <option value="default" selected>Default</option>
@@ -196,13 +192,6 @@
                 <button id="prev-page" class="category-btn">Previous</button>
                 <span id="page-info">Page 1</span>
                 <button id="next-page" class="category-btn">Next</button>
-            </div>
-        </section>
-
-        <section id="detail-view" class="content hidden">
-            <button id="back-to-results" class="category-btn">← Back</button>
-            <div id="detail-content">
-                <!-- Detail content will be injected here -->
             </div>
         </section>
     </main>
@@ -285,7 +274,7 @@
                     </div>
                     <div class="setting-item">
                         <label for="setting-image-autoplay">Enable Image Autoplay:</label>
-                        <input type="checkbox" id="setting-image-autoplay" checked>
+                        <input type="checkbox" id="setting-image-autoplay">
                     </div>
                     <div class="setting-item">
                         <label for="setting-slideshow-delay">Image Autoplay Delay (s):</label>
@@ -367,10 +356,10 @@
                     <button class="speed-opt" data-speed="1.75">1.75x</button>
                     <button class="speed-opt" data-speed="2.0">2.0x</button>
                 </div>
+                <button id="pip-subtitles" title="Subtitles">💬</button>
                 <button id="channel-surf-btn" title="Channel Surf (Interdimensional Cable)">🔀</button>
                 <button id="pip-stream-type" title="Switch Stream Type">🔄</button>
                 <button id="pip-native" title="Native Picture-in-Picture" class="hidden">📺</button>
-                <button id="pip-minimize" title="Minimize">_</button>
                 <button id="pip-theatre" title="Theatre Mode">□</button>
                 <button class="close-pip" title="Close">&times;</button>
             </div>
@@ -378,6 +367,7 @@
         <div id="media-viewer">
             <!-- Media tag (img, video, audio) will be injected here -->
         </div>
+        <div id="secondary-subtitle" class="hidden"></div>
         <div id="lyrics-display" class="hidden"></div>
     </div>
 
@@ -412,7 +402,6 @@
                         <div class="shortcut-item"><span>t</span> <span>Focus Search</span></div>
                         <div class="shortcut-item"><span>c</span> <span>Copy Path</span></div>
                         <div class="shortcut-item"><span>i</span> <span>Media Info</span></div>
-                        <div class="shortcut-item"><span>d</span> <span>Details View</span></div>
                         <div class="shortcut-item"><span>?</span> <span>Show This Help</span></div>
                     </section>
                     <section>
@@ -463,6 +452,24 @@
     </div>
 
     <div id="toast" class="hidden"></div>
+
+    <!-- Subtitle Modal -->
+    <div id="subtitle-modal" class="modal hidden">
+        <div class="modal-content" style="max-width: 400px;">
+            <div class="modal-header">
+                <h2>Subtitles</h2>
+                <button class="close-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div style="margin-bottom: 1rem; font-size: 0.9rem; color: var(--text-muted);">
+                    Select primary (top) and optional secondary (bottom) subtitles.
+                </div>
+                <div id="subtitle-list" style="display: flex; flex-direction: column; gap: 0.5rem;">
+                    <!-- Subtitle tracks will be injected here -->
+                </div>
+            </div>
+        </div>
+    </div>
 
     <script src="app.js"></script>
 </body>

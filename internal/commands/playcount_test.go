@@ -114,3 +114,42 @@ func TestServeCmd_HandleMarkPlayed(t *testing.T) {
 		t.Errorf("Expected play_count 2, got %d", playCount)
 	}
 }
+
+func TestServeCmd_HandleMarkUnplayed(t *testing.T) {
+	fixture := testutils.Setup(t)
+	defer fixture.Cleanup()
+
+	f1 := fixture.CreateDummyFile("media1.mp4")
+	addCmd := &AddCmd{
+		Args: []string{fixture.DBPath, f1},
+	}
+	addCmd.AfterApply()
+	addCmd.Run(nil)
+
+	cmd := &ServeCmd{
+		Databases: []string{fixture.DBPath},
+	}
+
+	dbConn := fixture.GetDB()
+	defer dbConn.Close()
+
+	// 1. Mark as played first
+	reqBody, _ := json.Marshal(map[string]string{"path": f1})
+	req := httptest.NewRequest(http.MethodPost, "/api/mark-played", bytes.NewBuffer(reqBody))
+	cmd.handleMarkPlayed(httptest.NewRecorder(), req)
+
+	// 2. Mark as unplayed
+	req = httptest.NewRequest(http.MethodPost, "/api/mark-unplayed", bytes.NewBuffer(reqBody))
+	w := httptest.NewRecorder()
+	cmd.handleMarkUnplayed(w, req)
+
+	if w.Result().StatusCode != http.StatusOK {
+		t.Errorf("Expected status 200, got %d", w.Result().StatusCode)
+	}
+
+	var playCount int
+	dbConn.QueryRow("SELECT COALESCE(play_count, 0) FROM media WHERE path = ?", f1).Scan(&playCount)
+	if playCount != 0 {
+		t.Errorf("Expected play_count 0, got %d", playCount)
+	}
+}

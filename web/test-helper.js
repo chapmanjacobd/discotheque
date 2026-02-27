@@ -42,6 +42,10 @@ export async function setupTestEnvironment(initialLocalStorage) {
                 { path: 'video1.mp4', type: 'video/mp4', size: 1024, duration: 60, db: 'test.db', caption_text: 'sample caption', caption_time: 10.5 },
                 { path: 'audio1.mp3', type: 'audio/mpeg', size: 512, duration: 120, db: 'test.db', caption_text: 'another caption', caption_time: 20.0 }
             ];
+        } else if (url.includes('/api/syncweb/folders')) {
+            data = mocks.syncweb_folders || [{ id: 'mysync' }];
+        } else if (url.includes('/api/syncweb/ls')) {
+            data = mocks.syncweb_ls || [{ path: 'syncweb://mysync/file.mp4', type: 'video/mp4', size: 1024 }];
         }
 
         return Promise.resolve({

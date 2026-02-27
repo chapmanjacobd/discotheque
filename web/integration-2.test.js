@@ -6,23 +6,6 @@ describe('Integration Test 2', () => {
         await setupTestEnvironment();
     });
 
-    it('shows detail view', async () => {
-        await new Promise(r => setTimeout(r, 200));
-        const card = document.querySelector('.media-card');
-        card.click(); // Start playing
-
-        // Press 'd' to show details
-        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'd', bubbles: true }));
-
-        const detailView = document.getElementById('detail-view');
-        expect(detailView.classList.contains('hidden')).toBe(false);
-        expect(document.getElementById('detail-content').textContent).toContain('video1.mp4');
-
-        const backBtn = document.getElementById('back-to-results');
-        backBtn.click();
-        expect(detailView.classList.contains('hidden')).toBe(true);
-    });
-
     it('toggles sidebar', async () => {
         const menuToggle = document.getElementById('menu-toggle');
         const sidebar = document.querySelector('.sidebar');
@@ -346,20 +329,6 @@ describe('Integration Test 2', () => {
 
         expect(sidebar.classList.contains('mobile-open')).toBe(false);
         expect(overlay.classList.contains('hidden')).toBe(true);
-    });
-
-    it('minimizes and expands PiP player', async () => {
-        const card = document.querySelector('.media-card');
-        card.click();
-
-        const pipPlayer = document.getElementById('pip-player');
-        const minimizeBtn = document.getElementById('pip-minimize');
-
-        minimizeBtn.click();
-        expect(pipPlayer.classList.contains('minimized')).toBe(true);
-
-        minimizeBtn.click();
-        expect(pipPlayer.classList.contains('minimized')).toBe(false);
     });
 
     it('toggles stream type (transcode)', async () => {

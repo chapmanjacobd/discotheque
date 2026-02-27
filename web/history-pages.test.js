@@ -123,4 +123,87 @@ describe('History Pages Client-side Data and Filters', () => {
             expect(paths).not.toContain('video2.mp4'); // Filtered out by type server-side in paths fetch
         }, { timeout: 2000 });
     });
+
+    it('toggles history filters when clicked again', async () => {
+        const inProgressBtn = document.getElementById('history-in-progress-btn');
+        const allMediaBtn = document.getElementById('all-media-btn');
+
+        // Initial state: Search page
+        expect(window.disco.state.page).toBe('search');
+        expect(window.disco.state.filters.unfinished).toBe(false);
+
+        // Click In Progress
+        inProgressBtn.click();
+        expect(window.disco.state.filters.unfinished).toBe(true);
+        expect(inProgressBtn.classList.contains('active')).toBe(true);
+
+        // Click In Progress again
+        inProgressBtn.click();
+        expect(window.disco.state.filters.unfinished).toBe(false);
+        expect(inProgressBtn.classList.contains('active')).toBe(false);
+        expect(allMediaBtn.classList.contains('active')).toBe(true);
+    });
+
+    it('shows episodes in Group view and merges local progress when In Progress is active', async () => {
+        const inProgressBtn = document.getElementById('history-in-progress-btn');
+        const viewGroup = document.getElementById('view-group');
+        
+        // Local progress has an item not yet synced to server
+        localStorage.setItem('disco-progress', JSON.stringify({
+            '/local/video.mp4': { pos: 50, last: Date.now() }
+        }));
+
+        global.fetch = vi.fn().mockImplementation((url) => {
+            if (url.includes('/api/episodes')) {
+                expect(url).toContain('unfinished=true');
+                return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
+            }
+            if (url.includes('/api/query') && url.includes('paths=')) {
+                return Promise.resolve({
+                    ok: true,
+                    json: () => Promise.resolve([
+                        { path: '/local/video.mp4', title: 'Local Video', type: 'video/mp4' }
+                    ])
+                });
+            }
+            return Promise.resolve({ 
+                ok: true, 
+                status: 200,
+                headers: { get: (n) => n === 'X-Total-Count' ? '0' : null },
+                json: () => Promise.resolve([]) 
+            });
+        });
+
+        inProgressBtn.click();
+        viewGroup.click();
+
+        await vi.waitFor(() => {
+            const groups = document.querySelectorAll('.similarity-group');
+            expect(groups.length).toBe(1);
+            expect(groups[0].textContent).toContain('/local');
+            expect(groups[0].textContent).toContain('Local Video');
+        }, { timeout: 2000 });
+    });
+
+    it('shows mark-played button for unplayed media', async () => {
+        const item = { path: 'unplayed.mp4', play_count: 0, duration: 100 };
+        global.fetch = vi.fn().mockImplementation((url) => {
+            if (url.includes('/api/query')) {
+                return Promise.resolve({
+                    ok: true,
+                    status: 200,
+                    headers: { get: () => '1' },
+                    json: () => Promise.resolve([item])
+                });
+            }
+            return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+        });
+
+        window.disco.performSearch();
+
+        await vi.waitFor(() => {
+            const markPlayedBtn = document.querySelector('.media-action-btn.mark-played');
+            expect(markPlayedBtn).toBeTruthy();
+        });
+    });
 });
