@@ -31,7 +31,7 @@ func NewTestCluster(t *testing.T, count int) *TestCluster {
 	for i := range count {
 		home := filepath.Join(tempDir, fmt.Sprintf("node-%d", i))
 		listenAddr := fmt.Sprintf("tcp://127.0.0.1:%d", 22000+i)
-		sw, err := NewSyncweb(home, fmt.Sprintf("node-%d", i), "", "", listenAddr)
+		sw, err := NewSyncweb(home, fmt.Sprintf("node-%d", i), listenAddr)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -138,7 +138,7 @@ func TestSyncwebIntegration(t *testing.T) {
 	node1 := cluster.Nodes[1]
 
 	// Write file to node 0
-	folder0Path := node0.GetFolders()[folderID]
+	folder0Path, _ := node0.GetFolderPath(folderID)
 	testFile := "hello.txt"
 	testContent := "hello from node 0"
 	if err := os.WriteFile(filepath.Join(folder0Path, testFile), []byte(testContent), 0o644); err != nil {
@@ -241,7 +241,7 @@ func TestSyncwebChain(t *testing.T) {
 	t.Log("Chain connected")
 
 	// Write file to node 0
-	folder0Path := n0.GetFolders()[folderID]
+	folder0Path, _ := n0.GetFolderPath(folderID)
 	testFile := "chain.txt"
 	testContent := "chain content"
 	os.WriteFile(filepath.Join(folder0Path, testFile), []byte(testContent), 0o644)

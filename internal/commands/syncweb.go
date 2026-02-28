@@ -48,7 +48,7 @@ func (c *SyncwebCmd) AfterApply() error {
 }
 
 func (c *SyncwebCmd) WithSyncweb(fn func(s *syncweb.Syncweb) error) error {
-	s, err := syncweb.NewSyncweb(c.SyncwebHome, "disco-syncweb", c.SyncwebPublic_, c.SyncwebPrivate_, "")
+	s, err := syncweb.NewSyncweb(c.SyncwebHome, "disco-syncweb", "")
 	if err != nil {
 		return err
 	}
@@ -451,7 +451,8 @@ func (c *SyncwebStatCmd) Run(g *SyncwebCmd) error {
 				continue
 			}
 
-			relativePath, _ := filepath.Rel(s.GetFolders()[folderID], localPath)
+			rootPath, _ := s.GetFolderPath(folderID)
+			relativePath, _ := filepath.Rel(rootPath, localPath)
 			info, ok, err := s.GetGlobalFileInfo(folderID, relativePath)
 			if err != nil {
 				slog.Error("Failed to get file info", "path", p, "error", err)
@@ -513,7 +514,8 @@ func (c *SyncwebSortCmd) Run(g *SyncwebCmd) error {
 				continue
 			}
 
-			relativePath, _ := filepath.Rel(s.GetFolders()[folderID], localPath)
+			rootPath, _ := s.GetFolderPath(folderID)
+			relativePath, _ := filepath.Rel(rootPath, localPath)
 			info, ok, err := s.GetGlobalFileInfo(folderID, relativePath)
 			if err == nil && ok {
 				files = append(files, fileWithInfo{Path: p, Info: info})
@@ -599,7 +601,8 @@ func (c *SyncwebDownloadCmd) Run(g *SyncwebCmd) error {
 				continue
 			}
 
-			relativePath, _ := filepath.Rel(s.GetFolders()[folderID], localPath)
+			rootPath, _ := s.GetFolderPath(folderID)
+			relativePath, _ := filepath.Rel(rootPath, localPath)
 			info, ok, err := s.GetGlobalFileInfo(folderID, relativePath)
 			if err != nil || !ok {
 				slog.Error("Failed to get file info for download", "path", p)

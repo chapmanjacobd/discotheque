@@ -12,6 +12,14 @@ import (
 	"github.com/chapmanjacobd/discotheque/internal/testutils"
 )
 
+func setupTestServeCmd(dbPath string) *ServeCmd {
+	cmd := &ServeCmd{
+		Databases: []string{dbPath},
+	}
+	cmd.APIToken = "test-token"
+	return cmd
+}
+
 func TestServeCmd_HandlePlay_FileNotFound(t *testing.T) {
 	fixture := testutils.Setup(t)
 	defer fixture.Cleanup()
@@ -28,13 +36,12 @@ func TestServeCmd_HandlePlay_FileNotFound(t *testing.T) {
 	os.Remove(f1)
 
 	// 3. Setup ServeCmd
-	cmd := &ServeCmd{
-		Databases: []string{fixture.DBPath},
-	}
+	cmd := setupTestServeCmd(fixture.DBPath)
 
 	// 4. Create request
 	reqBody, _ := json.Marshal(map[string]string{"path": f1})
 	req := httptest.NewRequest(http.MethodPost, "/api/play", bytes.NewBuffer(reqBody))
+	req.Header.Set("X-Disco-Token", cmd.APIToken)
 	w := httptest.NewRecorder()
 
 	// 5. Call handlePlay
@@ -75,12 +82,11 @@ func TestServeCmd_HandleHLSSegment_FileNotFound(t *testing.T) {
 	os.Remove(f1)
 
 	// 3. Setup ServeCmd
-	cmd := &ServeCmd{
-		Databases: []string{fixture.DBPath},
-	}
+	cmd := setupTestServeCmd(fixture.DBPath)
 
 	// 4. Create request
 	req := httptest.NewRequest(http.MethodGet, "/api/hls/segment?path="+f1+"&index=0", nil)
+	req.Header.Set("X-Disco-Token", cmd.APIToken)
 	w := httptest.NewRecorder()
 
 	// 5. Call handleHLSSegment
@@ -121,12 +127,11 @@ func TestServeCmd_HandleSubtitles_FileNotFound(t *testing.T) {
 	os.Remove(f1)
 
 	// 3. Setup ServeCmd
-	cmd := &ServeCmd{
-		Databases: []string{fixture.DBPath},
-	}
+	cmd := setupTestServeCmd(fixture.DBPath)
 
 	// 4. Create request
 	req := httptest.NewRequest(http.MethodGet, "/api/subtitles?path="+f1+"&index=0", nil)
+	req.Header.Set("X-Disco-Token", cmd.APIToken)
 	w := httptest.NewRecorder()
 
 	// 5. Call handleSubtitles

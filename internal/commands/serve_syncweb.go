@@ -19,7 +19,7 @@ import (
 var swInstance *syncweb.Syncweb
 
 func (c *ServeCmd) setupSyncweb() {
-	sw, err := syncweb.NewSyncweb(c.SyncwebHome, "disco-syncweb", c.SyncwebPublic_, c.SyncwebPrivate_, "")
+	sw, err := syncweb.NewSyncweb(c.SyncwebHome, "disco-syncweb", "")
 	if err != nil {
 		slog.Warn("Failed to initialize Syncweb instance", "error", err)
 	} else {
@@ -34,10 +34,14 @@ func (c *ServeCmd) setupSyncweb() {
 
 func (c *ServeCmd) addSyncwebRoots(resultsMap map[string]LsEntry, counts map[string]int, path string) {
 	if swInstance != nil && (path == "/" || path == "") {
-		for id, localPath := range swInstance.GetFolders() {
+		for _, id := range swInstance.GetFolders() {
 			entryPath := fmt.Sprintf("syncweb://%s/", id)
+			name := id
+			if localPath, ok := swInstance.GetFolderPath(id); ok {
+				name += " (" + filepath.Base(localPath) + ")"
+			}
 			resultsMap[entryPath] = LsEntry{
-				Name:  id + " (" + filepath.Base(localPath) + ")",
+				Name:  name,
 				Path:  entryPath,
 				IsDir: true,
 			}
@@ -74,11 +78,11 @@ func (c *ServeCmd) handleSyncwebFolders(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	folders := make([]map[string]string, 0)
-	for id, path := range swInstance.GetFolders() {
+	folderIDs := swInstance.GetFolders()
+	folders := make([]map[string]string, 0, len(folderIDs))
+	for _, id := range folderIDs {
 		folders = append(folders, map[string]string{
-			"id":   id,
-			"path": path,
+			"id": id,
 		})
 	}
 
@@ -94,6 +98,21 @@ func (c *ServeCmd) handleSyncwebLs(w http.ResponseWriter, r *http.Request) {
 
 	folderID := r.URL.Query().Get("folder")
 	prefix := r.URL.Query().Get("prefix")
+
+	// Security check: ensure the folder is one we actually have
+	configuredFolders := swInstance.GetFolders()
+	found := false
+	for _, id := range configuredFolders {
+		if id == folderID {
+			found = true
+			break
+		}
+	}
+	if !found {
+		http.Error(w, "Folder not found or not configured", http.StatusNotFound)
+		return
+	}
+
 	if prefix != "" && !strings.HasSuffix(prefix, "/") {
 		prefix += "/"
 	}
@@ -155,22 +174,46 @@ func (c *ServeCmd) handleSyncwebDownload(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	path := r.URL.Query().Get("path")
-	if path == "" {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		Path string `json:"path"`
+	}
+
+	// Try to decode from JSON body first
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		// Fallback to query param for compatibility if body is empty or malformed
+		req.Path = r.URL.Query().Get("path")
+	}
+
+	if req.Path == "" {
 		http.Error(w, "Path required", http.StatusBadRequest)
 		return
 	}
 
-	localPath, folderID, err := swInstance.ResolveLocalPath(path)
+	localPath, folderID, err := swInstance.ResolveLocalPath(req.Path)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	relativePath, _ := filepath.Rel(swInstance.GetFolders()[folderID], localPath)
+	if c.isPathBlacklisted(localPath) {
+		http.Error(w, "Access denied", http.StatusForbidden)
+		return
+	}
+
+	folderPath, ok := swInstance.GetFolderPath(folderID)
+	if !ok {
+		http.Error(w, "Folder root not found", http.StatusInternalServerError)
+		return
+	}
+	relativePath, _ := filepath.Rel(folderPath, localPath)
 
 	if err := swInstance.Unignore(folderID, relativePath); err != nil {
-		slog.Error("Syncweb download trigger failed", "path", path, "error", err)
+		slog.Error("Syncweb download trigger failed", "path", req.Path, "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

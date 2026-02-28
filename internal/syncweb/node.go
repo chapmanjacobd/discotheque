@@ -37,6 +37,8 @@ func NewNode(homeDir string, name string, listenAddr string) (*Node, error) {
 		return nil, err
 	}
 
+	setupLogging(homeDir)
+
 	ctx, cancel := context.WithCancel(context.Background())
 
 	// Set up event logger

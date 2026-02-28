@@ -1,4 +1,19 @@
 document.addEventListener('DOMContentLoaded', () => {
+    function getCookie(name) {
+        const value = `; ${document.cookie}`;
+        const parts = value.split(`; ${name}=`);
+        if (parts.length === 2) return parts.pop().split(';').shift();
+    }
+
+    async function fetchAPI(url, options = {}) {
+        const token = getCookie('disco_token');
+        const headers = {
+            ...options.headers,
+            'X-Disco-Token': token
+        };
+        return fetch(url, { ...options, headers });
+    }
+
     const searchInput = document.getElementById('search-input');
     const resultsContainer = document.getElementById('results-container');
     const resultsCount = document.getElementById('results-count');
@@ -426,7 +441,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const duration = state.trackShuffleDuration || 0;
                 params.append('duration', duration);
 
-                const resp = await fetch(`/api/random-clip?${params.toString()}`);
+                const resp = await fetchAPI(`/api/random-clip?${params.toString()}`);
                 if (!resp.ok) {
                     if (resp.status === 404) {
                         showToast(`No more ${type || 'media'} found to surf.`, 'ℹ️');
@@ -587,7 +602,7 @@ document.addEventListener('DOMContentLoaded', () => {
     async function fetchFilterBins(params) {
         try {
             const url = params ? `/api/filter-bins?${params.toString()}` : '/api/filter-bins';
-            const resp = await fetch(url);
+            const resp = await fetchAPI(url);
             if (!resp.ok) throw new Error('Failed to fetch filter bins');
             const data = await resp.json();
             state.filterBins = {
@@ -954,7 +969,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- API Calls ---
     async function fetchDatabases() {
         try {
-            const resp = await fetch('/api/databases');
+            const resp = await fetchAPI('/api/databases');
             if (!resp.ok) throw new Error('Offline');
             const data = await resp.json();
             allDatabases = data.databases;
@@ -996,7 +1011,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         try {
-            const resp = await fetch(apiURL, {
+            const resp = await fetchAPI(apiURL, {
                 signal: suggestionAbortController.signal
             });
             if (!resp.ok) throw new Error('Failed to fetch suggestions');
@@ -1090,7 +1105,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function fetchSyncwebFolders() {
         try {
-            const resp = await fetch('/api/syncweb/folders');
+            const resp = await fetchAPI('/api/syncweb/folders');
             if (!resp.ok) return;
             const folders = await resp.json();
             if (folders.length > 0) {
@@ -1118,7 +1133,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function fetchCategories() {
         try {
-            const resp = await fetch('/api/categories');
+            const resp = await fetchAPI('/api/categories');
             if (!resp.ok) throw new Error('Failed to fetch categories');
             state.categories = await resp.json() || [];
             renderCategoryList();
@@ -1139,7 +1154,7 @@ document.addEventListener('DOMContentLoaded', () => {
             p.append('all', 'true');
             p.append('paths', paths.join(','));
 
-            const resp = await fetch(`/api/query?${p.toString()}`);
+            const resp = await fetchAPI(`/api/query?${p.toString()}`);
             if (!resp.ok) throw new Error('Failed to fetch media by paths');
             return await resp.json() || [];
         } catch (err) {
@@ -1150,7 +1165,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function fetchGenres() {
         try {
-            const resp = await fetch('/api/genres');
+            const resp = await fetchAPI('/api/genres');
             if (!resp.ok) throw new Error('Failed to fetch genres');
             state.genres = await resp.json() || [];
         } catch (err) {
@@ -1160,7 +1175,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function fetchRatings() {
         try {
-            const resp = await fetch('/api/ratings');
+            const resp = await fetchAPI('/api/ratings');
             if (!resp.ok) throw new Error('Failed to fetch ratings');
             state.ratings = await resp.json() || [];
             renderRatingList();
@@ -1171,7 +1186,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function fetchPlaylists() {
         try {
-            const resp = await fetch('/api/playlists');
+            const resp = await fetchAPI('/api/playlists');
             if (!resp.ok) throw new Error('Failed to fetch playlists');
             state.playlists = await resp.json() || [];
             renderPlaylistList();
@@ -1271,7 +1286,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!state.filters.playlist) return;
 
         try {
-            const resp = await fetch('/api/playlists/reorder', {
+            const resp = await fetchAPI('/api/playlists/reorder', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -1339,7 +1354,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 150);
 
         try {
-            const resp = await fetch(`/api/playlists/items?title=${encodeURIComponent(title)}`);
+            const resp = await fetchAPI(`/api/playlists/items?title=${encodeURIComponent(title)}`);
             clearTimeout(skeletonTimeout);
             if (!resp.ok) throw new Error('Failed to fetch playlist items');
             state.playlistItems = await resp.json() || [];
@@ -1353,7 +1368,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function deletePlaylist(title) {
         try {
-            const resp = await fetch(`/api/playlists?title=${encodeURIComponent(title)}`, { method: 'DELETE' });
+            const resp = await fetchAPI(`/api/playlists?title=${encodeURIComponent(title)}`, { method: 'DELETE' });
             if (!resp.ok) throw new Error('Delete failed');
             showToast('Playlist deleted');
             fetchPlaylists();
@@ -1368,7 +1383,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function createPlaylist(title) {
         try {
-            const resp = await fetch('/api/playlists', {
+            const resp = await fetchAPI('/api/playlists', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ title })
@@ -1391,7 +1406,7 @@ document.addEventListener('DOMContentLoaded', () => {
             media_path: item.path
         };
         try {
-            const resp = await fetch('/api/playlists/items', {
+            const resp = await fetchAPI('/api/playlists/items', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
@@ -1410,7 +1425,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function removeFromPlaylist(title, item) {
         try {
-            const resp = await fetch('/api/playlists/items', {
+            const resp = await fetchAPI('/api/playlists/items', {
                 method: 'DELETE',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -1428,7 +1443,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function updateTrackNumber(title, item, num) {
         try {
-            const resp = await fetch('/api/playlists/items', {
+            const resp = await fetchAPI('/api/playlists/items', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -1531,7 +1546,7 @@ document.addEventListener('DOMContentLoaded', () => {
             params.append('path', path);
             appendFilterParams(params);
 
-            const resp = await fetch(`/api/du?${params.toString()}`);
+            const resp = await fetchAPI(`/api/du?${params.toString()}`);
             clearTimeout(skeletonTimeout);
             if (!resp.ok) throw new Error('Failed to fetch DU');
             state.duData = await resp.json();
@@ -1680,7 +1695,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 params.append('watched', 'true');
             }
 
-            const resp = await fetch(`/api/episodes?${params.toString()}`, {
+            const resp = await fetchAPI(`/api/episodes?${params.toString()}`, {
                 signal: searchAbortController.signal
             });
             if (!resp.ok) throw new Error('Failed to fetch episodes');
@@ -1873,7 +1888,7 @@ document.addEventListener('DOMContentLoaded', () => {
         resultsContainer.innerHTML = '<div class="loading-container" style="text-align: center; padding: 3rem;"><div class="spinner" style="border: 4px solid rgba(0,0,0,0.1); width: 36px; height: 36px; border-radius: 50%; border-left-color: var(--accent-color); animation: spin 1s linear infinite; margin: 0 auto 1rem;"></div><h3>Loading Categorization...</h3></div><style>@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }</style>';
 
         try {
-            const resp = await fetch('/api/categorize/keywords');
+            const resp = await fetchAPI('/api/categorize/keywords');
             if (!resp.ok) throw new Error('Failed to fetch keywords');
             const data = await resp.json();
             renderCuration(data);
@@ -2046,7 +2061,7 @@ document.addEventListener('DOMContentLoaded', () => {
             suggestionsArea.innerHTML = '<div class="spinner" style="border: 4px solid rgba(0,0,0,0.1); width: 24px; height: 24px; border-radius: 50%; border-left-color: var(--accent-color); animation: spin 1s linear infinite; margin: 1rem auto;"></div>';
 
             try {
-                const resp = await fetch('/api/categorize/suggest');
+                const resp = await fetchAPI('/api/categorize/suggest');
                 if (!resp.ok) throw new Error('Failed');
                 const suggestions = await resp.json();
                 renderSuggestionsArea(suggestions, suggestionsArea);
@@ -2080,7 +2095,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 btnRun.disabled = true;
                 btnRun.textContent = 'Running...';
                 try {
-                    const resp = await fetch('/api/categorize/apply', { method: 'POST' });
+                    const resp = await fetchAPI('/api/categorize/apply', { method: 'POST' });
                     if (!resp.ok) throw new Error('Apply failed');
                     const data = await resp.json();
                     showToast(`Successfully categorized ${data.count} files!`, '🏷️');
@@ -2101,7 +2116,7 @@ document.addEventListener('DOMContentLoaded', () => {
             btnDefaults.onclick = async () => {
                 if (confirm('Add default categories and keywords? (Existing ones will be kept)')) {
                     try {
-                        const resp = await fetch('/api/categorize/defaults', { method: 'POST' });
+                        const resp = await fetchAPI('/api/categorize/defaults', { method: 'POST' });
                         if (!resp.ok) throw new Error('Failed');
                         showToast('Default categories added');
                         fetchCuration(); // Refresh
@@ -2155,7 +2170,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function addKeyword(category, keyword) {
         try {
-            const resp = await fetch('/api/categorize/keyword', {
+            const resp = await fetchAPI('/api/categorize/keyword', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ category, keyword })
@@ -2171,7 +2186,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function deleteCategory(category) {
         try {
-            const resp = await fetch(`/api/categorize/category?category=${encodeURIComponent(category)}`, { method: 'DELETE' });
+            const resp = await fetchAPI(`/api/categorize/category?category=${encodeURIComponent(category)}`, { method: 'DELETE' });
             if (!resp.ok) throw new Error('Failed');
             showToast(`Deleted category "${category}"`);
             fetchCuration();
@@ -2183,7 +2198,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function deleteKeyword(category, keyword) {
         try {
-            const resp = await fetch('/api/categorize/keyword', {
+            const resp = await fetchAPI('/api/categorize/keyword', {
                 method: 'DELETE',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ category, keyword })
@@ -2207,7 +2222,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const prefix = url.pathname.substring(1);
 
         try {
-            const resp = await fetch(`/api/syncweb/ls?folder=${encodeURIComponent(folderID)}&prefix=${encodeURIComponent(prefix)}`);
+            const resp = await fetchAPI(`/api/syncweb/ls?folder=${encodeURIComponent(folderID)}&prefix=${encodeURIComponent(prefix)}`);
             if (!resp.ok) throw new Error(await resp.text());
 
             const data = await resp.json();
@@ -2229,7 +2244,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function triggerSyncwebDownload(path) {
         try {
-            const resp = await fetch(`/api/syncweb/download?path=${encodeURIComponent(path)}`, { method: 'POST' });
+            const resp = await fetchAPI('/api/syncweb/download', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ path })
+            });
             if (resp.ok) {
                 showToast('Download triggered via Syncweb');
             } else {
@@ -2312,7 +2331,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 params.append('watched', 'true');
             }
 
-            const resp = await fetch(`/api/query?${params.toString()}`, {
+            const resp = await fetchAPI(`/api/query?${params.toString()}`, {
                 signal: searchAbortController.signal
             });
 
@@ -2449,7 +2468,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         try {
             const paths = currentMedia.map(m => m.path);
-            const resp = await fetch('/api/empty-bin', {
+            const resp = await fetchAPI('/api/empty-bin', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ paths })
@@ -2468,7 +2487,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!confirm('Are you sure you want to permanently delete this file?')) return;
 
         try {
-            const resp = await fetch('/api/empty-bin', {
+            const resp = await fetchAPI('/api/empty-bin', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ paths: [path] })
@@ -2496,7 +2515,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         try {
-            const resp = await fetch('/api/delete', {
+            const resp = await fetchAPI('/api/delete', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ path, restore })
@@ -2555,7 +2574,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const path = item.path;
         showToast(`Playing: ${path.split('/').pop()}`);
         try {
-            const resp = await fetch('/api/play', {
+            const resp = await fetchAPI('/api/play', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ path })
@@ -2649,7 +2668,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const updatePromise = (async () => {
             try {
-                await fetch('/api/progress', {
+                await fetchAPI('/api/progress', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -2801,7 +2820,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function rateMedia(item, score) {
         try {
-            await fetch('/api/rate', {
+            await fetchAPI('/api/rate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ path: item.path, score: score })
@@ -2827,7 +2846,7 @@ document.addEventListener('DOMContentLoaded', () => {
             showToast('Marked as seen (Local)', '✅');
         } else {
             try {
-                const resp = await fetch('/api/mark-played', {
+                const resp = await fetchAPI('/api/mark-played', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ path: item.path })
@@ -2876,7 +2895,7 @@ document.addEventListener('DOMContentLoaded', () => {
             showToast('Marked as unplayed (Local)', '⭕');
         } else {
             try {
-                const resp = await fetch('/api/mark-unplayed', {
+                const resp = await fetchAPI('/api/mark-unplayed', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ path: item.path })
@@ -2961,7 +2980,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const basename = item.path.split('/').pop();
         let is404 = false;
         try {
-            const resp = await fetch(`/api/raw?path=${encodeURIComponent(item.path)}`, { method: 'HEAD' });
+            const resp = await fetchAPI(`/api/raw?path=${encodeURIComponent(item.path)}`, { method: 'HEAD' });
             is404 = resp.status === 404;
         } catch (err) {
             console.error('Failed to check media status:', err);

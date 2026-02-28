@@ -130,14 +130,14 @@ func (c *ServeCmd) handleZimView(w http.ResponseWriter, r *http.Request) {
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>%%s</title>
+    <title>%s</title>
     <style>
-        body, html { margin: 0; padding: 0; height: 100%%%%; overflow: hidden; background: #000; }
-        iframe { width: 100%%%%; height: 100%%%%; border: none; }
+        body, html { margin: 0; padding: 0; height: 100%%; overflow: hidden; background: #000; }
+        iframe { width: 100%%; height: 100%%; border: none; }
     </style>
 </head>
 <body>
-    <iframe src="%%s" allowfullscreen></iframe>
+    <iframe src="%s" allowfullscreen></iframe>
 </body>
 </html>`, zimName, contentURL)
 
@@ -162,13 +162,13 @@ func (m *KiwixManager) ensureKiwixServing(zimPath string) (int, error) {
 	cmd := exec.Command(
 		KIWIX_BIN,
 		"--nolibrarybutton",
-		"-p", fmt.Sprintf("%%d", port),
-		fmt.Sprintf("--urlRootLocation=/api/zim/proxy/%%d/", port),
+		"-p", fmt.Sprintf("%d", port),
+		fmt.Sprintf("--urlRootLocation=/api/zim/proxy/%d/", port),
 		zimPath,
 	)
 
 	if err := cmd.Start(); err != nil {
-		return 0, fmt.Errorf("failed to start kiwix-serve: %%w", err)
+		return 0, fmt.Errorf("failed to start kiwix-serve: %w", err)
 	}
 
 	m.instances[zimPath] = &KiwixInstance{
@@ -214,7 +214,7 @@ func (m *KiwixManager) cleanupOldInstances() {
 }
 
 func isPortAvailable(port int) bool {
-	addr := fmt.Sprintf("127.0.0.1:%%d", port)
+	addr := fmt.Sprintf("127.0.0.1:%d", port)
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {
 		return false
@@ -225,8 +225,8 @@ func isPortAvailable(port int) bool {
 
 func waitForKiwixReady(port int, timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)
-	urlRoot := fmt.Sprintf("/api/zim/proxy/%%d/", port)
-	checkURL := fmt.Sprintf("http://127.0.0.1:%%d%%s", port, urlRoot)
+	urlRoot := fmt.Sprintf("/api/zim/proxy/%d/", port)
+	checkURL := fmt.Sprintf("http://127.0.0.1:%d%s", port, urlRoot)
 
 	for time.Now().Before(deadline) {
 		resp, err := http.Head(checkURL)
@@ -238,12 +238,12 @@ func waitForKiwixReady(port int, timeout time.Duration) error {
 		}
 		time.Sleep(500 * time.Millisecond)
 	}
-	return fmt.Errorf("timeout waiting for kiwix-serve on port %%d", port)
+	return fmt.Errorf("timeout waiting for kiwix-serve on port %d", port)
 }
 
 func getKiwixContentURL(port int) (string, error) {
-	urlRoot := fmt.Sprintf("/api/zim/proxy/%%d", port)
-	catalogURL := fmt.Sprintf("http://127.0.0.1:%%d%%s/catalog/v2/entries", port, urlRoot)
+	urlRoot := fmt.Sprintf("/api/zim/proxy/%d", port)
+	catalogURL := fmt.Sprintf("http://127.0.0.1:%d%s/catalog/v2/entries", port, urlRoot)
 
 	resp, err := http.Get(catalogURL)
 	if err != nil {
@@ -252,7 +252,7 @@ func getKiwixContentURL(port int) (string, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("catalog returned status %%d", resp.StatusCode)
+		return "", fmt.Errorf("catalog returned status %d", resp.StatusCode)
 	}
 
 	var feed OpdsFeed
@@ -264,7 +264,7 @@ func getKiwixContentURL(port int) (string, error) {
 		for _, link := range feed.Entries[0].Link {
 			if link.Type == "text/html" {
 				contentPath := strings.TrimPrefix(link.Href, urlRoot+"/content/")
-				return fmt.Sprintf("%%s/viewer#%%s", urlRoot, contentPath), nil
+				return fmt.Sprintf("%s/viewer#%s", urlRoot, contentPath), nil
 			}
 		}
 	}

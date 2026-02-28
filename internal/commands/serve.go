@@ -58,69 +58,118 @@ type ServeCmd struct {
 	Trashcan             bool     `help:"Enable trash/recycle page and empty bin functionality"`
 	ReadOnly             bool     `help:"Disable server-side progress tracking and playlist modifications"`
 	ApplicationStartTime int64    `kong:"-"`
+	APIToken             string   `kong:"-"`
 	thumbnailCache       sync.Map `kong:"-"`
 	dbCache              sync.Map `kong:"-"`
 	hasFfmpeg            bool     `kong:"-"`
 }
 
+func (c *ServeCmd) authMiddleware(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		token := r.Header.Get("X-Disco-Token")
+		if token == "" {
+			// Also check cookie for same-origin convenience
+			if cookie, err := r.Cookie("disco_token"); err == nil {
+				token = cookie.Value
+			}
+		}
+
+		if token != c.APIToken {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+		next(w, r)
+	}
+}
+
+func (c *ServeCmd) isPathBlacklisted(path string) bool {
+	p := strings.ToLower(path)
+	blacklisted := []string{
+		"/etc/passwd",
+		"/etc/shadow",
+		"/.ssh/",
+		"/.aws/",
+		"/.config/",
+		"/.gnupg/",
+		"/root/",
+		"id_rsa",
+		"id_ed25519",
+	}
+	for _, b := range blacklisted {
+		if strings.Contains(p, b) {
+			return true
+		}
+	}
+	return false
+}
+
 func (c *ServeCmd) Mux() http.Handler {
 	mux := http.NewServeMux()
-	mux.HandleFunc("/api/databases", c.handleDatabases)
-	mux.HandleFunc("/api/categories", c.handleCategories)
-	mux.HandleFunc("/api/genres", c.handleGenres)
-	mux.HandleFunc("/api/ratings", c.handleRatings)
-	mux.HandleFunc("/api/query", c.handleQuery)
-	mux.HandleFunc("/api/play", c.handlePlay)
-	mux.HandleFunc("/api/delete", c.handleDelete)
-	mux.HandleFunc("/api/progress", c.handleProgress)
-	mux.HandleFunc("/api/mark-played", c.handleMarkPlayed)
-	mux.HandleFunc("/api/mark-unplayed", c.handleMarkUnplayed)
-	mux.HandleFunc("/api/rate", c.handleRate)
-	mux.HandleFunc("/api/playlists", c.handlePlaylists)
-	mux.HandleFunc("/api/playlists/items", c.handlePlaylistItems)
-	mux.HandleFunc("/api/playlists/reorder", c.handlePlaylistReorder)
-	mux.HandleFunc("/api/events", c.handleEvents)
-	mux.HandleFunc("/api/ls", c.handleLs)
-	mux.HandleFunc("/api/du", c.handleDU)
-	mux.HandleFunc("/api/episodes", c.handleEpisodes)
-	mux.HandleFunc("/api/filter-bins", c.handleFilterBins)
-	mux.HandleFunc("/api/random-clip", c.handleRandomClip)
-	mux.HandleFunc("/api/categorize/suggest", c.handleCategorizeSuggest)
-	mux.HandleFunc("/api/categorize/apply", c.handleCategorizeApply)
-	mux.HandleFunc("/api/categorize/keywords", c.handleCategorizeKeywords)
-	mux.HandleFunc("/api/categorize/defaults", c.handleCategorizeDefaults)
-	mux.HandleFunc("/api/categorize/category", c.handleCategorizeDeleteCategory)
-	mux.HandleFunc("/api/categorize/keyword", c.handleCategorizeKeyword)
-	mux.HandleFunc("/api/raw", c.handleRaw)
+	mux.HandleFunc("/api/databases", c.authMiddleware(c.handleDatabases))
+	mux.HandleFunc("/api/categories", c.authMiddleware(c.handleCategories))
+	mux.HandleFunc("/api/genres", c.authMiddleware(c.handleGenres))
+	mux.HandleFunc("/api/ratings", c.authMiddleware(c.handleRatings))
+	mux.HandleFunc("/api/query", c.authMiddleware(c.handleQuery))
+	mux.HandleFunc("/api/play", c.authMiddleware(c.handlePlay))
+	mux.HandleFunc("/api/delete", c.authMiddleware(c.handleDelete))
+	mux.HandleFunc("/api/progress", c.authMiddleware(c.handleProgress))
+	mux.HandleFunc("/api/mark-played", c.authMiddleware(c.handleMarkPlayed))
+	mux.HandleFunc("/api/mark-unplayed", c.authMiddleware(c.handleMarkUnplayed))
+	mux.HandleFunc("/api/rate", c.authMiddleware(c.handleRate))
+	mux.HandleFunc("/api/playlists", c.authMiddleware(c.handlePlaylists))
+	mux.HandleFunc("/api/playlists/items", c.authMiddleware(c.handlePlaylistItems))
+	mux.HandleFunc("/api/playlists/reorder", c.authMiddleware(c.handlePlaylistReorder))
+	mux.HandleFunc("/api/events", c.authMiddleware(c.handleEvents))
+	mux.HandleFunc("/api/ls", c.authMiddleware(c.handleLs))
+	mux.HandleFunc("/api/du", c.authMiddleware(c.handleDU))
+	mux.HandleFunc("/api/episodes", c.authMiddleware(c.handleEpisodes))
+	mux.HandleFunc("/api/filter-bins", c.authMiddleware(c.handleFilterBins))
+	mux.HandleFunc("/api/random-clip", c.authMiddleware(c.handleRandomClip))
+	mux.HandleFunc("/api/categorize/suggest", c.authMiddleware(c.handleCategorizeSuggest))
+	mux.HandleFunc("/api/categorize/apply", c.authMiddleware(c.handleCategorizeApply))
+	mux.HandleFunc("/api/categorize/keywords", c.authMiddleware(c.handleCategorizeKeywords))
+	mux.HandleFunc("/api/categorize/defaults", c.authMiddleware(c.handleCategorizeDefaults))
+	mux.HandleFunc("/api/categorize/category", c.authMiddleware(c.handleCategorizeDeleteCategory))
+	mux.HandleFunc("/api/categorize/keyword", c.authMiddleware(c.handleCategorizeKeyword))
+	mux.HandleFunc("/api/raw", c.authMiddleware(c.handleRaw))
 
-	mux.HandleFunc("/api/zim/view", c.handleZimView)
-	mux.HandleFunc("/api/zim/proxy/{port}/{rest...}", c.handleZimProxy)
+	mux.HandleFunc("/api/zim/view", c.authMiddleware(c.handleZimView))
+	mux.HandleFunc("/api/zim/proxy/{port}/{rest...}", c.authMiddleware(c.handleZimProxy))
 
-	mux.HandleFunc("/api/syncweb/folders", c.handleSyncwebFolders)
-	mux.HandleFunc("/api/syncweb/ls", c.handleSyncwebLs)
-	mux.HandleFunc("/api/syncweb/download", c.handleSyncwebDownload)
+	mux.HandleFunc("/api/syncweb/folders", c.authMiddleware(c.handleSyncwebFolders))
+	mux.HandleFunc("/api/syncweb/ls", c.authMiddleware(c.handleSyncwebLs))
+	mux.HandleFunc("/api/syncweb/download", c.authMiddleware(c.handleSyncwebDownload))
 
-	mux.HandleFunc("/api/hls/playlist", c.handleHLSPlaylist)
-	mux.HandleFunc("/api/hls/segment", c.handleHLSSegment)
-	mux.HandleFunc("/api/subtitles", c.handleSubtitles)
-	mux.HandleFunc("/api/thumbnail", c.handleThumbnail)
-	mux.HandleFunc("/opds", c.handleOPDS)
+	mux.HandleFunc("/api/hls/playlist", c.authMiddleware(c.handleHLSPlaylist))
+	mux.HandleFunc("/api/hls/segment", c.authMiddleware(c.handleHLSSegment))
+	mux.HandleFunc("/api/subtitles", c.authMiddleware(c.handleSubtitles))
+	mux.HandleFunc("/api/thumbnail", c.authMiddleware(c.handleThumbnail))
+	mux.HandleFunc("/opds", c.authMiddleware(c.handleOPDS))
 
 	if c.Trashcan {
-		mux.HandleFunc("/api/trash", c.handleTrash)
-		mux.HandleFunc("/api/empty-bin", c.handleEmptyBin)
+		mux.HandleFunc("/api/trash", c.authMiddleware(c.handleTrash))
+		mux.HandleFunc("/api/empty-bin", c.authMiddleware(c.handleEmptyBin))
 	}
 
 	// Serve static files
-	var handler http.Handler
-	if c.PublicDir != "" {
-		slog.Info("Serving static files from directory", "dir", c.PublicDir)
-		handler = http.FileServer(http.Dir(c.PublicDir))
-	} else {
-		slog.Info("Serving embedded static files")
-		handler = http.FileServer(http.FS(web.FS))
-	}
-	mux.Handle("/", handler)
+	fileHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Set cookie on every load so the frontend has access to it
+		http.SetCookie(w, &http.Cookie{
+			Name:     "disco_token",
+			Value:    c.APIToken,
+			Path:     "/",
+			HttpOnly: false, // Frontend needs to read it for CSRF/Auth headers
+			SameSite: http.SameSiteStrictMode,
+		})
+
+		if c.PublicDir != "" {
+			http.FileServer(http.Dir(c.PublicDir)).ServeHTTP(w, r)
+		} else {
+			http.FileServer(http.FS(web.FS)).ServeHTTP(w, r)
+		}
+	})
+
+	mux.Handle("/", fileHandler)
 	return mux
 }
 
@@ -179,6 +228,7 @@ func (c *ServeCmd) execDB(ctx context.Context, dbPath string, fn func(*sql.DB) e
 func (c *ServeCmd) Run(ctx *kong.Context) error {
 	models.SetupLogging(c.Verbose)
 	c.ApplicationStartTime = time.Now().UnixNano()
+	c.APIToken = utils.RandomString(32)
 
 	// Initialize internal Syncweb instance
 	c.setupSyncweb()
@@ -1890,6 +1940,12 @@ func (c *ServeCmd) handleRaw(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Query().Get("path")
 	if path == "" {
 		http.Error(w, "Path required", http.StatusBadRequest)
+		return
+	}
+
+	if c.isPathBlacklisted(path) {
+		slog.Warn("Access denied: path is blacklisted", "path", path)
+		http.Error(w, "Access denied: sensitive path", http.StatusForbidden)
 		return
 	}
 

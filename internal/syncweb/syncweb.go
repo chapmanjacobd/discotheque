@@ -2,13 +2,9 @@ package syncweb
 
 import (
 	"context"
-	"crypto/ed25519"
-	"encoding/base64"
-	"encoding/hex"
 	"fmt"
 	"io"
 	"log/slog"
-	"net/url"
 	"os"
 	"path/filepath"
 	"slices"
@@ -72,80 +68,19 @@ func (m *Measurements) Score(id protocol.DeviceID) float64 {
 
 type Syncweb struct {
 	Node         *Node
-	Public       ed25519.PublicKey
-	Private      ed25519.PrivateKey
 	Measurements *Measurements
 }
 
-func NewSyncweb(homeDir string, name string, publicKeyHex, privateKeyHex string, listenAddr string) (*Syncweb, error) {
+func NewSyncweb(homeDir string, name string, listenAddr string) (*Syncweb, error) {
 	node, err := NewNode(homeDir, name, listenAddr)
 	if err != nil {
 		return nil, err
 	}
 
-	var pub ed25519.PublicKey
-	var priv ed25519.PrivateKey
-
-	pubPath := filepath.Join(homeDir, "syncweb.pub")
-	privPath := filepath.Join(homeDir, "syncweb.priv")
-
-	if publicKeyHex != "" && privateKeyHex != "" {
-		pub, _ = hex.DecodeString(publicKeyHex)
-		priv, _ = hex.DecodeString(privateKeyHex)
-	} else if _, err := os.Stat(pubPath); err == nil {
-		// Load existing keys
-		pubHex, _ := os.ReadFile(pubPath)
-		privHex, _ := os.ReadFile(privPath)
-		pub, _ = hex.DecodeString(strings.TrimSpace(string(pubHex)))
-		priv, _ = hex.DecodeString(strings.TrimSpace(string(privHex)))
-	} else {
-		// Generate new pair if not provided and doesn't exist
-		pub, priv, _ = ed25519.GenerateKey(nil)
-		if homeDir != "" {
-			os.WriteFile(pubPath, []byte(hex.EncodeToString(pub)), 0o600)
-			os.WriteFile(privPath, []byte(hex.EncodeToString(priv)), 0o600)
-		}
-		slog.Info("Generated new Syncweb keys", "public", hex.EncodeToString(pub))
-	}
-
 	return &Syncweb{
 		Node:         node,
-		Public:       pub,
-		Private:      priv,
 		Measurements: NewMeasurements(),
 	}, nil
-}
-
-func (s *Syncweb) SignURL(u *url.URL) {
-	const signatureQueryParameter = "signature"
-	qs := u.Query()
-	qs.Del(signatureQueryParameter)
-	u.RawQuery = qs.Encode()
-
-	// Sign path + query
-	toSign := u.Path + "?" + u.RawQuery
-	signature := ed25519.Sign(s.Private, []byte(toSign))
-	qs.Add(signatureQueryParameter, base64.URLEncoding.EncodeToString(signature))
-	u.RawQuery = qs.Encode()
-}
-
-func (s *Syncweb) VerifyURL(u *url.URL) bool {
-	const signatureQueryParameter = "signature"
-	qs := u.Query()
-	signatureBase64 := qs.Get(signatureQueryParameter)
-	if len(signatureBase64) == 0 {
-		return false
-	}
-	qs.Del(signatureQueryParameter)
-	u.RawQuery = qs.Encode()
-
-	signature, err := base64.URLEncoding.DecodeString(signatureBase64)
-	if err != nil {
-		return false
-	}
-
-	toVerify := u.Path + "?" + u.RawQuery
-	return ed25519.Verify(s.Public, []byte(toVerify), signature)
 }
 
 func (s *Syncweb) Start() error {
@@ -364,17 +299,18 @@ func (s *Syncweb) DeleteDevice(id string) error {
 	return err
 }
 
-// GetFolders returns a map of folder ID to local path
-func (s *Syncweb) GetFolders() map[string]string {
-	folders := make(map[string]string)
+// GetFolders returns a list of folder IDs
+func (s *Syncweb) GetFolders() []string {
+	ids := make([]string, 0)
 	cfg := s.Node.Cfg.RawCopy()
 	for _, f := range cfg.Folders {
-		folders[f.ID] = f.Path
+		ids = append(ids, f.ID)
 	}
-	return folders
+	return ids
 }
 
-// ResolveLocalPath resolves a syncweb:// URL to a local filesystem path
+// ResolveLocalPath resolves a syncweb:// URL to a local filesystem path,
+// ensuring the path is within the folder's root directory.
 func (s *Syncweb) ResolveLocalPath(syncwebPath string) (string, string, error) {
 	if !strings.HasPrefix(syncwebPath, "syncweb://") {
 		return "", "", fmt.Errorf("invalid syncweb path: %s", syncwebPath)
@@ -387,16 +323,37 @@ func (s *Syncweb) ResolveLocalPath(syncwebPath string) (string, string, error) {
 	}
 
 	folderID := parts[0]
-	relativePath := parts[1]
+	relativePath := filepath.Clean(parts[1])
+
+	if strings.HasPrefix(relativePath, "..") || filepath.IsAbs(relativePath) {
+		return "", "", fmt.Errorf("invalid relative path: %s", relativePath)
+	}
 
 	cfg := s.Node.Cfg.RawCopy()
 	for _, f := range cfg.Folders {
 		if f.ID == folderID {
-			return filepath.Join(f.Path, relativePath), folderID, nil
+			fullPath := filepath.Join(f.Path, relativePath)
+			// Final safety check: ensure the joined path is still within f.Path
+			rel, err := filepath.Rel(f.Path, fullPath)
+			if err != nil || strings.HasPrefix(rel, "..") {
+				return "", "", fmt.Errorf("traversal detected: %s", relativePath)
+			}
+			return fullPath, folderID, nil
 		}
 	}
 
 	return "", "", fmt.Errorf("folder not found: %s", folderID)
+}
+
+// GetFolderPath returns the local path for a folder ID (internal use only)
+func (s *Syncweb) GetFolderPath(folderID string) (string, bool) {
+	cfg := s.Node.Cfg.RawCopy()
+	for _, f := range cfg.Folders {
+		if f.ID == folderID {
+			return f.Path, true
+		}
+	}
+	return "", false
 }
 
 // Unignore removes a file from the ignore list by adding an unignore (!) pattern
