@@ -34,3 +34,11 @@ func (c *ServeCmd) handleSyncwebLs(w http.ResponseWriter, r *http.Request) {
 func (c *ServeCmd) handleSyncwebDownload(w http.ResponseWriter, r *http.Request) {
 	http.Error(w, "Syncweb support not compiled in", http.StatusNotImplemented)
 }
+
+func (c *ServeCmd) handleSyncwebToggle(w http.ResponseWriter, r *http.Request) {
+	http.Error(w, "Syncweb support not compiled in", http.StatusNotImplemented)
+}
+
+func (c *ServeCmd) handleSyncwebStatus(w http.ResponseWriter, r *http.Request) {
+	http.Error(w, "Syncweb support not compiled in", http.StatusNotImplemented)
+}

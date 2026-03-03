@@ -139,6 +139,8 @@ func (c *ServeCmd) Mux() http.Handler {
 	mux.HandleFunc("/api/syncweb/folders", c.authMiddleware(c.handleSyncwebFolders))
 	mux.HandleFunc("/api/syncweb/ls", c.authMiddleware(c.handleSyncwebLs))
 	mux.HandleFunc("/api/syncweb/download", c.authMiddleware(c.handleSyncwebDownload))
+	mux.HandleFunc("/api/syncweb/toggle", c.authMiddleware(c.handleSyncwebToggle))
+	mux.HandleFunc("/api/syncweb/status", c.authMiddleware(c.handleSyncwebStatus))
 
 	mux.HandleFunc("/api/hls/playlist", c.authMiddleware(c.handleHLSPlaylist))
 	mux.HandleFunc("/api/hls/segment", c.authMiddleware(c.handleHLSSegment))

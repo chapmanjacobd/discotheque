@@ -10,15 +10,21 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/chapmanjacobd/discotheque/internal/syncweb"
 	"github.com/chapmanjacobd/discotheque/internal/utils"
 )
 
-var swInstance *syncweb.Syncweb
+var (
+	swInstance *syncweb.Syncweb
+	swMu       sync.Mutex
+)
 
 func (c *ServeCmd) setupSyncweb() {
+	swMu.Lock()
+	defer swMu.Unlock()
 	sw, err := syncweb.NewSyncweb(c.SyncwebHome, "disco-syncweb", "")
 	if err != nil {
 		slog.Warn("Failed to initialize Syncweb instance", "error", err)
@@ -33,7 +39,9 @@ func (c *ServeCmd) setupSyncweb() {
 }
 
 func (c *ServeCmd) addSyncwebRoots(resultsMap map[string]LsEntry, counts map[string]int, path string) {
-	if swInstance != nil && (path == "/" || path == "") {
+	swMu.Lock()
+	defer swMu.Unlock()
+	if swInstance != nil && (path == "/" || path == "") && swInstance.IsRunning() {
 		for _, id := range swInstance.GetFolders() {
 			entryPath := fmt.Sprintf("syncweb://%s/", id)
 			name := id
@@ -51,6 +59,8 @@ func (c *ServeCmd) addSyncwebRoots(resultsMap map[string]LsEntry, counts map[str
 }
 
 func (c *ServeCmd) resolveSyncwebPath(path string) (string, string, error) {
+	swMu.Lock()
+	defer swMu.Unlock()
 	if swInstance == nil {
 		return "", "", fmt.Errorf("syncweb not configured")
 	}
@@ -58,12 +68,17 @@ func (c *ServeCmd) resolveSyncwebPath(path string) (string, string, error) {
 }
 
 func (c *ServeCmd) serveSyncwebContent(w http.ResponseWriter, r *http.Request, folderID, path, localPath string) {
-	if swInstance == nil {
-		http.Error(w, "Syncweb not configured", http.StatusInternalServerError)
+	swMu.Lock()
+	if swInstance == nil || !swInstance.IsRunning() {
+		swMu.Unlock()
+		http.Error(w, "Syncweb not configured or offline", http.StatusServiceUnavailable)
 		return
 	}
+	sw := swInstance
+	swMu.Unlock()
+
 	slog.Info("Serving remote Syncweb file via block pulling", "path", path)
-	rs, err := swInstance.NewReadSeeker(r.Context(), folderID, strings.TrimPrefix(path, "syncweb://"+folderID+"/"))
+	rs, err := sw.NewReadSeeker(r.Context(), folderID, strings.TrimPrefix(path, "syncweb://"+folderID+"/"))
 	if err != nil {
 		slog.Error("Failed to create SyncwebReadSeeker", "path", path, "error", err)
 		http.Error(w, "Failed to stream remote file", http.StatusInternalServerError)
@@ -73,8 +88,10 @@ func (c *ServeCmd) serveSyncwebContent(w http.ResponseWriter, r *http.Request, f
 }
 
 func (c *ServeCmd) handleSyncwebFolders(w http.ResponseWriter, r *http.Request) {
-	if swInstance == nil {
-		http.Error(w, "Syncweb not configured", http.StatusServiceUnavailable)
+	swMu.Lock()
+	defer swMu.Unlock()
+	if swInstance == nil || !swInstance.IsRunning() {
+		http.Error(w, "Syncweb not configured or offline", http.StatusServiceUnavailable)
 		return
 	}
 
@@ -91,8 +108,10 @@ func (c *ServeCmd) handleSyncwebFolders(w http.ResponseWriter, r *http.Request) 
 }
 
 func (c *ServeCmd) handleSyncwebLs(w http.ResponseWriter, r *http.Request) {
-	if swInstance == nil {
-		http.Error(w, "Syncweb not configured", http.StatusServiceUnavailable)
+	swMu.Lock()
+	defer swMu.Unlock()
+	if swInstance == nil || !swInstance.IsRunning() {
+		http.Error(w, "Syncweb not configured or offline", http.StatusServiceUnavailable)
 		return
 	}
 
@@ -169,8 +188,10 @@ func (c *ServeCmd) handleSyncwebLs(w http.ResponseWriter, r *http.Request) {
 }
 
 func (c *ServeCmd) handleSyncwebDownload(w http.ResponseWriter, r *http.Request) {
-	if swInstance == nil {
-		http.Error(w, "Syncweb not configured", http.StatusServiceUnavailable)
+	swMu.Lock()
+	defer swMu.Unlock()
+	if swInstance == nil || !swInstance.IsRunning() {
+		http.Error(w, "Syncweb not configured or offline", http.StatusServiceUnavailable)
 		return
 	}
 
@@ -220,4 +241,64 @@ func (c *ServeCmd) handleSyncwebDownload(w http.ResponseWriter, r *http.Request)
 
 	w.WriteHeader(http.StatusAccepted)
 	fmt.Fprintln(w, "Download triggered")
+}
+
+func (c *ServeCmd) handleSyncwebToggle(w http.ResponseWriter, r *http.Request) {
+	swMu.Lock()
+	defer swMu.Unlock()
+
+	if swInstance == nil {
+		http.Error(w, "Syncweb not configured", http.StatusServiceUnavailable)
+		return
+	}
+
+	var req struct {
+		Offline bool `json:"offline"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if req.Offline {
+		if swInstance.IsRunning() {
+			slog.Info("Stopping Syncweb backend (Offline Mode)")
+			swInstance.Stop()
+		}
+	} else {
+		if !swInstance.IsRunning() {
+			slog.Info("Starting Syncweb backend (Online Mode)")
+			if err := swInstance.Start(); err != nil {
+				slog.Error("Failed to restart Syncweb", "error", err)
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+		}
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]bool{"offline": !swInstance.IsRunning()})
+}
+
+func (c *ServeCmd) handleSyncwebStatus(w http.ResponseWriter, r *http.Request) {
+	swMu.Lock()
+	defer swMu.Unlock()
+
+	status := "Not Configured"
+	offline := true
+	if swInstance != nil {
+		if swInstance.IsRunning() {
+			status = "Online"
+			offline = false
+		} else {
+			status = "Offline"
+			offline = true
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{
+		"status":  status,
+		"offline": offline,
+	})
 }

@@ -2,7 +2,6 @@ package syncweb
 
 import (
 	"context"
-	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -26,8 +25,8 @@ func (h *syncthingRedirectHandler) Handle(ctx context.Context, r slog.Record) er
 	if !isSyncthing && r.PC != 0 {
 		fs := runtime.CallersFrames([]uintptr{r.PC})
 		frame, _ := fs.Next()
-		if strings.Contains(frame.Function, "github.com/syncthing/syncthing") || 
-		   strings.Contains(frame.Function, "github.com/chapmanjacobd/discotheque/internal/syncweb") {
+		if strings.Contains(frame.Function, "github.com/syncthing/syncthing") ||
+			strings.Contains(frame.Function, "github.com/chapmanjacobd/discotheque/internal/syncweb") {
 			isSyncthing = true
 		}
 	}
@@ -71,10 +70,7 @@ func (h *syncthingRedirectHandler) WithGroup(name string) slog.Handler {
 	}
 }
 
-var (
-	once            sync.Once
-	syncthingLogOut io.Writer
-)
+var once sync.Once
 
 // setupLogging redirects Syncthing-related logs to a file in the home directory.
 func setupLogging(homeDir string) {
@@ -85,19 +81,18 @@ func setupLogging(homeDir string) {
 			slog.Warn("Failed to open syncthing log file", "path", logPath, "error", err)
 			return
 		}
-		syncthingLogOut = f
 
 		fileHandler := slog.NewTextHandler(f, &slog.HandlerOptions{
 			Level: slog.LevelInfo,
 		})
 
 		currentDefault := slog.Default().Handler()
-		
+
 		newDefault := &syncthingRedirectHandler{
 			fileHandler: fileHandler,
 			next:        currentDefault,
 		}
-		
+
 		slog.SetDefault(slog.New(newDefault))
 		slog.Info("Syncthing logging redirected to file", "path", logPath, "pkg", "syncweb")
 	})

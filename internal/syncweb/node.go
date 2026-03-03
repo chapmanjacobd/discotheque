@@ -22,6 +22,7 @@ type Node struct {
 	EvLogger events.Logger
 	Ctx      context.Context
 	Cancel   context.CancelFunc
+	running  bool
 }
 
 func NewNode(homeDir string, name string, listenAddr string) (*Node, error) {
@@ -124,7 +125,15 @@ func NewNode(homeDir string, name string, listenAddr string) (*Node, error) {
 }
 
 func (n *Node) Start() error {
-	return n.App.Start()
+	if err := n.App.Start(); err != nil {
+		return err
+	}
+	n.running = true
+	return nil
+}
+
+func (n *Node) IsRunning() bool {
+	return n.running
 }
 
 func (n *Node) Serve() error {
@@ -133,9 +142,13 @@ func (n *Node) Serve() error {
 }
 
 func (n *Node) Stop() {
+	if !n.running {
+		return
+	}
 	n.App.Stop(svcutil.ExitSuccess)
 	n.Cancel()
 	n.App.Wait()
+	n.running = false
 }
 
 func (n *Node) MyID() protocol.DeviceID {

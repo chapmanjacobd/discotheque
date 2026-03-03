@@ -220,6 +220,7 @@ document.addEventListener('DOMContentLoaded', () => {
         playbackRate: parseFloat(localStorage.getItem('disco-playback-rate')) || 1.0,
         slideshowDelay: parseInt(localStorage.getItem('disco-slideshow-delay')) || 5,
         trackShuffleDuration: parseInt(localStorage.getItem('disco-track-shuffle-duration')) || 0,
+        offlineMode: localStorage.getItem('disco-offline-mode') === 'true',
         playerMode: localStorage.getItem('disco-default-view') || 'pip', // Initialize with preference
         trashcan: false,
         readOnly: false,
@@ -381,6 +382,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('setting-theme').value = state.theme;
     document.getElementById('setting-post-playback').value = state.postPlaybackAction;
     document.getElementById('setting-default-view').value = state.defaultView;
+    document.getElementById('setting-offline-mode').checked = state.offlineMode;
     document.getElementById('setting-autoplay').checked = state.autoplay;
     const settingImageAutoplay = document.getElementById('setting-image-autoplay');
     if (settingImageAutoplay) settingImageAutoplay.checked = state.imageAutoplay;
@@ -1104,12 +1106,17 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function fetchSyncwebFolders() {
+        if (state.offlineMode) {
+            if (detailsSyncweb) detailsSyncweb.classList.add('hidden');
+            return;
+        }
+
         try {
             const resp = await fetchAPI('/api/syncweb/folders');
             if (!resp.ok) return;
             const folders = await resp.json();
             if (folders.length > 0) {
-                detailsSyncweb.classList.remove('hidden');
+                if (detailsSyncweb) detailsSyncweb.classList.remove('hidden');
                 syncwebList.innerHTML = '';
                 folders.forEach(f => {
                     const btn = document.createElement('button');
@@ -1125,9 +1132,23 @@ document.addEventListener('DOMContentLoaded', () => {
                     };
                     syncwebList.appendChild(btn);
                 });
+            } else {
+                if (detailsSyncweb) detailsSyncweb.classList.add('hidden');
             }
         } catch (e) {
             console.error('Failed to fetch syncweb folders', e);
+        }
+    }
+
+    async function syncOfflineMode() {
+        try {
+            await fetchAPI('/api/syncweb/toggle', {
+                method: 'POST',
+                body: JSON.stringify({ offline: state.offlineMode })
+            });
+            fetchSyncwebFolders();
+        } catch (e) {
+            console.error('Failed to sync offline mode', e);
         }
     }
 
@@ -3473,6 +3494,13 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         };
 
+        const fsBtn = document.getElementById('doc-fullscreen');
+        const modalContent = modal.querySelector('.modal-content');
+        if (fsBtn) {
+            fsBtn.classList.remove('hidden');
+            fsBtn.onclick = () => toggleFullscreen(modalContent);
+        }
+
         if (type.includes('epub')) {
             toggleEpubControls(true);
             epubViewer.classList.remove('hidden');
@@ -3529,9 +3557,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         epubViewer.ondblclick = (e) => {
             e.stopPropagation();
-            toggleFullscreen(epubViewer);
+            toggleFullscreen(modalContent);
         };
-        container.ondblclick = () => toggleFullscreen(epubViewer);
+        container.ondblclick = () => toggleFullscreen(modalContent);
 
         openModal('document-modal');
         epubViewer.focus();
@@ -4444,6 +4472,18 @@ document.addEventListener('DOMContentLoaded', () => {
                         });
                     }
                     return;
+                case 'f':
+                    const docModal = document.getElementById('document-modal');
+                    const pipPlayer = document.getElementById('pip-player');
+                    if (!docModal.classList.contains('hidden')) {
+                        toggleFullscreen(docModal.querySelector('.modal-content'));
+                    } else if (!pipPlayer.classList.contains('hidden')) {
+                        const media = pipViewer.querySelector('video, audio, img');
+                        if (media) {
+                            toggleFullscreen(pipViewer, media.tagName === 'VIDEO' ? media : pipViewer);
+                        }
+                    }
+                    return;
             }
         }
 
@@ -4519,14 +4559,6 @@ document.addEventListener('DOMContentLoaded', () => {
             case 'k':
                 e.preventDefault();
                 playPause();
-                break;
-            case 'f':
-                const docModal = document.getElementById('document-modal');
-                if (!docModal.classList.contains('hidden')) {
-                    toggleFullscreen(document.getElementById('document-container'));
-                } else {
-                    toggleFullscreen(pipViewer, media.tagName === 'VIDEO' ? media : pipViewer);
-                }
                 break;
             case 'm':
                 media.muted = !media.muted;
@@ -4987,6 +5019,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (pipPlayer.classList.contains('hidden')) {
             state.playerMode = state.defaultView;
         }
+    };
+
+    const settingOfflineMode = document.getElementById('setting-offline-mode');
+    if (settingOfflineMode) settingOfflineMode.onchange = (e) => {
+        state.offlineMode = e.target.checked;
+        localStorage.setItem('disco-offline-mode', state.offlineMode);
+        syncOfflineMode();
     };
 
     const settingAutoplay = document.getElementById('setting-autoplay');
@@ -5460,7 +5499,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Initial load
     readUrl(true);
     fetchDatabases();
-    fetchSyncwebFolders();
+    syncOfflineMode();
     fetchCategories();
     fetchGenres();
     fetchRatings();
@@ -5470,6 +5509,13 @@ document.addEventListener('DOMContentLoaded', () => {
     initSidebarPersistence();
     onUrlChange();
     applyTheme();
+
+    document.addEventListener('fullscreenchange', () => {
+        const fsBtn = document.getElementById('doc-fullscreen');
+        if (fsBtn) {
+            fsBtn.title = document.fullscreenElement ? 'Exit Fullscreen' : 'Toggle Fullscreen';
+        }
+    });
 
     // Expose for testing
     window.disco = {
@@ -5481,6 +5527,7 @@ document.addEventListener('DOMContentLoaded', () => {
         formatRelativeDate,
         formatParents,
         openInPiP,
+        openInDocumentViewer,
         performSearch,
         updateProgress,
         seekToProgress,

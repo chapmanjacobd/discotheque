@@ -66,7 +66,7 @@ func TestSecurity_PathValidation(t *testing.T) {
 	defer sw.Stop()
 
 	syncDir := filepath.Join(homeDir, "sync")
-	os.MkdirAll(syncDir, 0700)
+	os.MkdirAll(syncDir, 0o700)
 	folderID := "test"
 	sw.AddFolder(folderID, "test", syncDir, config.FolderTypeSendReceive)
 

@@ -91,6 +91,10 @@ func (s *Syncweb) Stop() {
 	s.Node.Stop()
 }
 
+func (s *Syncweb) IsRunning() bool {
+	return s.Node.IsRunning()
+}
+
 // AddDevice adds a device to the Syncthing configuration
 func (s *Syncweb) AddDevice(deviceID string, name string, introducer bool) error {
 	id, err := protocol.DeviceIDFromString(deviceID)

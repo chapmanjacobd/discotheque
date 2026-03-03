@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -199,24 +200,21 @@ func TestServeCmd_Handlers(t *testing.T) {
 	})
 
 	t.Run("HandleEvents", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/api/events", nil)
-		// We can't easily test SSE with httptest.Recorder if it doesn't flush or if it blocks.
-		// But we can check if it returns the right content type.
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		req := httptest.NewRequest(http.MethodGet, "/api/events", nil).WithContext(ctx)
 		w := httptest.NewRecorder()
 
-		// Use a channel to timeout if it blocks
 		done := make(chan bool)
 		go func() {
 			handler.ServeHTTP(w, req)
 			done <- true
 		}()
 
-		// Give it a tiny bit of time then "cancel" or just check what we have
-		select {
-		case <-done:
-		case <-time.After(10 * time.Millisecond):
-			// SSE handler might block forever, which is fine for this test if we just want to check headers
-		}
+		// Give it a tiny bit of time to set headers, then cancel
+		time.Sleep(10 * time.Millisecond)
+		cancel()
+		<-done
 
 		if w.Header().Get("Content-Type") != "text/event-stream" {
 			t.Errorf("Expected text/event-stream, got %s", w.Header().Get("Content-Type"))

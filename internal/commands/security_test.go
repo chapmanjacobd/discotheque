@@ -22,11 +22,11 @@ func TestSecurity_SyncwebPathTraversal(t *testing.T) {
 	// 1. Create a "secret" file outside any syncweb folder
 	secretContent := "top-secret-data"
 	secretFile := filepath.Join(fixture.TempDir, "secret.txt")
-	os.WriteFile(secretFile, []byte(secretContent), 0600)
+	os.WriteFile(secretFile, []byte(secretContent), 0o600)
 
 	// 2. Setup Syncweb with a dummy folder
 	syncDir := filepath.Join(fixture.TempDir, "sync")
-	os.MkdirAll(syncDir, 0700)
+	os.MkdirAll(syncDir, 0o700)
 
 	cmd := &ServeCmd{
 		Databases: []string{fixture.DBPath},
@@ -104,7 +104,7 @@ func TestSecurity_SyncwebInfoDisclosure(t *testing.T) {
 	defer fixture.Cleanup()
 
 	syncDir := filepath.Join(fixture.TempDir, "sync")
-	os.MkdirAll(syncDir, 0700)
+	os.MkdirAll(syncDir, 0o700)
 
 	cmd := &ServeCmd{
 		Databases: []string{fixture.DBPath},

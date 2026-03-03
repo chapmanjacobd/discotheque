@@ -75,7 +75,7 @@ func (c *ServeCmd) handleZimProxy(w http.ResponseWriter, r *http.Request) {
 	proxy := httputil.NewSingleHostReverseProxy(target)
 	// We need to strip the prefix /api/zim/proxy/{port} before sending to target
 	// but kiwix-serve was started with --urlRootLocation=/api/zim/proxy/{port}/
-	// so it might actually expect the full path. 
+	// so it might actually expect the full path.
 	// The filestash plugin didn't seem to strip it in its ZimProxyHandler.
 	proxy.ServeHTTP(w, r)
 }
@@ -184,7 +184,7 @@ func (m *KiwixManager) ensureKiwixServing(zimPath string) (int, error) {
 }
 
 func (m *KiwixManager) findAvailablePort() int {
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		port := KIWIX_PORT_START + i
 		if !m.usedPorts[port] && isPortAvailable(port) {
 			return port
