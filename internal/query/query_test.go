@@ -78,14 +78,44 @@ func TestQueryBuilder_Build(t *testing.T) {
 			"SELECT * FROM media WHERE COALESCE(time_deleted, 0) = 0 AND rowid IN (SELECT rowid FROM media WHERE COALESCE(time_deleted, 0) = 0 ORDER BY RANDOM() LIMIT 160) ORDER BY RANDOM() LIMIT 10",
 		},
 		{
-			"FTS Search",
+			"FTS Search (Improved Join)",
 			models.GlobalFlags{
 				FTSFlags:     models.FTSFlags{FTS: true, FTSTable: "media_fts"},
 				FilterFlags:  models.FilterFlags{Search: []string{"term"}},
 				QueryFlags:   models.QueryFlags{Limit: 10},
 				DeletedFlags: models.DeletedFlags{HideDeleted: true},
 			},
-			"SELECT * FROM media WHERE COALESCE(time_deleted, 0) = 0 AND rowid IN (SELECT rowid FROM media_fts WHERE media_fts MATCH ?) LIMIT 10",
+			"SELECT media.* FROM media JOIN media_fts ON media.rowid = media_fts.rowid WHERE COALESCE(time_deleted, 0) = 0 AND media_fts MATCH ? LIMIT 10",
+		},
+		{
+			"FTS Search (Column specific)",
+			models.GlobalFlags{
+				FTSFlags:     models.FTSFlags{FTS: true, FTSTable: "media_fts"},
+				FilterFlags:  models.FilterFlags{Search: []string{"title:term"}},
+				QueryFlags:   models.QueryFlags{Limit: 10},
+				DeletedFlags: models.DeletedFlags{HideDeleted: true},
+			},
+			"SELECT media.* FROM media JOIN media_fts ON media.rowid = media_fts.rowid WHERE COALESCE(time_deleted, 0) = 0 AND media_fts MATCH ? LIMIT 10",
+		},
+		{
+			"Flexible Search",
+			models.GlobalFlags{
+				FilterFlags:  models.FilterFlags{Search: []string{"a", "b"}, FlexibleSearch: true},
+				QueryFlags:   models.QueryFlags{Limit: 10},
+				DeletedFlags: models.DeletedFlags{HideDeleted: true},
+			},
+			"SELECT * FROM media WHERE COALESCE(time_deleted, 0) = 0 AND ((path LIKE ? OR title LIKE ?) OR (path LIKE ? OR title LIKE ?)) LIMIT 10",
+		},
+		{
+			"Mixed FTS and other filters",
+			models.GlobalFlags{
+				FTSFlags:         models.FTSFlags{FTS: true},
+				FilterFlags:      models.FilterFlags{Search: []string{"term"}, Size: []string{">100MB"}},
+				MediaFilterFlags: models.MediaFilterFlags{VideoOnly: true},
+				QueryFlags:       models.QueryFlags{Limit: 10},
+				DeletedFlags:     models.DeletedFlags{HideDeleted: true},
+			},
+			"SELECT media.* FROM media JOIN media_fts ON media.rowid = media_fts.rowid WHERE COALESCE(time_deleted, 0) = 0 AND media_fts MATCH ? AND size >= ? AND (type = 'video') LIMIT 10",
 		},
 		{
 			"Only Deleted",

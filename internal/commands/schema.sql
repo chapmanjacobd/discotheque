@@ -124,6 +124,18 @@ CREATE INDEX IF NOT EXISTS idx_time_deleted ON media(time_deleted);
 CREATE INDEX IF NOT EXISTS idx_time_last_played ON media(time_last_played);
 CREATE INDEX IF NOT EXISTS idx_duration ON media(duration);
 CREATE INDEX IF NOT EXISTS idx_size ON media(size);
+CREATE INDEX IF NOT EXISTS idx_type ON media(type);
+CREATE INDEX IF NOT EXISTS idx_genre ON media(genre);
+CREATE INDEX IF NOT EXISTS idx_artist ON media(artist);
+CREATE INDEX IF NOT EXISTS idx_album ON media(album);
+CREATE INDEX IF NOT EXISTS idx_categories ON media(categories);
+CREATE INDEX IF NOT EXISTS idx_uploader ON media(uploader);
+CREATE INDEX IF NOT EXISTS idx_score ON media(score);
+CREATE INDEX IF NOT EXISTS idx_view_count ON media(view_count);
+CREATE INDEX IF NOT EXISTS idx_time_created ON media(time_created);
+CREATE INDEX IF NOT EXISTS idx_time_modified ON media(time_modified);
+CREATE INDEX IF NOT EXISTS idx_time_uploaded ON media(time_uploaded);
+CREATE INDEX IF NOT EXISTS idx_time_downloaded ON media(time_downloaded);
 
 -- Optional FTS table
 CREATE VIRTUAL TABLE IF NOT EXISTS media_fts USING fts5(

@@ -126,9 +126,22 @@ func (qb *QueryBuilder) BuildSelect(columns string) (string, []any) {
 
 		if qb.Flags.FTS {
 			// FTS match syntax
-			quoted := utils.FtsQuote(allInclude)
-			searchTerm := strings.Join(quoted, joinOp)
-			whereClauses = append(whereClauses, fmt.Sprintf("rowid IN (SELECT rowid FROM %s WHERE %s MATCH ?)", table, table))
+			var ftsTerms []string
+			for _, term := range allInclude {
+				if strings.Contains(term, ":") {
+					parts := strings.SplitN(term, ":", 2)
+					col, val := parts[0], parts[1]
+					// Validate column name to prevent injection
+					validCols := map[string]bool{"title": true, "path": true, "text": true}
+					if validCols[strings.ToLower(col)] {
+						ftsTerms = append(ftsTerms, fmt.Sprintf("%s:%s", col, utils.FtsQuote([]string{val})[0]))
+						continue
+					}
+				}
+				ftsTerms = append(ftsTerms, utils.FtsQuote([]string{term})[0])
+			}
+			searchTerm := strings.Join(ftsTerms, joinOp)
+			whereClauses = append(whereClauses, fmt.Sprintf("%s MATCH ?", table))
 			args = append(args, searchTerm)
 		} else {
 			// Regular LIKE search
@@ -362,7 +375,16 @@ func (qb *QueryBuilder) BuildSelect(columns string) (string, []any) {
 	}
 
 	// Build query
-	query := fmt.Sprintf("SELECT %s FROM media", columns)
+	fromClause := "media"
+	useFTSJoin := qb.Flags.FTS && len(allInclude) > 0
+
+	if useFTSJoin {
+		fromClause = fmt.Sprintf("media JOIN %s ON media.rowid = %s.rowid", table, table)
+		if columns == "*" {
+			columns = "media.*"
+		}
+	}
+	query := fmt.Sprintf("SELECT %s FROM %s", columns, fromClause)
 
 	if len(whereClauses) > 0 {
 		query += " WHERE " + strings.Join(whereClauses, " AND ")
