@@ -1,13 +1,10 @@
-Trash+Unplayed or Trash+In Progress shows files that aren't in the trash and "Page 2 of 1"
-Clicking a History filter exits Trash
+Media Type constraint + Episodic constraint
 
-Instead of the default ffmpeg text to video, let's style it more like Rapid Serial Visual Presentation (RSVP) at 220wpm and include text to speech audio track
+gifs and other files that fail transcode should try to be streamed as-is before failing AKA try Direct if HLS fails before saying Unplayable
 
-Let's port the xklb bookmarking and link related things to a new repo. No fts but search via fast golang filtering
+> already covered by existing scan root
+for same path as root (should be allowed)
 
-## `web/` (Frontend)
-- [ ] `app.js`: Refactor frontend logic into smaller modules or components.
-- [ ] Implement better state management (e.g., using a lightweight store instead of global variables).
-- [ ] Improve UI responsiveness and mobile experience.
-- [ ] Increase test coverage for frontend components (currently 20+ `.test.js` files, but verify depth).
-- [ ] Optimize loading performance for large media lists.
+show a more accurate toast for Access Denied response
+
+mobile gestures for video tag: double tap center to toggle pause/play, double tap left or right to seek 10 seconds, hold down and swipe to seek like Mx Player does

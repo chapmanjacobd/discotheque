@@ -42,6 +42,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const filterCaptions = document.getElementById('filter-captions');
 
     const pipPlayer = document.getElementById('pip-player');
+    const pipLoading = document.getElementById('pip-loading');
     const pipViewer = document.getElementById('media-viewer');
     const pipTitle = document.getElementById('media-title');
     if (pipTitle) {
@@ -1620,13 +1621,10 @@ document.addEventListener('DOMContentLoaded', () => {
         resultsContainer.className = 'similarity-view';
         resultsContainer.innerHTML = `
             <div class="loading-container" style="text-align: center; padding: 3rem;">
-                <div class="spinner" style="border: 4px solid rgba(0,0,0,0.1); width: 36px; height: 36px; border-radius: 50%; border-left-color: var(--accent-color); animation: spin 1s linear infinite; margin: 0 auto 1rem;"></div>
+                <div class="spinner"></div>
                 <h3>Grouping by Parent Folder...</h3>
                 <p>Organizing media into episodic groups.</p>
             </div>
-            <style>
-                @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-            </style>
         `;
     }
 
@@ -1845,7 +1843,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.querySelector('.search-container').classList.add('hidden');
 
         // Show loading initially
-        resultsContainer.innerHTML = '<div class="loading-container" style="text-align: center; padding: 3rem;"><div class="spinner" style="border: 4px solid rgba(0,0,0,0.1); width: 36px; height: 36px; border-radius: 50%; border-left-color: var(--accent-color); animation: spin 1s linear infinite; margin: 0 auto 1rem;"></div><h3>Loading Categorization...</h3></div><style>@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }</style>';
+        resultsContainer.innerHTML = '<div class="loading-container" style="text-align: center; padding: 3rem;"><div class="spinner"></div><h3>Loading Categorization...</h3></div>';
 
         try {
             const resp = await fetchAPI('/api/categorize/keywords');
@@ -2018,7 +2016,7 @@ document.addEventListener('DOMContentLoaded', () => {
         findBtn.onclick = async () => {
             findBtn.disabled = true;
             findBtn.textContent = 'Analyzing...';
-            suggestionsArea.innerHTML = '<div class="spinner" style="border: 4px solid rgba(0,0,0,0.1); width: 24px; height: 24px; border-radius: 50%; border-left-color: var(--accent-color); animation: spin 1s linear infinite; margin: 1rem auto;"></div>';
+            suggestionsArea.innerHTML = '<div class="spinner" style="width: 24px; height: 24px; margin: 1rem auto;"></div>';
 
             try {
                 const resp = await fetchAPI('/api/categorize/suggest');
@@ -2918,6 +2916,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function handleMediaError(item) {
+        if (pipLoading) pipLoading.classList.add('hidden');
         // Only handle error for the currently active item.
         // If state.playback.item is null, the player was likely closed manually.
         if (!state.playback.item || state.playback.item.path !== item.path) return;
@@ -3121,6 +3120,14 @@ document.addEventListener('DOMContentLoaded', () => {
             state.playback.hlsInstance = null;
         }
 
+        if (pipLoading) {
+            if (item.rsvp) {
+                pipLoading.classList.remove('hidden');
+            } else {
+                pipLoading.classList.add('hidden');
+            }
+        }
+
         let el;
 
         if (type.includes('video')) {
@@ -3130,6 +3137,12 @@ document.addEventListener('DOMContentLoaded', () => {
             el.preload = 'auto';
             el.playsInline = true;
             el.muted = state.playback.muted;
+
+            if (item.rsvp) {
+                el.oncanplay = () => {
+                    if (pipLoading) pipLoading.classList.add('hidden');
+                };
+            }
 
             el.onvolumechange = () => {
                 if (el._systemMute) return;

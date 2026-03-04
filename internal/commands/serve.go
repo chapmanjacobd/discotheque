@@ -3064,7 +3064,7 @@ func (c *ServeCmd) handleRSVP(w http.ResponseWriter, r *http.Request) {
 	// Verify path in database
 	found := false
 	for _, dbPath := range c.Databases {
-		err := c.execDB(r.Context(), dbPath, func(sqlDB *sql.DB) error {
+		c.execDB(r.Context(), dbPath, func(sqlDB *sql.DB) error {
 			queries := database.New(sqlDB)
 			_, err := queries.GetMediaByPathExact(r.Context(), path)
 			if err == nil {
@@ -3111,7 +3111,7 @@ func (c *ServeCmd) handleRSVP(w http.ResponseWriter, r *http.Request) {
 	defer os.RemoveAll(tmpDir)
 
 	assPath := filepath.Join(tmpDir, "subtitles.ass")
-	if err := os.WriteFile(assPath, []byte(assContent), 0644); err != nil {
+	if err := os.WriteFile(assPath, []byte(assContent), 0o644); err != nil {
 		http.Error(w, "Failed to write subtitles", http.StatusInternalServerError)
 		return
 	}

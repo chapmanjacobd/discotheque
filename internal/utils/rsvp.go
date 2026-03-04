@@ -73,14 +73,14 @@ func GenerateRSVPAss(text string, wpm int) (string, float64) {
 	startTime := 0.0
 	for _, word := range words {
 		endTime := startTime + durationPerWord
-		
+
 		startStr := formatAssTime(startTime)
 		endStr := formatAssTime(endTime)
-		
+
 		// Sanitize word for ASS
 		word = strings.ReplaceAll(word, "{", "\\{")
 		word = strings.ReplaceAll(word, "}", "\\}")
-		
+
 		// Highlight the middle character/part if possible (ORP - Optimal Recognition Point)
 		// Simple implementation: just show the word
 		sb.WriteString(fmt.Sprintf("Dialogue: 0,%s,%s,Default,,0,0,0,,%s\n", startStr, endStr, word))

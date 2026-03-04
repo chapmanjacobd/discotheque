@@ -28,7 +28,7 @@ func TestExtractText(t *testing.T) {
 	tmpFile, _ := os.CreateTemp("", "test*.txt")
 	defer os.Remove(tmpFile.Name())
 	content := "Test content"
-	os.WriteFile(tmpFile.Name(), []byte(content), 0644)
+	os.WriteFile(tmpFile.Name(), []byte(content), 0o644)
 
 	text, err := ExtractText(tmpFile.Name())
 	if err != nil {
