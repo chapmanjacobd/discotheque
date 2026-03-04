@@ -135,6 +135,8 @@ func (c *ServeCmd) Mux() http.Handler {
 	mux.HandleFunc("/api/zim/view", c.authMiddleware(c.handleZimView))
 	mux.HandleFunc("/api/zim/proxy/{port}/{rest...}", c.authMiddleware(c.handleZimProxy))
 
+	mux.HandleFunc("/api/rsvp", c.authMiddleware(c.handleRSVP))
+
 	mux.HandleFunc("/api/hls/playlist", c.authMiddleware(c.handleHLSPlaylist))
 	mux.HandleFunc("/api/hls/segment", c.authMiddleware(c.handleHLSSegment))
 	mux.HandleFunc("/api/subtitles", c.authMiddleware(c.handleSubtitles))
@@ -3048,6 +3050,117 @@ func (c *ServeCmd) handleHLSSegment(w http.ResponseWriter, r *http.Request) {
 			slog.Debug("Client disconnected during HLS transcoding", "path", path, "index", index)
 		} else {
 			slog.Error("HLS transcoding failed", "path", path, "index", index, "error", err)
+		}
+	}
+}
+
+func (c *ServeCmd) handleRSVP(w http.ResponseWriter, r *http.Request) {
+	path := r.URL.Query().Get("path")
+	if path == "" {
+		http.Error(w, "Path required", http.StatusBadRequest)
+		return
+	}
+
+	// Verify path in database
+	found := false
+	for _, dbPath := range c.Databases {
+		err := c.execDB(r.Context(), dbPath, func(sqlDB *sql.DB) error {
+			queries := database.New(sqlDB)
+			_, err := queries.GetMediaByPathExact(r.Context(), path)
+			if err == nil {
+				found = true
+			}
+			return err
+		})
+		if found {
+			break
+		}
+	}
+
+	if !found {
+		http.Error(w, "Access denied", http.StatusForbidden)
+		return
+	}
+
+	wpm := 220
+	if wpmStr := r.URL.Query().Get("wpm"); wpmStr != "" {
+		if val, err := strconv.Atoi(wpmStr); err == nil && val > 0 {
+			wpm = val
+		}
+	}
+
+	text, err := utils.ExtractText(path)
+	if err != nil {
+		slog.Error("Text extraction failed", "path", path, "error", err)
+		http.Error(w, fmt.Sprintf("Text extraction failed: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	assContent, duration := utils.GenerateRSVPAss(text, wpm)
+	if duration <= 0 {
+		http.Error(w, "Empty text content", http.StatusBadRequest)
+		return
+	}
+
+	// Create temp directory for ASS and WAV
+	tmpDir, err := os.MkdirTemp("", "disco-rsvp-*")
+	if err != nil {
+		http.Error(w, "Failed to create temp directory", http.StatusInternalServerError)
+		return
+	}
+	defer os.RemoveAll(tmpDir)
+
+	assPath := filepath.Join(tmpDir, "subtitles.ass")
+	if err := os.WriteFile(assPath, []byte(assContent), 0644); err != nil {
+		http.Error(w, "Failed to write subtitles", http.StatusInternalServerError)
+		return
+	}
+
+	wavPath := filepath.Join(tmpDir, "audio.wav")
+	if err := utils.GenerateTTS(text, wavPath, wpm); err != nil {
+		slog.Warn("TTS generation failed", "error", err)
+		wavPath = ""
+	}
+
+	w.Header().Set("Content-Type", "video/webm")
+	w.Header().Set("Accept-Ranges", "bytes")
+
+	// FFmpeg: black background + audio + RSVP subtitles
+	var args []string
+	args = append(args, "-hide_banner", "-loglevel", "error")
+	args = append(args, "-f", "lavfi", "-i", fmt.Sprintf("color=c=black:s=1280x720:d=%f", duration))
+
+	if wavPath != "" {
+		args = append(args, "-i", wavPath)
+	}
+
+	// Escape path for ffmpeg filter (simple Linux paths should be fine, but let's be safe)
+	escapedAssPath := strings.ReplaceAll(assPath, "\\", "/")
+	escapedAssPath = strings.ReplaceAll(escapedAssPath, ":", "\\:")
+
+	args = append(args,
+		"-vf", fmt.Sprintf("ass='%s'", escapedAssPath),
+		"-c:v", "libvpx-vp9",
+		"-deadline", "realtime",
+		"-cpu-used", "8",
+		"-crf", "30",
+		"-b:v", "0",
+	)
+
+	if wavPath != "" {
+		args = append(args, "-c:a", "libopus", "-b:a", "64k")
+	}
+
+	args = append(args, "-f", "webm", "pipe:1")
+
+	slog.Info("Starting RSVP stream", "path", path, "wpm", wpm, "duration", duration)
+
+	cmd := exec.CommandContext(r.Context(), "ffmpeg", args...)
+	cmd.Stdout = w
+
+	if err := cmd.Run(); err != nil {
+		if r.Context().Err() == nil {
+			slog.Error("FFmpeg RSVP streaming failed", "error", err)
 		}
 	}
 }

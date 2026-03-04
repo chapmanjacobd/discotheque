@@ -46,18 +46,21 @@ describe('Trash Filter Behavior', () => {
         // Start in 'search' page (default)
         expect(window.disco.state.page).toBe('search');
         
-        // Click In Progress
+        // Click In Progress (Turn ON)
         inProgressBtn.click();
-        expect(window.disco.state.page).toBe('search');
         expect(window.disco.state.filters.unfinished).toBe(true);
 
-        // Go to playlist page (simulate by setting state manually as button click might be complex to mock if fetch needed)
+        // Turn OFF
+        inProgressBtn.click();
+        expect(window.disco.state.filters.unfinished).toBe(false);
+
+        // Now Go to playlist page
         window.disco.state.page = 'playlist';
         
-        // Click In Progress
+        // Click In Progress (Turn ON)
         inProgressBtn.click();
-        // Should switch to search page (unless logic says otherwise)
-        // My fix said: if (state.page !== 'trash') state.page = 'search';
+        
+        // Should switch to search page
         expect(window.disco.state.page).toBe('search');
     });
 });

@@ -2909,6 +2909,14 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    async function playRSVP(item) {
+        const originalPlayer = state.player;
+        state.player = 'browser';
+        const rsvpItem = { ...item, rsvp: true, type: 'video/webm' };
+        await openInPiP(rsvpItem, true);
+        state.player = originalPlayer;
+    }
+
     async function handleMediaError(item) {
         // Only handle error for the currently active item.
         // If state.playback.item is null, the player was likely closed manually.
@@ -3106,7 +3114,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // Standard raw URL (possibly sliced if using fallback)
-        let url = `/api/raw?path=${encodeURIComponent(path)}`;
+        let url = item.rsvp ? `/api/rsvp?path=${encodeURIComponent(path)}` : `/api/raw?path=${encodeURIComponent(path)}`;
 
         if (state.playback.hlsInstance) {
             state.playback.hlsInstance.destroy();
@@ -3429,6 +3437,14 @@ document.addEventListener('DOMContentLoaded', () => {
         if (fsBtn) {
             fsBtn.classList.remove('hidden');
             fsBtn.onclick = () => toggleFullscreen(modalContent);
+        }
+
+        const rsvpBtn = document.getElementById('doc-rsvp');
+        if (rsvpBtn) {
+            rsvpBtn.onclick = () => {
+                closeModal('document-modal');
+                playRSVP(item);
+            };
         }
 
         if (type.includes('epub')) {
@@ -3784,7 +3800,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     ${!state.readOnly ? `<button class="media-action-btn remove-playlist" title="Remove from Playlist">&times;</button>` : ''}
                 `;
             } else {
+                const isText = item.type && (item.type.includes('text') || item.type.includes('epub') || item.type.includes('pdf'));
                 actionBtns = `
+                    ${isText ? `<button class="media-action-btn rsvp" title="Play as RSVP Video">👁️</button>` : ''}
                     ${!state.readOnly ? `<button class="media-action-btn add-playlist" title="Add to Playlist">+</button>` : ''}
                     ${plays > 0 ?
                         `<button class="media-action-btn mark-unplayed" title="Mark as Unplayed">⭕</button>` :
@@ -3877,6 +3895,12 @@ document.addEventListener('DOMContentLoaded', () => {
             if (btnDelete) btnDelete.onclick = (e) => {
                 e.stopPropagation();
                 deleteMedia(item.path, false);
+            };
+
+            const btnRSVP = card.querySelector('.media-action-btn.rsvp');
+            if (btnRSVP) btnRSVP.onclick = (e) => {
+                e.stopPropagation();
+                playRSVP(item);
             };
 
             const btnRestore = card.querySelector('.media-action-btn.restore');
