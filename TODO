@@ -1,4 +1,7 @@
+Trash+Unplayed or Trash+In Progress shows files that aren't in the trash and "Page 2 of 1"
+Clicking a History filter exits Trash
 
+Instead of the default ffmpeg text to video, let's style it more like Rapid Serial Visual Presentation (RSVP) at 220wpm and include text to speech audio track
 
 Let's port the xklb bookmarking and link related things to a new repo. No fts but search via fast golang filtering
 

@@ -1173,6 +1173,11 @@ main {
 .pip-body {
     border-radius: 0 0 12px 12px;
     overflow: hidden;
+    position: relative;
+    /* Force clipping for video/accelerated layers */
+    -webkit-mask-image: -webkit-radial-gradient(white, black);
+    mask-image: radial-gradient(white, black);
+    transform: translateZ(0);
 }
 
 #media-viewer {
