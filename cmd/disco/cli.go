@@ -44,6 +44,8 @@ type CLI struct {
 	Seek           commands.SeekCmd           `cmd:"" help:"Seek mpv playback" aliases:"ffwd,rewind"`
 	MergeDBs       commands.MergeDBsCmd       `cmd:"" name:"merge-dbs" help:"Merge multiple SQLite databases" aliases:"mergedbs"`
 	Explode        commands.ExplodeCmd        `cmd:"" help:"Create symlinks for all subcommands (busybox-style)"`
+	Update         commands.UpdateCmd         `cmd:"" help:"Check for and install updates from GitHub"`
+	Version        commands.VersionCmd        `cmd:"" help:"Show version and build information"`
 
 	SyncwebCLI
 

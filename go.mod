@@ -10,6 +10,7 @@ require (
 	github.com/charmbracelet/bubbletea v1.3.10
 	github.com/charmbracelet/lipgloss v1.1.0
 	github.com/gabriel-vasile/mimetype v1.4.13
+	github.com/mattn/go-isatty v0.0.20
 	github.com/mattn/go-runewidth v0.0.19
 	github.com/mattn/go-sqlite3 v1.14.34
 	github.com/muesli/clusters v0.0.0-20200529215643-2700303c1762
@@ -17,6 +18,7 @@ require (
 	github.com/rivo/uniseg v0.4.7
 	github.com/sevlyar/go-daemon v0.1.6
 	github.com/syncthing/syncthing v1.30.0-rc.1.0.20260202043224-b40f2acdad80
+	github.com/ulikunitz/xz v0.5.15
 )
 
 require (
@@ -55,7 +57,6 @@ require (
 	github.com/kr/text v0.2.0 // indirect
 	github.com/lucasb-eyer/go-colorful v1.3.0 // indirect
 	github.com/lufia/plan9stats v0.0.0-20260216142805-b3301c5f2a88 // indirect
-	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-localereader v0.0.1 // indirect
 	github.com/miscreant/miscreant.go v0.0.0-20200214223636-26d376326b75 // indirect
 	github.com/muesli/ansi v0.0.0-20230316100256-276c6243b2f6 // indirect

@@ -13,6 +13,7 @@ import (
 )
 
 func main() {
+	utils.AutoUpdate()
 	cli := &CLI{}
 	parser, err := kong.New(cli,
 		kong.Name("disco"),
