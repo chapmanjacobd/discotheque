@@ -1440,7 +1440,7 @@ document.addEventListener('DOMContentLoaded', () => {
         ratingList.querySelectorAll('.category-btn').forEach(btn => {
             btn.onclick = (e) => {
                 const rating = btn.dataset.rating;
-                state.page = 'search';
+                if (state.page !== 'trash') state.page = 'search';
 
                 const idx = state.filters.ratings.indexOf(rating);
                 if (idx !== -1) {
@@ -1451,6 +1451,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 localStorage.setItem('disco-filter-ratings', JSON.stringify(state.filters.ratings));
                 btn.classList.toggle('active');
+                state.currentPage = 1;
                 updateNavActiveStates();
                 performSearch();
             };
@@ -4250,6 +4251,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     state.filters.excludedDbs.push(val);
                 }
                 localStorage.setItem('disco-excluded-dbs', JSON.stringify(state.filters.excludedDbs));
+                state.currentPage = 1;
                 performSearch();
             };
         });
@@ -4289,7 +4291,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (btn.id === 'categorization-link-btn') return;
             btn.onclick = (e) => {
                 const cat = btn.dataset.cat;
-                state.page = 'search';
+                if (state.page !== 'trash') state.page = 'search';
 
                 const idx = state.filters.categories.indexOf(cat);
                 if (idx !== -1) {
@@ -4300,6 +4302,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 localStorage.setItem('disco-filter-categories', JSON.stringify(state.filters.categories));
                 btn.classList.toggle('active');
+                state.currentPage = 1;
                 updateNavActiveStates();
                 performSearch();
             };
@@ -5170,11 +5173,12 @@ document.addEventListener('DOMContentLoaded', () => {
             if (state.filters.unfinished) {
                 state.filters.unfinished = false;
             } else {
-                state.page = 'search';
+                if (state.page !== 'trash') state.page = 'search';
                 state.filters.unfinished = true;
                 state.filters.completed = false;
                 state.filters.unplayed = false;
             }
+            state.currentPage = 1;
             updateNavActiveStates();
             performSearch();
         };
@@ -5185,11 +5189,12 @@ document.addEventListener('DOMContentLoaded', () => {
             if (state.filters.unplayed) {
                 state.filters.unplayed = false;
             } else {
-                state.page = 'search';
+                if (state.page !== 'trash') state.page = 'search';
                 state.filters.unplayed = true;
                 state.filters.unfinished = false;
                 state.filters.completed = false;
             }
+            state.currentPage = 1;
             updateNavActiveStates();
             performSearch();
         };
@@ -5200,11 +5205,12 @@ document.addEventListener('DOMContentLoaded', () => {
             if (state.filters.completed) {
                 state.filters.completed = false;
             } else {
-                state.page = 'search';
+                if (state.page !== 'trash') state.page = 'search';
                 state.filters.completed = true;
                 state.filters.unfinished = false;
                 state.filters.unplayed = false;
             }
+            state.currentPage = 1;
             updateNavActiveStates();
             performSearch();
         };
@@ -5241,6 +5247,7 @@ document.addEventListener('DOMContentLoaded', () => {
             sortPlaylistItems();
             renderResults();
         } else {
+            state.currentPage = 1;
             performSearch();
         }
     };
@@ -5253,6 +5260,7 @@ document.addEventListener('DOMContentLoaded', () => {
             sortPlaylistItems();
             renderResults();
         } else {
+            state.currentPage = 1;
             performSearch();
         }
     };
@@ -5310,8 +5318,14 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    if (limitInput) limitInput.oninput = debounce(performSearch, 500);
-    if (limitAll) limitAll.onchange = performSearch;
+    if (limitInput) limitInput.oninput = debounce(() => {
+        state.currentPage = 1;
+        performSearch();
+    }, 500);
+    if (limitAll) limitAll.onchange = () => {
+        state.currentPage = 1;
+        performSearch();
+    };
 
     if (viewGrid) {
         viewGrid.onclick = () => {
