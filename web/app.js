@@ -2871,6 +2871,43 @@ document.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => seekToProgress(el, targetPos, retryCount + 1), 333);
     }
 
+    function cycleSubtitles(reverse = false) {
+        const media = pipViewer.querySelector('video');
+        if (!media || !media.textTracks) return;
+
+        const tracks = Array.from(media.textTracks).filter(t => t.kind === 'subtitles');
+        if (tracks.length === 0) return;
+
+        // Find current active track index
+        let activeIndex = tracks.findIndex(t => t.mode === 'showing');
+
+        // Disable all
+        tracks.forEach(t => t.mode = 'disabled');
+
+        if (reverse) {
+            // Cycle: showing (0) -> none (-1) -> last (N-1) -> ...
+            if (activeIndex === -1) {
+                activeIndex = tracks.length - 1;
+            } else {
+                activeIndex--;
+            }
+        } else {
+            // Cycle: showing (0) -> showing (1) -> ... -> last (N-1) -> none (-1) -> 0
+            if (activeIndex >= tracks.length - 1) {
+                activeIndex = -1;
+            } else {
+                activeIndex++;
+            }
+        }
+
+        if (activeIndex !== -1) {
+            tracks[activeIndex].mode = 'showing';
+            showToast(`Subtitles: ${tracks[activeIndex].label || 'Track ' + (activeIndex + 1)}`, '💬');
+        } else {
+            showToast('Subtitles: Off', '💬');
+        }
+    }
+
     async function handleMediaError(item) {
         // Only handle error for the currently active item.
         // If state.playback.item is null, the player was likely closed manually.
@@ -4447,7 +4484,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 media.muted = !media.muted;
                 break;
             case 'j':
-                setTime(Math.max(0, currentTime - 10));
+                if (media.tagName === 'VIDEO') {
+                    cycleSubtitles(e.shiftKey);
+                } else {
+                    setTime(Math.max(0, currentTime - 10));
+                }
                 break;
             case 'l':
                 setTime(Math.min(duration, currentTime + 10));

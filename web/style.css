@@ -1191,6 +1191,7 @@ main {
     display: block;
     object-fit: contain;
     border-radius: inherit;
+    overflow: hidden;
 }
 
 .modal-content:fullscreen {
