@@ -38,7 +38,6 @@ type LsEntry struct {
 
 type ServeCmd struct {
 	models.CoreFlags        `embed:""`
-	models.SyncwebFlags     `embed:""`
 	models.QueryFlags       `embed:""`
 	models.PathFilterFlags  `embed:""`
 	models.FilterFlags      `embed:""`
@@ -136,12 +135,6 @@ func (c *ServeCmd) Mux() http.Handler {
 	mux.HandleFunc("/api/zim/view", c.authMiddleware(c.handleZimView))
 	mux.HandleFunc("/api/zim/proxy/{port}/{rest...}", c.authMiddleware(c.handleZimProxy))
 
-	mux.HandleFunc("/api/syncweb/folders", c.authMiddleware(c.handleSyncwebFolders))
-	mux.HandleFunc("/api/syncweb/ls", c.authMiddleware(c.handleSyncwebLs))
-	mux.HandleFunc("/api/syncweb/download", c.authMiddleware(c.handleSyncwebDownload))
-	mux.HandleFunc("/api/syncweb/toggle", c.authMiddleware(c.handleSyncwebToggle))
-	mux.HandleFunc("/api/syncweb/status", c.authMiddleware(c.handleSyncwebStatus))
-
 	mux.HandleFunc("/api/hls/playlist", c.authMiddleware(c.handleHLSPlaylist))
 	mux.HandleFunc("/api/hls/segment", c.authMiddleware(c.handleHLSSegment))
 	mux.HandleFunc("/api/subtitles", c.authMiddleware(c.handleSubtitles))
@@ -232,9 +225,6 @@ func (c *ServeCmd) Run(ctx *kong.Context) error {
 	c.ApplicationStartTime = time.Now().UnixNano()
 	c.APIToken = utils.RandomString(32)
 
-	// Initialize internal Syncweb instance
-	c.setupSyncweb()
-
 	for _, dbPath := range c.Databases {
 		sqlDB, err := database.Connect(dbPath)
 		if err != nil {
@@ -272,7 +262,6 @@ func (c *ServeCmd) Run(ctx *kong.Context) error {
 func (c *ServeCmd) GetGlobalFlags() models.GlobalFlags {
 	return models.GlobalFlags{
 		CoreFlags:        c.CoreFlags,
-		SyncwebFlags:     c.SyncwebFlags,
 		QueryFlags:       c.QueryFlags,
 		PathFilterFlags:  c.PathFilterFlags,
 		FilterFlags:      c.FilterFlags,
@@ -1086,8 +1075,6 @@ func (c *ServeCmd) handleLs(w http.ResponseWriter, r *http.Request) {
 
 	resultsMap := make(map[string]LsEntry)
 	counts := make(map[string]int)
-
-	c.addSyncwebRoots(resultsMap, counts, path)
 
 	for _, dbPath := range c.Databases {
 		err := c.execDB(r.Context(), dbPath, func(sqlDB *sql.DB) error {
@@ -2031,25 +2018,7 @@ func (c *ServeCmd) handleRaw(w http.ResponseWriter, r *http.Request) {
 	var m models.Media
 	found := false
 
-	isSyncweb := strings.HasPrefix(path, "syncweb://")
 	localPath := path
-	var folderID string
-
-	if isSyncweb {
-		var err error
-		localPath, folderID, err = c.resolveSyncwebPath(path)
-		if err != nil {
-			slog.Error("Failed to resolve syncweb path", "path", path, "error", err)
-			http.Error(w, "Invalid syncweb path", http.StatusBadRequest)
-			return
-		}
-		// For syncweb files not in DB, we'll use a minimal models.Media object
-		mime := utils.DetectMimeType(localPath)
-		m = models.Media{
-			Path: path,
-			Type: &mime,
-		}
-	}
 
 	for _, dbPath := range c.Databases {
 		err := c.execDB(r.Context(), dbPath, func(sqlDB *sql.DB) error {
@@ -2069,14 +2038,14 @@ func (c *ServeCmd) handleRaw(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if !found && !isSyncweb {
+	if !found {
 		slog.Warn("Access denied: file not in database", "path", path)
 		http.Error(w, "Access denied: file not in database", http.StatusForbidden)
 		return
 	}
 
 	isLocal := utils.FileExists(localPath)
-	if !isLocal && !isSyncweb {
+	if !isLocal {
 		slog.Warn("File not found on disk, marking as deleted in databases", "path", path)
 		c.markDeletedInAllDBs(r.Context(), path, true)
 		http.Error(w, "File not found", http.StatusNotFound)
@@ -2090,11 +2059,6 @@ func (c *ServeCmd) handleRaw(w http.ResponseWriter, r *http.Request) {
 
 	if strategy.NeedsTranscode {
 		if c.hasFfmpeg {
-			// For now transcode only local files or we'd need a more complex pipe
-			if !isLocal {
-				http.Error(w, "Transcoding remote files not yet supported", http.StatusNotImplemented)
-				return
-			}
 			c.handleTranscode(w, r, localPath, m, strategy)
 			return
 		} else {
@@ -2102,12 +2066,8 @@ func (c *ServeCmd) handleRaw(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if isLocal {
-		slog.Debug("Serving local file", "path", localPath)
-		http.ServeFile(w, r, localPath)
-	} else {
-		c.serveSyncwebContent(w, r, folderID, path, localPath)
-	}
+	slog.Debug("Serving local file", "path", localPath)
+	http.ServeFile(w, r, localPath)
 }
 
 func (c *ServeCmd) handleTranscode(w http.ResponseWriter, r *http.Request, path string, m models.Media, strategy utils.TranscodeStrategy) {
@@ -2135,7 +2095,7 @@ func (c *ServeCmd) handleTranscode(w http.ResponseWriter, r *http.Request, path 
 		args = append(args, "-c:v", "copy")
 	} else {
 		if strategy.TargetMime == "video/mp4" {
-			args = append(args, "-c:v", "libx264", "-preset", "ultrafast", "-tune", "zerolatency", "-crf", "28")
+			args = append(args, "-c:v", "libx264", "-preset", "ultrafast", "-crf", "28")
 		} else {
 			// WebM
 			args = append(args, "-c:v", "libvpx-vp9", "-deadline", "realtime", "-cpu-used", "8", "-crf", "30", "-b:v", "0")

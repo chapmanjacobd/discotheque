@@ -110,7 +110,7 @@ func Extract(ctx context.Context, path string, scanSubtitles bool) (*MediaMetada
 		return result, nil
 	}
 
-	if mediaType == "text" {
+	if mediaType == "text" && utils.TextExtensionMap[strings.ToLower(filepath.Ext(path))] {
 		if params.Duration.Int64 == 0 {
 			// Basic duration estimate for text
 			d := int64(float64(stat.Size())/4.2/220*60) + 10
@@ -129,7 +129,7 @@ func Extract(ctx context.Context, path string, scanSubtitles bool) (*MediaMetada
 		"-show_chapters",
 		"-of", "json",
 		"-analyze_duration", "100000", // 0.1s
-		"-probesize", "500000",       // 500KB
+		"-probesize", "500000", // 500KB
 		path,
 	)
 
@@ -285,7 +285,6 @@ func Extract(ctx context.Context, path string, scanSubtitles bool) (*MediaMetada
 		// We could potentially try a more aggressive probe or just log it
 	}
 
-
 	params.VideoCodecs = utils.ToNullString(utils.Combine(vCodecs))
 	params.AudioCodecs = utils.ToNullString(utils.Combine(aCodecs))
 
@@ -366,6 +365,9 @@ func parseSubtitleFile(subPath, mediaPath string) ([]db.InsertCaptionParams, err
 
 	for i := 0; i < len(lines); i++ {
 		line := strings.TrimSpace(lines[i])
+		if line == "" {
+			continue
+		}
 		if timeRegex.MatchString(line) && strings.Contains(line, "-->") {
 			matches := timeRegex.FindAllString(line, -1)
 			if len(matches) > 0 {

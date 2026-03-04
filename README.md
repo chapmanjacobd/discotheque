@@ -2924,12 +2924,6 @@ Flags:
         Don't ask for confirmation
   -T, --timeout
         Quit after N minutes/seconds
-  --syncweb-url
-        Syncweb/Syncthing API URL
-  --syncweb-api-key
-        Syncweb/Syncthing API Key
-  --syncweb-home
-        Syncweb home directory
   -q, --query
         Raw SQL query (overrides all query building)
   -L, --limit
@@ -3372,12 +3366,6 @@ Flags:
         Don't ask for confirmation
   -T, --timeout
         Quit after N minutes/seconds
-  --syncweb-url
-        Syncweb/Syncthing API URL
-  --syncweb-api-key
-        Syncweb/Syncthing API Key
-  --syncweb-home
-        Syncweb home directory
   -q, --query
         Raw SQL query (overrides all query building)
   -L, --limit
@@ -4306,30 +4294,26 @@ $ disco explode --help
 
 </details>
 
-### syncweb
+### update
 
-Syncweb: an offline-first distributed web
+Check for and install updates from GitHub
 
 <details><summary>All Options</summary>
 
 ```bash
-$ disco syncweb --help
+$ disco update --help
+```
 
-Flags:
-  -v, --verbose
-        Enable verbose logging
-  --simulate
-        Dry run; don't actually do anything
-  -y, --no-confirm
-        Don't ask for confirmation
-  -T, --timeout
-        Quit after N minutes/seconds
-  --syncweb-url
-        Syncweb/Syncthing API URL
-  --syncweb-api-key
-        Syncweb/Syncthing API Key
-  --syncweb-home
-        Syncweb home directory
+</details>
+
+### version
+
+Show version and build information
+
+<details><summary>All Options</summary>
+
+```bash
+$ disco version --help
 ```
 
 </details>

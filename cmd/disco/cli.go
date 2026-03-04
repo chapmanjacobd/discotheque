@@ -47,8 +47,6 @@ type CLI struct {
 	Update         commands.UpdateCmd         `cmd:"" help:"Check for and install updates from GitHub"`
 	Version        commands.VersionCmd        `cmd:"" help:"Show version and build information"`
 
-	SyncwebCLI
-
 	ExitCalled bool `kong:"-"`
 }
 

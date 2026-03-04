@@ -1073,7 +1073,6 @@ main {
 .pip-container.hidden {
     display: none;
 }
-
 .pip-container.theatre {
     position: static;
     width: 100%;
@@ -1082,6 +1081,13 @@ main {
     border-bottom: 1px solid var(--border-color);
     margin-bottom: 1.5rem;
     z-index: 100;
+    border-radius: 0;
+}
+
+.pip-container.theatre .pip-header,
+.pip-container.theatre .pip-body {
+    border-radius: 0;
+}
     /* Lower z-index so dropdowns can go over it */
 }
 
@@ -1164,13 +1170,18 @@ main {
     background: #101010;
 }
 
+.pip-body {
+    border-radius: 0 0 12px 12px;
+    overflow: hidden;
+}
+
 #media-viewer {
     background: #101010;
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: 0 0 12px 12px;
-    overflow: clip;
+    border-radius: inherit;
+    overflow: hidden;
 }
 
 #media-viewer img,
@@ -1179,6 +1190,7 @@ main {
     max-height: 60vh;
     display: block;
     object-fit: contain;
+    border-radius: inherit;
 }
 
 .modal-content:fullscreen {
@@ -1444,6 +1456,12 @@ main {
         right: 0;
         border-left: none;
         border-right: none;
+        border-radius: 0;
+    }
+
+    .pip-container .pip-header,
+    .pip-container .pip-body {
+        border-radius: 0;
     }
 
     #media-viewer video,
@@ -1725,23 +1743,6 @@ main {
 
 body.is-dragging .sidebar .category-btn * {
     pointer-events: none;
-}
-
-/* Syncweb Styles */
-.folder-thumb, .remote-thumb {
-    user-select: none;
-}
-
-.media-action-btn.download-btn:hover {
-    background: var(--accent-color);
-}
-
-.remote-thumb:hover {
-    background: var(--hover-color) !important;
-}
-
-[data-theme="dark"] .folder-thumb, [data-theme="dark"] .remote-thumb {
-    background: #111 !important;
 }
 
 /* Mobile Native Video Controls Styling */

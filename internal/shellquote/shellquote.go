@@ -22,11 +22,11 @@ func ShellQuote(s string) string {
 
 	y := strings.ReplaceAll(s, "'", "'\\''")
 	y = simplifyRe.ReplaceAllStringFunc(y, func(str string) string {
-		var inner string
+		var inner strings.Builder
 		for i := 0; i < len(str)/4; i++ {
-			inner += "'"
+			inner.WriteString("'")
 		}
-		return `'"` + inner + `"'`
+		return `'"` + inner.String() + `"'`
 	})
 
 	y = "'" + y + "'"

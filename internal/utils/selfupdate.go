@@ -77,9 +77,9 @@ func shouldCheckProbabilistically() bool {
 	// Update the last check time before performing the check to ensure we don't
 	// retry immediately on failure and stay within the daily quota.
 	state.LastCheck = time.Now()
-	os.MkdirAll(filepath.Dir(statePath), 0755)
+	os.MkdirAll(filepath.Dir(statePath), 0o755)
 	if newData, err := json.Marshal(state); err == nil {
-		os.WriteFile(statePath, newData, 0644)
+		os.WriteFile(statePath, newData, 0o644)
 	}
 
 	return true
@@ -142,7 +142,7 @@ func doUpdate(url string) {
 		return
 	}
 
-	if err := os.Chmod(newp, 0755); err != nil {
+	if err := os.Chmod(newp, 0o755); err != nil {
 		fmt.Fprintln(os.Stderr, "couldn't chmod update:", err)
 		return
 	}

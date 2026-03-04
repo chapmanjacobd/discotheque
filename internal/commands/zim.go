@@ -88,14 +88,6 @@ func (c *ServeCmd) handleZimView(w http.ResponseWriter, r *http.Request) {
 	}
 
 	localPath := path
-	if strings.HasPrefix(path, "syncweb://") {
-		var err error
-		localPath, _, err = c.resolveSyncwebPath(path)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-	}
 
 	if !strings.HasSuffix(strings.ToLower(localPath), ".zim") {
 		http.Error(w, "Not a .zim file", http.StatusBadRequest)

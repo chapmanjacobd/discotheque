@@ -16,15 +16,6 @@ type CoreFlags struct {
 	Timeout   string `short:"T" help:"Quit after N minutes/seconds"`
 }
 
-// SyncwebFlags are flags related to Syncweb configuration
-type SyncwebFlags struct {
-	SyncwebURL      string `help:"Syncweb/Syncthing API URL" group:"Syncweb" env:"SYNCWEB_URL"`
-	SyncwebAPIKey   string `help:"Syncweb/Syncthing API Key" group:"Syncweb" env:"SYNCWEB_API_KEY"`
-	SyncwebHome     string `help:"Syncweb home directory" group:"Syncweb" env:"SYNCWEB_HOME"`
-	SyncwebPublic_  string `kong:"-" env:"SYNCWEB_PUBLIC"`
-	SyncwebPrivate_ string `kong:"-" env:"SYNCWEB_PRIVATE"`
-}
-
 type QueryFlags struct {
 	Query  string `short:"q" help:"Raw SQL query (overrides all query building)" group:"Query"`
 	Limit  int    `short:"L" default:"100" help:"Limit results per database" group:"Query"`
@@ -256,7 +247,6 @@ type MergeFlags struct {
 // GlobalFlags are flags available to disco data commands (print, search, du, etc)
 type GlobalFlags struct {
 	CoreFlags        `embed:""`
-	SyncwebFlags     `embed:""`
 	QueryFlags       `embed:""`
 	PathFilterFlags  `embed:""`
 	FilterFlags      `embed:""`

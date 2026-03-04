@@ -1,17 +1,12 @@
 .PHONY: build test cover webtest webcover clean fmt lint sql install all readme dev
 
 BINARY_NAME=disco
-SYNCWEB_BINARY=syncweb
-
-MIN_TAGS=noassets
-BUILD_TAGS=noassets,fts5
-SYNCWEB_TAGS=$(BUILD_TAGS),syncweb
+BUILD_TAGS=fts5
 
 all: fmt lint sql test webtest build readme
 
 build:
-	go build -tags "$(SYNCWEB_TAGS)" -o $(BINARY_NAME) ./cmd/disco
-	go build -tags "$(SYNCWEB_TAGS)" -o $(SYNCWEB_BINARY) ./cmd/syncweb
+	go build -tags "$(BUILD_TAGS)" -o $(BINARY_NAME) ./cmd/disco
 
 dev:
 	(sleep 2 && xdg-open http://localhost:5555) &
@@ -21,12 +16,10 @@ readme: build
 	./$(BINARY_NAME) readme > README.md
 
 test:
-	go test -tags "$(MIN_TAGS)" ./...
 	go test -tags "$(BUILD_TAGS)" ./...
-	go test -tags "$(SYNCWEB_TAGS)" ./...
 
 cover:
-	go test -tags "$(SYNCWEB_TAGS)" -coverprofile=coverage.out ./...
+	go test -tags "$(BUILD_TAGS)" -coverprofile=coverage.out ./...
 	go tool cover -func=coverage.out | awk '{n=split($$NF,a,"%%"); if (a[1] < 85) print $$0}' | sort -k3 -n
 
 webtest:
@@ -52,11 +45,10 @@ sql:
 	-sqlc diff
 
 clean:
-	rm -f $(BINARY_NAME) $(SYNCWEB_BINARY)
+	rm -f $(BINARY_NAME)
 	rm -f test.db
 	rm -f coverage.out
 
 # Install the binary to $GOPATH/bin
 install:
 	go install -tags "$(BUILD_TAGS)" ./cmd/disco
-	go install -tags "$(BUILD_TAGS)" ./cmd/syncweb

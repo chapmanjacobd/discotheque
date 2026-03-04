@@ -147,13 +147,6 @@
 
             <div class="sidebar-separator"></div>
 
-            <details id="details-syncweb" class="hidden">
-                <summary>Syncweb</summary>
-                <div id="syncweb-list" class="sidebar-buttons">
-                    <!-- Syncweb folders will be injected here -->
-                </div>
-            </details>
-
                 <button id="du-btn" class="category-btn" style="width: 100%; margin-bottom: 0.2rem;">📊
                     Disk Usage</button>
                 <button id="trash-btn" class="category-btn hidden" style="width: 100%; margin-bottom: 0.5rem;">🗑️
@@ -243,16 +236,6 @@
                             <option value="pip">Picture-in-Picture</option>
                             <option value="theatre">Theatre Mode</option>
                         </select>
-                    </div>
-                    <div class="full-toggle">
-                        <label class="switch">
-                            <input type="checkbox" id="setting-offline-mode">
-                            <span class="slider round"></span>
-                        </label>
-                        <div class="toggle-text">
-                            <h3>Offline Mode</h3>
-                            <p>Disable Syncweb backend and Block Exchange Protocol</p>
-                        </div>
                     </div>
                     <div class="full-toggle">
                         <label class="switch">
@@ -396,11 +379,13 @@
                 <button class="close-pip" title="Close">&times;</button>
             </div>
         </div>
-        <div id="media-viewer">
-            <!-- Media tag (img, video, audio) will be injected here -->
+        <div class="pip-body">
+            <div id="media-viewer">
+                <!-- Media tag (img, video, audio) will be injected here -->
+            </div>
+            <div id="secondary-subtitle" class="hidden"></div>
+            <div id="lyrics-display" class="hidden"></div>
         </div>
-        <div id="secondary-subtitle" class="hidden"></div>
-        <div id="lyrics-display" class="hidden"></div>
     </div>
 
     <!-- Metadata Modal -->

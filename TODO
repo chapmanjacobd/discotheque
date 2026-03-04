@@ -1,4 +1,4 @@
-Let's split the syncthing/syncweb stuff into a new repo that is focused on file management rather than being a media player
+
 
 Let's port the xklb bookmarking and link related things to a new repo. No fts but search via fast golang filtering
 
@@ -8,5 +8,3 @@ Let's port the xklb bookmarking and link related things to a new repo. No fts bu
 - [ ] Improve UI responsiveness and mobile experience.
 - [ ] Increase test coverage for frontend components (currently 20+ `.test.js` files, but verify depth).
 - [ ] Optimize loading performance for large media lists.
-
-mountpoints list like Android File Browser and auto-unmount duplicate mountpoints on initial scan

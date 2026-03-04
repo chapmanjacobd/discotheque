@@ -219,7 +219,7 @@ func TestE2E_AddWithVTTCaptions(t *testing.T) {
 
 	// 1. Create a dummy video file and a sidecar VTT
 	videoPath := filepath.Join(fixture.TempDir, "movie.mp4")
-	if err := os.WriteFile(videoPath, []byte("fake video data"), 0o644); err != nil {
+	if err := os.WriteFile(videoPath, []byte("\x00\x00\x00\x20ftypisom"), 0o644); err != nil {
 		t.Fatalf("failed to create dummy video: %v", err)
 	}
 
@@ -263,6 +263,14 @@ Another caption here.
 	defer db.Close()
 
 	var count int
+	err = db.QueryRow("SELECT COUNT(*) FROM media WHERE path = ?", videoPath).Scan(&count)
+	if err != nil {
+		t.Fatalf("failed to query media: %v", err)
+	}
+	if count == 0 {
+		t.Fatalf("Expected media to be imported into the database, but found 0")
+	}
+
 	err = db.QueryRow("SELECT COUNT(*) FROM captions WHERE media_path = ?", videoPath).Scan(&count)
 	if err != nil {
 		t.Fatalf("failed to query captions: %v", err)

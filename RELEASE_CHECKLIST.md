@@ -48,7 +48,6 @@ This checklist covers the essential manual tests to perform before a new release
     - [ ] Test **Default Player** (Browser vs System).
 - [ ] **Metadata Modal**: Right-click (or click 'i') on a media item and verify metadata details are shown.
 - [ ] **Trash**: Move an item to trash from the UI and verify it appears in the trash view (if enabled).
-- [ ] **Offline Mode**: Enable "Offline Mode" in settings and verify the "Syncweb" section in the sidebar disappears immediately. Disable it and verify it reappears (if folders exist).
 
 ## 5. Advanced Logic & Maintenance
 - [ ] **Dedupe**: Run `disco dedupe --simulate` to see if it identifies duplicate files.
@@ -56,16 +55,7 @@ This checklist covers the essential manual tests to perform before a new release
 - [ ] **Disk Usage**: Run `disco du` or check the "Disk Usage" button in the Web UI.
 - [ ] **Regex/Cluster Sort**: Run `disco rs` or `disco cs` on a list of paths.
 
-## 6. Syncweb (Syncthing Integration)
-- [ ] **Service Start**: Run `disco syncweb start` and ensure it initializes.
-- [ ] **Folder Management**: Test `disco syncweb create` and `disco syncweb folders`.
-- [ ] **Device Management**: Test `disco syncweb accept` and `disco syncweb devices`.
-- [ ] **Cluster Search**: Run `disco syncweb find <pattern>` to search files across the cluster.
-- [ ] **File Operations**: Test `disco syncweb ls`, `disco syncweb stat`, and `disco syncweb sort`.
-- [ ] **Downloads**: Test `disco syncweb download <syncweb-url>` and verify the file starts syncing.
-- [ ] **Web UI Integration**: Verify the "Syncweb" section appears in the sidebar if the service is active.
-
-## 7. Performance & Stability
+## 6. Performance & Stability
 - [ ] **Large Result Sets**: Set search limit to 1000+ in settings and scroll through the results.
 - [ ] **Broken Media**: Attempt to play a corrupted file and verify the UI handles it gracefully (toast message or error state).
 - [ ] **Responsive Design**: Resize the browser window to mobile width and verify the sidebar/grid adapts.
