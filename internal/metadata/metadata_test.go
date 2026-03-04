@@ -105,7 +105,8 @@ echo '{
 	os.Setenv("PATH", tmpDir+string(os.PathListSeparator)+oldPath)
 	defer os.Setenv("PATH", oldPath)
 
-	f, _ := os.CreateTemp("", "mock-video.mp4")
+	f, _ := os.CreateTemp("", "mock-video-*.mp4")
+	f.Write([]byte{0x00, 0x00, 0x00, 0x18, 'f', 't', 'y', 'p', 'm', 'p', '4', '2'}) // Basic mp4 header to avoid text detection
 	defer os.Remove(f.Name())
 
 	meta, err := Extract(context.Background(), f.Name(), false)

@@ -36,10 +36,14 @@ type MediaMetadata struct {
 type Stream struct {
 	CodecType    string            `json:"codec_type"`
 	CodecName    string            `json:"codec_name"`
+	Profile      string            `json:"profile"`
+	PixFmt       string            `json:"pix_fmt"`
 	Width        int               `json:"width"`
 	Height       int               `json:"height"`
 	AvgFrameRate string            `json:"avg_frame_rate"`
 	RFrameRate   string            `json:"r_frame_rate"`
+	SampleRate   string            `json:"sample_rate"`
+	Channels     int               `json:"channels"`
 	Duration     string            `json:"duration"`
 	Tags         map[string]string `json:"tags"`
 	Disposition  map[string]int    `json:"disposition"`
@@ -102,22 +106,52 @@ func Extract(ctx context.Context, path string, scanSubtitles bool) (*MediaMetada
 				params.Description = utils.ToNullString(extractAapt(string(output), `package: name='([^']*)' versionCode='([^']*)' versionName='([^']*)' platformBuildVersionName='([^']*)'`))
 			}
 		}
+		result.Media = params
+		return result, nil
+	}
+
+	if mediaType == "text" {
+		if params.Duration.Int64 == 0 {
+			// Basic duration estimate for text
+			d := int64(float64(stat.Size())/4.2/220*60) + 10
+			params.Duration = utils.ToNullInt64(d)
+		}
+		result.Media = params
+		return result, nil
 	}
 
 	var duration int64
 	cmd := exec.CommandContext(ctx, "ffprobe",
+		"-v", "error",
 		"-hide_banner",
 		"-show_format",
 		"-show_streams",
 		"-show_chapters",
 		"-of", "json",
+		"-analyze_duration", "100000", // 0.1s
+		"-probesize", "500000",       // 500KB
 		path,
 	)
 
 	var vCodecs, aCodecs, sCodecs []string
 	var vCount, aCount, sCount int64
 
-	if output, err := cmd.Output(); err == nil {
+	output, err := cmd.Output()
+	if err != nil {
+		// Fallback without optimizations for corrupted or unusual files
+		cmdFallback := exec.CommandContext(ctx, "ffprobe",
+			"-v", "error",
+			"-hide_banner",
+			"-show_format",
+			"-show_streams",
+			"-show_chapters",
+			"-of", "json",
+			path,
+		)
+		output, _ = cmdFallback.Output()
+	}
+
+	if len(output) > 0 {
 		var data FFProbeOutput
 		if err := json.Unmarshal(output, &data); err == nil {
 			// Format info
@@ -180,7 +214,15 @@ func Extract(ctx context.Context, path string, scanSubtitles bool) (*MediaMetada
 						continue
 					}
 					vCount++
-					vCodecs = append(vCodecs, s.CodecName)
+					codecInfo := s.CodecName
+					if s.Profile != "" && s.Profile != "unknown" {
+						codecInfo += " (" + s.Profile + ")"
+					}
+					if s.PixFmt != "" {
+						codecInfo += " [" + s.PixFmt + "]"
+					}
+					vCodecs = append(vCodecs, codecInfo)
+
 					if params.Width.Int64 == 0 {
 						params.Width = utils.ToNullInt64(int64(s.Width))
 						params.Height = utils.ToNullInt64(int64(s.Height))
@@ -188,10 +230,38 @@ func Extract(ctx context.Context, path string, scanSubtitles bool) (*MediaMetada
 					}
 				case "audio":
 					aCount++
-					aCodecs = append(aCodecs, s.CodecName)
+					codecInfo := s.CodecName
+					if s.Channels > 0 {
+						codecInfo += " " + strconv.Itoa(s.Channels) + "ch"
+					}
+					if s.SampleRate != "" {
+						codecInfo += " " + s.SampleRate + "Hz"
+					}
+					var details []string
+					if lang := s.Tags["language"]; lang != "" {
+						details = append(details, lang)
+					}
+					if title := s.Tags["title"]; title != "" {
+						details = append(details, title)
+					}
+					if len(details) > 0 {
+						codecInfo += " (" + strings.Join(details, ", ") + ")"
+					}
+					aCodecs = append(aCodecs, codecInfo)
 				case "subtitle":
 					sCount++
-					sCodecs = append(sCodecs, s.CodecName)
+					codecInfo := s.CodecName
+					var details []string
+					if lang := s.Tags["language"]; lang != "" {
+						details = append(details, lang)
+					}
+					if title := s.Tags["title"]; title != "" {
+						details = append(details, title)
+					}
+					if len(details) > 0 {
+						codecInfo += " (" + strings.Join(details, ", ") + ")"
+					}
+					sCodecs = append(sCodecs, codecInfo)
 				}
 			}
 
@@ -209,7 +279,12 @@ func Extract(ctx context.Context, path string, scanSubtitles bool) (*MediaMetada
 				})
 			}
 		}
+	} else {
+		// If ffprobe fails, it might be a corrupted file or non-media file
+		// We already have some basic info from os.Stat and mimetype
+		// We could potentially try a more aggressive probe or just log it
 	}
+
 
 	params.VideoCodecs = utils.ToNullString(utils.Combine(vCodecs))
 	params.AudioCodecs = utils.ToNullString(utils.Combine(aCodecs))
@@ -250,12 +325,6 @@ func Extract(ctx context.Context, path string, scanSubtitles bool) (*MediaMetada
 		}
 	}
 	params.Type = utils.ToNullString(mediaType)
-
-	if mediaType == "text" && params.Duration.Int64 == 0 {
-		// Basic duration estimate for text
-		d := int64(float64(stat.Size())/4.2/220*60) + 10
-		params.Duration = utils.ToNullInt64(d)
-	}
 
 	result.Media = params
 	return result, nil
