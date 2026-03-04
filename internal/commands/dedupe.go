@@ -14,6 +14,7 @@ import (
 	"github.com/alecthomas/kong"
 	"github.com/chapmanjacobd/discotheque/internal/db"
 	"github.com/chapmanjacobd/discotheque/internal/models"
+	"github.com/chapmanjacobd/discotheque/internal/shellquote"
 	"github.com/chapmanjacobd/discotheque/internal/utils"
 )
 
@@ -132,8 +133,8 @@ func (c *DedupeCmd) Run(ctx *kong.Context) error {
 	slog.Info("Deleting duplicates...")
 	for _, d := range finalCandidates {
 		if c.DedupeCmd != "" {
-			quotedDup := utils.ShellQuote(d.DuplicatePath)
-			quotedKeep := utils.ShellQuote(d.KeepPath)
+			quotedDup := shellquote.ShellQuote(d.DuplicatePath)
+			quotedKeep := shellquote.ShellQuote(d.KeepPath)
 			cmdStr := strings.ReplaceAll(c.DedupeCmd, "{}", quotedDup)
 			// rmlint style is cmd duplicate keep
 			exec.Command("bash", "-c", cmdStr+" "+quotedDup+" "+quotedKeep).Run()

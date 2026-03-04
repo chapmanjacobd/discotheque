@@ -11,14 +11,12 @@ import (
 )
 
 func TestSyncwebCLI_Structure(t *testing.T) {
-	cli := &CLI{}
-	syncwebCmd := &commands.SyncwebCmd{}
+	cli := &commands.SyncwebCmd{}
 
 	_, err := kong.New(cli,
 		kong.Name("syncweb"),
 		kong.Description("Syncweb: an offline-first distributed web"),
 		kong.UsageOnError(),
-		kong.Bind(syncwebCmd),
 	)
 	if err != nil {
 		t.Fatalf("Failed to create kong parser: %v", err)
@@ -26,14 +24,12 @@ func TestSyncwebCLI_Structure(t *testing.T) {
 }
 
 func TestSyncwebCLI_Subcommands(t *testing.T) {
-	cli := &CLI{}
-	syncwebCmd := &commands.SyncwebCmd{}
+	cli := &commands.SyncwebCmd{}
 
 	parser, err := kong.New(cli,
 		kong.Name("syncweb"),
 		kong.Description("Syncweb: an offline-first distributed web"),
 		kong.UsageOnError(),
-		kong.Bind(syncwebCmd),
 	)
 	if err != nil {
 		t.Fatalf("Failed to create kong parser: %v", err)

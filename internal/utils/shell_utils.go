@@ -8,33 +8,13 @@ import (
 	"strings"
 
 	"github.com/chapmanjacobd/discotheque/internal/models"
+	"github.com/chapmanjacobd/discotheque/internal/shellquote"
 )
-
-// ShellQuote returns a shell-escaped version of the string
-func ShellQuote(s string) string {
-	if s == "" {
-		return "''"
-	}
-	// If it doesn't contain any special characters, return it as is
-	safeChars := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_./"
-	allSafe := true
-	for _, r := range s {
-		if !strings.ContainsRune(safeChars, r) {
-			allSafe = false
-			break
-		}
-	}
-	if allSafe {
-		return s
-	}
-
-	return "'" + strings.ReplaceAll(s, "'", "'\\''") + "'"
-}
 
 // RenameMoveFile moves a file from src to dst, creating parent directories if needed
 func RenameMoveFile(flags models.GlobalFlags, src, dst string) error {
 	if flags.Simulate {
-		fmt.Printf("mv %s %s\n", src, dst)
+		fmt.Printf("mv %s %s\n", shellquote.ShellQuote(src), shellquote.ShellQuote(dst))
 		return nil
 	}
 
@@ -81,7 +61,7 @@ func Trash(flags models.GlobalFlags, path string) error {
 	}
 
 	if flags.Simulate {
-		fmt.Printf("trash %s\n", path)
+		fmt.Printf("trash %s\n", shellquote.ShellQuote(path))
 		return nil
 	}
 

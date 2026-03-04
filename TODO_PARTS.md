@@ -1,9 +1,5 @@
 # Discotheque TODO List by Component
 
-## `cmd/` (Entry Points)
-- [ ] `cmd/disco/main.go`: Improve error handling and logging configuration
-- [ ] `cmd/syncweb/`: Ensure consistency between standalone `syncweb` and the one integrated into `disco`.
-
 ## `internal/metadata/` (Media Extraction)
 - [ ] Enhance metadata extraction to include more detailed media information (e.g., codec details, subtitle tracks).
 - [ ] Improve handling of corrupted or unusual media files.

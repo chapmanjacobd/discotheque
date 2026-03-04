@@ -10,11 +10,13 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/chapmanjacobd/discotheque/internal/models"
 	"github.com/chapmanjacobd/discotheque/internal/syncweb"
 	"github.com/chapmanjacobd/discotheque/internal/utils"
+	"github.com/sevlyar/go-daemon"
 	"github.com/syncthing/syncthing/lib/config"
 	"github.com/syncthing/syncthing/lib/protocol"
 )
@@ -35,8 +37,9 @@ type SyncwebCmd struct {
 	Sort      SyncwebSortCmd      `cmd:"" help:"Sort Syncthing files by multiple criteria"`
 	Download  SyncwebDownloadCmd  `cmd:"" help:"Mark file paths for download/sync" aliases:"dl,upload,unignore,sync"`
 	Automatic SyncwebAutomaticCmd `cmd:"" help:"Start syncweb-automatic daemon"`
-	Start     SyncwebStartCmd     `cmd:"" help:"Start Syncweb" aliases:"restart"`
-	Stop      SyncwebStopCmd      `cmd:"" help:"Shut down Syncweb" aliases:"shutdown,quit"`
+	Serve     SyncwebServeCmd     `cmd:"" help:"Run Syncweb in foreground"`
+	Start     SyncwebStartCmd     `cmd:"" help:"Start Syncweb daemon" aliases:"restart"`
+	Stop      SyncwebStopCmd      `cmd:"" help:"Stop Syncweb daemon" aliases:"shutdown,quit"`
 	Version   SyncwebVersionCmd   `cmd:"" help:"Show Syncweb version"`
 }
 
@@ -698,17 +701,78 @@ func (c *SyncwebAutomaticCmd) Run(g *SyncwebCmd) error {
 	})
 }
 
+type SyncwebServeCmd struct{}
+
+func (c *SyncwebServeCmd) Run(g *SyncwebCmd) error {
+	models.SetupLogging(g.Verbose)
+	return g.WithSyncweb(func(s *syncweb.Syncweb) error {
+		slog.Info("Syncweb serving in foreground", "myID", s.Node.MyID())
+		return s.Node.Serve()
+	})
+}
+
 type SyncwebStartCmd struct{}
 
 func (c *SyncwebStartCmd) Run(g *SyncwebCmd) error {
-	slog.Info("Syncweb starts automatically when used via CLI or Serve")
+	models.SetupLogging(g.Verbose)
+	home := g.SyncwebHome
+	if home == "" {
+		home = filepath.Join(os.Getenv("HOME"), ".config", "syncweb")
+	}
+
+	cntxt := &daemon.Context{
+		PidFileName: filepath.Join(home, "syncweb.pid"),
+		PidFilePerm: 0o644,
+		LogFileName: filepath.Join(home, "syncweb.log"),
+		LogFilePerm: 0o640,
+		WorkDir:     home,
+		Umask:       0o27,
+		Args:        []string{"syncweb", "serve", "--home", home},
+	}
+
+	d, err := cntxt.Reborn()
+	if err != nil {
+		return fmt.Errorf("unable to run: %w", err)
+	}
+	if d != nil {
+		slog.Info("Syncweb daemon started", "pid", d.Pid)
+		return nil
+	}
+	defer cntxt.Release()
+
+	slog.Info("Syncweb daemon process starting")
+	// The child process continues from here
 	return nil
 }
 
 type SyncwebStopCmd struct{}
 
 func (c *SyncwebStopCmd) Run(g *SyncwebCmd) error {
-	slog.Info("Syncweb stops automatically when CLI or Serve exits")
+	models.SetupLogging(g.Verbose)
+	home := g.SyncwebHome
+	if home == "" {
+		home = filepath.Join(os.Getenv("HOME"), ".config", "syncweb")
+	}
+
+	pidFile := filepath.Join(home, "syncweb.pid")
+	if _, err := os.Stat(pidFile); os.IsNotExist(err) {
+		return fmt.Errorf("syncweb daemon is not running (PID file not found)")
+	}
+
+	cntxt := &daemon.Context{
+		PidFileName: pidFile,
+	}
+
+	d, err := cntxt.Search()
+	if err != nil {
+		return fmt.Errorf("unable to find daemon process: %w", err)
+	}
+
+	if err := d.Signal(syscall.SIGTERM); err != nil {
+		return fmt.Errorf("unable to send signal to daemon: %w", err)
+	}
+
+	slog.Info("Syncweb daemon stop signal sent")
 	return nil
 }
 

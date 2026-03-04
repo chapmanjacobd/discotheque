@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/chapmanjacobd/discotheque/internal/models"
 	"github.com/chapmanjacobd/discotheque/internal/syncweb"
 	"github.com/chapmanjacobd/discotheque/internal/utils"
 )

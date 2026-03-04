@@ -12,6 +12,7 @@ import (
 	"github.com/chapmanjacobd/discotheque/internal/db"
 	"github.com/chapmanjacobd/discotheque/internal/history"
 	"github.com/chapmanjacobd/discotheque/internal/models"
+	"github.com/chapmanjacobd/discotheque/internal/shellquote"
 	"github.com/chapmanjacobd/discotheque/internal/utils"
 )
 
@@ -135,7 +136,7 @@ func RunExitCommand(flags models.GlobalFlags, exitCode int, path string) error {
 	}
 
 	// Replace {} with path
-	cmdStr = strings.ReplaceAll(cmdStr, "{}", utils.ShellQuote(path))
+	cmdStr = strings.ReplaceAll(cmdStr, "{}", shellquote.ShellQuote(path))
 
 	slog.Info("Running exit command", "code", exitCode, "command", cmdStr)
 	cmd := exec.Command("bash", "-c", cmdStr)

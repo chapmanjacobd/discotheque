@@ -4294,6 +4294,18 @@ Flags:
 
 </details>
 
+### explode
+
+Create symlinks for all subcommands (busybox-style)
+
+<details><summary>All Options</summary>
+
+```bash
+$ disco explode --help
+```
+
+</details>
+
 ### syncweb
 
 Syncweb: an offline-first distributed web

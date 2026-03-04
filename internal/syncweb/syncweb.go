@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/syncthing/syncthing/lib/config"
+	"github.com/syncthing/syncthing/lib/events"
 	stmodel "github.com/syncthing/syncthing/lib/model"
 	"github.com/syncthing/syncthing/lib/protocol"
 )
@@ -114,8 +115,14 @@ func (s *Syncweb) watchEvents() {
 		case ev := <-sub.C():
 			switch ev.Type {
 			case events.DeviceRejected:
-				data := ev.Data.(map[string]interface{})
-				if deviceIDStr, ok := data["device"].(string); ok {
+				var deviceIDStr string
+				if m, ok := ev.Data.(map[string]any); ok {
+					deviceIDStr, _ = m["device"].(string)
+				} else if m, ok := ev.Data.(map[string]string); ok {
+					deviceIDStr = m["device"]
+				}
+
+				if deviceIDStr != "" {
 					if id, err := protocol.DeviceIDFromString(deviceIDStr); err == nil {
 						s.pendingDevices.Store(id, ev.Time)
 						slog.Info("Device rejected (pending)", "id", id)
@@ -126,8 +133,14 @@ func (s *Syncweb) watchEvents() {
 				// Ideally we would fetch the list here, but since we can't get it from Internals,
 				// we rely on DeviceRejected events for now or try to use Discovery
 			case events.DeviceConnected:
-				data := ev.Data.(map[string]interface{})
-				if deviceIDStr, ok := data["id"].(string); ok {
+				var deviceIDStr string
+				if m, ok := ev.Data.(map[string]any); ok {
+					deviceIDStr, _ = m["id"].(string)
+				} else if m, ok := ev.Data.(map[string]string); ok {
+					deviceIDStr = m["id"]
+				}
+
+				if deviceIDStr != "" {
 					if id, err := protocol.DeviceIDFromString(deviceIDStr); err == nil {
 						s.pendingDevices.Delete(id)
 					}
@@ -141,7 +154,7 @@ func (s *Syncweb) watchEvents() {
 
 func (s *Syncweb) GetPendingDevices() map[string]time.Time {
 	res := make(map[string]time.Time)
-	s.pendingDevices.Range(func(key, value interface{}) bool {
+	s.pendingDevices.Range(func(key, value any) bool {
 		res[key.(protocol.DeviceID).String()] = value.(time.Time)
 		return true
 	})

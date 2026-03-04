@@ -54,7 +54,7 @@ func migrateColumns(db *sql.DB) error {
 				rows.Close()
 				return err
 			}
-			if strings.ToLower(name) == strings.ToLower(c.column) {
+			if strings.EqualFold(name, c.column) {
 				exists = true
 				break
 			}

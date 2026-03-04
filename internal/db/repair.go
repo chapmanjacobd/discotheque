@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/chapmanjacobd/discotheque/internal/shellquote"
 	_ "github.com/mattn/go-sqlite3"
 )
 
@@ -90,8 +91,8 @@ func Repair(dbPath string) error {
 	slog.Info("Attempting recovery...", "from", corruptMain, "to", dbPath)
 
 	// Attempt .recover
-	quotedCorrupt := utils.ShellQuote(corruptMain)
-	quotedDB := utils.ShellQuote(dbPath)
+	quotedCorrupt := shellquote.ShellQuote(corruptMain)
+	quotedDB := shellquote.ShellQuote(dbPath)
 	cmdRecover := exec.Command("bash", "-c", fmt.Sprintf("sqlite3 %s \".recover\" | sqlite3 %s", quotedCorrupt, quotedDB))
 	out, err := cmdRecover.CombinedOutput()
 

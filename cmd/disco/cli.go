@@ -43,6 +43,7 @@ type CLI struct {
 	Pause          commands.PauseCmd          `cmd:"" help:"Toggle mpv pause state" aliases:"play"`
 	Seek           commands.SeekCmd           `cmd:"" help:"Seek mpv playback" aliases:"ffwd,rewind"`
 	MergeDBs       commands.MergeDBsCmd       `cmd:"" name:"merge-dbs" help:"Merge multiple SQLite databases" aliases:"mergedbs"`
+	Explode        commands.ExplodeCmd        `cmd:"" help:"Create symlinks for all subcommands (busybox-style)"`
 
 	SyncwebCLI
 

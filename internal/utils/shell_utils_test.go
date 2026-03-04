@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/chapmanjacobd/discotheque/internal/shellquote"
 )
 
 func TestShellQuote(t *testing.T) {
@@ -20,7 +22,7 @@ func TestShellQuote(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		got := ShellQuote(tt.input)
+		got := shellquote.ShellQuote(tt.input)
 		if got != tt.expected {
 			t.Errorf("ShellQuote(%q) = %q, want %q", tt.input, got, tt.expected)
 		}
