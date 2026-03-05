@@ -21,9 +21,9 @@ describe('Routing', () => {
         window.disco.state.filters.categories = ['Movies'];
         window.disco.state.filters.ratings = [5];
         document.getElementById('search-input').value = 'TEDxTalk';
-        
+
         await window.disco.performSearch(); // This calls syncUrl
-        
+
         const hash = window.location.hash;
         expect(hash).toContain('category=Movies');
         expect(hash).toContain('rating=5');

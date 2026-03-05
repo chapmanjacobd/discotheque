@@ -5514,12 +5514,17 @@ document.addEventListener('DOMContentLoaded', () => {
     if (sidebarOverlay) sidebarOverlay.onclick = closeMobileSidebar;
 
     // Close sidebar when clicking on a category, genre, rating or playlist on mobile
-    sidebar.addEventListener('click', (e) => {
+    // Also close on media selection to show the player/content
+    document.addEventListener('click', (e) => {
         const target = e.target;
-        if (target.closest('.category-btn') || target.closest('.playlist-name') || target.closest('#trash-btn') || target.closest('#history-btn')) {
-            if (window.innerWidth <= 768) {
-                closeMobileSidebar();
-            }
+        const isClickable = target.closest('.category-btn') || 
+                           target.closest('.playlist-name') || 
+                           target.closest('#trash-btn') || 
+                           target.closest('#history-btn') || 
+                           target.closest('.media-card');
+                           
+        if (isClickable && window.innerWidth <= 768) {
+            closeMobileSidebar();
         }
     });
 
