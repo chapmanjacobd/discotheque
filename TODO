@@ -1,6 +1,3 @@
-Media Type constraint + Episodic constraint
-
-gifs and other files that fail transcode should try to be streamed as-is before failing AKA try Direct if HLS fails before saying Unplayable
 
 > already covered by existing scan root
 for same path as root (should be allowed)

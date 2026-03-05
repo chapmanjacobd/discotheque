@@ -590,12 +590,12 @@ document.addEventListener('DOMContentLoaded', () => {
             btn.onclick = () => {
                 const type = btn.dataset.type;
                 if (state.filters.types.includes(type)) {
-                    state.filters.types = state.filters.types.filter(t => t !== type);
+                    state.filters.types = [];
                 } else {
-                    state.filters.types.push(type);
+                    state.filters.types = [type];
                 }
                 localStorage.setItem('disco-types', JSON.stringify(state.filters.types));
-                btn.classList.toggle('active');
+                updateNavActiveStates();
                 performSearch();
             };
         });
@@ -2674,9 +2674,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     body: JSON.stringify({ path: item.path })
                 });
                 if (!resp.ok) throw new Error('Action failed');
-                showToast('Marked as seen', '✅');
+                showToast('Marked as played', '✅');
             } catch (err) {
-                console.error('Failed to mark as seen:', err);
+                console.error('Failed to mark as played:', err);
                 showToast('Action failed');
                 return;
             }
@@ -3735,7 +3735,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     ${!state.readOnly ? `<button class="media-action-btn add-playlist" title="Add to Playlist">+</button>` : ''}
                     ${plays > 0 ?
                         `<button class="media-action-btn mark-unplayed" title="Mark as Unplayed">⭕</button>` :
-                        `<button class="media-action-btn mark-played" title="Mark as Seen">✅</button>`
+                        `<button class="media-action-btn mark-played" title="Mark as Played">✅</button>`
                     }
                     ${!state.readOnly ? `<button class="media-action-btn delete" title="Move to Trash">🗑️</button>` : ''}
                 `;
@@ -4047,7 +4047,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div class="playlist-item-actions">
                         ${!state.readOnly ? `<button class="table-action-btn add-btn" title="Add to Playlist">+</button>` : ''}
                         ${plays > 0 ?
-                        `<button class="table-action-btn mark-unplayed-btn" title="Mark as Unplayed">⭕</button>` :
+                        `<button class="table-action-btn mark-unplayed-btn" title="Unmark as Played">⭕</button>` :
                         `<button class="table-action-btn mark-played-btn" title="Mark as Played">✅</button>`
                     }
                         ${!state.readOnly ? `<button class="table-action-btn delete-btn" title="Move to Trash">🗑️</button>` : ''}
@@ -4246,15 +4246,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 const cat = btn.dataset.cat;
                 if (state.page !== 'trash') state.page = 'search';
 
-                const idx = state.filters.categories.indexOf(cat);
-                if (idx !== -1) {
-                    state.filters.categories.splice(idx, 1);
+                if (state.filters.categories.includes(cat)) {
+                    state.filters.categories = [];
                 } else {
-                    state.filters.categories.push(cat);
+                    state.filters.categories = [cat];
                 }
 
                 localStorage.setItem('disco-filter-categories', JSON.stringify(state.filters.categories));
-                btn.classList.toggle('active');
                 state.currentPage = 1;
                 updateNavActiveStates();
                 performSearch();
@@ -5385,7 +5383,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Initial load
     readUrl(true);
     fetchDatabases();
-    
+
     fetchCategories();
     fetchGenres();
     fetchRatings();
