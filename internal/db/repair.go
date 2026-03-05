@@ -90,25 +90,27 @@ func Repair(dbPath string) error {
 	// 5. Recover
 	slog.Info("Attempting recovery...", "from", corruptMain, "to", dbPath)
 
-	// Attempt .recover
 	quotedCorrupt := shellquote.ShellQuote(corruptMain)
 	quotedDB := shellquote.ShellQuote(dbPath)
-	cmdRecover := exec.Command("bash", "-c", fmt.Sprintf("sqlite3 %s \".recover\" | sqlite3 %s", quotedCorrupt, quotedDB))
-	out, err := cmdRecover.CombinedOutput()
 
+	// Fallback to .dump first as it preserves schema better if it works
 	repairStepSuccess := false
+	slog.Info("Trying recovery via .dump...")
+	cmdDump := exec.Command("bash", "-c", fmt.Sprintf("sqlite3 %s \".dump\" | sqlite3 %s", quotedCorrupt, quotedDB))
+	out, err := cmdDump.CombinedOutput()
 	if err == nil {
-		slog.Info("Initial recovery step successful via .recover")
+		slog.Info("Initial recovery step successful via .dump")
 		repairStepSuccess = true
 	} else {
-		slog.Warn(".recover failed", "error", err, "output", string(out))
+		slog.Warn(".dump failed, falling back to .recover", "error", err)
 		os.Remove(dbPath)
 
-		// Fallback to .dump
-		cmdDump := exec.Command("bash", "-c", fmt.Sprintf("sqlite3 %s \".dump\" | sqlite3 %s", quotedCorrupt, quotedDB))
-		out, err = cmdDump.CombinedOutput()
+		// Fallback to .recover
+		// We use .quit to ensure it doesn't hang if it somehow enters interactive mode
+		cmdRecover := exec.Command("bash", "-c", fmt.Sprintf("sqlite3 %s \".recover\" \".quit\" | sqlite3 %s", quotedCorrupt, quotedDB))
+		out, err = cmdRecover.CombinedOutput()
 		if err == nil {
-			slog.Info("Initial recovery step successful via .dump")
+			slog.Info("Initial recovery step successful via .recover")
 			repairStepSuccess = true
 		} else {
 			slog.Error("Recovery failed completely", "error", err, "output", string(out))
