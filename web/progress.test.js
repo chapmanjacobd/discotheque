@@ -214,45 +214,77 @@ describe('Progress Resuming', () => {
         expect(count).toBe(6); // 5 server + 1 local
     });
 
-    it('sorts zero progress items last', () => {
-        const media = [
-            { path: 'a.mp4', duration: 100, playhead: 50 }, // 0.5
-            { path: 'b.mp4', duration: 100, playhead: 0 },  // 0
-            { path: 'c.mp4', duration: 100, playhead: 80 }, // 0.8
-            { path: 'd.mp4', duration: 100, playhead: 10 }  // 0.1
-        ];
+    it('syncs to server if isComplete is true even if sessionTime < 90s', async () => {
+        const item = {
+            path: 'video1.mp4',
+            type: 'video/mp4',
+            duration: 600
+        };
 
-        window.disco.state.filters.sort = 'progress';
-        window.disco.state.filters.reverse = false; // Descending (default)
+        // Mock startTime to be just now
+        window.disco.state.playback.startTime = Date.now();
+        window.disco.state.playback.lastUpdate = 0;
 
-        // Simulate the sorting logic inside performSearch (simplified)
-        media.sort((a, b) => {
-            const progA = (a.duration && a.playhead) ? a.playhead / a.duration : 0;
-            const progB = (b.duration && b.playhead) ? b.playhead / b.duration : 0;
-            if (progA === 0 && progB === 0) return 0;
-            if (progA === 0) return 1;
-            if (progB === 0) return -1;
-            return progB - progA;
-        });
+        global.fetch.mockClear();
+        await window.disco.updateProgress(item, 600, 600, true);
 
-        expect(media[0].path).toBe('c.mp4'); // 0.8
-        expect(media[1].path).toBe('a.mp4'); // 0.5
-        expect(media[2].path).toBe('d.mp4'); // 0.1
-        expect(media[3].path).toBe('b.mp4'); // 0
+        expect(global.fetch).toHaveBeenCalledWith(
+            '/api/progress',
+            expect.objectContaining({
+                method: 'POST',
+                body: expect.stringContaining('"completed":true')
+            })
+        );
+    });
 
-        // Test reverse
-        media.sort((a, b) => {
-            const progA = (a.duration && a.playhead) ? a.playhead / a.duration : 0;
-            const progB = (b.duration && b.playhead) ? b.playhead / b.duration : 0;
-            if (progA === 0 && progB === 0) return 0;
-            if (progA === 0) return 1;
-            if (progB === 0) return -1;
-            return progA - progB; // Ascending
-        });
+    it('throttles local storage updates to once per second', async () => {
+        const item = { path: 'video1.mp4', type: 'video/mp4' };
+        localStorage.clear();
+        
+        // Use fake timers to control time
+        vi.useFakeTimers();
+        
+        await window.disco.updateProgress(item, 10, 100);
+        let progress = JSON.parse(localStorage.getItem('disco-progress'));
+        expect(progress['video1.mp4'].pos).toBe(10);
+        
+        // Call again immediately with new pos
+        await window.disco.updateProgress(item, 11, 100);
+        progress = JSON.parse(localStorage.getItem('disco-progress'));
+        expect(progress['video1.mp4'].pos).toBe(10); // Should still be 10 due to throttle
+        
+        // Advance time by 1.1s
+        vi.advanceTimersByTime(1100);
+        
+        await window.disco.updateProgress(item, 12, 100);
+        progress = JSON.parse(localStorage.getItem('disco-progress'));
+        expect(progress['video1.mp4'].pos).toBe(12); // Should now be updated to 12
+        
+        vi.useRealTimers();
+    });
 
-        expect(media[0].path).toBe('d.mp4'); // 0.1
-        expect(media[1].path).toBe('a.mp4'); // 0.5
-        expect(media[2].path).toBe('c.mp4'); // 0.8
-        expect(media[3].path).toBe('b.mp4'); // 0 (still last!)
+    it('syncs to server at 30s intervals after initial 90s', async () => {
+        const item = { path: 'video1.mp4', type: 'video/mp4', duration: 1000 };
+        
+        // Mock startTime to be 100s ago
+        window.disco.state.playback.startTime = Date.now() - 100000;
+        window.disco.state.playback.lastUpdate = Date.now();
+        
+        global.fetch.mockClear();
+        
+        // Advance 20s (less than 30s interval)
+        vi.useFakeTimers();
+        vi.advanceTimersByTime(20000);
+        
+        await window.disco.updateProgress(item, 120, 1000);
+        expect(global.fetch).not.toHaveBeenCalled();
+        
+        // Advance another 15s (total 35s)
+        vi.advanceTimersByTime(15000);
+        
+        await window.disco.updateProgress(item, 135, 1000);
+        expect(global.fetch).toHaveBeenCalled();
+        
+        vi.useRealTimers();
     });
 });

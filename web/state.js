@@ -77,6 +77,7 @@ export const state = {
         lastSkipTime: 0,
         hlsInstance: null,
         toastTimer: null,
-        muted: localStorage.getItem('disco-muted') === 'true'
+        muted: localStorage.getItem('disco-muted') === 'true',
+        consecutiveErrors: 0
     }
 };

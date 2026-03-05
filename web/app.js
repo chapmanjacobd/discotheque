@@ -782,6 +782,7 @@ document.addEventListener('DOMContentLoaded', () => {
             state.filters.categories = params.getAll('category');
             state.filters.genre = params.get('genre') || '';
             state.filters.ratings = params.getAll('rating');
+            state.filters.search = params.get('search') || '';
             state.filters.all = params.get('all') === 'true';
             state.filters.min_score = params.get('min_score') || '';
 
@@ -2440,6 +2441,10 @@ document.addEventListener('DOMContentLoaded', () => {
     async function updateProgress(item, playhead, duration, isComplete = false) {
         if (state.playback.isSurfing) return state.playback.pendingUpdate;
 
+        if (playhead > 1) {
+            state.playback.consecutiveErrors = 0;
+        }
+
         const media = pipViewer.querySelector('video, audio');
         if (!isComplete && media && (media.seeking || media.readyState < 3)) {
             return state.playback.pendingUpdate;
@@ -2874,8 +2879,10 @@ document.addEventListener('DOMContentLoaded', () => {
             renderResults();
         }
 
-        // Auto-skip to next
-        if (state.autoplay) {
+        // Auto-skip to next (up to 3 consecutive errors)
+        state.playback.consecutiveErrors = (state.playback.consecutiveErrors || 0) + 1;
+
+        if (state.autoplay && state.playback.consecutiveErrors <= 3) {
             if (state.playback.skipTimeout) {
                 clearTimeout(state.playback.skipTimeout);
             }
@@ -2886,6 +2893,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }, 1200);
         } else {
+            if (state.playback.consecutiveErrors > 3) {
+                showToast('Stopped auto-skip after 3 errors', '🛑');
+                state.playback.consecutiveErrors = 0;
+            }
             closePiP();
         }
     }
@@ -5551,6 +5562,8 @@ document.addEventListener('DOMContentLoaded', () => {
         getPlayCount,
         markMediaPlayed,
         updateNavActiveStates,
+        readUrl,
+        syncUrl,
         showToast,
         state
     };
