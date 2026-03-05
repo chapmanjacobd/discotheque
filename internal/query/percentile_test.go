@@ -27,7 +27,8 @@ func TestResolvePercentileFlags(t *testing.T) {
 		path TEXT PRIMARY KEY,
 		size INTEGER,
 		duration INTEGER,
-		time_deleted INTEGER DEFAULT 0
+		time_deleted INTEGER DEFAULT 0,
+		categories TEXT
 	);
 	CREATE TABLE history (id INTEGER PRIMARY KEY AUTOINCREMENT, media_path TEXT NOT NULL, time_played INTEGER, playhead INTEGER, done INTEGER);
 	CREATE TABLE captions (media_path TEXT NOT NULL, time REAL, text TEXT);
@@ -36,8 +37,8 @@ func TestResolvePercentileFlags(t *testing.T) {
 
 	// Insert 100 items with increasing size and duration
 	for i := 1; i <= 100; i++ {
-		dbConn.Exec("INSERT INTO media (path, size, duration) VALUES (?, ?, ?)",
-			fmt.Sprintf("/dir%d/file%d.mp4", (i-1)/10, i), i*1000, i*10)
+		dbConn.Exec("INSERT INTO media (path, size, duration, categories) VALUES (?, ?, ?, ?)",
+			fmt.Sprintf("/dir%d/file%d.mp4", (i-1)/10, i), i*1000, i*10, fmt.Sprintf(";dir%d;", (i-1)/10))
 	}
 
 	ctx := context.Background()

@@ -116,7 +116,7 @@ func (c *AddCmd) Run(ctx *kong.Context) error {
 		// Check if this path or a parent is already a playlist
 		isSubpath := false
 		for _, pl := range existingPlaylists {
-			if pl.Path.Valid && (absRoot == pl.Path.String || strings.HasPrefix(absRoot, pl.Path.String+string(filepath.Separator))) {
+			if pl.Path.Valid && (strings.HasPrefix(absRoot, pl.Path.String+string(filepath.Separator))) {
 				slog.Info("Path already covered by existing scan root", "path", absRoot, "root", pl.Path.String)
 				isSubpath = true
 				break

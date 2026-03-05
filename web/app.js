@@ -359,8 +359,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 const resp = await fetchAPI(`/api/random-clip?${params.toString()}`);
                 if (!resp.ok) {
-                    if (resp.status === 404) {
-                        showToast(`No more ${type || 'media'} found to surf.`, 'ℹ️');
+                    if (resp.status === 403) {
+                        showToast('Access Denied', '🚫');
+                        return;
+                    }
+                    if (resp.status === 404) {                        showToast(`No more ${type || 'media'} found to surf.`, 'ℹ️');
                         return;
                     }
                     throw new Error('Failed to fetch random clip');
@@ -1238,7 +1241,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (err) {
             clearTimeout(skeletonTimeout);
             console.error('Playlist items fetch failed:', err);
-            showToast('Failed to load playlist');
+            showToast(err.message === 'Access Denied' ? err.message : 'Failed to load playlist');
         }
     }
 
@@ -1431,7 +1434,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (err) {
             clearTimeout(skeletonTimeout);
             console.error('DU fetch failed:', err);
-            showToast('Failed to load Disk Usage');
+            showToast(err.message === 'Access Denied' ? err.message : 'Failed to load Disk Usage');
         }
     }
 
@@ -1650,7 +1653,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (err) {
             if (err.name === 'AbortError') return;
             console.error('Episodes fetch failed:', err);
-            showToast('Failed to load Episodes');
+            showToast(err.message === 'Access Denied' ? err.message : 'Failed to load Episodes');
             resultsContainer.innerHTML = `<div class="error">Failed to load episodes.</div>`;
         }
     }
@@ -1768,7 +1771,7 @@ document.addEventListener('DOMContentLoaded', () => {
             renderCuration(data);
         } catch (err) {
             console.error('Curation fetch failed:', err);
-            showToast('Failed to load Curation Tool');
+            showToast(err.message === 'Access Denied' ? err.message : 'Failed to load Curation Tool');
             resultsContainer.innerHTML = '<div class="error">Failed to load categorization tool.</div>';
         }
     }
@@ -2301,7 +2304,7 @@ document.addEventListener('DOMContentLoaded', () => {
             fetchTrash();
         } catch (err) {
             console.error('Empty bin failed:', err);
-            showToast('Failed to empty bin');
+            showToast(err.message === 'Access Denied' ? err.message : 'Failed to empty bin');
         }
     }
 
@@ -2320,7 +2323,7 @@ document.addEventListener('DOMContentLoaded', () => {
             fetchTrash();
         } catch (err) {
             console.error('Permanent delete failed:', err);
-            showToast('Failed to delete');
+            showToast(err.message === 'Access Denied' ? err.message : 'Failed to delete');
         }
     }
 
@@ -2362,7 +2365,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } catch (err) {
             console.error('Delete/Restore failed:', err);
-            showToast('Action failed');
+            showToast(err.message === 'Access Denied' ? err.message : 'Action failed');
             if (itemEl) itemEl.classList.remove('fade-out');
         } finally {
             if (content) content.style.overflow = '';
@@ -2403,7 +2406,12 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             if (!resp.ok) {
-                if (resp.status === 404 || resp.status === 415) {
+                if (resp.status === 403) {
+                    showToast('Access Denied', '🚫');
+                    if (state.autoplay) {
+                        playSibling(1);
+                    }
+                } else if (resp.status === 404 || resp.status === 415) {
                     const basename = path.split('/').pop();
                     const msg = resp.status === 404 ? `File not found: ${basename}` : `Unplayable (Unsupported): ${basename}`;
                     const emoji = resp.status === 404 ? '🗑️' : '⚠️';
@@ -2425,7 +2433,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } catch (err) {
             console.error('Playback failed', err);
-            showToast('Playback failed');
+            showToast(err.message === 'Access Denied' ? err.message : 'Playback failed');
         }
     }
 
@@ -2677,7 +2685,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 showToast('Marked as played', '✅');
             } catch (err) {
                 console.error('Failed to mark as played:', err);
-                showToast('Action failed');
+                showToast(err.message === 'Access Denied' ? err.message : 'Action failed');
                 return;
             }
         }
@@ -2726,7 +2734,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 showToast('Marked as unplayed', '⭕');
             } catch (err) {
                 console.error('Failed to mark as unplayed:', err);
-                showToast('Action failed');
+                showToast(err.message === 'Access Denied' ? err.message : 'Action failed');
                 return;
             }
         }
@@ -4267,8 +4275,15 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         let icon = customEmoji;
+        const lowerMsg = msg.toLowerCase();
+        if (lowerMsg === 'forbidden' || lowerMsg === 'unauthorized' || lowerMsg === 'access denied' || 
+            lowerMsg.includes(': forbidden') || lowerMsg.includes(': unauthorized') || lowerMsg.includes(': access denied')) {
+            msg = 'Access Denied';
+            icon = '🚫';
+        }
+
         if (!icon) {
-            icon = msg.toLowerCase().includes('fail') || msg.toLowerCase().includes('error') ? '❌' : 'ℹ️';
+            icon = lowerMsg.includes('fail') || lowerMsg.includes('error') ? '❌' : 'ℹ️';
         }
 
         toast.innerHTML = `<span>${icon}</span> <span>${msg}</span>`;

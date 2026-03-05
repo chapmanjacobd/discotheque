@@ -10,5 +10,9 @@ export async function fetchAPI(url, options = {}) {
         ...options.headers,
         'X-Disco-Token': token
     };
-    return fetch(url, { ...options, headers });
+    const resp = await fetch(url, { ...options, headers });
+    if (resp.status === 403 || resp.status === 401) {
+        throw new Error('Access Denied');
+    }
+    return resp;
 }

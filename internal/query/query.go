@@ -466,46 +466,6 @@ func OverrideSort(s string) string {
 }
 
 // MediaQuery executes a query against multiple databases concurrently
-func GetGlobalParentCounts(ctx context.Context, dbs []string) (map[string]int64, error) {
-	counts := make(map[string]int64)
-	var mu sync.Mutex
-	var wg sync.WaitGroup
-
-	for _, dbPath := range dbs {
-		wg.Add(1)
-		go func(path string) {
-			defer wg.Done()
-			sqlDB, err := db.Connect(path)
-			if err != nil {
-				return
-			}
-			defer sqlDB.Close()
-
-			rows, err := sqlDB.QueryContext(ctx, "SELECT path FROM media WHERE COALESCE(time_deleted, 0) = 0")
-			if err != nil {
-				return
-			}
-			defer rows.Close()
-
-			localCounts := make(map[string]int64)
-			for rows.Next() {
-				var p string
-				if err := rows.Scan(&p); err == nil {
-					localCounts[filepath.Dir(p)]++
-				}
-			}
-
-			mu.Lock()
-			for k, v := range localCounts {
-				counts[k] += v
-			}
-			mu.Unlock()
-		}(dbPath)
-	}
-	wg.Wait()
-	return counts, nil
-}
-
 func MediaQuery(ctx context.Context, dbs []string, flags models.GlobalFlags) ([]models.MediaWithDB, error) {
 	origLimit := flags.Limit
 	origOffset := flags.Offset
@@ -563,10 +523,9 @@ func MediaQuery(ctx context.Context, dbs []string, flags models.GlobalFlags) ([]
 	}
 
 	if isEpisodic {
-		// 1. Get total counts for ALL non-deleted files globally
-		globalParentCounts, err := GetGlobalParentCounts(ctx, dbs)
-		if err != nil {
-			return nil, err
+		counts := make(map[string]int64)
+		for _, m := range allMedia {
+			counts[m.Parent()]++
 		}
 
 		r, err := utils.ParseRange(flags.FileCounts, func(s string) (int64, error) {
@@ -576,8 +535,7 @@ func MediaQuery(ctx context.Context, dbs []string, flags models.GlobalFlags) ([]
 		if err == nil {
 			var filtered []models.MediaWithDB
 			for _, m := range allMedia {
-				count := globalParentCounts[m.Parent()]
-				if r.Matches(count) {
+				if r.Matches(counts[m.Parent()]) {
 					filtered = append(filtered, m)
 				}
 			}
@@ -612,34 +570,24 @@ func MediaQuery(ctx context.Context, dbs []string, flags models.GlobalFlags) ([]
 
 func ResolvePercentileFlags(ctx context.Context, dbs []string, flags models.GlobalFlags) (models.GlobalFlags, error) {
 	hasPSize := false
-	pSizeSet := false
 	for _, s := range flags.Size {
-		if min, max, ok := utils.ParsePercentileRange(s); ok {
+		if _, _, ok := utils.ParsePercentileRange(s); ok {
 			hasPSize = true
-			if min != 0 || max != 100 {
-				pSizeSet = true
-			}
+			break
 		}
 	}
 
 	hasPDuration := false
-	pDurationSet := false
 	for _, d := range flags.Duration {
-		if min, max, ok := utils.ParsePercentileRange(d); ok {
+		if _, _, ok := utils.ParsePercentileRange(d); ok {
 			hasPDuration = true
-			if min != 0 || max != 100 {
-				pDurationSet = true
-			}
+			break
 		}
 	}
 
 	hasPEpisodes := false
-	pEpisodesSet := false
-	if min, max, ok := utils.ParsePercentileRange(flags.FileCounts); ok {
+	if _, _, ok := utils.ParsePercentileRange(flags.FileCounts); ok {
 		hasPEpisodes = true
-		if min != 0 || max != 100 {
-			pEpisodesSet = true
-		}
 	}
 
 	if !hasPSize && !hasPDuration && !hasPEpisodes {
@@ -647,37 +595,27 @@ func ResolvePercentileFlags(ctx context.Context, dbs []string, flags models.Glob
 	}
 
 	// Helper to get values for a field
-	getValues := func(field string, global bool) ([]int64, error) {
-		var tempFlags models.GlobalFlags
-		if global {
-			tempFlags = models.GlobalFlags{
-				DeletedFlags: models.DeletedFlags{
-					HideDeleted: flags.HideDeleted,
-					OnlyDeleted: flags.OnlyDeleted,
-				},
+	getValues := func(field string) ([]int64, error) {
+		tempFlags := flags
+		// Clear all percentile filters to avoid nested resolution or circular dependencies
+		var cleanSize []string
+		for _, s := range flags.Size {
+			if _, _, ok := utils.ParsePercentileRange(s); !ok {
+				cleanSize = append(cleanSize, s)
 			}
-		} else {
-			tempFlags = flags
-			// Clear all percentile filters to avoid nested resolution or circular dependencies
-			var cleanSize []string
-			for _, s := range flags.Size {
-				if _, _, ok := utils.ParsePercentileRange(s); !ok {
-					cleanSize = append(cleanSize, s)
-				}
-			}
-			tempFlags.Size = cleanSize
+		}
+		tempFlags.Size = cleanSize
 
-			var cleanDuration []string
-			for _, d := range flags.Duration {
-				if _, _, ok := utils.ParsePercentileRange(d); !ok {
-					cleanDuration = append(cleanDuration, d)
-				}
+		var cleanDuration []string
+		for _, d := range flags.Duration {
+			if _, _, ok := utils.ParsePercentileRange(d); !ok {
+				cleanDuration = append(cleanDuration, d)
 			}
-			tempFlags.Duration = cleanDuration
+		}
+		tempFlags.Duration = cleanDuration
 
-			if _, _, ok := utils.ParsePercentileRange(flags.FileCounts); ok {
-				tempFlags.FileCounts = ""
-			}
+		if _, _, ok := utils.ParsePercentileRange(flags.FileCounts); ok {
+			tempFlags.FileCounts = ""
 		}
 		// We need to disable limits to get the full distribution
 		tempFlags.All = true
@@ -691,6 +629,7 @@ func ResolvePercentileFlags(ctx context.Context, dbs []string, flags models.Glob
 		} else {
 			sqlQuery, args = qb.BuildSelect(field)
 		}
+		// fmt.Printf("Query for %s: %s %v\n", field, sqlQuery, args)
 
 		var values []int64
 		var mu sync.Mutex
@@ -701,39 +640,36 @@ func ResolvePercentileFlags(ctx context.Context, dbs []string, flags models.Glob
 				defer wg.Done()
 				sqlDB, err := db.Connect(path)
 				if err != nil {
+					fmt.Printf("Connect error in ResolvePercentileFlags: %v\n", err)
 					return
 				}
 				defer sqlDB.Close()
 
 				rows, err := sqlDB.QueryContext(ctx, sqlQuery, args...)
 				if err != nil {
+					fmt.Printf("Query error in ResolvePercentileFlags: %v\n", err)
 					return
 				}
 				defer rows.Close()
 
 				if field == "episodes" {
-					var gCounts map[string]int64
-					var err error
-					if global {
-						gCounts, err = GetGlobalParentCounts(ctx, dbs)
-					} else {
-						// Filtered counts
-						gCounts = make(map[string]int64)
-						for rows.Next() {
-							var p string
-							if err := rows.Scan(&p); err == nil {
-								gCounts[filepath.Dir(p)]++
-							}
+					// Filtered counts
+					gCounts := make(map[string]int64)
+					count := 0
+					for rows.Next() {
+						var p string
+						if err := rows.Scan(&p); err == nil {
+							gCounts[filepath.Dir(p)]++
+							count++
 						}
 					}
+					fmt.Printf("Resolved episodes: %d rows, %d dirs\n", count, len(gCounts))
 
-					if err == nil {
-						mu.Lock()
-						for _, c := range gCounts {
-							values = append(values, c)
-						}
-						mu.Unlock()
+					mu.Lock()
+					for _, c := range gCounts {
+						values = append(values, c)
 					}
+					mu.Unlock()
 				} else {
 					var localValues []int64
 					for rows.Next() {
@@ -742,6 +678,7 @@ func ResolvePercentileFlags(ctx context.Context, dbs []string, flags models.Glob
 							localValues = append(localValues, v.Int64)
 						}
 					}
+					fmt.Printf("Resolved %s: %d values\n", field, len(localValues))
 					mu.Lock()
 					values = append(values, localValues...)
 					mu.Unlock()
@@ -753,7 +690,7 @@ func ResolvePercentileFlags(ctx context.Context, dbs []string, flags models.Glob
 	}
 
 	if hasPSize {
-		values, err := getValues("size", pSizeSet)
+		values, err := getValues("size")
 		if err == nil && len(values) > 0 {
 			mapping := utils.CalculatePercentiles(values)
 			var newSize []string
@@ -772,7 +709,7 @@ func ResolvePercentileFlags(ctx context.Context, dbs []string, flags models.Glob
 	}
 
 	if hasPDuration {
-		values, err := getValues("duration", pDurationSet)
+		values, err := getValues("duration")
 		if err == nil && len(values) > 0 {
 			mapping := utils.CalculatePercentiles(values)
 			var newDuration []string
@@ -791,7 +728,7 @@ func ResolvePercentileFlags(ctx context.Context, dbs []string, flags models.Glob
 	}
 
 	if hasPEpisodes {
-		values, err := getValues("episodes", pEpisodesSet)
+		values, err := getValues("episodes")
 		if err == nil && len(values) > 0 {
 			mapping := utils.CalculatePercentiles(values)
 			if min, max, ok := utils.ParsePercentileRange(flags.FileCounts); ok {
