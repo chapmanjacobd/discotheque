@@ -146,10 +146,10 @@
 
             <div class="sidebar-separator"></div>
 
-                <button id="du-btn" class="category-btn" style="width: 100%; margin-bottom: 0.2rem;">📊
-                    Disk Usage</button>
-                <button id="trash-btn" class="category-btn hidden" style="width: 100%; margin-bottom: 0.5rem;">🗑️
-                    Trash</button>
+            <button id="du-btn" class="category-btn" style="width: 100%; margin-bottom: 0.2rem;">📊
+                Disk Usage</button>
+            <button id="trash-btn" class="category-btn hidden" style="width: 100%; margin-bottom: 0.5rem;">🗑️
+                Trash</button>
         </aside>
 
         <section class="content">
@@ -200,19 +200,9 @@
                 <button class="close-modal">&times;</button>
             </div>
             <div class="modal-body">
+
                 <section>
-                    <h3>Playback</h3>
-                    <div class="setting-item">
-                        <label for="setting-player">Default Player:</label>
-                        <select id="setting-player">
-                            <option value="browser">Browser (Internal)</option>
-                            <option value="system">System (mpv)</option>
-                        </select>
-                    </div>
-                    <div class="setting-item">
-                        <label for="setting-language">Preferred Language:</label>
-                        <input type="text" id="setting-language" placeholder="e.g. eng, spa, jp" value="">
-                    </div>
+                    <h3>System</h3>
                     <div class="setting-item">
                         <label for="setting-theme">Theme:</label>
                         <select id="setting-theme">
@@ -221,14 +211,10 @@
                             <option value="dark">Dark</option>
                         </select>
                     </div>
-                    <div class="setting-item">
-                        <label for="setting-post-playback">After Playback:</label>
-                        <select id="setting-post-playback">
-                            <option value="nothing">Do nothing</option>
-                            <option value="delete">Delete file</option>
-                            <option value="ask">Ask to delete</option>
-                        </select>
-                    </div>
+                </section>
+
+                <section>
+                    <h3>Playback</h3>
                     <div class="setting-item">
                         <label for="setting-default-view">Default View:</label>
                         <select id="setting-default-view">
@@ -236,73 +222,12 @@
                             <option value="theatre">Theatre Mode</option>
                         </select>
                     </div>
-                    <div class="full-toggle">
-                        <label class="switch">
-                            <input type="checkbox" id="setting-autoplay" checked>
-                            <span class="slider round"></span>
-                        </label>
-                        <div class="toggle-text">
-                            <h3>Autoplay Next</h3>
-                            <p>Automatically play the next item in the list</p>
-                        </div>
-                    </div>
+
                     <div class="setting-item">
-                        <label for="setting-default-video-rate">Default Video Rate:</label>
-                        <select id="setting-default-video-rate">
-                            <option value="0.5">0.5x</option>
-                            <option value="0.75">0.75x</option>
-                            <option value="1" selected>1.0x (Normal)</option>
-                            <option value="1.25">1.25x</option>
-                            <option value="1.5">1.5x</option>
-                            <option value="1.75">1.75x</option>
-                            <option value="2">2.0x</option>
-                        </select>
+                        <label for="setting-language">Preferred Subtitle Language(s):</label>
+                        <input type="text" id="setting-language" placeholder="e.g. eng, spa, jp" value="">
                     </div>
 
-                    <div class="full-toggle">
-                        <label class="switch">
-                            <input type="checkbox" id="setting-show-pip-speed">
-                            <span class="slider round"></span>
-                        </label>
-                        <div class="toggle-text">
-                            <h3>Show Speed Button</h3>
-                            <p>Show the playback speed control in the player</p>
-                        </div>
-                    </div>
-
-                    <div class="full-toggle">
-                        <label class="switch">
-                            <input type="checkbox" id="setting-show-pip-surf">
-                            <span class="slider round"></span>
-                        </label>
-                        <div class="toggle-text">
-                            <h3>Show Surf Button</h3>
-                            <p>Show the channel surf button in the player</p>
-                        </div>
-                    </div>
-
-                    <div class="full-toggle">
-                        <label class="switch">
-                            <input type="checkbox" id="setting-show-pip-stream">
-                            <span class="slider round"></span>
-                        </label>
-                        <div class="toggle-text">
-                            <h3>Show Stream Button</h3>
-                            <p>Show the HLS/Direct stream toggle button</p>
-                        </div>
-                    </div>
-                    <div class="setting-item">
-                        <label for="setting-default-audio-rate">Default Audio Rate:</label>
-                        <select id="setting-default-audio-rate">
-                            <option value="0.5">0.5x</option>
-                            <option value="0.75">0.75x</option>
-                            <option value="1" selected>1.0x (Normal)</option>
-                            <option value="1.25">1.25x</option>
-                            <option value="1.5">1.5x</option>
-                            <option value="1.75">1.75x</option>
-                            <option value="2">2.0x</option>
-                        </select>
-                    </div>
                     <div class="full-toggle">
                         <label class="switch">
                             <input type="checkbox" id="setting-local-resume" checked>
@@ -313,6 +238,27 @@
                             <p>Remember and restore playback position</p>
                         </div>
                     </div>
+
+                    <div class="setting-item">
+                        <label for="setting-post-playback">After Playback:</label>
+                        <select id="setting-post-playback">
+                            <option value="nothing">Do nothing</option>
+                            <option value="delete">Delete file</option>
+                            <option value="ask">Ask to delete</option>
+                        </select>
+                    </div>
+
+                    <div class="full-toggle">
+                        <label class="switch">
+                            <input type="checkbox" id="setting-autoplay" checked>
+                            <span class="slider round"></span>
+                        </label>
+                        <div class="toggle-text">
+                            <h3>Autoplay Next</h3>
+                            <p>Automatically play the next item in the list</p>
+                        </div>
+                    </div>
+
                     <div class="full-toggle">
                         <label class="switch">
                             <input type="checkbox" id="setting-image-autoplay">
@@ -327,47 +273,114 @@
                         <label for="setting-slideshow-delay">Image Autoplay Delay (seconds):</label>
                         <input type="number" id="setting-slideshow-delay" value="5" min="1">
                     </div>
+
+                    <div class="full-toggle">
+                        <label class="switch">
+                            <input type="checkbox" id="setting-show-pip-speed">
+                            <span class="slider round"></span>
+                        </label>
+                        <div class="toggle-text">
+                            <h3>Show Speed Button</h3>
+                            <p>Show the playback speed control in the player</p>
+                        </div>
+                    </div>
+
                     <div class="setting-item">
-                        <label for="setting-track-shuffle-duration">Track shuffle/preview duration (seconds):</label>
-                        <input type="number" id="setting-track-shuffle-duration" value="0" min="0" placeholder="0 for full">
+                        <label for="setting-default-video-rate">Default Video Rate:</label>
+                        <select id="setting-default-video-rate">
+                            <option value="0.5">0.5x</option>
+                            <option value="0.75">0.75x</option>
+                            <option value="1" selected>1.0x (Normal)</option>
+                            <option value="1.25">1.25x</option>
+                            <option value="1.5">1.5x</option>
+                            <option value="1.75">1.75x</option>
+                            <option value="2">2.0x</option>
+                        </select>
+                    </div>
+                    <div class="setting-item">
+                        <label for="setting-default-audio-rate">Default Audio Rate:</label>
+                        <select id="setting-default-audio-rate">
+                            <option value="0.5">0.5x</option>
+                            <option value="0.75">0.75x</option>
+                            <option value="1" selected>1.0x (Normal)</option>
+                            <option value="1.25">1.25x</option>
+                            <option value="1.5">1.5x</option>
+                            <option value="1.75">1.75x</option>
+                            <option value="2">2.0x</option>
+                        </select>
+                    </div>
+
+                    <div class="full-toggle">
+                        <label class="switch">
+                            <input type="checkbox" id="setting-show-pip-stream">
+                            <span class="slider round"></span>
+                        </label>
+                        <div class="toggle-text">
+                            <h3>Show Stream Button</h3>
+                            <p>Show the HLS/Direct stream toggle button</p>
+                        </div>
+                    </div>
+
+                    <div class="full-toggle">
+                        <label class="switch">
+                            <input type="checkbox" id="setting-show-pip-surf">
+                            <span class="slider round"></span>
+                        </label>
+                        <div class="toggle-text">
+                            <h3>Show Surf Button</h3>
+                            <p>Show the channel surf button in the player</p>
+                        </div>
+                    </div>
+
+                    <div class="setting-item">
+                        <label for="setting-track-shuffle-duration">Track preview duration (seconds):</label>
+                        <input type="number" id="setting-track-shuffle-duration" value="0" min="0"
+                            placeholder="0 for full">
                     </div>
 
                     <details style="margin-top: 2rem; cursor: pointer;">
-                        <summary style="font-size: 0.9rem; font-weight: 600; color: var(--text-muted); margin-bottom: 1rem;">Advanced Settings</summary>
+                        <summary
+                            style="font-size: 0.9rem; font-weight: 600; color: var(--text-muted); margin-bottom: 1rem;">
+                            Advanced Settings
+                        </summary>
+
+                        <div class="setting-item">
+                            <label for="setting-player">Default Player:</label>
+                            <select id="setting-player">
+                                <option value="browser">Browser (Internal)</option>
+                                <option value="system">System (mpv)</option>
+                            </select>
+                        </div>
+
                         <div class="setting-item" style="margin-top: 1rem;">
                             <label for="setting-auto-loop-max">Auto-Loop Max Duration (seconds):</label>
                             <input type="number" id="setting-auto-loop-max" min="0" placeholder="0 to disable">
                         </div>
-                    </details>
-                </section>
-                <section>
-                    <h3>Search</h3>
-                    <div class="setting-item">
-                        <label for="limit">Result Limit:</label>
-                        <div style="display: flex; gap: 10px; align-items: center;">
-                            <input type="number" id="limit" value="100" min="1">
-                            <label
-                                style="font-size: 0.8rem; display: flex; align-items: center; gap: 4px; white-space: nowrap; cursor: pointer;">
-                                <input type="checkbox" id="limit-all"> All
-                            </label>
+
+                        <div class="setting-item">
+                            <label for="limit">Search results limit:</label>
+                            <div style="display: flex; gap: 10px; align-items: center;">
+                                <input type="number" id="limit" value="100" min="1">
+                                <label
+                                    style="font-size: 0.8rem; display: flex; align-items: center; gap: 4px; white-space: nowrap; cursor: pointer;">
+                                    <input type="checkbox" id="limit-all"> All
+                                </label>
+                            </div>
                         </div>
-                    </div>
-                </section>
 
-                <section id="db-settings">
-                    <h3>Databases</h3>
-                    <div id="db-checkbox-list">
-                        <!-- Database checkboxes will be injected here -->
-                    </div>
-                </section>
+                        <section id="db-settings">
+                            <h3>Databases</h3>
+                            <div id="db-checkbox-list">
+                                <!-- Database checkboxes will be injected here -->
+                            </div>
+                        </section>
 
-                <section>
-                    <h3>Maintenance</h3>
-                    <div class="setting-item">
-                        <span>LocalStorage Data: <small id="storage-size">Calculating...</small></span>
-                        <button id="clear-storage-btn" class="table-action-btn"
-                            style="color: #e74c3c; border-color: #e74c3c;">Clear Cache</button>
-                    </div>
+                        <div class="setting-item">
+                            <span>LocalStorage Data: <small id="storage-size">Calculating...</small></span>
+                            <button id="clear-storage-btn" class="table-action-btn"
+                                style="color: #e74c3c; border-color: #e74c3c;">Clear Cache</button>
+                        </div>
+                    </details>
                 </section>
             </div>
         </div>
@@ -404,19 +417,20 @@
             <div class="pip-controls">
                 <button id="pip-slideshow" title="Toggle Slideshow" class="hidden">▶️</button>
                 <button id="pip-speed" title="Playback Speed" class="hidden"
-                   style="font-size: 0.75rem; font-weight: 600; padding: 2px 6px; background: var(--bg-color); border: 1px solid var(--border-color); border-radius: 4px;">1.0x</button>
+                    style="font-size: 0.75rem; font-weight: 600; padding: 2px 6px; background: var(--bg-color); border: 1px solid var(--border-color); border-radius: 4px;">1.0x</button>
                 <div id="pip-speed-menu" class="hidden"
-                   style="position: absolute; bottom: 100%; background: var(--sidebar-bg); border: 1px solid var(--border-color); border-radius: 5px; box-shadow: var(--shadow); padding: 0.7rem; display: flex; flex-direction: column; gap: 0.2rem; z-index: 10000;">
-                   <button class="speed-opt" data-speed="0.5">0.5x</button>
-                   <button class="speed-opt" data-speed="0.75">0.75x</button>
-                   <button class="speed-opt" data-speed="1.0">1.0x (Normal)</button>
-                   <button class="speed-opt" data-speed="1.25">1.25x</button>
-                   <button class="speed-opt" data-speed="1.5">1.5x</button>
-                   <button class="speed-opt" data-speed="1.75">1.75x</button>
-                   <button class="speed-opt" data-speed="2.0">2.0x</button>
+                    style="position: absolute; bottom: 100%; background: var(--sidebar-bg); border: 1px solid var(--border-color); border-radius: 5px; box-shadow: var(--shadow); padding: 0.7rem; display: flex; flex-direction: column; gap: 0.2rem; z-index: 10000;">
+                    <button class="speed-opt" data-speed="0.5">0.5x</button>
+                    <button class="speed-opt" data-speed="0.75">0.75x</button>
+                    <button class="speed-opt" data-speed="1.0">1.0x (Normal)</button>
+                    <button class="speed-opt" data-speed="1.25">1.25x</button>
+                    <button class="speed-opt" data-speed="1.5">1.5x</button>
+                    <button class="speed-opt" data-speed="1.75">1.75x</button>
+                    <button class="speed-opt" data-speed="2.0">2.0x</button>
                 </div>
                 <button id="channel-surf-btn" title="Channel Surf (Interdimensional Cable)" class="hidden">🔀</button>
-                <button id="pip-stream-type" title="Switch Stream Type" class="hidden">🔄</button>                <button id="pip-native" title="Native Picture-in-Picture" class="hidden">📺</button>
+                <button id="pip-stream-type" title="Switch Stream Type" class="hidden">🔄</button> <button
+                    id="pip-native" title="Native Picture-in-Picture" class="hidden">📺</button>
                 <button id="pip-theatre" title="Theatre Mode">□</button>
                 <button class="close-pip" title="Close">&times;</button>
             </div>
