@@ -1278,44 +1278,6 @@ main {
     box-sizing: border-box;
 }
 
-#lyrics-display {
-    background: #000;
-    color: #fff;
-    padding: 2rem;
-    text-align: center;
-    font-size: 1.5rem;
-    font-weight: 700;
-    min-height: 100px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    line-height: 1.4;
-    border-top: 1px solid var(--border-color);
-    text-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
-}
-
-#lyrics-display.hidden {
-    display: none;
-}
-
-#secondary-subtitle {
-    position: absolute;
-    top: 50px; /* Below pip-header */
-    left: 0;
-    width: 100%;
-    text-align: center;
-    background: rgba(0, 0, 0, 0.6);
-    color: white;
-    padding: 0.5rem;
-    font-size: 1.2rem;
-    pointer-events: none;
-    z-index: 10;
-}
-
-#secondary-subtitle.hidden {
-    display: none;
-}
-
 #settings-button {
     background: none;
     border: none;

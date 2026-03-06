@@ -374,7 +374,6 @@
                     <button class="speed-opt" data-speed="1.75">1.75x</button>
                     <button class="speed-opt" data-speed="2.0">2.0x</button>
                 </div>
-                <button id="pip-subtitles" title="Subtitles">💬</button>
                 <button id="channel-surf-btn" title="Channel Surf (Interdimensional Cable)">🔀</button>
                 <button id="pip-stream-type" title="Switch Stream Type">🔄</button>
                 <button id="pip-native" title="Native Picture-in-Picture" class="hidden">📺</button>
@@ -387,8 +386,6 @@
                 <!-- Media tag (img, video, audio) will be injected here -->
             </div>
             <div id="seek-indicator" class="hidden"></div>
-            <div id="secondary-subtitle" class="hidden"></div>
-            <div id="lyrics-display" class="hidden"></div>
         </div>
     </div>
 
@@ -474,26 +471,7 @@
             </div>
         </div>
     </div>
-
     <div id="toast" class="hidden"></div>
-
-    <!-- Subtitle Modal -->
-    <div id="subtitle-modal" class="modal hidden">
-        <div class="modal-content" style="max-width: 400px;">
-            <div class="modal-header">
-                <h2>Subtitles</h2>
-                <button class="close-modal">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div style="margin-bottom: 1rem; font-size: 0.9rem; color: var(--text-muted);">
-                    Select primary (top) and optional secondary (bottom) subtitles.
-                </div>
-                <div id="subtitle-list" style="display: flex; flex-direction: column; gap: 0.5rem;">
-                    <!-- Subtitle tracks will be injected here -->
-                </div>
-            </div>
-        </div>
-    </div>
 
     <script type="module" src="app.js"></script>
 </body>

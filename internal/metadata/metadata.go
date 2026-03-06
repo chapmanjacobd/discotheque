@@ -230,18 +230,21 @@ func Extract(ctx context.Context, path string, scanSubtitles bool) (*MediaMetada
 					aCodecs = append(aCodecs, codecInfo)
 				case "subtitle":
 					sCount++
-					codecInfo := s.CodecName
-					var details []string
+					var label string
 					if lang := s.Tags["language"]; lang != "" {
-						details = append(details, lang)
+						label = lang
 					}
 					if title := s.Tags["title"]; title != "" {
-						details = append(details, title)
+						if label != "" {
+							label += " - " + title
+						} else {
+							label = title
+						}
 					}
-					if len(details) > 0 {
-						codecInfo += " (" + strings.Join(details, ", ") + ")"
+					if label == "" {
+						label = s.CodecName
 					}
-					sCodecs = append(sCodecs, codecInfo)
+					sCodecs = append(sCodecs, label)
 				}
 			}
 

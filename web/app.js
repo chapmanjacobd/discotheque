@@ -51,8 +51,6 @@ document.addEventListener('DOMContentLoaded', () => {
             selection.addRange(range);
         };
     }
-    const lyricsDisplay = document.getElementById('lyrics-display');
-    const secondarySubtitle = document.getElementById('secondary-subtitle');
     const searchSuggestions = document.getElementById('search-suggestions');
 
     const viewGroup = document.getElementById('view-group');
@@ -88,75 +86,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const pipSpeedBtn = document.getElementById('pip-speed');
     const pipSpeedMenu = document.getElementById('pip-speed-menu');
-    const pipSubtitlesBtn = document.getElementById('pip-subtitles');
-
-    if (pipSubtitlesBtn) {
-        pipSubtitlesBtn.onclick = () => {
-            renderSubtitleList();
-            openModal('subtitle-modal');
-        };
-    }
-
-    function renderSubtitleList() {
-        const list = document.getElementById('subtitle-list');
-        if (!list) return;
-        list.innerHTML = '';
-
-        const media = pipViewer.querySelector('video, audio');
-        if (!media || !media.textTracks || media.textTracks.length === 0) {
-            list.innerHTML = '<p style="text-align: center; padding: 1rem; color: var(--text-muted);">No subtitle tracks found.</p>';
-            return;
-        }
-
-        const tracks = Array.from(media.textTracks);
-
-        // Add "None" option
-        const noneBtn = document.createElement('button');
-        noneBtn.className = 'category-btn';
-        noneBtn.style.width = '100%';
-        noneBtn.style.marginBottom = '0.5rem';
-        noneBtn.textContent = 'Disable All';
-        noneBtn.onclick = () => {
-            tracks.forEach(t => t.mode = 'disabled');
-            renderSubtitleList();
-        };
-        list.appendChild(noneBtn);
-
-        tracks.forEach((track, index) => {
-            const row = document.createElement('div');
-            row.style.display = 'flex';
-            row.style.gap = '0.5rem';
-            row.style.alignItems = 'center';
-
-            const primaryBtn = document.createElement('button');
-            primaryBtn.className = 'category-btn' + (track.mode === 'showing' ? ' active' : '');
-            primaryBtn.style.flex = '1';
-            primaryBtn.style.textAlign = 'left';
-            primaryBtn.textContent = track.label || `Track ${index + 1}`;
-            primaryBtn.onclick = () => {
-                const currentMode = track.mode;
-                tracks.forEach(t => { if (t.mode === 'showing') t.mode = 'disabled'; });
-                track.mode = (currentMode === 'showing') ? 'disabled' : 'showing';
-                renderSubtitleList();
-            };
-
-            const secondaryBtn = document.createElement('button');
-            secondaryBtn.className = 'category-btn' + (track.mode === 'hidden' ? ' active' : '');
-            secondaryBtn.textContent = '2nd';
-            secondaryBtn.title = 'Show as secondary subtitle (at top of player)';
-            secondaryBtn.style.padding = '0.5rem';
-            secondaryBtn.onclick = () => {
-                const currentMode = track.mode;
-                tracks.forEach(t => { if (t.mode === 'hidden') t.mode = 'disabled'; });
-                track.mode = (currentMode === 'hidden') ? 'disabled' : 'hidden';
-                renderSubtitleList();
-            };
-
-            row.appendChild(primaryBtn);
-            row.appendChild(secondaryBtn);
-            list.appendChild(row);
-        });
-    }
 
     const filterBrowseCol = document.getElementById('filter-browse-col');
     const filterBrowseVal = document.getElementById('filter-browse-val');
@@ -2971,10 +2900,6 @@ document.addEventListener('DOMContentLoaded', () => {
         pipTitle.textContent = path.split('/').pop();
         pipTitle.title = path;
         pipViewer.innerHTML = '';
-        lyricsDisplay.classList.add('hidden');
-        lyricsDisplay.textContent = '';
-        secondarySubtitle.classList.add('hidden');
-        secondarySubtitle.textContent = '';
 
         // Apply mode
         const theatreAnchor = document.getElementById('theatre-anchor');
@@ -3154,19 +3079,6 @@ document.addEventListener('DOMContentLoaded', () => {
             el.ontimeupdate = () => {
                 const isComplete = (el.duration > 90) && (el.duration - el.currentTime < 90) && (el.currentTime / el.duration > 0.95);
                 updateProgress(item, el.currentTime, el.duration, isComplete);
-
-                // Handle secondary subtitles
-                const tracks = Array.from(el.textTracks);
-                const secondary = tracks.find(t => t.mode === 'hidden');
-                if (secondary && secondary.activeCues && secondary.activeCues.length > 0) {
-                    const cue = Array.from(secondary.activeCues).pop();
-                    if (cue) {
-                        secondarySubtitle.classList.remove('hidden');
-                        secondarySubtitle.textContent = cue.text;
-                    }
-                } else {
-                    secondarySubtitle.classList.add('hidden');
-                }
             };
 
             el.onended = async () => {
@@ -3208,7 +3120,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const codecs = item.subtitle_codecs.split(';');
                 codecs.forEach((codec, index) => {
                     const isExt = codec.startsWith('.');
-                    const label = isExt ? `External (${codec})` : (codec || `Embedded #${index + 1}`);
+                    const label = isExt ? `External` : (codec || `Track ${index + 1}`);
                     const trackUrl = isExt ?
                         `/api/subtitles?path=${encodeURIComponent(item.path.substring(0, item.path.lastIndexOf('.')) + codec)}` :
                         `/api/subtitles?path=${encodeURIComponent(path)}&index=${index}`;
@@ -3219,7 +3131,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // 2. Always check for external subtitle file (sibling with same name)
             if (!type.includes('image')) {
-                addTrack(`/api/subtitles?path=${encodeURIComponent(path)}`, 'External/Auto', 'auto');
+                addTrack(`/api/subtitles?path=${encodeURIComponent(path)}`, 'External', 'auto');
             }
 
         } else if (type.includes('audio')) {
@@ -3243,31 +3155,6 @@ document.addEventListener('DOMContentLoaded', () => {
             el.ontimeupdate = () => {
                 const isComplete = (el.duration > 90) && (el.duration - el.currentTime < 90) && (el.currentTime / el.duration > 0.95);
                 updateProgress(item, el.currentTime, el.duration, isComplete);
-
-                // Handle lyrics/subtitles
-                const tracks = Array.from(el.textTracks);
-                const primary = tracks.find(t => t.mode === 'showing') || tracks[0];
-                const secondary = tracks.find(t => t.mode === 'hidden');
-
-                if (primary && primary.activeCues && primary.activeCues.length > 0) {
-                    const cue = Array.from(primary.activeCues).pop();
-                    if (cue) {
-                        lyricsDisplay.classList.remove('hidden');
-                        lyricsDisplay.textContent = cue.text;
-                    }
-                } else {
-                    lyricsDisplay.classList.add('hidden');
-                }
-
-                if (secondary && secondary.activeCues && secondary.activeCues.length > 0) {
-                    const cue = Array.from(secondary.activeCues).pop();
-                    if (cue) {
-                        secondarySubtitle.classList.remove('hidden');
-                        secondarySubtitle.textContent = cue.text;
-                    }
-                } else {
-                    secondarySubtitle.classList.add('hidden');
-                }
             };
 
             el.onended = async () => {
@@ -3584,8 +3471,6 @@ document.addEventListener('DOMContentLoaded', () => {
             media.src = "";
         }
         pipViewer.innerHTML = '';
-        lyricsDisplay.classList.add('hidden');
-        lyricsDisplay.textContent = '';
         pipPlayer.classList.add('hidden');
         document.body.classList.remove('has-pip');
 
