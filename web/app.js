@@ -2575,8 +2575,6 @@ document.addEventListener('DOMContentLoaded', () => {
     function playSibling(offset, isUser = false, isDelete = false) {
         if (currentMedia.length === 0) return;
 
-        const wasFullscreen = !!document.fullscreenElement;
-
         if (isUser && !isDelete) {
             stopSlideshow();
         }
@@ -2623,7 +2621,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (nextIndex >= 0 && nextIndex < currentMedia.length) {
             if (state.player === 'browser') {
-                openInPiP(currentMedia[nextIndex], isNewSession, false, wasFullscreen);
+                openInPiP(currentMedia[nextIndex], isNewSession);
             } else {
                 playMedia(currentMedia[nextIndex]);
             }
@@ -2635,7 +2633,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 performSearch().then(() => {
                     if (currentMedia.length > 0) {
                         if (state.player === 'browser') {
-                            openInPiP(currentMedia[0], isNewSession, false, wasFullscreen);
+                            openInPiP(currentMedia[0], isNewSession);
                         } else {
                             playMedia(currentMedia[0]);
                         }
@@ -2648,7 +2646,7 @@ document.addEventListener('DOMContentLoaded', () => {
             performSearch().then(() => {
                 if (currentMedia.length > 0) {
                     if (state.player === 'browser') {
-                        openInPiP(currentMedia[currentMedia.length - 1], isNewSession, false, wasFullscreen);
+                        openInPiP(currentMedia[currentMedia.length - 1], isNewSession);
                     } else {
                         playMedia(currentMedia[currentMedia.length - 1]);
                     }
@@ -2854,8 +2852,6 @@ document.addEventListener('DOMContentLoaded', () => {
         // If state.playback.item is null, the player was likely closed manually.
         if (!state.playback.item || state.playback.item.path !== item.path) return;
 
-        const wasFullscreen = !!document.fullscreenElement;
-
         // Clear handlers to prevent other events (like onended) from firing after error
         const media = pipViewer.querySelector('video, audio, img');
         if (media) {
@@ -2895,7 +2891,7 @@ document.addEventListener('DOMContentLoaded', () => {
             state.playback.skipTimeout = setTimeout(() => {
                 if (state.playback.skipTimeout) { // Check if it was cleared in the meantime
                     state.playback.skipTimeout = null;
-                    playSibling(1, false, false, wasFullscreen);
+                    playSibling(1);
                 }
             }, 1200);
         } else {
@@ -2907,7 +2903,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    async function openInPiP(item, isNewSession = false, isSurfing = false, forceFullscreen = false) {
+    async function openInPiP(item, isNewSession = false, isSurfing = false) {
         state.playback.isSurfing = isSurfing;
 
         if (state.playback.slideshowTimer) {
@@ -2918,8 +2914,6 @@ document.addEventListener('DOMContentLoaded', () => {
             clearTimeout(state.playback.surfTimer);
             state.playback.surfTimer = null;
         }
-
-        const wasFullscreen = forceFullscreen || !!document.fullscreenElement;
 
         if (isNewSession) {
             // New explicit request: reset state.imageAutoplay to user preference
@@ -3371,12 +3365,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         pipViewer.appendChild(el);
-
-        // Maintain/Switch fullscreen state if active
-        if (wasFullscreen) {
-            const preferred = (type.includes('video')) ? el : pipViewer;
-            preferred.requestFullscreen().catch(e => console.error("Fullscreen switch failed:", e));
-        }
     }
 
     function openInDocumentViewer(item) {
@@ -3560,18 +3548,16 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function toggleFullscreen(defaultEl, preferredEl) {
-        const el = preferredEl || defaultEl;
+    function toggleFullscreen(el) {
         if (!el) return;
 
         if (document.fullscreenElement) {
-            // If already fullscreen on a different element, switch to preferred
-            if (document.fullscreenElement !== el) {
-                el.requestFullscreen().catch(err => {
-                    console.error(`Error attempting to switch full-screen mode: ${err.message}`);
-                });
-            } else {
+            if (document.fullscreenElement === el) {
                 document.exitFullscreen();
+            } else {
+                el.requestFullscreen().catch(err => {
+                    console.error(`Error attempting to enable full-screen mode: ${err.message}`);
+                });
             }
         } else {
             el.requestFullscreen().catch(err => {
@@ -4430,10 +4416,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (!docModal.classList.contains('hidden')) {
                         toggleFullscreen(docModal.querySelector('.modal-content'));
                     } else if (!pipPlayer.classList.contains('hidden')) {
-                        const media = pipViewer.querySelector('video, audio, img');
-                        if (media) {
-                            toggleFullscreen(pipViewer, media.tagName === 'VIDEO' ? media : pipViewer);
-                        }
+                        toggleFullscreen(pipViewer);
                     }
                     return;
             }
@@ -4443,11 +4426,10 @@ document.addEventListener('DOMContentLoaded', () => {
             case 'delete':
                 if (state.playback.item && !pipPlayer.classList.contains('hidden')) {
                     const itemToDelete = state.playback.item;
-                    const wasFullscreen = !!document.fullscreenElement;
                     if (e.shiftKey) {
                         closePiP();
                     } else {
-                        playSibling(1, true, true, wasFullscreen);
+                        playSibling(1, true, true);
                     }
                     deleteMedia(itemToDelete.path);
                     return;
@@ -4524,7 +4506,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 break;
             case 'l':
-                setTime(Math.min(duration, currentTime + 10));
+                if (media.tagName === 'VIDEO' || media.tagName === 'AUDIO') {
+                    media.loop = !media.loop;
+                    showToast(media.loop ? 'Loop: ON' : 'Loop: OFF', '🔁');
+                }
                 break;
             case 'arrowleft':
                 setTime(Math.max(0, currentTime - 5));
@@ -4569,24 +4554,22 @@ document.addEventListener('DOMContentLoaded', () => {
         // If we just had an error, don't trigger post-playback skip
         if (state.playback.skipTimeout) return;
 
-        const wasFullscreen = !!document.fullscreenElement;
-
         if (state.postPlaybackAction === 'delete') {
             deleteMedia(item.path);
-            if (state.autoplay) playSibling(1, false, true, wasFullscreen);
+            if (state.autoplay) playSibling(1, false, true);
         } else if (state.postPlaybackAction === 'ask') {
             openModal('confirm-modal');
             document.getElementById('confirm-yes').onclick = () => {
                 closeModal('confirm-modal');
                 deleteMedia(item.path);
-                if (state.autoplay) playSibling(1, false, true, wasFullscreen);
+                if (state.autoplay) playSibling(1, false, true);
             };
             document.getElementById('confirm-no').onclick = () => {
                 closeModal('confirm-modal');
-                if (state.autoplay) playSibling(1, false, false, wasFullscreen);
+                if (state.autoplay) playSibling(1);
             };
         } else {
-            if (state.autoplay) playSibling(1, false, false, wasFullscreen);
+            if (state.autoplay) playSibling(1);
         }
     }
 
