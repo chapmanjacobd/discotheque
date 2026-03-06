@@ -39,11 +39,11 @@ func TestGetHLSSegmentArgs(t *testing.T) {
 	path := "/media/video.mp4"
 	startTime := 12.0
 	segmentDuration := 6
-	
+
 	t.Run("VideoCopy", func(t *testing.T) {
 		strategy := TranscodeStrategy{VideoCopy: true}
 		args := GetHLSSegmentArgs(path, startTime, segmentDuration, strategy)
-		
+
 		argStr := strings.Join(args, " ")
 		if !strings.Contains(argStr, "-c:v copy") {
 			t.Errorf("Expected video copy, got %v", args)
@@ -56,7 +56,7 @@ func TestGetHLSSegmentArgs(t *testing.T) {
 	t.Run("VideoTranscode", func(t *testing.T) {
 		strategy := TranscodeStrategy{VideoCopy: false}
 		args := GetHLSSegmentArgs(path, startTime, segmentDuration, strategy)
-		
+
 		argStr := strings.Join(args, " ")
 		if !strings.Contains(argStr, "-c:v libx264") {
 			t.Errorf("Expected libx264, got %v", args)

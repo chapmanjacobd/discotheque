@@ -27,7 +27,7 @@ func GenerateHLSPlaylist(path string, duration float64, segmentDuration int) str
 	sb.WriteString("#EXT-X-MEDIA-SEQUENCE:0\n")
 	sb.WriteString("#EXT-X-PLAYLIST-TYPE:VOD\n")
 
-	for i := 0; i < segments; i++ {
+	for i := range segments {
 		segDuration := float64(segmentDuration)
 		if i == segments-1 {
 			rem := math.Mod(duration, float64(segmentDuration))

@@ -114,9 +114,9 @@ func TestComplexFilteringAndAggregation(t *testing.T) {
 		if len(folders) != 2 {
 			t.Errorf("Expected 2 folders, got %d", len(folders))
 		}
-		// dir2 should be first (1GB + 10MB > 100MB + 500MB)
-		if !strings.Contains(folders[0].Path, "dir2") {
-			t.Errorf("Expected dir2 to be first, got %s", folders[0].Path)
+		// /root/dir2 should be first (1GB + 10MB > 100MB + 500MB)
+		if !strings.Contains(folders[0].Path, "/root/dir2") {
+			t.Errorf("Expected /root/dir2 to be first, got %s", folders[0].Path)
 		}
 	})
 }

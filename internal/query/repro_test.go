@@ -49,7 +49,7 @@ func TestMediaTypeAndEpisodicConstraint(t *testing.T) {
 		if err != nil {
 			t.Fatalf("MediaQuery failed: %v", err)
 		}
-		
+
 		if len(got) != 1 {
 			t.Errorf("Expected 1 result (the video in /dir1), got %d", len(got))
 		} else if got[0].Path != "/dir1/v1.mp4" {

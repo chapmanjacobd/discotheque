@@ -189,14 +189,39 @@ func AggregateByDepth(media []models.MediaWithDB, flags models.GlobalFlags) []mo
 				}
 				updateStats(groups[parent], m, true)
 			}
+		} else if flags.BigDirs {
+			// BigDirs: group by immediate parent directory
+			parent := m.Parent()
+			if _, ok := groups[parent]; !ok {
+				groups[parent] = &models.FolderStats{Path: parent}
+			}
+			updateStats(groups[parent], m, true)
 		} else if flags.Depth > 0 && len(parts) > flags.Depth {
-			parent := strings.Join(parts[:flags.Depth+1], string(filepath.Separator))
+			// Group at depth (e.g., depth=1 -> "/media" or "media", depth=2 -> "/media/video")
+			// For absolute paths, parts[0] is "", so we need depth+1 components
+			// For relative paths, we need exactly depth components
+			var parent string
+			if parts[0] == "" {
+				// Absolute path: include the leading "/"
+				if flags.Depth < len(parts) {
+					parent = strings.Join(parts[:flags.Depth+1], string(filepath.Separator))
+				} else {
+					parent = strings.Join(parts, string(filepath.Separator))
+				}
+			} else {
+				// Relative path: use exactly depth components
+				if flags.Depth <= len(parts) {
+					parent = strings.Join(parts[:flags.Depth], string(filepath.Separator))
+				} else {
+					parent = strings.Join(parts, string(filepath.Separator))
+				}
+			}
 			if _, ok := groups[parent]; !ok {
 				groups[parent] = &models.FolderStats{Path: parent}
 			}
 			updateStats(groups[parent], m, true)
 		} else {
-			// Default to immediate parent
+			// Default to immediate parent (when Depth=0 or file is at/below target depth)
 			parent := m.Parent()
 			if _, ok := groups[parent]; !ok {
 				groups[parent] = &models.FolderStats{Path: parent}

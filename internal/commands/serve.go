@@ -613,8 +613,8 @@ func (c *ServeCmd) handleQuery(w http.ResponseWriter, r *http.Request) {
 				for _, row := range rows {
 					m := models.MediaWithDB{
 						Media: models.Media{
-							Path: row.MediaPath,
-							Type: models.NullStringPtr(row.Type),
+							Path:  row.MediaPath,
+							Type:  models.NullStringPtr(row.Type),
 							Title: models.NullStringPtr(row.Title),
 						},
 						DB:          dbPath,
@@ -1292,17 +1292,16 @@ func (c *ServeCmd) handleDU(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// For folder aggregation, calculate the depth to show immediate children
-	// depth determines how many path components to group by
-	// depth=1 groups by first component (e.g., "media" from "media/video/file.mp4")
-	// depth=2 groups by first two components (e.g., "media/video" from "media/video/file.mp4")
-	depth := 1  // Default to showing top-level folders
+	// For folder aggregation, calculate the depth to group by
+	// depth=1 groups by first component (e.g., "/media" from "/media/video/file.mp4")
+	// depth=2 groups by first two components (e.g., "/media/video" from "/media/video/file.mp4")
+	// The aggregation will show immediate children of the current path
+	depth := 1 // Default for root path (shows top-level folders)
 	if path != "" && path != "/" {
 		cleanPath := filepath.Clean(path)
-		// Current depth is the number of components in the path
-		depth = strings.Count(cleanPath, string(filepath.Separator)) + 1
-		// Add 1 to show children of the current path
-		depth++
+		// Depth = number of components in current path + 1
+		// This makes aggregation show items one level deeper than current path
+		depth = strings.Count(cleanPath, string(filepath.Separator)) + 2
 	}
 
 	aggFlags := flags
@@ -1915,7 +1914,7 @@ func (c *ServeCmd) handleCategorizeSuggest(w http.ResponseWriter, r *http.Reques
 		if !matched {
 			// Use a map to count each word only once per file
 			uniqueWords := make(map[string]bool)
-			
+
 			words := utils.ExtractWords(utils.PathToSentence(m.Path))
 			if m.Title != nil {
 				words = append(words, utils.ExtractWords(*m.Title)...)

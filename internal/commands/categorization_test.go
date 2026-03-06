@@ -831,7 +831,7 @@ func TestHandleCategorizeApply(t *testing.T) {
 	})
 
 	t.Run("ApplyCategorization with no matches returns count 0", func(t *testing.T) {
-	// Create database with media that won't match any keywords
+		// Create database with media that won't match any keywords
 		emptyDB, err := os.CreateTemp("", "disco_test_empty_*.db")
 		if err != nil {
 			t.Fatalf("Failed to create temp db: %v", err)

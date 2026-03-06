@@ -103,7 +103,7 @@ func TestDUServerSideFiltering(t *testing.T) {
 	}
 	handler := cmd.Mux()
 
-	// 1. Filter by video
+	// 1. Filter by video - should only show "media" folder at root level
 	req := httptest.NewRequest(http.MethodGet, "/api/du?video=true", nil)
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, req)
@@ -116,20 +116,50 @@ func TestDUServerSideFiltering(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Should find "media/video" folder (immediate parent of the video file)
-	// The video filter should still apply, so we should see the media/video folder
-	// with accurate size aggregation from video files
-	foundVideoFolder := false
+	// Should find "media" folder (immediate child of root)
+	// The video filter applies, so we should only see video files aggregated
+	foundMedia := false
 	for _, r := range resp {
-		if r.Path == "media/video" || r.Path == "/media/video" {
-			foundVideoFolder = true
+		if r.Path == "media" {
+			foundMedia = true
 			// Size should include video file (1000 bytes)
 			if r.TotalSize < 1000 {
-				t.Errorf("Expected media/video folder to include video size, got %d", r.TotalSize)
+				t.Errorf("Expected media folder to include video size, got %d", r.TotalSize)
 			}
 		}
 	}
-	if !foundVideoFolder {
-		t.Errorf("Did not find media/video folder in response: %v", resp)
+	if !foundMedia {
+		t.Errorf("Did not find media folder in response: %v", resp)
+	}
+
+	// 2. Test with specific path - should show immediate children only
+	req2 := httptest.NewRequest(http.MethodGet, "/api/du?path=media", nil)
+	w2 := httptest.NewRecorder()
+	handler.ServeHTTP(w2, req2)
+
+	var resp2 []struct {
+		Path      string `json:"path"`
+		TotalSize int64  `json:"total_size"`
+	}
+	if err := json.NewDecoder(w2.Body).Decode(&resp2); err != nil {
+		t.Fatal(err)
+	}
+
+	// Should find "media/video" and "media/audio" (immediate children of "media")
+	foundVideo := false
+	foundAudio := false
+	for _, r := range resp2 {
+		if r.Path == "media/video" {
+			foundVideo = true
+		}
+		if r.Path == "media/audio" {
+			foundAudio = true
+		}
+	}
+	if !foundVideo {
+		t.Errorf("Did not find media/video folder in response: %v", resp2)
+	}
+	if !foundAudio {
+		t.Errorf("Did not find media/audio folder in response: %v", resp2)
 	}
 }
