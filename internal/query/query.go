@@ -557,6 +557,69 @@ func MediaQuery(ctx context.Context, dbs []string, flags models.GlobalFlags) ([]
 		}
 	}
 
+	// Group by parent directory with aggregated counts and totals
+	if flags.GroupByParent {
+		type GroupedMedia struct {
+			ParentPath        string  `json:"parent_path"`
+			EpisodeCount      int64   `json:"episode_count"`
+			TotalSize         int64   `json:"total_size"`
+			TotalDuration     int64   `json:"total_duration"`
+			LatestEpisodeTime *string `json:"latest_episode_time,omitempty"`
+			// Include representative media info
+			RepresentativePath string  `json:"representative_path"`
+			RepresentativeType *string `json:"representative_type,omitempty"`
+		}
+
+		groups := make(map[string]*GroupedMedia)
+		for _, m := range allMedia {
+			parent := m.Parent()
+			if _, ok := groups[parent]; !ok {
+				groups[parent] = &GroupedMedia{
+					ParentPath:         parent,
+					EpisodeCount:       0,
+					TotalSize:          0,
+					TotalDuration:      0,
+					RepresentativePath: m.Path,
+					RepresentativeType: m.Type,
+				}
+			}
+			g := groups[parent]
+			g.EpisodeCount++
+			if m.Size != nil {
+				g.TotalSize += *m.Size
+			}
+			if m.Duration != nil {
+				g.TotalDuration += *m.Duration
+			}
+			// Track latest episode by path (assumes sorted by path/time)
+			if g.LatestEpisodeTime == nil || m.Path > *g.LatestEpisodeTime {
+				g.LatestEpisodeTime = &m.Path
+			}
+		}
+
+		// Convert map to slice for return
+		allMedia = make([]models.MediaWithDB, 0, len(groups))
+		for _, g := range groups {
+			m := models.MediaWithDB{
+				Media: models.Media{
+					Path:     g.RepresentativePath,
+					Type:     g.RepresentativeType,
+					Size:     &g.TotalSize,
+					Duration: &g.TotalDuration,
+					Title:    &g.ParentPath,
+				},
+				DB:            allMedia[0].DB,
+				EpisodeCount:  g.EpisodeCount,
+				TotalSize:     g.TotalSize,
+				TotalDuration: g.TotalDuration,
+			}
+			allMedia = append(allMedia, m)
+		}
+
+		// Sort grouped results
+		SortMedia(allMedia, flags)
+	}
+
 	if flags.FetchSiblings != "" {
 		var err error
 		allMedia, err = FetchSiblings(ctx, allMedia, flags)

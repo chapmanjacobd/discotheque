@@ -107,6 +107,7 @@ type AggregateFlags struct {
 	GroupByExtensions bool     `help:"Group by file extensions" group:"Aggregate"`
 	GroupByMimeTypes  bool     `help:"Group by mimetypes" group:"Aggregate"`
 	GroupBySize       bool     `help:"Group by size buckets" group:"Aggregate"`
+	GroupByParent     bool     `help:"Group media by parent directory with counts and totals" group:"Aggregate"`
 	Depth             int      `short:"D" help:"Aggregate at specific directory depth" group:"Aggregate"`
 	MinDepth          int      `default:"0" help:"Minimum depth for aggregation" group:"Aggregate"`
 	MaxDepth          int      `help:"Maximum depth for aggregation" group:"Aggregate"`

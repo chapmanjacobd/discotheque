@@ -126,6 +126,9 @@ type MediaWithDB struct {
 	CaptionTime     float64 `json:"caption_time"`
 	CaptionCount    int64   `json:"caption_count"`
 	CaptionDuration int64   `json:"caption_duration"`
+	EpisodeCount    int64   `json:"episode_count"`
+	TotalSize       int64   `json:"total_size"`
+	TotalDuration   int64   `json:"total_duration"`
 }
 
 // FolderStats aggregates media by folder

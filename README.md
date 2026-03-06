@@ -297,6 +297,8 @@ Flags:
         Group by mimetypes
   --group-by-size
         Group by size buckets
+  --group-by-parent
+        Group media by parent directory with counts and totals
   -D, --depth
         Aggregate at specific directory depth
   --min-depth
@@ -1139,6 +1141,8 @@ Flags:
         Group by mimetypes
   --group-by-size
         Group by size buckets
+  --group-by-parent
+        Group media by parent directory with counts and totals
   -D, --depth
         Aggregate at specific directory depth
   --min-depth
@@ -1443,6 +1447,8 @@ Flags:
         Group by mimetypes
   --group-by-size
         Group by size buckets
+  --group-by-parent
+        Group media by parent directory with counts and totals
   -D, --depth
         Aggregate at specific directory depth
   --min-depth
@@ -3056,6 +3062,8 @@ Flags:
         Group by mimetypes
   --group-by-size
         Group by size buckets
+  --group-by-parent
+        Group media by parent directory with counts and totals
   -D, --depth
         Aggregate at specific directory depth
   --min-depth
@@ -3498,6 +3506,8 @@ Flags:
         Group by mimetypes
   --group-by-size
         Group by size buckets
+  --group-by-parent
+        Group media by parent directory with counts and totals
   -D, --depth
         Aggregate at specific directory depth
   --min-depth

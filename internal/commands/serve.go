@@ -558,6 +558,9 @@ func (c *ServeCmd) parseFlags(r *http.Request) models.GlobalFlags {
 	} else if episodes := q.Get("episodes"); episodes != "" {
 		flags.FileCounts = episodes
 	}
+	if groupBy := q.Get("group_by"); groupBy == "parent" {
+		flags.GroupByParent = true
+	}
 	return flags
 }
 
@@ -1508,6 +1511,8 @@ func (c *ServeCmd) handleDU(w http.ResponseWriter, r *http.Request) {
 
 	query.SortFolders(results, sortBy, reverse)
 
+	// Set total count header for pagination
+	w.Header().Set("X-Total-Count", strconv.Itoa(len(results)))
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(results)
 }
@@ -1528,6 +1533,8 @@ func (c *ServeCmd) handleEpisodes(w http.ResponseWriter, r *http.Request) {
 
 	results := aggregate.GroupByParent(allMedia)
 
+	// Set total count header for pagination
+	w.Header().Set("X-Total-Count", strconv.Itoa(len(results)))
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(results)
 }
@@ -1571,6 +1578,7 @@ func (c *ServeCmd) handleFilterBins(w http.ResponseWriter, r *http.Request) {
 
 		qb := query.NewQueryBuilder(tempFlags)
 		sqlQuery, args := qb.BuildSelect("path, size, duration")
+		slog.Info("FilterBins query", "sql", sqlQuery, "args", args, "isGlobal", isGlobal)
 
 		var wg sync.WaitGroup
 		for _, dbPath := range c.Databases {
@@ -1587,20 +1595,40 @@ func (c *ServeCmd) handleFilterBins(w http.ResponseWriter, r *http.Request) {
 					var localSizes []int64
 					var localDurations []int64
 					localParentCounts := make(map[string]int64)
+					var sampleCount int
 
 					for rows.Next() {
 						var p string
 						var s, d sql.NullInt64
 						if err := rows.Scan(&p, &s, &d); err == nil {
-							if s.Valid {
-								localSizes = append(localSizes, s.Int64)
+							sampleCount++
+							if sampleCount <= 3 {
+								slog.Info("FilterBins sample", "path", p, "size", s.Int64, "duration", d.Int64, "sizeValid", s.Valid, "durationValid", d.Valid)
 							}
-							if d.Valid {
+							// Validate data to catch corrupted values
+							// Size should be between 1 byte and 100TB
+							if s.Valid && s.Int64 > 0 && s.Int64 < 100*1024*1024*1024*1024 {
+								localSizes = append(localSizes, s.Int64)
+							} else if s.Valid {
+								slog.Warn("FilterBins: Skipping corrupted size value", "path", p, "size", s.Int64)
+							}
+							// Duration should be between 1 second and 31 days
+							if d.Valid && d.Int64 > 0 && d.Int64 < 2678400 {
 								localDurations = append(localDurations, d.Int64)
+							} else if d.Valid {
+								slog.Warn("FilterBins: Skipping corrupted duration value", "path", p, "duration", d.Int64)
 							}
 							parent := filepath.Dir(p)
 							localParentCounts[parent]++
 						}
+					}
+
+					slog.Info("FilterBins DB result", "dbPath", path, "samplesRead", sampleCount, "sizesCollected", len(localSizes), "durationsCollected", len(localDurations))
+					if len(localSizes) > 0 {
+						slog.Info("FilterBins size stats", "min", slices.Min(localSizes), "max", slices.Max(localSizes))
+					}
+					if len(localDurations) > 0 {
+						slog.Info("FilterBins duration stats", "min", slices.Min(localDurations), "max", slices.Max(localDurations))
 					}
 
 					mu.Lock()
@@ -1805,11 +1833,18 @@ func (c *ServeCmd) calculateFilterCounts(ctx context.Context, flags models.Globa
 						var p string
 						var s, d sql.NullInt64
 						if err := rows.Scan(&p, &s, &d); err == nil {
-							if s.Valid {
+							// Validate data to catch corrupted values
+							// Size should be between 1 byte and 100TB
+							if s.Valid && s.Int64 > 0 && s.Int64 < 100*1024*1024*1024*1024 {
 								localSizes = append(localSizes, s.Int64)
+							} else if s.Valid {
+								slog.Warn("Skipping corrupted size value", "path", p, "size", s.Int64)
 							}
-							if d.Valid {
+							// Duration should be between 1 second and 31 days
+							if d.Valid && d.Int64 > 0 && d.Int64 < 2678400 {
 								localDurations = append(localDurations, d.Int64)
+							} else if d.Valid {
+								slog.Warn("Skipping corrupted duration value", "path", p, "duration", d.Int64)
 							}
 							parent := filepath.Dir(p)
 							localParentCounts[parent]++
@@ -2161,18 +2196,58 @@ func (c *ServeCmd) handleRandomClip(w http.ResponseWriter, r *http.Request) {
 		end = start + cableDuration
 	}
 
+	// Support fields parameter to limit response size
+	fieldsParam := r.URL.Query().Get("fields")
+
 	type clipResponse struct {
 		models.MediaWithDB
 		Start int `json:"start"`
 		End   int `json:"end"`
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(clipResponse{
+	response := clipResponse{
 		MediaWithDB: item,
 		Start:       start,
 		End:         end,
-	})
+	}
+
+	// If fields parameter is provided, only include specified fields
+	if fieldsParam != "" {
+		requestedFields := strings.Split(fieldsParam, ",")
+		fieldSet := make(map[string]bool)
+		for _, f := range requestedFields {
+			fieldSet[strings.TrimSpace(f)] = true
+		}
+
+		// Clear all fields first
+		cleared := models.MediaWithDB{
+			DB: item.DB,
+		}
+
+		// Only include requested fields
+		if fieldSet["path"] {
+			cleared.Path = item.Path
+		}
+		if fieldSet["type"] {
+			cleared.Type = item.Type
+		}
+		if fieldSet["duration"] {
+			cleared.Duration = item.Duration
+		}
+		if fieldSet["start"] || fieldSet["end"] {
+			// Always include start/end if either is requested since they're part of the response wrapper
+			response.Start = start
+			response.End = end
+		}
+		if fieldSet["db"] {
+			cleared.DB = item.DB
+		}
+
+		response.MediaWithDB = cleared
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
 }
 
 func (c *ServeCmd) handleCategorizeSuggest(w http.ResponseWriter, r *http.Request) {
@@ -2773,6 +2848,7 @@ func (c *ServeCmd) handleTrash(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	w.Header().Set("X-Total-Count", strconv.Itoa(len(media)))
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(media)
 }

@@ -2479,15 +2479,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (filteredCaptions.length > 0) {
                     currentMedia = filteredCaptions;
                 }
-
-                // Update count
-                state.totalCount = currentMedia.length;
-            }
-
-            // Update total count after client-side filtering
-            if ((state.filters.unplayed || state.filters.unfinished || state.filters.completed || state.page === 'history' || state.filters.excludedDbs.length > 0) &&
-                !(state.page === 'captions' && state.filters.search)) {
-                state.totalCount = currentMedia.length;
             }
 
             // Local sorting for play_count if global progress is disabled
@@ -3899,14 +3890,19 @@ document.addEventListener('DOMContentLoaded', () => {
             const emptyBtn = document.getElementById('empty-bin-btn');
             if (emptyBtn) emptyBtn.onclick = emptyBin;
         } else if (state.page === 'history') {
-            const unit = state.totalCount === 1 ? 'result' : 'results';
-            resultsCount.textContent = `${state.totalCount} recently played ${unit}`;
+            // Show filtered count for history filters, otherwise show server total
+            const displayCount = (state.filters.unplayed || state.filters.unfinished || state.filters.completed) ? currentMedia.length : state.totalCount;
+            const unit = displayCount === 1 ? 'result' : 'results';
+            resultsCount.textContent = `${displayCount} recently played ${unit}`;
         } else if (state.page === 'playlist') {
             const unit = currentMedia.length === 1 ? 'result' : 'results';
             resultsCount.textContent = `${currentMedia.length} ${unit} in ${state.filters.playlist || 'playlist'}`;
         } else {
-            const unit = state.totalCount === 1 ? 'result' : 'results';
-            resultsCount.textContent = `${state.totalCount} ${unit}`;
+            // Show filtered count for client-side filters, otherwise show server total
+            const hasClientFilter = state.filters.unplayed || state.filters.unfinished || state.filters.completed || state.filters.excludedDbs.length > 0;
+            const displayCount = hasClientFilter ? currentMedia.length : state.totalCount;
+            const unit = displayCount === 1 ? 'result' : 'results';
+            resultsCount.textContent = `${displayCount} ${unit}`;
         }
 
         if (currentMedia.length === 0) {
@@ -5810,9 +5806,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (duBtn) {
         duBtn.onclick = () => {
-            state.page = 'du';
-            updateNavActiveStates();
-            fetchDU(state.duPath);
+            if (state.page === 'du') {
+                // Toggle off DU mode if already active
+                state.page = 'search';
+                updateNavActiveStates();
+                performSearch();
+            } else {
+                state.page = 'du';
+                updateNavActiveStates();
+                fetchDU(state.duPath);
+            }
         };
     }
 
@@ -6131,6 +6134,7 @@ document.addEventListener('DOMContentLoaded', () => {
         syncUrl,
         showToast,
         resetFilters,
+        updateSliderLabels,
         state
     };
 });

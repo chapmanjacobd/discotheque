@@ -38,7 +38,9 @@ describe('Unplayed Filter Client-side', () => {
             expect(results.length).toBe(1);
             expect(results[0].getAttribute('data-path')).toBe('video2.mp4');
         }, { timeout: 2000 });
-        
-        expect(window.disco.state.totalCount).toBe(1);
+
+        // totalCount preserves server count, currentMedia has filtered count
+        expect(window.disco.state.totalCount).toBe(2);
+        expect(window.disco.currentMedia.length).toBe(1);
     });
 });

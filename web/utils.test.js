@@ -25,6 +25,14 @@ describe('Utility Functions', () => {
       expect(formatDuration(3600)).toBe('1:00:00');
       expect(formatDuration(3661)).toBe('1:01:01');
     });
+
+    it('handles unreasonable duration values', () => {
+      const { formatDuration } = window.disco;
+      // Values that are clearly corrupted (e.g., stored in wrong unit)
+      expect(formatDuration(-1)).toBe('Invalid duration');
+      expect(formatDuration(2678401)).toBe('Invalid duration'); // > 31 days
+      expect(formatDuration(6000000000)).toBe('Invalid duration'); // 6 billion seconds
+    });
   });
 
   describe('shortDuration', () => {

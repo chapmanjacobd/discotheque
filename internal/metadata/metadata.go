@@ -137,7 +137,10 @@ func Extract(ctx context.Context, path string, scanSubtitles bool) (*MediaMetada
 			// Format info
 			if d, err := strconv.ParseFloat(data.Format.Duration, 64); err == nil {
 				duration = int64(d)
-				params.Duration = utils.ToNullInt64(duration)
+				// Validate duration is reasonable (max 31 days for sanity)
+				if duration > 0 && duration < 2678400 {
+					params.Duration = utils.ToNullInt64(duration)
+				}
 			}
 
 			if data.Format.Tags != nil {

@@ -78,6 +78,57 @@ describe('Range Sliders', () => {
         });
     });
 
+    it('displays duration values correctly from percentiles', async () => {
+        await setupTestEnvironment();
+        const minSlider = document.getElementById('duration-min-slider');
+        const maxSlider = document.getElementById('duration-max-slider');
+        const label = document.getElementById('duration-percentile-label');
+
+        // Manually set filter bins with realistic duration values (in seconds)
+        window.disco.state.filterBins = {
+            duration_min: 0,
+            duration_max: 7200, // 2 hours
+            duration_percentiles: [0, 60, 300, 600, 1800, 3600, 7200]
+        };
+
+        // Update slider labels
+        window.disco.updateSliderLabels();
+
+        // Label should show formatted duration range (0 to 2 hours)
+        expect(label.textContent).toContain('0:00');
+        expect(label.textContent).toContain('2:00:00');
+        // Should NOT show absurd values like "69897d"
+        expect(label.textContent).not.toMatch(/\d{4,}d/);
+    });
+
+    it('handles duration percentile values correctly', async () => {
+        await setupTestEnvironment();
+        
+        // Set up state with duration percentiles
+        window.disco.state.filterBins = {
+            duration_min: 30,
+            duration_max: 14400, // 4 hours
+            duration_percentiles: Array.from({length: 101}, (_, i) => Math.floor(30 + (14400 - 30) * (i / 100)))
+        };
+
+        const minSlider = document.getElementById('duration-min-slider');
+        const maxSlider = document.getElementById('duration-max-slider');
+        const label = document.getElementById('duration-percentile-label');
+
+        // Set sliders to specific percentiles
+        minSlider.value = '0';
+        maxSlider.value = '100';
+        
+        window.disco.updateSliderLabels();
+
+        // Should show range from ~30 seconds to 4 hours
+        const labelText = label.textContent;
+        expect(labelText).toContain('0:30'); // min
+        expect(labelText).toContain('4:00:00'); // max
+        // Verify no absurdly large day values
+        expect(labelText).not.toMatch(/\d{3,}d/);
+    });
+
     it('prevents min slider from exceeding max slider', async () => {
         await setupTestEnvironment();
         const minSlider = document.getElementById('episodes-min-slider');
