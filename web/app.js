@@ -1440,7 +1440,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const prevPath = state.duPath;
         const isForwardNav = prevPath && path.startsWith(prevPath);
         const isBackwardNav = prevPath && prevPath.startsWith(path);
-        
+
         state.page = 'du';
         state.duPath = path;
 
@@ -1453,6 +1453,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const sortReverseBtn = document.getElementById('sort-reverse-btn');
             if (sortBy) sortBy.value = 'size';
             if (sortReverseBtn) sortReverseBtn.classList.add('active');
+
+            // Fetch filter bins to populate percentile sliders when entering DU mode
+            // This ensures bins are populated even when coming from "No media found" state
+            fetchFilterBins();
         }
 
         syncUrl();
@@ -1470,7 +1474,7 @@ document.addEventListener('DOMContentLoaded', () => {
             clearTimeout(skeletonTimeout);
             if (!resp.ok) throw new Error('Failed to fetch DU');
             let data = await resp.json();
-            
+
             // Auto-skip through single-item folders (forward navigation only, including initial load)
             // Skip backward navigation check - only auto-skip on forward nav or initial load
             const shouldAutoSkip = (isForwardNav || isFirstDUVisit) && data && data.length === 1;
@@ -1486,7 +1490,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
             }
-            
+
             state.duData = data;
             renderDU(state.duData);
         } catch (err) {
@@ -1571,7 +1575,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Check if this is a single file
             const isSingleFile = (item.count === 0 && item.files && item.files.length === 1) ||
-                                 (item.files && item.files.length === 1 && item.files[0].path === item.path);
+                (item.files && item.files.length === 1 && item.files[0].path === item.path);
 
             if (isSingleFile) {
                 // Single file row
@@ -1646,7 +1650,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Check if this is a single file (not a folder)
             const isSingleFile = (item.count === 0 && item.files && item.files.length === 1) ||
-                                 (item.files && item.files.length === 1 && item.files[0].path === item.path);
+                (item.files && item.files.length === 1 && item.files[0].path === item.path);
 
             if (isSingleFile) {
                 // Render as clickable media card
@@ -3953,8 +3957,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     <h2 style="margin: 0 0 0.5rem 0; color: var(--text);">No media found</h2>
                     <p style="margin: 0; max-width: 400px;">
                         ${state.filters.search ?
-                            `No results for "${state.filters.search}". Try adjusting your search or filters.` :
-                            'Try adjusting your filters or add some media to your library.'}
+                    `No results for "${state.filters.search}". Try adjusting your search or filters.` :
+                    'Try adjusting your filters or add some media to your library.'}
                     </p>
                     ${state.filters.types.length > 0 || state.filters.categories.length > 0 || state.filters.sizes.length > 0 || state.filters.durations.length > 0 ? `
                         <button class="category-btn" onclick="window.disco.resetFilters()" style="margin-top: 1.5rem;">
@@ -4299,9 +4303,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="caption-media-header">
                     <div class="caption-media-thumb">
                         ${type.includes('image') ?
-                            `<img src="${thumbUrl}" loading="lazy">` :
-                            `<div class="caption-media-icon">🎬</div>`
-                        }
+                    `<img src="${thumbUrl}" loading="lazy">` :
+                    `<div class="caption-media-icon">🎬</div>`
+                }
                     </div>
                     <div class="caption-media-info">
                         <div class="media-title" title="${path}">${basename}</div>

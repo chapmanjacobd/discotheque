@@ -193,7 +193,7 @@ export async function setupTestEnvironment(initialLocalStorage) {
     };
 
     // Load index.html
-    const htmlPath = path.resolve(__dirname, 'index.html');
+    const htmlPath = path.resolve(__dirname, '../index.html');
     const html = fs.readFileSync(htmlPath, 'utf8');
     document.body.innerHTML = html;
 
@@ -207,7 +207,7 @@ export async function setupTestEnvironment(initialLocalStorage) {
     }
     vi.resetModules();
 
-    await import('./app.js');
+    await import('../app.js');
     document.dispatchEvent(new Event('DOMContentLoaded'));
 
     // Wait for async init and multiple renders

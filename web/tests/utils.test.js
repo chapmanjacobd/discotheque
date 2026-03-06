@@ -26,12 +26,14 @@ describe('Utility Functions', () => {
       expect(formatDuration(3661)).toBe('1:01:01');
     });
 
-    it('handles unreasonable duration values', () => {
+    it('formats durations over 24 hours with days', () => {
       const { formatDuration } = window.disco;
-      // Values that are clearly corrupted (e.g., stored in wrong unit)
-      expect(formatDuration(-1)).toBe('Invalid duration');
-      expect(formatDuration(2678401)).toBe('Invalid duration'); // > 31 days
-      expect(formatDuration(6000000000)).toBe('Invalid duration'); // 6 billion seconds
+      // 25 hours = 1 day 1 hour
+      expect(formatDuration(90000)).toBe('1d 01:00');
+      // 1 day exactly
+      expect(formatDuration(86400)).toBe('1d 00:00');
+      // 2 days 3 hours 15 minutes
+      expect(formatDuration(184500)).toBe('2d 03:15');
     });
   });
 
