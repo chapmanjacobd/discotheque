@@ -448,6 +448,32 @@ main {
     border: 1px solid var(--border-color);
 }
 
+.du-path-display {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: var(--bg-color);
+    padding: 0.4rem 0.8rem;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+    flex: 1;
+    min-width: 0;
+}
+
+.du-path-display.hidden {
+    display: none;
+}
+
+#du-current-path {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+    font-family: monospace;
+}
+
 .sidebar-buttons {
     display: flex;
     flex-direction: column;

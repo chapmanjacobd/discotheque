@@ -1414,7 +1414,30 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderDU(data) {
         if (!data) data = [];
 
-        resultsCount.textContent = `Disk Usage: ${state.duPath || 'Root'}`;
+        // Show current path in toolbar (truncated)
+        const duPathDisplay = document.getElementById('du-path-display');
+        const duCurrentPath = document.getElementById('du-current-path');
+        if (duPathDisplay && duCurrentPath) {
+            duPathDisplay.classList.remove('hidden');
+            const displayPath = state.duPath || '/';
+            const truncated = displayPath.length > 60 ? '...' + displayPath.slice(-57) : displayPath;
+            duCurrentPath.textContent = truncated;
+            duCurrentPath.title = displayPath;
+        }
+
+        // Show folder/file count in results-info
+        let totalFolders = 0;
+        let totalFiles = 0;
+        data.forEach(item => {
+            if (item.count === 0 && item.files && item.files.length === 1) {
+                totalFiles++;
+            } else {
+                totalFolders++;
+                totalFiles += item.count;
+            }
+        });
+        resultsCount.textContent = `${totalFolders} folders, ${totalFiles} files`;
+
         resultsContainer.className = 'grid du-view';
         resultsContainer.innerHTML = '';
 
@@ -1495,9 +1518,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div class="media-info">
                         <div class="media-title" title="${item.path}">${name}</div>
                         <div class="media-meta">
-                            <span>${size}</span>
+                            <span title="Folder Size">${size}</span>
                             <span>${count} files</span>
-                            <span>${duration}</span>
+                            <span title="Total Duration">${duration}</span>
                         </div>
                     </div>
                 `;
@@ -3592,6 +3615,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Rendering ---
     function renderResults() {
         if (!currentMedia) currentMedia = [];
+
+        // Hide DU path display when not in DU view
+        const duPathDisplay = document.getElementById('du-path-display');
+        if (duPathDisplay && state.page !== 'du') {
+            duPathDisplay.classList.add('hidden');
+        }
 
         // Prevent scroll jump by keeping current height temporarily
         const currentHeight = resultsContainer.offsetHeight;

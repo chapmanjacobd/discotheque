@@ -1298,6 +1298,11 @@ func (c *ServeCmd) handleDU(w http.ResponseWriter, r *http.Request) {
 	aggFlags := flags
 	aggFlags.Depth = depth
 	aggFlags.Parents = false
+	// Default sort for DU is by size descending
+	if aggFlags.SortBy == "" || aggFlags.SortBy == "default" {
+		aggFlags.SortBy = "size"
+		aggFlags.Reverse = true
+	}
 
 	stats := query.AggregateMedia(media, aggFlags)
 	query.SortFolders(stats, aggFlags.SortBy, aggFlags.Reverse)
