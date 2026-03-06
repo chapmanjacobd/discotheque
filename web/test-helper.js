@@ -38,10 +38,18 @@ export async function setupTestEnvironment(initialLocalStorage) {
                 duration_min: 0, duration_max: 3600
             };
         } else if (url.includes('/api/query')) {
-            data = mocks.media || [
-                { path: 'video1.mp4', type: 'video/mp4', size: 1024, duration: 60, db: 'test.db', caption_text: 'sample caption', caption_time: 10.5 },
-                { path: 'audio1.mp3', type: 'audio/mpeg', size: 512, duration: 120, db: 'test.db', caption_text: 'another caption', caption_time: 20.0 }
-            ];
+            if (url.includes('captions=true')) {
+                data = mocks.media_with_captions || [
+                    { path: 'video1.mp4', type: 'video/mp4', size: 1024, duration: 60, db: 'test.db', caption_text: 'sample caption', caption_time: 10.5 },
+                    { path: 'video2.mp4', type: 'video/mp4', size: 2048, duration: 120, db: 'test.db', caption_text: 'another caption', caption_time: 20.0 },
+                    { path: 'video3.mp4', type: 'video/mp4', size: 512, duration: 30, db: 'test.db', caption_text: 'third caption', caption_time: 5.0 }
+                ];
+            } else {
+                data = mocks.media || [
+                    { path: 'video1.mp4', type: 'video/mp4', size: 1024, duration: 60, db: 'test.db', caption_text: 'sample caption', caption_time: 10.5 },
+                    { path: 'audio1.mp3', type: 'audio/mpeg', size: 512, duration: 120, db: 'test.db', caption_text: 'another caption', caption_time: 20.0 }
+                ];
+            }
         }
 
         return Promise.resolve({

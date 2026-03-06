@@ -26,6 +26,35 @@
       "transcode": false
     }
   ],
+  "media_with_captions": [
+    {
+      "path": "video1.mp4",
+      "duration": 120,
+      "size": 52428800,
+      "type": "video/mp4",
+      "db": "test.db",
+      "caption_text": "sample caption text",
+      "caption_time": 10.5
+    },
+    {
+      "path": "video2.mp4",
+      "duration": 180,
+      "size": 62428800,
+      "type": "video/mp4",
+      "db": "test.db",
+      "caption_text": "another caption here",
+      "caption_time": 25.3
+    },
+    {
+      "path": "video3.mp4",
+      "duration": 90,
+      "size": 42428800,
+      "type": "video/mp4",
+      "db": "test.db",
+      "caption_text": "third caption example",
+      "caption_time": 5.0
+    }
+  ],
   "databases": {
     "databases": [
       "test.db"

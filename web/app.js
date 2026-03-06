@@ -3917,7 +3917,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const fragment = document.createDocumentFragment();
 
-        currentMedia.forEach(item => {
+        // Filter out items without captions
+        const itemsWithCaptions = currentMedia.filter(item =>
+            item.caption_text && item.caption_text.trim() !== '' &&
+            item.caption_time !== null && item.caption_time !== undefined
+        );
+
+        itemsWithCaptions.forEach(item => {
             const row = document.createElement('div');
             row.className = 'caption-row';
 
@@ -5599,6 +5605,7 @@ document.addEventListener('DOMContentLoaded', () => {
         updateNavActiveStates,
         playSibling,
         renderPagination,
+        renderCaptionsList,
         readUrl,
         syncUrl,
         showToast,
