@@ -2627,17 +2627,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 playMedia(currentMedia[nextIndex]);
             }
         } else if (nextIndex >= currentMedia.length && !state.filters.all && state.page === 'search') {
-            // End of current page, fetch next
-            state.currentPage++;
-            performSearch().then(() => {
-                if (currentMedia.length > 0) {
-                    if (state.player === 'browser') {
-                        openInPiP(currentMedia[0], isNewSession);
-                    } else {
-                        playMedia(currentMedia[0]);
+            const totalPages = Math.ceil(state.totalCount / state.filters.limit);
+            if (state.currentPage < totalPages) {
+                // End of current page, fetch next
+                state.currentPage++;
+                performSearch().then(() => {
+                    if (currentMedia.length > 0) {
+                        if (state.player === 'browser') {
+                            openInPiP(currentMedia[0], isNewSession);
+                        } else {
+                            playMedia(currentMedia[0]);
+                        }
                     }
-                }
-            });
+                });
+            }
         } else if (nextIndex < 0 && state.currentPage > 1 && !state.filters.all && state.page === 'search') {
             // Beginning of current page, fetch previous
             state.currentPage--;
@@ -5457,9 +5460,12 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     if (nextPageBtn) nextPageBtn.onclick = () => {
-        state.currentPage++;
-        performSearch();
-        resultsContainer.scrollTo(0, 0);
+        const totalPages = Math.ceil(state.totalCount / state.filters.limit);
+        if (state.currentPage < totalPages) {
+            state.currentPage++;
+            performSearch();
+            resultsContainer.scrollTo(0, 0);
+        }
     };
 
     // --- Inactivity Tracking ---
@@ -5551,6 +5557,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Expose for testing
     window.disco = {
+        get currentMedia() { return currentMedia; },
+        set currentMedia(v) { currentMedia = v; },
         formatSize,
         formatDuration,
         shortDuration,
@@ -5567,6 +5575,8 @@ document.addEventListener('DOMContentLoaded', () => {
         getPlayCount,
         markMediaPlayed,
         updateNavActiveStates,
+        playSibling,
+        renderPagination,
         readUrl,
         syncUrl,
         showToast,
