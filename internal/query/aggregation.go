@@ -196,7 +196,7 @@ func AggregateByDepth(media []models.MediaWithDB, flags models.GlobalFlags) []mo
 				groups[parent] = &models.FolderStats{Path: parent}
 			}
 			updateStats(groups[parent], m, true)
-		} else if flags.Depth > 0 {
+		} else if flags.Depth > 0 && len(parts) > flags.Depth {
 			// Group at depth (e.g., depth=1 -> "/media" or "media", depth=2 -> "/media/video")
 			// For absolute paths, parts[0] is "", so we need depth+1 components
 			// For relative paths, we need exactly depth components
@@ -221,7 +221,7 @@ func AggregateByDepth(media []models.MediaWithDB, flags models.GlobalFlags) []mo
 			}
 			updateStats(groups[parent], m, true)
 		} else {
-			// Default to immediate parent (when Depth=0)
+			// Default to immediate parent (when Depth=0 or file is at/below target depth)
 			parent := m.Parent()
 			if _, ok := groups[parent]; !ok {
 				groups[parent] = &models.FolderStats{Path: parent}
