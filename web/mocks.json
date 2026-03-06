@@ -70,6 +70,29 @@
     }
   ],
   "categorize_suggest": ["Concert", "Live", "Studio", "Acoustic", "Remix"],
+  "du_data": [
+    {
+      "path": "/videos/movies/",
+      "total_size": 1073741824,
+      "total_duration": 7200,
+      "count": 5,
+      "files": []
+    },
+    {
+      "path": "/videos/music/",
+      "total_size": 536870912,
+      "total_duration": 3600,
+      "count": 10,
+      "files": []
+    },
+    {
+      "path": "/audio/",
+      "total_size": 268435456,
+      "total_duration": 1800,
+      "count": 20,
+      "files": []
+    }
+  ],
   "databases": {
     "databases": [
       "test.db"

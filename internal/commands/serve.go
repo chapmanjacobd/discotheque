@@ -1298,8 +1298,8 @@ func (c *ServeCmd) handleDU(w http.ResponseWriter, r *http.Request) {
 	aggFlags := flags
 	aggFlags.Depth = depth
 	aggFlags.Parents = false
-	// Default sort for DU is by size descending
-	if aggFlags.SortBy == "" || aggFlags.SortBy == "default" {
+	// Default sort for DU is by size descending (only if no sort specified)
+	if aggFlags.SortBy == "" {
 		aggFlags.SortBy = "size"
 		aggFlags.Reverse = true
 	}

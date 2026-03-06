@@ -650,6 +650,14 @@ document.addEventListener('DOMContentLoaded', () => {
         state.filters.durations.forEach(b => params.append('duration', getBinQueryParam(b)));
 
         state.filters.types.forEach(t => params.append('type', t));
+        
+        // Add sort parameters
+        if (state.filters.sort && state.filters.sort !== 'default') {
+            params.append('sort', state.filters.sort);
+        }
+        if (state.filters.reverse) {
+            params.append('reverse', 'true');
+        }
     }
 
     function syncUrl() {
@@ -1386,8 +1394,20 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function fetchDU(path = '') {
+        const isFirstDUVisit = state.page !== 'du';
         state.page = 'du';
         state.duPath = path;
+        
+        // Set default sort for DU view on first visit: size descending
+        if (isFirstDUVisit) {
+            state.filters.sort = 'size';
+            state.filters.reverse = true;
+            const sortBy = document.getElementById('sort-by');
+            const sortReverseBtn = document.getElementById('sort-reverse-btn');
+            if (sortBy) sortBy.value = 'size';
+            if (sortReverseBtn) sortReverseBtn.classList.add('active');
+        }
+        
         syncUrl();
 
         const skeletonTimeout = setTimeout(() => {
@@ -1418,13 +1438,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const duToolbar = document.getElementById('du-toolbar');
         const duPathInput = document.getElementById('du-path-input');
         const duBackBtn = document.getElementById('du-back-btn');
-        
+
         if (duToolbar && duPathInput) {
             duToolbar.classList.remove('hidden');
             const displayPath = state.duPath || '/';
             duPathInput.value = displayPath;
             duPathInput.title = displayPath;
-            
+
             // Show/hide back button based on current path
             if (duBackBtn) {
                 if (state.duPath && state.duPath !== '/' && state.duPath !== '.') {
@@ -4299,7 +4319,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         toast.innerHTML = `<span>${icon}</span> <span>${msg}</span>`;
-        
+
         // Move toast into fullscreen element if active
         if (document.fullscreenElement) {
             if (toast.parentElement !== document.fullscreenElement) {
@@ -5348,11 +5368,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // DU path input - allows editing and navigation
     const duPathInput = document.getElementById('du-path-input');
     if (duPathInput) {
-        // Select all text on click for easy copy
-        duPathInput.addEventListener('click', () => {
-            duPathInput.select();
-        });
-
         // Navigate to path on Enter
         duPathInput.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') {
@@ -5392,6 +5407,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (state.page === 'playlist') {
             sortPlaylistItems();
             renderResults();
+        } else if (state.page === 'du') {
+            state.currentPage = 1;
+            fetchDU(state.duPath);
         } else {
             state.currentPage = 1;
             performSearch();
@@ -5405,6 +5423,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (state.page === 'playlist') {
             sortPlaylistItems();
             renderResults();
+        } else if (state.page === 'du') {
+            state.currentPage = 1;
+            fetchDU(state.duPath);
         } else {
             state.currentPage = 1;
             performSearch();
@@ -5572,12 +5593,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // Also close on media selection to show the player/content
     document.addEventListener('click', (e) => {
         const target = e.target;
-        const isClickable = target.closest('.category-btn') || 
-                           target.closest('.playlist-name') || 
-                           target.closest('#trash-btn') || 
-                           target.closest('#history-btn') || 
-                           target.closest('.media-card');
-                           
+        const isClickable = target.closest('.category-btn') ||
+            target.closest('.playlist-name') ||
+            target.closest('#trash-btn') ||
+            target.closest('#history-btn') ||
+            target.closest('.media-card');
+
         if (isClickable && window.innerWidth <= 768) {
             closeMobileSidebar();
         }

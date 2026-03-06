@@ -65,6 +65,12 @@ export async function setupTestEnvironment(initialLocalStorage) {
             data = { success: true };
         } else if (url.includes('/api/categorize/category')) {
             data = { success: true };
+        } else if (url.includes('/api/du')) {
+            data = mocks.du_data || [
+                { path: '/videos/movies/', total_size: 1073741824, total_duration: 7200, count: 5, files: [] },
+                { path: '/videos/music/', total_size: 536870912, total_duration: 3600, count: 10, files: [] },
+                { path: '/audio/', total_size: 268435456, total_duration: 1800, count: 20, files: [] }
+            ];
         }
 
         return Promise.resolve({
