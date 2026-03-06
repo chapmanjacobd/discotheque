@@ -149,8 +149,7 @@ describe('Advanced Integration Tests', () => {
 
         await vi.waitFor(() => {
             const calls = global.fetch.mock.calls;
-            // The URL might contain either view=captions or captions=true depending on implementation
-            const hasCaptionsRequest = calls.some(call => call[0].includes('captions=true') || call[0].includes('view=captions'));
+            const hasCaptionsRequest = calls.some(call => call[0].includes('captions=true') || call[0].includes('mode=captions'));
             expect(hasCaptionsRequest).toBe(true);
         });
 
@@ -163,7 +162,7 @@ describe('Advanced Integration Tests', () => {
         await vi.waitFor(() => {
             const calls = global.fetch.mock.calls;
             const hasCaptionsQuery = calls.some(call =>
-                (call[0].includes('captions=true') || call[0].includes('view=captions')) &&
+                (call[0].includes('captions=true') || call[0].includes('mode=captions')) &&
                 call[0].includes('search=findme')
             );
             expect(hasCaptionsQuery).toBe(true);

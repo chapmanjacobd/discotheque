@@ -701,19 +701,19 @@ document.addEventListener('DOMContentLoaded', () => {
     function syncUrl() {
         const params = new URLSearchParams();
         if (state.page === 'trash') {
-            params.set('view', 'trash');
+            params.set('mode', 'trash');
         } else if (state.page === 'history') {
-            params.set('view', 'history');
+            params.set('mode', 'history');
         } else if (state.page === 'playlist' && state.filters.playlist) {
-            params.set('view', 'playlist');
+            params.set('mode', 'playlist');
             params.set('title', state.filters.playlist);
         } else if (state.page === 'du') {
-            params.set('view', 'du');
+            params.set('mode', 'du');
             if (state.duPath) params.set('path', state.duPath);
         } else if (state.page === 'curation') {
-            params.set('view', 'curation');
+            params.set('mode', 'curation');
         } else if (state.page === 'captions') {
-            params.set('view', 'captions');
+            params.set('mode', 'captions');
         } else {
             state.filters.categories.forEach(c => params.append('category', c));
             if (state.filters.genre) params.set('genre', state.filters.genre);
@@ -721,9 +721,11 @@ document.addEventListener('DOMContentLoaded', () => {
             if (state.filters.search) params.set('search', state.filters.search);
             if (state.filters.min_score) params.set('min_score', state.filters.min_score);
             if (state.filters.max_score) params.set('max_score', state.filters.max_score);
-            if (state.filters.unplayed) params.set('unplayed', 'true');
-            if (state.filters.unfinished) params.set('unfinished', 'true');
-            if (state.filters.completed) params.set('completed', 'true');
+            if (state.filters.unplayed || state.filters.unfinished || state.filters.completed) {
+                if (state.filters.unfinished) params.set('history', 'in-progress');
+                else if (state.filters.unplayed) params.set('history', 'unplayed');
+                else if (state.filters.completed) params.set('history', 'completed');
+            }
 
             state.filters.episodes.forEach(b => params.append('episodes', getBinQueryParam(b)));
             state.filters.sizes.forEach(b => params.append('size', getBinQueryParam(b)));
@@ -744,8 +746,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (window.location.hash !== newHash) {
             // Use pushState for DU navigation and page changes to support back button
             // Use replaceState for filter changes to avoid history spam
-            const isDUPathChange = state.page === 'du' && !window.location.hash.includes('view=du');
-            const isPageChange = !window.location.hash.includes(`view=${state.page}`);
+            const isDUPathChange = state.page === 'du' && !window.location.hash.includes('mode=du');
+            const isPageChange = !window.location.hash.includes(`mode=${state.page}`);
 
             if (isPageChange || state.page === 'du') {
                 window.history.pushState(state.filters, '', window.location.pathname + newHash);
@@ -759,34 +761,34 @@ document.addEventListener('DOMContentLoaded', () => {
         // Support both hash and search params, preferring hash for the new system
         const hash = window.location.hash.substring(1);
         const params = hash ? new URLSearchParams(hash) : new URLSearchParams(window.location.search);
-        const view = params.get('view');
+        const mode = params.get('mode');
 
         const pageParam = params.get('p');
         state.currentPage = pageParam ? parseInt(pageParam) : 1;
 
-        if (view === 'trash') {
+        if (mode === 'trash') {
             state.page = 'trash';
             state.filters.categories = [];
             state.filters.ratings = [];
-        } else if (view === 'history') {
+        } else if (mode === 'history') {
             state.page = 'history';
             state.filters.categories = [];
             state.filters.ratings = [];
-        } else if (view === 'playlist') {
+        } else if (mode === 'playlist') {
             state.page = 'playlist';
             state.filters.playlist = params.get('title');
             state.filters.categories = [];
             state.filters.ratings = [];
-        } else if (view === 'du') {
+        } else if (mode === 'du') {
             state.page = 'du';
             state.duPath = params.get('path') || '';
             state.filters.categories = [];
             state.filters.ratings = [];
-        } else if (view === 'curation') {
+        } else if (mode === 'curation') {
             state.page = 'curation';
             state.filters.categories = [];
             state.filters.ratings = [];
-        } else if (view === 'captions') {
+        } else if (mode === 'captions') {
             state.page = 'captions';
             state.filters.categories = [];
             state.filters.ratings = [];
@@ -803,11 +805,13 @@ document.addEventListener('DOMContentLoaded', () => {
             state.filters.search = params.get('search') || '';
             state.filters.all = params.get('all') === 'true';
             state.filters.min_score = params.get('min_score') || '';
-
             state.filters.max_score = params.get('max_score') || '';
-            state.filters.unplayed = params.get('unplayed') === 'true';
-            state.filters.unfinished = params.get('unfinished') === 'true';
-            state.filters.completed = params.get('completed') === 'true';
+
+            // Read history filter from URL
+            const historyFilter = params.get('history');
+            state.filters.unfinished = historyFilter === 'in-progress';
+            state.filters.unplayed = historyFilter === 'unplayed';
+            state.filters.completed = historyFilter === 'completed';
 
             state.filters.episodes = params.getAll('episodes').map(val => {
                 if (val.startsWith('p')) {
@@ -1972,7 +1976,8 @@ document.addEventListener('DOMContentLoaded', () => {
         container.className = 'curation-container';
         container.style.display = 'flex';
         container.style.gap = '2rem';
-        container.style.height = 'calc(100vh - 250px)'; // Approx height
+        container.style.height = '100%';
+        container.style.padding = '1rem';
 
         // --- Left Column: Categories ---
         const categoriesCol = document.createElement('div');
@@ -3913,7 +3918,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     flex-direction: column;
                     align-items: center;
                     justify-content: center;
-                    height: calc(100vh - 200px);
+                    padding: 2rem;
                     text-align: center;
                     color: var(--text-muted);
                     max-width: 500px;
@@ -5671,6 +5676,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (trashBtn) {
         trashBtn.onclick = () => {
+            if (state.page === 'trash') {
+                // Toggle off trash mode if already active
+                state.page = 'search';
+                updateNavActiveStates();
+                performSearch();
+                return;
+            }
+
             // Reset ALL filters when entering trash mode for safety
             // This prevents dangerous situations where filters could show untrashed files in trash view
             state.filters.categories = [];
@@ -5748,6 +5761,7 @@ document.addEventListener('DOMContentLoaded', () => {
         historyInProgressBtn.onclick = () => {
             if (state.filters.unfinished) {
                 state.filters.unfinished = false;
+                state.page = 'search';
             } else {
                 if (state.page !== 'trash') state.page = 'search';
                 state.filters.unfinished = true;
@@ -5764,6 +5778,7 @@ document.addEventListener('DOMContentLoaded', () => {
         historyUnplayedBtn.onclick = () => {
             if (state.filters.unplayed) {
                 state.filters.unplayed = false;
+                state.page = 'search';
             } else {
                 if (state.page !== 'trash') state.page = 'search';
                 state.filters.unplayed = true;
@@ -5780,6 +5795,7 @@ document.addEventListener('DOMContentLoaded', () => {
         historyCompletedBtn.onclick = () => {
             if (state.filters.completed) {
                 state.filters.completed = false;
+                state.page = 'search';
             } else {
                 if (state.page !== 'trash') state.page = 'search';
                 state.filters.completed = true;
