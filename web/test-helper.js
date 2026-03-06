@@ -50,6 +50,21 @@ export async function setupTestEnvironment(initialLocalStorage) {
                     { path: 'audio1.mp3', type: 'audio/mpeg', size: 512, duration: 120, db: 'test.db', caption_text: 'another caption', caption_time: 20.0 }
                 ];
             }
+        } else if (url.includes('/api/categorize/keywords')) {
+            data = mocks.categorize_keywords || [
+                { category: 'Genre', keywords: ['Rock', 'Jazz', 'Pop'] },
+                { category: 'Mood', keywords: ['Happy', 'Sad'] }
+            ];
+        } else if (url.includes('/api/categorize/suggest')) {
+            data = mocks.categorize_suggest || ['Concert', 'Live', 'Studio'];
+        } else if (url.includes('/api/categorize/apply')) {
+            data = { success: true };
+        } else if (url.includes('/api/categorize/defaults')) {
+            data = { success: true };
+        } else if (url.includes('/api/categorize/keyword')) {
+            data = { success: true };
+        } else if (url.includes('/api/categorize/category')) {
+            data = { success: true };
         }
 
         return Promise.resolve({

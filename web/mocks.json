@@ -55,6 +55,21 @@
       "caption_time": 5.0
     }
   ],
+  "categorize_keywords": [
+    {
+      "category": "Genre",
+      "keywords": ["Rock", "Jazz", "Pop", "Electronic"]
+    },
+    {
+      "category": "Mood",
+      "keywords": ["Happy", "Sad", "Energetic", "Calm"]
+    },
+    {
+      "category": "Era",
+      "keywords": ["80s", "90s", "2000s"]
+    }
+  ],
+  "categorize_suggest": ["Concert", "Live", "Studio", "Acoustic", "Remix"],
   "databases": {
     "databases": [
       "test.db"
