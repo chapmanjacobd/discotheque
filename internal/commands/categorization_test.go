@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -583,7 +584,17 @@ func TestHandleCategorizeSuggest(t *testing.T) {
 
 		// Should have some suggestions
 		if len(results) == 0 {
-			t.Error("Expected some keyword suggestions")
+			t.Fatal("Expected some keyword suggestions")
+		}
+
+		// Validate response structure
+		for i, r := range results {
+			if r.Word == "" {
+				t.Errorf("Result[%d]: Word should not be empty", i)
+			}
+			if r.Count <= 0 {
+				t.Errorf("Result[%d]: Count should be positive, got %d", i, r.Count)
+			}
 		}
 
 		// "Rock" should not be in suggestions (already categorized)
@@ -591,6 +602,25 @@ func TestHandleCategorizeSuggest(t *testing.T) {
 			if r.Word == "Rock" {
 				t.Error("Should not suggest 'Rock' as it's already a keyword")
 			}
+		}
+
+		// Expected words from titles: jazz, performance, pop, concert, live, show
+		// Verify we get expected suggestions (case-insensitive)
+		foundWords := make(map[string]bool)
+		for _, r := range results {
+			foundWords[strings.ToLower(r.Word)] = true
+		}
+
+		// At least some of these common words should appear
+		expectedWords := []string{"jazz", "performance", "pop", "concert", "live", "show"}
+		foundExpected := 0
+		for _, expected := range expectedWords {
+			if foundWords[expected] {
+				foundExpected++
+			}
+		}
+		if foundExpected < 1 {
+			t.Errorf("Expected at least 1 common word from titles, found %d: %v", foundExpected, foundWords)
 		}
 	})
 
@@ -798,26 +828,7 @@ func TestHandleCategorizeApply(t *testing.T) {
 			t.Errorf("Expected status 200, got %d: %s", w.Code, w.Body.String())
 		}
 
-		// Verify categories were applied
-		db, err := sql.Open("sqlite3", tmpDB.Name())
-		if err != nil {
-			t.Fatalf("Failed to reopen db: %v", err)
-		}
-		defer db.Close()
-
-		var categories sql.NullString
-		err = db.QueryRow("SELECT categories FROM media WHERE path = '/videos/rock_concert.mp4'").Scan(&categories)
-		if err != nil {
-			t.Fatalf("Failed to query categories: %v", err)
-		}
-
-		if !categories.Valid || categories.String == "" {
-			t.Error("Expected rock_concert to have categories")
-		} else {
-			t.Logf("rock_concert categories: %s", categories.String)
-		}
-
-		// Check response count
+		// Check response structure
 		var resp struct {
 			Count int `json:"count"`
 		}
@@ -826,7 +837,55 @@ func TestHandleCategorizeApply(t *testing.T) {
 		}
 
 		if resp.Count == 0 {
-			t.Error("Expected at least 1 media to be categorized")
+			t.Fatal("Expected at least 1 media to be categorized")
+		}
+
+		// Verify categories were applied
+		db, err := sql.Open("sqlite3", tmpDB.Name())
+		if err != nil {
+			t.Fatalf("Failed to reopen db: %v", err)
+		}
+		defer db.Close()
+
+		// Check rock_concert has Genre and Type categories
+		var categories sql.NullString
+		err = db.QueryRow("SELECT categories FROM media WHERE path = '/videos/rock_concert.mp4'").Scan(&categories)
+		if err != nil {
+			t.Fatalf("Failed to query categories: %v", err)
+		}
+
+		if !categories.Valid || categories.String == "" {
+			t.Fatal("Expected rock_concert to have categories")
+		}
+
+		// Verify category format: should contain both Genre and Type
+		if !strings.Contains(categories.String, ";Genre;") {
+			t.Errorf("Expected categories to contain ';Genre;', got '%s'", categories.String)
+		}
+		if !strings.Contains(categories.String, ";Type;") {
+			t.Errorf("Expected categories to contain ';Type;', got '%s'", categories.String)
+		}
+
+		// Check jazz_performance has Genre category
+		err = db.QueryRow("SELECT categories FROM media WHERE path = '/videos/jazz_performance.mp4'").Scan(&categories)
+		if err != nil {
+			t.Fatalf("Failed to query categories: %v", err)
+		}
+
+		if !categories.Valid || categories.String == "" {
+			t.Error("Expected jazz_performance to have categories")
+		} else if !strings.Contains(categories.String, ";Genre;") {
+			t.Errorf("Expected jazz_performance categories to contain ';Genre;', got '%s'", categories.String)
+		}
+
+		// Check uncategorized file remains uncategorized (no keyword matches)
+		err = db.QueryRow("SELECT categories FROM media WHERE path = '/videos/uncategorized.mp4'").Scan(&categories)
+		if err != nil {
+			t.Fatalf("Failed to query categories: %v", err)
+		}
+
+		if categories.Valid && categories.String != "" {
+			t.Errorf("Expected uncategorized to remain empty, got '%s'", categories.String)
 		}
 	})
 

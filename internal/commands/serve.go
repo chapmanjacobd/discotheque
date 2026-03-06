@@ -1867,8 +1867,8 @@ func (c *ServeCmd) calculateFilterCounts(ctx context.Context, flags models.Globa
 	}
 
 	// Calculate bins (simplified - just the main distributions)
-	_, sizes, _ := calculateBins("size", false)
-	durations, _, _ := calculateBins("duration", false)
+	sizes, _, _ := calculateBins("size", false)
+	_, durations, _ := calculateBins("duration", false)
 	_, _, parentCounts := calculateBins("episodes", false)
 
 	// Build size bins

@@ -617,11 +617,116 @@ func TestIntegration_FolderStatsAccuracy(t *testing.T) {
 
 // Benchmark: Filter + Sort on Large Dataset
 func BenchmarkIntegration_FilterSort(b *testing.B) {
-	fixture := setupIntegrationTest(&testing.T{})
-	defer fixture.Cleanup()
+	// Create a temporary test fixture for the benchmark
+	// Note: We use a shared fixture across all benchmark iterations for efficiency
+	tempDir, err := os.MkdirTemp("", "lb-bench-*")
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	database, err := sql.Open("sqlite3", ":memory:")
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer database.Close()
+
+	// Create schema matching the integration test setup
+	schema := `
+	CREATE TABLE media (
+		path TEXT PRIMARY KEY,
+		title TEXT,
+		duration INTEGER,
+		size INTEGER,
+		time_created INTEGER,
+		time_modified INTEGER,
+		time_deleted INTEGER DEFAULT 0,
+		time_first_played INTEGER DEFAULT 0,
+		time_last_played INTEGER DEFAULT 0,
+		play_count INTEGER DEFAULT 0,
+		playhead INTEGER DEFAULT 0,
+		type TEXT,
+		width INTEGER,
+		height INTEGER,
+		fps REAL,
+		video_codecs TEXT,
+		audio_codecs TEXT,
+		subtitle_codecs TEXT,
+		video_count INTEGER DEFAULT 0,
+		audio_count INTEGER DEFAULT 0,
+		subtitle_count INTEGER DEFAULT 0,
+		album TEXT,
+		artist TEXT,
+		genre TEXT,
+		mood TEXT,
+		bpm INTEGER,
+		key TEXT,
+		decade TEXT,
+		categories TEXT,
+		city TEXT,
+		country TEXT,
+		description TEXT,
+		language TEXT,
+		webpath TEXT,
+		uploader TEXT,
+		time_uploaded INTEGER,
+		time_downloaded INTEGER,
+		view_count INTEGER,
+		num_comments INTEGER,
+		favorite_count INTEGER,
+		score REAL,
+		upvote_ratio REAL,
+		latitude REAL,
+		longitude REAL
+	);
+	CREATE INDEX idx_time_deleted ON media(time_deleted);
+	CREATE INDEX idx_time_last_played ON media(time_last_played);
+	`
+	if _, err := database.Exec(schema); err != nil {
+		b.Fatal(err)
+	}
+
+	// Insert test data matching the integration test setup
+	testData := []struct {
+		path     string
+		title    string
+		duration int32
+		size     int64
+	}{
+		{filepath.Join(tempDir, "tv/Show/S01E01.mp4"), "Pilot", 2700, 500_000_000},
+		{filepath.Join(tempDir, "tv/Show/S01E02.mp4"), "Episode 2", 2700, 480_000_000},
+		{filepath.Join(tempDir, "tv/Show/S01E10.mp4"), "Finale", 3600, 520_000_000},
+		{filepath.Join(tempDir, "tv/Show/S02E01.mp4"), "New Season", 2700, 490_000_000},
+		{filepath.Join(tempDir, "movies/action/BigMovie.2024.1080p.mp4"), "Big Action", 7200, 2_000_000_000},
+		{filepath.Join(tempDir, "movies/action/SmallMovie.720p.mp4"), "Small Action", 5400, 800_000_000},
+		{filepath.Join(tempDir, "movies/action/sample.mp4"), "Sample", 300, 50_000_000},
+		{filepath.Join(tempDir, "movies/comedy/Funny.2023.mp4"), "Funny Movie", 6000, 1_200_000_000},
+		{filepath.Join(tempDir, "movies/comedy/Short.mp4"), "Short Comedy", 1800, 300_000_000},
+		{filepath.Join(tempDir, "docs/nature/Wildlife.mp4"), "Wildlife Doc", 5400, 1_500_000_000},
+		{filepath.Join(tempDir, "docs/history/Ancient.mp4"), "Ancient History", 7200, 1_800_000_000},
+		{filepath.Join(tempDir, "audiobooks/Fiction/Book1-01.m4a"), "Chapter 1", 3600, 100_000_000},
+		{filepath.Join(tempDir, "audiobooks/Fiction/Book1-02.m4a"), "Chapter 2", 3600, 100_000_000},
+		{filepath.Join(tempDir, "audiobooks/Fiction/Book1-03.m4a"), "Chapter 3", 3600, 100_000_000},
+	}
+
+	for _, td := range testData {
+		_, err := database.Exec(`
+			INSERT INTO media (path, title, duration, size, time_deleted)
+			VALUES (?, ?, ?, ?, 0)
+		`, td.path, td.title, td.duration, td.size)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+
+	queries := db.New(database)
 
 	ctx := context.Background()
-	dbMedia, _ := fixture.Queries.GetMedia(ctx, 100)
+	dbMedia, err := queries.GetMedia(ctx, 100)
+	if err != nil {
+		b.Fatal(err)
+	}
+
 	var allMedia []models.MediaWithDB
 	for _, m := range dbMedia {
 		allMedia = append(allMedia, models.FromDBWithDB(m, "test.db"))
