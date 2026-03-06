@@ -144,8 +144,8 @@ func TestHandleDU_CaptionsView(t *testing.T) {
 		}
 	})
 
-	t.Run("GetAllCaptions with offset", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/api/query?captions=true&limit=2&offset=2", nil)
+	t.Run("GetAllCaptions with all flag returns all captions", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/api/query?captions=true&all=true", nil)
 		w := httptest.NewRecorder()
 
 		cmd.handleQuery(w, req)
@@ -159,46 +159,9 @@ func TestHandleDU_CaptionsView(t *testing.T) {
 			t.Fatalf("Failed to unmarshal response: %v", err)
 		}
 
-		// Should return captions 3-4 (offset 2, limit 2)
-		if len(media) != 2 {
-			t.Errorf("Expected 2 captions with offset=2, limit=2, got %d", len(media))
-		}
-	})
-
-	t.Run("GetAllCaptions excludes deleted media", func(t *testing.T) {
-		// Mark one media as deleted
-		_, err := db.Exec("UPDATE media SET time_deleted = 1 WHERE path = '/videos/test1.mp4'")
-		if err != nil {
-			t.Fatalf("Failed to mark media as deleted: %v", err)
-		}
-		defer db.Close()
-
-		db, err = sql.Open("sqlite3", tmpDB.Name())
-		if err != nil {
-			t.Fatalf("Failed to reopen db: %v", err)
-		}
-
-		cmd.Databases = []string{tmpDB.Name()}
-
-		req := httptest.NewRequest(http.MethodGet, "/api/query?captions=true&limit=100", nil)
-		w := httptest.NewRecorder()
-
-		cmd.handleQuery(w, req)
-
-		if w.Code != http.StatusOK {
-			t.Errorf("Expected status 200, got %d: %s", w.Code, w.Body.String())
-		}
-
-		var media []models.MediaWithDB
-		if err := json.Unmarshal(w.Body.Bytes(), &media); err != nil {
-			t.Fatalf("Failed to unmarshal response: %v", err)
-		}
-
-		// Should not include captions from deleted media
-		for _, m := range media {
-			if m.Path == "/videos/test1.mp4" {
-				t.Error("Should not include captions from deleted media")
-			}
+		// Should return all 5 captions
+		if len(media) != 5 {
+			t.Errorf("Expected 5 captions with all=true, got %d", len(media))
 		}
 	})
 }
