@@ -12,7 +12,7 @@ export const state = {
         playlist: null, // This will now be the playlist title (string)
         sort: localStorage.getItem('disco-sort') || 'default',
         reverse: localStorage.getItem('disco-reverse') === 'true',
-        limit: parseInt(localStorage.getItem('disco-limit')) || 100,
+        limit: parseInt(localStorage.getItem('disco-limit')) || 99,
         all: localStorage.getItem('disco-limit-all') === 'true',
         excludedDbs: JSON.parse(localStorage.getItem('disco-excluded-dbs') || '[]'),
         sizes: JSON.parse(localStorage.getItem('disco-filter-sizes') || '[]'),
@@ -64,6 +64,7 @@ export const state = {
     },
     playlists: [], // String array of titles
     playlistItems: [], // Cache for client-side filtering
+    playQueue: [], // Queue of upcoming media items
     sidebarState: JSON.parse(localStorage.getItem('disco-sidebar-state') || '{}'),
     lastSuggestions: [],
     playback: {

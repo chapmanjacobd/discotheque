@@ -1182,6 +1182,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             };
         });
+
+        // Update Now Playing button visibility
+        updateNowPlayingButton();
+    }
+
+    function updateNowPlayingButton() {
+        const nowPlayingBtn = document.getElementById('now-playing-btn');
+        if (!nowPlayingBtn) return;
+
+        if (state.playback.item) {
+            nowPlayingBtn.classList.remove('hidden');
+        } else {
+            nowPlayingBtn.classList.add('hidden');
+        }
     }
 
     async function handlePlaylistReorder(draggedItem, newIndex) {
@@ -1475,13 +1489,15 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!resp.ok) throw new Error('Failed to fetch DU');
             let data = await resp.json();
 
-            // Auto-skip through single-item folders (forward navigation only, including initial load)
-            // Skip backward navigation check - only auto-skip on forward nav or initial load
-            const shouldAutoSkip = (isForwardNav || isFirstDUVisit) && data && data.length === 1;
+            // Auto-skip through single-item folders recursively (including initial load)
+            // Keep auto-skipping as long as we have exactly one folder
+            let shouldAutoSkip = isFirstDUVisit && data && data.length === 1;
             if (shouldAutoSkip) {
                 const singleItem = data[0];
-                // Check if it's a folder (has count > 0 or is a folder path)
-                const isFolder = singleItem.count > 0 || (singleItem.files && singleItem.files.length === 0);
+                // Check if it's a folder (count > 0 means it has files in subdirectories)
+                // A folder with only subfolders (no direct files) will have count > 0
+                // A single file will have count === 0 and files.length === 1
+                const isFolder = singleItem.count > 0;
                 if (isFolder) {
                     // Auto-navigate into this folder
                     state.duPath = singleItem.path + (singleItem.path.endsWith('/') ? '' : '/');
@@ -3242,6 +3258,18 @@ document.addEventListener('DOMContentLoaded', () => {
         state.playback.hasMarkedComplete = false;
         state.playback.lastPlayedIndex = currentMedia.findIndex(m => m.path === item.path);
 
+        // Build playqueue from current media list (next items to play)
+        if (state.playback.lastPlayedIndex !== -1) {
+            // Queue up the next 120 items (or fewer if at end of list)
+            const queueEnd = Math.min(state.playback.lastPlayedIndex + 120, currentMedia.length);
+            state.playQueue = currentMedia.slice(state.playback.lastPlayedIndex + 1, queueEnd);
+        } else {
+            state.playQueue = [];
+        }
+
+        // Update Now Playing button visibility
+        updateNowPlayingButton();
+
         // Preload next 2 images
         if (state.playback.lastPlayedIndex !== -1) {
             let count = 0;
@@ -3859,10 +3887,14 @@ document.addEventListener('DOMContentLoaded', () => {
         // Reset mode to default preference
         state.playerMode = state.defaultView;
         state.playback.item = null;
+        state.playQueue = [];
+
+        // Update Now Playing button visibility
+        updateNowPlayingButton();
     }
 
     function renderPagination() {
-        if (state.filters.all || state.page === 'trash' || state.page === 'playlist' || state.page === 'history' || state.page === 'captions') {
+        if (state.filters.all || state.page === 'trash' || state.page === 'playlist' || state.page === 'history') {
             paginationContainer.classList.add('hidden');
             return;
         }
@@ -5899,6 +5931,24 @@ document.addEventListener('DOMContentLoaded', () => {
         newPlaylistBtn.onclick = () => {
             const title = prompt('Playlist Title:');
             if (title) createPlaylist(title);
+        };
+    }
+
+    const nowPlayingBtn = document.getElementById('now-playing-btn');
+    if (nowPlayingBtn) {
+        nowPlayingBtn.onclick = () => {
+            if (state.playback.item) {
+                // Show the playqueue as a special dynamic playlist
+                state.page = 'playlist';
+                state.filters.playlist = '__now_playing__';
+                state.filters.categories = [];
+                state.filters.genre = '';
+                state.filters.ratings = [];
+                updateNavActiveStates();
+                // Render the playqueue (current + upcoming items)
+                currentMedia = [state.playback.item, ...state.playQueue];
+                renderResults();
+            }
         };
     }
 

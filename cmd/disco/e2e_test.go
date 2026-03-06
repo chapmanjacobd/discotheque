@@ -226,10 +226,10 @@ func TestE2E_AddWithVTTCaptions(t *testing.T) {
 	vttPath := filepath.Join(fixture.TempDir, "movie.vtt")
 	vttContent := `WEBVTT
 
-00:00:01.000 --> 00:00:04.000
+00:00:11.000 --> 00:00:14.000
 This is a sample caption.
 
-00:00:05.000 --> 00:00:08.000
+00:00:15.000 --> 00:00:18.000
 Another caption here.
 `
 	if err := os.WriteFile(vttPath, []byte(vttContent), 0o644); err != nil {

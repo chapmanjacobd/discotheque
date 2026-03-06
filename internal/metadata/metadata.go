@@ -350,7 +350,7 @@ func parseSubtitleFile(subPath, mediaPath string) ([]db.InsertCaptionParams, err
 			if len(matches) > 0 {
 				startTime := utils.FromTimestampSeconds(strings.ReplaceAll(matches[0], ",", "."))
 
-				// Skip captions that start before 10 seconds
+				// Skip captions that start before 10 seconds (typically intro sequences or malformed early captions)
 				if startTime < 10.0 {
 					continue
 				}
@@ -393,7 +393,8 @@ func cleanCaptionText(s string) string {
 	
 	// Filter out malformed text that looks like unclosed/empty HTML attributes
 	// e.g., "untitled chapter 1" from malformed <untitled chapter="" 1="">
-	if strings.Contains(s, "=") && !strings.Contains(s, " ") {
+	// These typically contain = signs with empty quoted values
+	if strings.Contains(s, "=") && strings.Contains(s, `""`) {
 		return ""
 	}
 	
