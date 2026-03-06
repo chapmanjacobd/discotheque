@@ -232,6 +232,38 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('setting-local-resume').checked = state.localResume;
     document.getElementById('setting-default-video-rate').value = state.defaultVideoRate;
     document.getElementById('setting-default-audio-rate').value = state.defaultAudioRate;
+
+    const settingHidePipSpeed = document.getElementById('setting-hide-pip-speed');
+    const settingHidePipSurf = document.getElementById('setting-hide-pip-surf');
+    const settingHidePipStream = document.getElementById('setting-hide-pip-stream');
+
+    if (settingHidePipSpeed) {
+        settingHidePipSpeed.checked = state.hidePipSpeed;
+        settingHidePipSpeed.onchange = (e) => {
+            state.hidePipSpeed = e.target.checked;
+            localStorage.setItem('disco-hide-pip-speed', state.hidePipSpeed);
+            updatePipVisibility();
+        };
+    }
+    if (settingHidePipSurf) {
+        settingHidePipSurf.checked = state.hidePipSurf;
+        settingHidePipSurf.onchange = (e) => {
+            state.hidePipSurf = e.target.checked;
+            localStorage.setItem('disco-hide-pip-surf', state.hidePipSurf);
+            updatePipVisibility();
+        };
+    }
+    if (settingHidePipStream) {
+        settingHidePipStream.checked = state.hidePipStream;
+        settingHidePipStream.onchange = (e) => {
+            state.hidePipStream = e.target.checked;
+            localStorage.setItem('disco-hide-pip-stream', state.hidePipStream);
+            updatePipVisibility();
+        };
+    }
+
+    updatePipVisibility();
+
     document.getElementById('setting-slideshow-delay').value = state.slideshowDelay;
     if (settingTrackShuffleDuration) settingTrackShuffleDuration.value = state.trackShuffleDuration;
     if (limitInput) limitInput.value = state.filters.limit;
@@ -247,111 +279,115 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    if (channelSurfBtn) {
-        channelSurfBtn.onclick = async (e) => {
-            const isAutomated = e && e.detail && e.detail.isAutomated;
-            const isManual = e && (e.isTrusted || e.detail?.isManual);
-
-            if (state.playback.isSurfing) {
-                if (isManual) {
-                    state.playback.isSurfing = false;
-                    if (state.playback.surfTimer) {
-                        clearTimeout(state.playback.surfTimer);
-                        state.playback.surfTimer = null;
-                    }
-                    showToast('Channel Surf Stopped', 'ℹ️');
-                    channelSurfBtn.classList.remove('active');
-                    return;
+    async function toggleChannelSurf(isAutomated = false, isManual = true) {
+        if (state.playback.isSurfing) {
+            if (isManual) {
+                state.playback.isSurfing = false;
+                if (state.playback.surfTimer) {
+                    clearTimeout(state.playback.surfTimer);
+                    state.playback.surfTimer = null;
                 }
-            } else {
-                if (isAutomated) return;
-                state.playback.isSurfing = true;
+                showToast('Channel Surf Stopped', 'ℹ️');
+                if (channelSurfBtn) channelSurfBtn.classList.remove('active');
+                return;
+            }
+        } else {
+            if (isAutomated) return;
+            state.playback.isSurfing = true;
+        }
+
+        try {
+            // Determine filter type based on current media
+            let type = '';
+            if (state.playback.item && state.playback.item.type) {
+                const currentType = state.playback.item.type;
+                if (currentType.startsWith('video')) type = 'video';
+                else if (currentType.startsWith('audio')) type = 'audio';
+                else if (currentType.startsWith('image')) type = 'image';
+                else if (currentType.startsWith('text') || currentType.includes('pdf') || currentType.includes('epub') || currentType.includes('mobi')) type = 'text';
             }
 
-            try {
-                // Determine filter type based on current media
-                let type = '';
-                if (state.playback.item && state.playback.item.type) {
-                    const currentType = state.playback.item.type;
-                    if (currentType.startsWith('video')) type = 'video';
-                    else if (currentType.startsWith('audio')) type = 'audio';
-                    else if (currentType.startsWith('image')) type = 'image';
-                    else if (currentType.startsWith('text') || currentType.includes('pdf') || currentType.includes('epub') || currentType.includes('mobi')) type = 'text';
+            const params = new URLSearchParams();
+            if (type) params.append('type', type);
+
+            // Add duration param
+            const duration = state.trackShuffleDuration || 0;
+            params.append('duration', duration);
+
+            const resp = await fetchAPI(`/api/random-clip?${params.toString()}`);
+            if (!resp.ok) {
+                if (resp.status === 403) {
+                    showToast('Access Denied', '🚫');
+                    return;
                 }
-
-                const params = new URLSearchParams();
-                if (type) params.append('type', type);
-
-                // Add duration param
-                const duration = state.trackShuffleDuration || 0;
-                params.append('duration', duration);
-
-                const resp = await fetchAPI(`/api/random-clip?${params.toString()}`);
-                if (!resp.ok) {
-                    if (resp.status === 403) {
-                        showToast('Access Denied', '🚫');
-                        return;
-                    }
-                    if (resp.status === 404) {                        showToast(`No more ${type || 'media'} found to surf.`, 'ℹ️');
-                        return;
-                    }
-                    throw new Error('Failed to fetch random clip');
-                }
-                const data = await resp.json();
-                if (!data || !data.path) {
+                if (resp.status === 404) {
                     showToast(`No more ${type || 'media'} found to surf.`, 'ℹ️');
                     return;
                 }
-
-                // Show toast about what's playing
-                const filename = data.path.split('/').pop();
-                showToast(`Channel Surf: ${filename} (${formatDuration(data.start)})`, '🔀');
-
-                channelSurfBtn.classList.add('active');
-
-                // Open in PiP
-                await openInPiP(data, true, true);
-
-                // Seek to the random start time
-                const media = pipViewer.querySelector('video, audio');
-                if (media) {
-                    media.currentTime = data.start;
-
-                    // Add listener for end of clip
-                    if (data.end && data.end > data.start) {
-                        const checkTime = () => {
-                            if (!state.playback.isSurfing) {
-                                media.removeEventListener('timeupdate', checkTime);
-                                return;
-                            }
-                            if (media.currentTime >= data.end) {
-                                media.removeEventListener('timeupdate', checkTime);
-                                // Trigger next surf
-                                if (channelSurfBtn) channelSurfBtn.dispatchEvent(new CustomEvent('click', { detail: { isAutomated: true } }));
-                            }
-                        };
-                        media.addEventListener('timeupdate', checkTime);
-                    }
-                } else {
-                    // Handle images
-                    const img = pipViewer.querySelector('img');
-                    if (img) {
-                        // Use slideshow delay for images when surfing
-                        const delay = state.slideshowDelay || 5;
-                        if (state.playback.surfTimer) clearTimeout(state.playback.surfTimer);
-                        state.playback.surfTimer = setTimeout(() => {
-                            state.playback.surfTimer = null;
-                            if (!state.playback.isSurfing) return;
-                            if (channelSurfBtn) channelSurfBtn.dispatchEvent(new CustomEvent('click', { detail: { isAutomated: true } }));
-                        }, delay * 1000);
-                    }
-                }
-            } catch (err) {
-                console.error('Channel surf failed:', err);
-                errorToast(err, 'Channel surf failed');
-                state.playback.isSurfing = false;
-                channelSurfBtn.classList.remove('active');
+                throw new Error('Failed to fetch random clip');
             }
+            const data = await resp.json();
+            if (!data || !data.path) {
+                showToast(`No more ${type || 'media'} found to surf.`, 'ℹ️');
+                return;
+            }
+
+            // Show toast about what's playing
+            const filename = data.path.split('/').pop();
+            showToast(`Channel Surf: ${filename} (${formatDuration(data.start)})`, '🔀');
+
+            if (channelSurfBtn) channelSurfBtn.classList.add('active');
+
+            // Open in PiP
+            await openInPiP(data, true, true);
+
+            // Seek to the random start time
+            const media = pipViewer.querySelector('video, audio');
+            if (media) {
+                media.currentTime = data.start;
+
+                // Add listener for end of clip
+                if (data.end && data.end > data.start) {
+                    const checkTime = () => {
+                        if (!state.playback.isSurfing) {
+                            media.removeEventListener('timeupdate', checkTime);
+                            return;
+                        }
+                        if (media.currentTime >= data.end) {
+                            media.removeEventListener('timeupdate', checkTime);
+                            // Trigger next surf
+                            toggleChannelSurf(true, false);
+                        }
+                    };
+                    media.addEventListener('timeupdate', checkTime);
+                }
+            } else {
+                // Handle images
+                const img = pipViewer.querySelector('img');
+                if (img) {
+                    // Use slideshow delay for images when surfing
+                    const delay = state.slideshowDelay || 5;
+                    if (state.playback.surfTimer) clearTimeout(state.playback.surfTimer);
+                    state.playback.surfTimer = setTimeout(() => {
+                        state.playback.surfTimer = null;
+                        if (!state.playback.isSurfing) return;
+                        toggleChannelSurf(true, false);
+                    }, delay * 1000);
+                }
+            }
+        } catch (err) {
+            console.error('Channel surf failed:', err);
+            errorToast(err, 'Channel surf failed');
+            state.playback.isSurfing = false;
+            if (channelSurfBtn) channelSurfBtn.classList.remove('active');
+        }
+    }
+
+    if (channelSurfBtn) {
+        channelSurfBtn.onclick = (e) => {
+            const isAutomated = e && e.detail && e.detail.isAutomated;
+            const isManual = e && (e.isTrusted || e.detail?.isManual);
+            toggleChannelSurf(isAutomated, isManual);
         };
     }
 
@@ -2591,7 +2627,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ path: item.path, score: score })
             });
-            showToast(`Rated: ${'⭐'.repeat(score)}`);
+            if (score === 0) {
+                showToast(`Unrated`, '⭐️');
+            } else {
+                showToast(`Rated: ${'⭐'.repeat(score)}`);
+            }
             fetchRatings();
         } catch (err) {
             console.error('Failed to rate media:', err);
@@ -2832,8 +2872,19 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    function updatePipVisibility() {
+        const speedBtn = document.getElementById('pip-speed');
+        const surfBtn = document.getElementById('channel-surf-btn');
+        const streamBtn = document.getElementById('pip-stream-type');
+
+        if (speedBtn) speedBtn.classList.toggle('hidden', state.hidePipSpeed);
+        if (surfBtn) surfBtn.classList.toggle('hidden', state.hidePipSurf);
+        if (streamBtn) streamBtn.classList.toggle('hidden', state.hidePipStream);
+    }
+
     async function openInPiP(item, isNewSession = false, isSurfing = false) {
         state.playback.isSurfing = isSurfing;
+        updatePipVisibility();
 
         if (state.playback.slideshowTimer) {
             clearTimeout(state.playback.slideshowTimer);
@@ -4414,9 +4465,19 @@ document.addEventListener('DOMContentLoaded', () => {
                     setTime(currentTime + 5);
                 }
                 break;
+            case 'r':
+                toggleChannelSurf();
+                break;
             case '0': case '1': case '2': case '3': case '4':
             case '5': case '6': case '7': case '8': case '9':
                 if (e.code.startsWith('Digit')) {
+                    if (e.shiftKey) {
+                        const score = parseInt(e.code.replace('Digit', ''));
+                        if (score >= 0 && score <= 5 && state.playback.item) {
+                            rateMedia(state.playback.item, score);
+                        }
+                        return;
+                    }
                     const percent = parseInt(e.code.replace('Digit', '')) / 10;
                     if (!isNaN(duration)) {
                         setTime(duration * percent);

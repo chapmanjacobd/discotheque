@@ -258,6 +258,39 @@
                             <option value="2">2.0x</option>
                         </select>
                     </div>
+
+                    <div class="full-toggle">
+                        <label class="switch">
+                            <input type="checkbox" id="setting-hide-pip-speed">
+                            <span class="slider round"></span>
+                        </label>
+                        <div class="toggle-text">
+                            <h3>Hide Speed Button</h3>
+                            <p>Hide the playback speed control in the player</p>
+                        </div>
+                    </div>
+
+                    <div class="full-toggle">
+                        <label class="switch">
+                            <input type="checkbox" id="setting-hide-pip-surf">
+                            <span class="slider round"></span>
+                        </label>
+                        <div class="toggle-text">
+                            <h3>Hide Surf Button</h3>
+                            <p>Hide the channel surf button in the player</p>
+                        </div>
+                    </div>
+
+                    <div class="full-toggle">
+                        <label class="switch">
+                            <input type="checkbox" id="setting-hide-pip-stream">
+                            <span class="slider round"></span>
+                        </label>
+                        <div class="toggle-text">
+                            <h3>Hide Stream Button</h3>
+                            <p>Hide the HLS/Direct stream toggle button</p>
+                        </div>
+                    </div>
                     <div class="setting-item">
                         <label for="setting-default-audio-rate">Default Audio Rate:</label>
                         <select id="setting-default-audio-rate">
@@ -362,21 +395,20 @@
             <span id="media-title"></span>
             <div class="pip-controls">
                 <button id="pip-slideshow" title="Toggle Slideshow" class="hidden">▶️</button>
-                <button id="pip-speed" title="Playback Speed"
-                    style="font-size: 0.75rem; font-weight: 600; padding: 2px 6px; background: var(--bg-color); border: 1px solid var(--border-color); border-radius: 4px;">1.0x</button>
+                <button id="pip-speed" title="Playback Speed" class="hidden"
+                   style="font-size: 0.75rem; font-weight: 600; padding: 2px 6px; background: var(--bg-color); border: 1px solid var(--border-color); border-radius: 4px;">1.0x</button>
                 <div id="pip-speed-menu" class="hidden"
-                    style="position: absolute; bottom: 100%; background: var(--sidebar-bg); border: 1px solid var(--border-color); border-radius: 5px; box-shadow: var(--shadow); padding: 0.7rem; display: flex; flex-direction: column; gap: 0.2rem; z-index: 10000;">
-                    <button class="speed-opt" data-speed="0.5">0.5x</button>
-                    <button class="speed-opt" data-speed="0.75">0.75x</button>
-                    <button class="speed-opt" data-speed="1.0">1.0x (Normal)</button>
-                    <button class="speed-opt" data-speed="1.25">1.25x</button>
-                    <button class="speed-opt" data-speed="1.5">1.5x</button>
-                    <button class="speed-opt" data-speed="1.75">1.75x</button>
-                    <button class="speed-opt" data-speed="2.0">2.0x</button>
+                   style="position: absolute; bottom: 100%; background: var(--sidebar-bg); border: 1px solid var(--border-color); border-radius: 5px; box-shadow: var(--shadow); padding: 0.7rem; display: flex; flex-direction: column; gap: 0.2rem; z-index: 10000;">
+                   <button class="speed-opt" data-speed="0.5">0.5x</button>
+                   <button class="speed-opt" data-speed="0.75">0.75x</button>
+                   <button class="speed-opt" data-speed="1.0">1.0x (Normal)</button>
+                   <button class="speed-opt" data-speed="1.25">1.25x</button>
+                   <button class="speed-opt" data-speed="1.5">1.5x</button>
+                   <button class="speed-opt" data-speed="1.75">1.75x</button>
+                   <button class="speed-opt" data-speed="2.0">2.0x</button>
                 </div>
-                <button id="channel-surf-btn" title="Channel Surf (Interdimensional Cable)">🔀</button>
-                <button id="pip-stream-type" title="Switch Stream Type">🔄</button>
-                <button id="pip-native" title="Native Picture-in-Picture" class="hidden">📺</button>
+                <button id="channel-surf-btn" title="Channel Surf (Interdimensional Cable)" class="hidden">🔀</button>
+                <button id="pip-stream-type" title="Switch Stream Type" class="hidden">🔄</button>                <button id="pip-native" title="Native Picture-in-Picture" class="hidden">📺</button>
                 <button id="pip-theatre" title="Theatre Mode">□</button>
                 <button class="close-pip" title="Close">&times;</button>
             </div>
@@ -427,10 +459,13 @@
                         <div class="shortcut-item"><span>Space / k</span> <span>Play/Pause</span></div>
                         <div class="shortcut-item"><span>f</span> <span>Fullscreen</span></div>
                         <div class="shortcut-item"><span>m</span> <span>Mute</span></div>
+                        <div class="shortcut-item"><span>r</span> <span>Toggle Surf</span></div>
                         <div class="shortcut-item"><span>j / J</span> <span>Cycle / Reverse Subs</span></div>
-                        <div class="shortcut-item"><span>l</span> <span>Seek +10s</span></div>
+                        <div class="shortcut-item"><span>l</span> <span>Toggle Loop</span></div>
                         <div class="shortcut-item"><span>← / →</span> <span>Seek -5s / +5s</span></div>
                         <div class="shortcut-item"><span>0-9</span> <span>Seek to %</span></div>
+                        <div class="shortcut-item"><span>Shift + 0</span> <span>Unrate</span></div>
+                        <div class="shortcut-item"><span>Shift + 1-5</span> <span>Rate 1-5 Stars</span></div>
                         <div class="shortcut-item"><span>q / Esc</span> <span>Close Player</span></div>
                     </section>
                     <section>
