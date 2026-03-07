@@ -45,10 +45,11 @@ test.describe('Search and Filtering', () => {
     await page.fill('#search-input', '');
     await page.press('#search-input', 'Enter');
     await page.waitForTimeout(1000);
-    
+
     // Results should be back to normal
     const cards = page.locator('.media-card');
-    await expect(cards).toHaveCount({ min: 1 });
+    const count = await cards.count();
+    expect(count).toBeGreaterThanOrEqual(1);
   });
 
   test('filters by media type', async ({ page, server }) => {

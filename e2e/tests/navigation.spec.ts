@@ -25,12 +25,16 @@ test.describe('Basic Navigation', () => {
 
   test('navigates to Captions view', async ({ page, server }) => {
     await page.goto(server.getBaseUrl());
-    
+
     // Click Captions button
     await page.click('#captions-btn');
-    
+
+    // Wait for captions to load
+    await page.waitForSelector('.caption-media-card', { timeout: 10000 });
+
     // Should show captions
-    await expect(page.locator('.caption-media-card')).toBeVisible();
+    const captionCards = page.locator('.caption-media-card');
+    await expect(captionCards.first()).toBeVisible();
   });
 
   test('opens and closes settings modal', async ({ page, server }) => {

@@ -20,13 +20,14 @@ test.describe('Disk Usage Navigation', () => {
 
   test('displays folder cards with size visualization', async ({ page, server }) => {
     await page.goto(server.getBaseUrl() + '/#mode=du');
-    
+
     await page.waitForSelector('#du-toolbar', { timeout: 10000 });
-    
+
     // Should show folder/file cards
     const cards = page.locator('.media-card.du-card, .media-card');
-    await expect(cards).toHaveCount({ min: 1 });
-    
+    const count = await cards.count();
+    expect(count).toBeGreaterThanOrEqual(1);
+
     // Cards should have size information
     const firstCard = cards.first();
     await expect(firstCard).toBeVisible();
