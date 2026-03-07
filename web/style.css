@@ -1068,12 +1068,22 @@ main {
 }
 
 .close-modal {
-    background: none;
+    background: transparent;
     border: none;
     color: var(--text-color);
-    font-size: 2rem;
+    font-size: 1.6rem;
+    line-height: 1rem;
     cursor: pointer;
-    line-height: 1;
+    padding: 0.5rem 0.7rem;
+    border-radius: 6px;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.close-modal:hover {
+    background: var(--hover-color);
 }
 
 /* Settings items */
@@ -1631,23 +1641,23 @@ main {
 }
 
 #document-modal .doc-controls .close-modal {
-    background: none;
+    background: transparent;
     border: none;
     color: var(--text-color);
-    font-size: 1.8rem;
+    font-size: 1.6rem;
+    line-height: 1rem;
     cursor: pointer;
-    line-height: 1;
-    padding: 0 0.5rem;
-    height: 100%;
-    display: flex;
+    padding: 0.5rem 0.7rem;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
     margin-left: 0.5rem;
+    border-radius: 6px;
+    transition: all 0.2s;
 }
 
 #document-modal .doc-controls .close-modal:hover {
-    background: var(--sidebar-bg-hover);
-    border-radius: 4px;
+    background: var(--hover-color);
 }
 
 #document-container {
@@ -1722,7 +1732,8 @@ main {
         font-size: 0.7rem;
     }
 
-    #document-modal .category-btn {
+    #document-modal .category-btn,
+    #document-modal .close-modal {
         padding: 0.3rem 0.5rem;
         font-size: 0.85rem;
         color: var(--text-color);
