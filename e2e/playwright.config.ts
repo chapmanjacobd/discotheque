@@ -57,12 +57,13 @@ export default defineConfig({
       name: 'firefox',
       use: {
         ...devices['Desktop Firefox'],
-        // Mute audio and disable features that could interfere with tests
+        // Mute audio and configure for testing
         launchOptions: {
           firefoxUserPrefs: {
             'media.volume_scale': '0.0', // Mute all audio
-            'media.autoplay.default': 5, // Block autoplay
-            'media.autoplay.blocking_policy': 2, // Block autoplay
+            'media.autoplay.default': 5, // Allow autoplay with user gesture
+            'media.autoplay.blocking_policy': 0, // Don't block autoplay
+            'media.block-autoplay-until-in-foreground': false, // Allow autoplay
             'dom.disable_open_during_load': false, // Allow popups
             'privacy.trackingprotection.enabled': false, // Disable tracking protection
             'browser.safebrowsing.malware.enabled': false, // Disable safe browsing

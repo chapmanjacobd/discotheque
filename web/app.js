@@ -4750,6 +4750,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // 1. Independent shortcuts (don't require active PiP)
         if (!e.ctrlKey && !e.metaKey && !e.altKey) {
+            // Escape key closes the topmost visible modal
+            if (e.key === 'Escape') {
+                // Find all visible modals and close the one with highest z-index
+                // (if equal z-index, the last one in DOM order is visually on top)
+                const allModals = document.querySelectorAll('.modal:not(.hidden)');
+                if (allModals.length > 0) {
+                    // Get the last visible modal (topmost in DOM = visually on top when z-index is equal)
+                    const topmostModal = allModals[allModals.length - 1];
+                    topmostModal.classList.add('hidden');
+                    e.preventDefault();
+                    return;
+                }
+                // No modal was open, let the event continue to be processed
+                // (will close PiP if active, or hide search suggestions)
+            }
+
             switch (e.key.toLowerCase()) {
                 case 'n':
                     playSibling(1, true);
