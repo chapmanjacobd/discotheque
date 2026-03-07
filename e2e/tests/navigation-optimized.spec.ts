@@ -4,6 +4,15 @@ test.describe('Basic Navigation (Read-Only)', () => {
   // All tests in this describe block are read-only
   test.use({ readOnly: true });
 
+  // Helper to open sidebar on mobile
+  async function openSidebar(page) {
+    const menuToggle = page.locator('#menu-toggle');
+    if (await menuToggle.isVisible()) {
+      await menuToggle.click();
+      await page.waitForTimeout(300);
+    }
+  }
+
   test('loads the home page', async ({ page, server }) => {
     await page.goto(server.getBaseUrl());
 
@@ -18,6 +27,9 @@ test.describe('Basic Navigation (Read-Only)', () => {
   test('navigates to Disk Usage view', async ({ page, server }) => {
     await page.goto(server.getBaseUrl());
 
+    // Open sidebar on mobile
+    await openSidebar(page);
+
     // Click DU button
     await page.click('#du-btn');
 
@@ -28,6 +40,9 @@ test.describe('Basic Navigation (Read-Only)', () => {
 
   test('navigates to Captions view', async ({ page, server }) => {
     await page.goto(server.getBaseUrl());
+
+    // Open sidebar on mobile
+    await openSidebar(page);
 
     // Click Captions button
     await page.click('#captions-btn');
@@ -57,6 +72,9 @@ test.describe('Basic Navigation (Read-Only)', () => {
 
   test('toggles view modes (grid/details)', async ({ page, server }) => {
     await page.goto(server.getBaseUrl());
+
+    // Open sidebar on mobile
+    await openSidebar(page);
 
     // Should start in grid view
     await expect(page.locator('#view-grid')).toHaveClass(/active/);

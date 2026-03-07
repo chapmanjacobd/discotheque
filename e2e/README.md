@@ -161,7 +161,6 @@ e2e/
 ├── utils/
 │   ├── test-server.ts    # Disco server management
 │   ├── cli-runner.ts     # CLI command runner
-│   └── seed-db.ts        # Database seeding
 └── tests/
     # CLI E2E Tests
     ├── cli-add.spec.ts                    # Add command tests

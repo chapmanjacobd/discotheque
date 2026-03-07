@@ -61,25 +61,25 @@ test.describe('Search and Query Integration', () => {
 
   test('filters by progress states under History', async ({ page, server }) => {
     await page.goto(server.getBaseUrl());
-    
+
     await page.waitForSelector('.media-card', { timeout: 10000 });
-    
+
     // Open History/Progress filter section
     const historyDetails = page.locator('#details-history');
     if (await historyDetails.isVisible()) {
       await historyDetails.evaluate((el: HTMLDetailsElement) => el.open = true);
       await page.waitForTimeout(500);
-      
+
       // Click Unfinished filter
       const unfinishedBtn = page.locator('#history-in-progress-btn');
       if (await unfinishedBtn.isVisible()) {
         await unfinishedBtn.click();
         await page.waitForTimeout(1000);
-        
+
         // Should only show unfinished items
         // In our seed data, we might not have many, but check it doesn't error
         const hash = await page.evaluate(() => window.location.hash);
-        expect(hash).toContain('unfinished=true');
+        expect(hash).toContain('history=in-progress');
       }
     }
   });

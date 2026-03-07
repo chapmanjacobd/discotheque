@@ -4869,7 +4869,22 @@ document.addEventListener('DOMContentLoaded', () => {
             case 'q':
             case 'w':
             case 's':
+                if (isDocModalVisible) {
+                    closeModal('document-modal');
+                } else if (isPipVisible) {
+                    closePiP();
+                }
+                e.preventDefault();
+                return;
             case 'escape':
+                // Escape exits fullscreen first if active, otherwise closes the viewer
+                if (document.fullscreenElement) {
+                    document.exitFullscreen().catch(err => {
+                        console.error('Failed to exit fullscreen:', err);
+                    });
+                    e.preventDefault();
+                    return;
+                }
                 if (isDocModalVisible) {
                     closeModal('document-modal');
                 } else if (isPipVisible) {

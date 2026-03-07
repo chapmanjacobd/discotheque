@@ -67,8 +67,10 @@ export const test = base.extend<{
     const workerId = process.env.TEST_WORKER_INDEX || 'default';
     const project = process.env.PLAYWRIGHT_PROJECT || 'chromium';
     const serverKey = `${project}-${workerId}`;
+    const tmpDir = path.join(__dirname, '../tmp');
 
     let server: TestServer;
+    let tempDbPath: string | null = null;
 
     if (readOnly) {
       // Use shared global server for read-only tests
@@ -82,9 +84,18 @@ export const test = base.extend<{
         server = globalServers.get(serverKey)!;
       }
     } else {
-      // Create isolated server for state-modifying tests
+      // Create isolated server with a temporary copy of the database for state-modifying tests
+      // This ensures each test starts with a clean database state
+      try {
+        fs.mkdirSync(tmpDir, { recursive: true });
+      } catch (e) {
+        // Directory may already exist
+      }
+      tempDbPath = path.join(tmpDir, `test-${process.pid}-${Date.now()}.db`);
+      fs.copyFileSync(testDbPath, tempDbPath);
+      
       server = new TestServer({
-        databasePath: testDbPath,
+        databasePath: tempDbPath,
       });
       await server.start();
     }
@@ -105,9 +116,24 @@ export const test = base.extend<{
 
     await use(server);
 
-    // Cleanup: only stop isolated servers, not shared ones
+    // Cleanup: stop isolated servers and remove temporary database
     if (!readOnly) {
       await server.stop();
+      // Remove temporary database copy
+      if (tempDbPath && fs.existsSync(tempDbPath)) {
+        try {
+          fs.unlinkSync(tempDbPath);
+          // Also remove WAL and SHM files if they exist
+          fs.unlinkSync(tempDbPath + '-wal');
+        } catch (e) {
+          // Files may already be deleted
+        }
+        try {
+          fs.unlinkSync(tempDbPath + '-shm');
+        } catch (e) {
+          // File may not exist
+        }
+      }
     }
   },
 });

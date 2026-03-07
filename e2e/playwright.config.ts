@@ -52,45 +52,53 @@ export default defineConfig({
 
   /* Configure projects for major browsers */
   projects: [
+    // {
+    //   name: 'desktop',
+    //   use: {
+    //     ...devices['Desktop Firefox'],
+    //     // Mute audio and configure for testing
+    //     launchOptions: {
+    //       firefoxUserPrefs: {
+    //         'media.volume_scale': '0.0', // Mute all audio
+    //         'media.autoplay.default': 5, // Allow autoplay with user gesture
+    //         'media.autoplay.blocking_policy': 0, // Don't block autoplay
+    //         'media.block-autoplay-until-in-foreground': false, // Allow autoplay
+    //         'dom.disable_open_during_load': false, // Allow popups
+    //         'privacy.trackingprotection.enabled': false, // Disable tracking protection
+    //         'browser.safebrowsing.malware.enabled': false, // Disable safe browsing
+    //         'browser.safebrowsing.phishing.enabled': false, // Disable phishing protection
+    //       },
+    //       headless: true, // Run in headless mode
+    //     },
+    //   },
+    // },
+
+    // {
+    //   name: 'Mobile Chrome',
+    //   use: { ...devices['Pixel 5'] },
+    // },
+
     {
-      name: 'firefox',
+      name: 'desktop',
       use: {
-        ...devices['Desktop Firefox'],
-        // Mute audio and configure for testing
+       ...devices['Desktop Chrome'],
         launchOptions: {
-          firefoxUserPrefs: {
-            'media.volume_scale': '0.0', // Mute all audio
-            'media.autoplay.default': 5, // Allow autoplay with user gesture
-            'media.autoplay.blocking_policy': 0, // Don't block autoplay
-            'media.block-autoplay-until-in-foreground': false, // Allow autoplay
-            'dom.disable_open_during_load': false, // Allow popups
-            'privacy.trackingprotection.enabled': false, // Disable tracking protection
-            'browser.safebrowsing.malware.enabled': false, // Disable safe browsing
-            'browser.safebrowsing.phishing.enabled': false, // Disable phishing protection
-          },
-          // headless: true, // Run in headless mode
+          args: [
+            '--mute-audio',
+            '--autoplay-policy=user-gesture-required',
+            '--disable-background-media-suspend',
+          ],
+          headless: true,
+        },
+        contextOptions: {
+          permissions: [],
         },
       },
     },
 
-    /* Temporarily disabled: Mobile and Safari tests */
     // {
-    //   name: 'Mobile Chrome',
-    //   use: {
-    //     ...devices['Pixel 5'],
-    //     // Mute audio for Chrome
-    //     launchOptions: {
-    //       args: [
-    //         '--mute-audio',
-    //         '--autoplay-policy=user-gesture-required',
-    //         '--disable-background-media-suspend',
-    //       ],
-    //       headless: true,
-    //     },
-    //     contextOptions: {
-    //       permissions: [],
-    //     },
-    //   },
+    //   name: 'Mobile Safari',
+    //   use: { ...devices['iPhone 12'] },
     // },
 
     // {
@@ -106,6 +114,11 @@ export default defineConfig({
     //       reducedMotion: 'reduce',
     //     },
     //   },
+    // },
+
+    // {
+    //   name: 'Microsoft Edge',
+    //   use: { ...devices['Desktop Edge'], channel: 'msedge' },
     // },
   ],
 

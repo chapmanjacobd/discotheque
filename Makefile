@@ -40,7 +40,7 @@ e2e-install:
 	cd e2e && npm install && npx playwright install
 
 e2e: build e2e-install
-	cd e2e && npx playwright test --project=firefox tests/*.spec.ts
+	cd e2e && npx playwright test --project=desktop tests/*.spec.ts
 
 e2e-ui: build e2e-install
 	cd e2e && npx playwright test --ui

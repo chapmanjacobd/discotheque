@@ -2681,7 +2681,9 @@ func (c *ServeCmd) handleRaw(w http.ResponseWriter, r *http.Request) {
 
 func (c *ServeCmd) handleTranscode(w http.ResponseWriter, r *http.Request, path string, m models.Media, strategy utils.TranscodeStrategy) {
 	w.Header().Set("Content-Type", strategy.TargetMime)
-	w.Header().Set("Accept-Ranges", "bytes")
+	// Note: We don't support HTTP Range requests for transcoded content.
+	// Seeking is handled via the "start" query parameter instead.
+	w.Header().Set("Accept-Ranges", "none")
 	w.Header().Set("Content-Disposition", fmt.Sprintf("inline; filename=%q", filepath.Base(path)))
 
 	start := r.URL.Query().Get("start")

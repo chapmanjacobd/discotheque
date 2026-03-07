@@ -87,27 +87,27 @@ test.describe('Playlist Management E2E', () => {
 test.describe('Settings Persistence', () => {
   test('persists theme setting across reloads', async ({ page, server }) => {
     await page.goto(server.getBaseUrl());
-    
+
     // Open settings
     await page.click('#settings-button');
     await page.waitForSelector('#settings-modal', { timeout: 5000 });
-    
+
     // Change theme
     const themeSelect = page.locator('#setting-theme');
     await themeSelect.selectOption('dark');
-    
+
     // Close settings
     await page.click('#settings-modal .close-modal');
     await page.waitForTimeout(500);
-    
+
     // Reload page
     await page.reload();
     await page.waitForSelector('.media-card', { timeout: 10000 });
-    
+
     // Re-open settings and verify theme persisted
     await page.click('#settings-button');
     await expect(themeSelect).toHaveValue('dark');
-    
+
     // Close settings
     await page.click('#settings-modal .close-modal');
   });
@@ -146,23 +146,23 @@ test.describe('Settings Persistence', () => {
 
   test('persists language preference', async ({ page, server }) => {
     await page.goto(server.getBaseUrl());
-    
+
     // Open settings
     await page.click('#settings-button');
     await page.waitForSelector('#settings-modal', { timeout: 5000 });
-    
+
     // Set language
     const langInput = page.locator('#setting-language');
     await langInput.fill('eng,spa');
-    
+
     // Close settings
     await page.click('#settings-modal .close-modal');
     await page.waitForTimeout(500);
-    
+
     // Reload page
     await page.reload();
     await page.waitForSelector('.media-card', { timeout: 10000 });
-    
+
     // Re-open settings and verify language persisted
     await page.click('#settings-button');
     await expect(langInput).toHaveValue('eng,spa');
@@ -288,23 +288,23 @@ test.describe('Settings Persistence', () => {
 
   test('persists slideshow delay', async ({ page, server }) => {
     await page.goto(server.getBaseUrl());
-    
+
     // Open settings
     await page.click('#settings-button');
     await page.waitForSelector('#settings-modal', { timeout: 5000 });
-    
+
     // Set slideshow delay
     const delayInput = page.locator('#setting-slideshow-delay');
     await delayInput.fill('10');
-    
+
     // Close settings
     await page.click('#settings-modal .close-modal');
     await page.waitForTimeout(500);
-    
+
     // Reload page
     await page.reload();
     await page.waitForSelector('.media-card', { timeout: 10000 });
-    
+
     // Re-open settings and verify delay persisted
     await page.click('#settings-button');
     await expect(delayInput).toHaveValue('10');
@@ -425,7 +425,7 @@ test.describe('Playback Controls', () => {
     // Play a media
     await page.locator('.media-card[data-type*="video"], .media-card[data-type*="audio"], .media-card[data-type*="image"]').first().click();
     await waitForPlayer(page);
-    
+
     // Wait for video to load
     await page.waitForTimeout(1000);
 
@@ -446,14 +446,25 @@ test.describe('Playback Controls', () => {
     await page.waitForSelector('.media-card', { timeout: 10000 });
 
     // Play a media
-    const firstCard = page.locator('.media-card[data-type*="video"], .media-card[data-type*="audio"], .media-card[data-type*="image"]').first();
+    const firstCard = page.locator('.media-card[data-type*="video"], .media-card[data-type*="audio"]').first();
     await firstCard.click();
     await waitForPlayer(page);
 
-    // Wait for media to load and start playing
-    await page.waitForTimeout(1000);
+    // Wait for media element to be available
+    await page.waitForSelector('video, audio', { timeout: 5000 });
 
     const video = page.locator('video, audio');
+
+    // Wait for media to be ready (have a valid duration)
+    await page.waitForFunction(() => {
+      const v = document.querySelector('video, audio') as HTMLMediaElement;
+      return v && v.duration > 0 && !isNaN(v.duration);
+    }, { timeout: 10000 });
+
+    // Explicitly play the media
+    await video.evaluate((el: HTMLMediaElement) => el.play());
+    await page.waitForTimeout(500);
+
     // Wait until video is actually playing
     await page.waitForFunction(() => {
       const v = document.querySelector('video, audio') as HTMLMediaElement;
@@ -483,7 +494,21 @@ test.describe('Playback Controls', () => {
     // Play a media
     await page.locator('.media-card[data-type*="video"], .media-card[data-type*="audio"], .media-card[data-type*="image"]').first().click();
     await waitForPlayer(page);
-    await page.waitForTimeout(1000);
+
+    // Wait for media element to be available
+    await page.waitForSelector('video, audio', { timeout: 5000 });
+
+    const video = page.locator('video, audio');
+
+    // Wait for media to be ready (have a valid duration)
+    await page.waitForFunction(() => {
+      const v = document.querySelector('video, audio') as HTMLMediaElement;
+      return v && v.duration > 0 && !isNaN(v.duration);
+    }, { timeout: 10000 });
+
+    // Explicitly play the media
+    await video.evaluate((el: HTMLMediaElement) => el.play());
+    await page.waitForTimeout(500);
 
     // Wait until video is actually playing
     await page.waitForFunction(() => {
@@ -491,8 +516,6 @@ test.describe('Playback Controls', () => {
       return v && !v.paused;
     }, { timeout: 5000 });
 
-    const video = page.locator('video, audio');
-    
     // Ensure we have enough duration for seeking
     const duration = await video.evaluate((el: HTMLMediaElement) => el.duration);
     const seekPos = Math.min(10, duration > 2 ? duration - 1 : 0);

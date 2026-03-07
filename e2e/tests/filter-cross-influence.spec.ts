@@ -2,9 +2,22 @@ import { test, expect } from '../fixtures';
 
 test.describe('Cross-Filter Influence', () => {
   test.use({ readOnly: true });
+
+  // Helper to open sidebar on mobile
+  async function openSidebar(page) {
+    const menuToggle = page.locator('#menu-toggle');
+    if (await menuToggle.isVisible()) {
+      await menuToggle.click();
+      await page.waitForTimeout(300);
+    }
+  }
+
   test.describe('Episodes Filter Affects Size and Duration', () => {
     test('episodes filter should affect size range labels', async ({ page, server }) => {
       await page.goto(server.getBaseUrl());
+
+      // Open sidebar on mobile
+      await openSidebar(page);
 
       // Wait for media to load
       await page.waitForSelector('.media-card', { timeout: 10000 });
@@ -66,6 +79,9 @@ test.describe('Cross-Filter Influence', () => {
     test('episodes filter should affect duration range labels', async ({ page, server }) => {
       await page.goto(server.getBaseUrl());
 
+      // Open sidebar on mobile
+      await openSidebar(page);
+
       // Wait for media to load
       await page.waitForSelector('.media-card', { timeout: 10000 });
 
@@ -126,6 +142,9 @@ test.describe('Cross-Filter Influence', () => {
     test('duration filter should NOT recursively shrink duration range', async ({ page, server }) => {
       await page.goto(server.getBaseUrl());
 
+      // Open sidebar on mobile
+      await openSidebar(page);
+
       // Wait for media to load
       await page.waitForSelector('.media-card', { timeout: 10000 });
 
@@ -183,6 +202,9 @@ test.describe('Cross-Filter Influence', () => {
     test('size filter should NOT recursively shrink size range', async ({ page, server }) => {
       await page.goto(server.getBaseUrl());
 
+      // Open sidebar on mobile
+      await openSidebar(page);
+
       // Wait for media to load
       await page.waitForSelector('.media-card', { timeout: 10000 });
 
@@ -234,6 +256,9 @@ test.describe('Cross-Filter Influence', () => {
 
     test('multiple filters can be combined and results update correctly', async ({ page, server }) => {
       await page.goto(server.getBaseUrl());
+
+      // Open sidebar on mobile
+      await openSidebar(page);
 
       // Wait for media to load
       await page.waitForSelector('.media-card', { timeout: 10000 });
@@ -295,6 +320,9 @@ test.describe('Cross-Filter Influence', () => {
 
     test('resetting episodes filter restores original size and duration ranges', async ({ page, server }) => {
       await page.goto(server.getBaseUrl());
+
+      // Open sidebar on mobile
+      await openSidebar(page);
 
       // Wait for media to load
       await page.waitForSelector('.media-card', { timeout: 10000 });

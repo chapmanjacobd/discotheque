@@ -145,7 +145,7 @@ test.describe('Document Viewer (PDF/EPUB)', () => {
     // Search for test PDF
     await page.fill('#search-input', 'test-document.pdf');
     await page.press('#search-input', 'Enter');
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(500);
 
     const pdfCard = page.locator('.media-card:has-text("test-document.pdf")');
     if (await pdfCard.count() > 0) {
@@ -155,8 +155,8 @@ test.describe('Document Viewer (PDF/EPUB)', () => {
       // Click fullscreen button (use force: true to bypass iframe overlay)
       const fsBtn = page.locator('#doc-fullscreen');
       await fsBtn.first().click({ force: true });
-      
-      // Wait for fullscreen change event
+
+      // Wait for fullscreen change with retry polling
       await page.waitForFunction(() => !!document.fullscreenElement, { timeout: 5000 });
 
       // Should enter fullscreen
@@ -165,7 +165,8 @@ test.describe('Document Viewer (PDF/EPUB)', () => {
 
       // Use Escape key to exit fullscreen (more reliable than button click in fullscreen mode)
       await page.keyboard.press('Escape');
-      
+      await page.waitForTimeout(300);
+
       // Wait for fullscreen to exit
       await page.waitForFunction(() => !document.fullscreenElement, { timeout: 5000 });
 

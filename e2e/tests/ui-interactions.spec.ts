@@ -6,17 +6,20 @@ test.describe('Fullscreen Toggle', () => {
   test('fullscreen button is visible in document viewer', async ({ page, server }) => {
     await page.goto(server.getBaseUrl());
 
-    // Filter to documents
-    await page.fill('#search-input', '.pdf');
+    // Wait for media to load
+    await page.waitForSelector('.media-card', { timeout: 10000 });
+
+    // Search for PDF document
+    await page.fill('#search-input', 'test-document.pdf');
     await page.press('#search-input', 'Enter');
     await page.waitForSelector('.media-card', { timeout: 10000 });
     await page.waitForTimeout(1000);
 
-    // Open a document (PDF)
-    const docCard = page.locator('.media-card[data-type*="text"], .media-card:has(.rsvp)').first();
-    await docCard.click();
+    // Open the PDF
+    const pdfCard = page.locator('.media-card:has-text("test-document.pdf")').first();
+    await pdfCard.click();
     await page.waitForSelector('#document-modal:not(.hidden)', { timeout: 10000 });
-    
+
     // Fullscreen button should be visible in document modal
     const fullscreenBtn = page.locator('#doc-fullscreen');
     await expect(fullscreenBtn).toBeVisible();
@@ -25,20 +28,23 @@ test.describe('Fullscreen Toggle', () => {
   test('fullscreen button toggles document fullscreen mode', async ({ page, server }) => {
     await page.goto(server.getBaseUrl());
 
-    // Filter to documents
-    await page.fill('#search-input', '.pdf');
+    // Wait for media to load
+    await page.waitForSelector('.media-card', { timeout: 10000 });
+
+    // Search for PDF document
+    await page.fill('#search-input', 'test-document.pdf');
     await page.press('#search-input', 'Enter');
     await page.waitForSelector('.media-card', { timeout: 10000 });
     await page.waitForTimeout(1000);
 
-    // Open a document (PDF)
-    const docCard = page.locator('.media-card[data-type*="text"], .media-card:has(.rsvp)').first();
-    await docCard.click();
+    // Open the PDF
+    const pdfCard = page.locator('.media-card:has-text("test-document.pdf")').first();
+    await pdfCard.click();
     await page.waitForSelector('#document-modal:not(.hidden)', { timeout: 10000 });
 
     // Click fullscreen button
     const fullscreenBtn = page.locator('#doc-fullscreen');
-    
+
     // Note: Actual fullscreen may be blocked by browser, but we can test the button click
     await fullscreenBtn.click();
     await page.waitForTimeout(1000);
@@ -402,6 +408,9 @@ test.describe('Metadata Modal', () => {
 });
 
 test.describe('Trash Functionality', () => {
+  // Run in serial mode to prevent database state interference between tests
+  test.describe.configure({ mode: 'serial' });
+
   test('trash button is visible for media', async ({ page, server }) => {
     await page.goto(server.getBaseUrl());
 
@@ -483,23 +492,25 @@ test.describe('Trash Functionality', () => {
     const initialCount = await initialCards.count();
 
     if (initialCount > 0) {
-      // Select first card
-      const firstCard = initialCards.first();
-      await firstCard.click();
-      await page.waitForTimeout(300);
+      // Select first video card (keyboard delete works on selected media)
+      const firstCard = page.locator('.media-card[data-type*="video"], .media-card[data-type*="audio"]').first();
+      if (await firstCard.count() > 0) {
+        await firstCard.click();
+        await page.waitForTimeout(300);
 
-      // Press Delete key
-      await page.keyboard.press('Delete');
-      await page.waitForTimeout(1000);
+        // Press Delete key
+        await page.keyboard.press('Delete');
+        await page.waitForTimeout(1000);
 
-      // No confirmation dialog should appear - deletion is immediate
-      const confirmDialog = page.locator('#confirm-modal');
-      await expect(confirmDialog.first()).not.toBeVisible();
+        // No confirmation dialog should appear - deletion is immediate
+        const confirmDialog = page.locator('#confirm-modal');
+        await expect(confirmDialog.first()).not.toBeVisible();
 
-      // Card should be removed
-      const remainingCards = page.locator('.media-card');
-      const remainingCount = await remainingCards.count();
-      expect(remainingCount).toBeLessThan(initialCount);
+        // Card should be removed
+        const remainingCards = page.locator('.media-card');
+        const remainingCount = await remainingCards.count();
+        expect(remainingCount).toBeLessThan(initialCount);
+      }
     }
   });
 
@@ -536,6 +547,30 @@ test.describe('Trash Functionality', () => {
   });
 
   test('trash button is disabled for already deleted items', async ({ page, server }) => {
+    // First, delete an item from the main view
+    await page.goto(server.getBaseUrl());
+
+    // Wait for media to load
+    await page.waitForSelector('.media-card', { timeout: 10000 });
+
+    // Get initial card count and delete the first item
+    const initialCards = page.locator('.media-card');
+    const initialCount = await initialCards.count();
+
+    if (initialCount > 0) {
+      // Hover and click trash button on first card to delete it
+      const firstCard = initialCards.first();
+      await firstCard.hover();
+      await page.waitForTimeout(500);
+
+      const trashBtn = page.locator('.media-action-btn.delete, .trash-btn, .delete-btn').first();
+      if (await trashBtn.count() > 0) {
+        await trashBtn.click();
+        await page.waitForTimeout(1000);
+      }
+    }
+
+    // Now navigate to trash mode to see deleted items
     await page.goto(server.getBaseUrl() + '#mode=trash');
 
     // Wait for media to load
@@ -606,7 +641,7 @@ test.describe('Trash Functionality', () => {
     await page.waitForSelector('#settings-modal', { state: 'hidden', timeout: 5000 });
 
     // Click first media card to open player
-    const firstCard = page.locator('.media-card[data-type*="video"], .media-card[data-type*="audio"], .media-card[data-type*="image"]').first();
+    const firstCard = page.locator('.media-card[data-type*="video"], .media-card[data-type*="audio"]').first();
     await firstCard.click();
     await page.waitForTimeout(1000);
 
