@@ -29,30 +29,52 @@ fi
 mkdir -p "$FIXTURES_DIR"
 mkdir -p "$MEDIA_DIR"/{videos,audio,images,documents}
 
-# Create fake media files if they don't exist
-if [ ! -f "$MEDIA_DIR/videos/movie1.mp4" ]; then
-    echo "Creating fake media files..."
-    
-    # Minimal MP4 (ftyp box)
-    printf '\x00\x00\x00\x18ftypisom\x00\x00\x00\x00isom\x00\x00\x00\x08free' > "$MEDIA_DIR/videos/movie1.mp4"
-    printf '\x00\x00\x00\x18ftypisom\x00\x00\x00\x00isom\x00\x00\x00\x08free' > "$MEDIA_DIR/videos/movie2.mp4"
-    printf '\x00\x00\x00\x18ftypisom\x00\x00\x00\x00isom\x00\x00\x00\x08free' > "$MEDIA_DIR/videos/clip1.mp4"
-    printf '\x00\x00\x00\x18ftypisom\x00\x00\x00\x00isom\x00\x00\x00\x08free' > "$MEDIA_DIR/videos/clip2.mp4"
-    
-    # Minimal MP3 (ID3 header)
-    printf '\x49\x44\x33\x03\x00\x00\x00\x00\x00\x00' > "$MEDIA_DIR/audio/song1.mp3"
-    printf '\x49\x44\x33\x03\x00\x00\x00\x00\x00\x00' > "$MEDIA_DIR/audio/song2.mp3"
-    printf '\x49\x44\x33\x03\x00\x00\x00\x00\x00\x00' > "$MEDIA_DIR/audio/podcast.mp3"
-    
-    # Minimal JPEG
-    printf '\xFF\xD8\xFF\xE0\x00\x10JFIF\x00\x01\x01\x00\x00\x01\x00\x01\x00\x00\xFF\xD9' > "$MEDIA_DIR/images/photo1.jpg"
-    printf '\xFF\xD8\xFF\xE0\x00\x10JFIF\x00\x01\x01\x00\x00\x01\x00\x01\x00\x00\xFF\xD9' > "$MEDIA_DIR/images/photo2.jpg"
-    
-    # Minimal PDF
-    printf '%%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\ntrailer\n<< /Root 1 0 R >>\n%%%%EOF' > "$MEDIA_DIR/documents/doc1.pdf"
-    
-    # VTT subtitle files
-    cat > "$MEDIA_DIR/videos/movie1.vtt" << 'VTT'
+# Generate playable media files with ffmpeg
+echo "Generating test media files with ffmpeg..."
+
+# Video files with audio tracks (playable in browser)
+ffmpeg -y -f lavfi -i testsrc=duration=10:size=320x240:rate=30 \
+    -f lavfi -i sine=frequency=440:duration=10 \
+    -c:v libx264 -c:a aac -movflags +faststart \
+    "$MEDIA_DIR/videos/movie1.mp4" 2>/dev/null
+
+ffmpeg -y -f lavfi -i testsrc=duration=8:size=320x240:rate=30 \
+    -f lavfi -i sine=frequency=523:duration=8 \
+    -c:v libx264 -c:a aac -movflags +faststart \
+    "$MEDIA_DIR/videos/movie2.mp4" 2>/dev/null
+
+ffmpeg -y -f lavfi -i testsrc=duration=5:size=320x240:rate=30 \
+    -f lavfi -i sine=frequency=659:duration=5 \
+    -c:v libx264 -c:a aac -movflags +faststart \
+    "$MEDIA_DIR/videos/clip1.mp4" 2>/dev/null
+
+ffmpeg -y -f lavfi -i testsrc=duration=3:size=320x240:rate=30 \
+    -f lavfi -i sine=frequency=784:duration=3 \
+    -c:v libx264 -c:a aac -movflags +faststart \
+    "$MEDIA_DIR/videos/clip2.mp4" 2>/dev/null
+
+# Audio files (playable in browser)
+ffmpeg -y -f lavfi -i sine=frequency=440:duration=30 \
+    -c:a libmp3lame -b:a 128k \
+    "$MEDIA_DIR/audio/song1.mp3" 2>/dev/null
+
+ffmpeg -y -f lavfi -i sine=frequency=523:duration=25 \
+    -c:a libmp3lame -b:a 128k \
+    "$MEDIA_DIR/audio/song2.mp3" 2>/dev/null
+
+ffmpeg -y -f lavfi -i sine=frequency=330:duration=60 \
+    -c:a libmp3lame -b:a 128k \
+    "$MEDIA_DIR/audio/podcast.mp3" 2>/dev/null
+
+# Minimal JPEG images
+printf '\xFF\xD8\xFF\xE0\x00\x10JFIF\x00\x01\x01\x00\x00\x01\x00\x01\x00\x00\xFF\xD9' > "$MEDIA_DIR/images/photo1.jpg"
+printf '\xFF\xD8\xFF\xE0\x00\x10JFIF\x00\x01\x01\x00\x00\x01\x00\x01\x00\x00\xFF\xD9' > "$MEDIA_DIR/images/photo2.jpg"
+
+# Minimal PDF
+printf '%%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\ntrailer\n<< /Root 1 0 R >>\n%%%%EOF' > "$MEDIA_DIR/documents/doc1.pdf"
+
+# VTT subtitle files (external subtitles for caption scanning)
+cat > "$MEDIA_DIR/videos/movie1.vtt" << 'VTT'
 WEBVTT
 
 00:00:15.500 --> 00:00:20.000
@@ -65,7 +87,7 @@ This is an exciting scene
 The plot thickens
 VTT
 
-    cat > "$MEDIA_DIR/videos/movie2.vtt" << 'VTT'
+cat > "$MEDIA_DIR/videos/movie2.vtt" << 'VTT'
 WEBVTT
 
 00:00:20.000 --> 00:00:25.000
@@ -75,20 +97,21 @@ Opening scene
 Main character appears
 VTT
 
-    cat > "$MEDIA_DIR/videos/clip1.vtt" << 'VTT'
+cat > "$MEDIA_DIR/videos/clip1.vtt" << 'VTT'
 WEBVTT
 
 00:00:12.000 --> 00:00:15.000
 Short clip caption
 VTT
 
-    cat > "$MEDIA_DIR/videos/clip2.vtt" << 'VTT'
+cat > "$MEDIA_DIR/videos/clip2.vtt" << 'VTT'
 WEBVTT
 
 00:00:15.000 --> 00:00:18.000
 Another short clip
 VTT
-fi
+
+echo "Test media files generated successfully"
 
 # Build disco binary if needed
 if [ ! -f "$REPO_ROOT/disco" ]; then
@@ -99,7 +122,7 @@ fi
 # Create database with disco
 echo "Creating database with disco..."
 cd "$REPO_ROOT"
-./disco add "$DB_FILE" "$MEDIA_DIR"
+./disco add --scan-subtitles "$DB_FILE" "$MEDIA_DIR"
 
 # Verify database
 echo ""

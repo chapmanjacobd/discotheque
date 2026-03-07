@@ -27,55 +27,58 @@ test.describe('Search and Query Integration', () => {
 
   test('persists filters when switching views', async ({ page, server }) => {
     await page.goto(server.getBaseUrl());
-    
+
     await page.waitForSelector('.media-card', { timeout: 10000 });
-    
+
     // Expand media type filter
     const mediaTypeDetails = page.locator('#details-media-type');
     if (!(await mediaTypeDetails.getAttribute('open'))) {
       await mediaTypeDetails.locator('summary').click();
     }
-    
+
     // Select video type
     await page.click('#media-type-list .category-btn[data-type="video"]');
     await page.waitForTimeout(500);
-    
+
     // Get current URL hash
     const hashAfterFilter = await page.evaluate(() => window.location.hash);
     expect(hashAfterFilter).toContain('type=video');
-    
+
     // Switch to DU mode
     await page.click('#du-btn');
     await page.waitForSelector('#du-toolbar', { timeout: 10000 });
-    
-    // Filter should persist in URL
-    const hashAfterDU = await page.evaluate(() => window.location.hash);
-    expect(hashAfterDU).toContain('type=video');
+
+    // Filter should persist (check localStorage since DU mode has different URL structure)
+    const filtersInStorage = await page.evaluate(() => {
+      const filters = localStorage.getItem('disco-filters');
+      return filters ? JSON.parse(filters) : null;
+    });
+    expect(filtersInStorage?.types).toContain('video');
   });
 
   test('handles view mode switching (Grid, Group, Details)', async ({ page, server }) => {
     await page.goto(server.getBaseUrl());
-    
+
     await page.waitForSelector('.media-card', { timeout: 10000 });
-    
+
     // Start in grid view
     await expect(page.locator('#view-grid')).toHaveClass(/active/);
     await expect(page.locator('.grid')).toBeVisible();
-    
+
     // Switch to Group (Episodes) view
     await page.click('#view-group');
     await page.waitForTimeout(1000);
     await expect(page.locator('#view-group')).toHaveClass(/active/);
-    
-    // Should fetch episodes
-    await expect(page.locator('.episode-group, .media-card')).toBeVisible();
-    
+
+    // Should have media cards (group view may not have episode-group if no episodes)
+    await expect(page.locator('.media-card').first()).toBeVisible();
+
     // Switch to Details view
     await page.click('#view-details');
     await page.waitForTimeout(1000);
     await expect(page.locator('#view-details')).toHaveClass(/active/);
     await expect(page.locator('.details-table')).toBeVisible();
-    
+
     // Switch back to Grid
     await page.click('#view-grid');
     await page.waitForTimeout(500);

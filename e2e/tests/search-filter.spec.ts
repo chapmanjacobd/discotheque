@@ -120,25 +120,24 @@ test.describe('Search and Filtering', () => {
 
   test('reverse sort toggles correctly', async ({ page, server }) => {
     await page.goto(server.getBaseUrl());
-    
+
     await page.waitForSelector('.media-card', { timeout: 10000 });
-    
+
     const reverseBtn = page.locator('#sort-reverse-btn');
-    
+
     // Click to toggle
     await reverseBtn.click();
     await page.waitForTimeout(300);
-    
+
     // Should have active class
     await expect(reverseBtn).toHaveClass(/active/);
-    
+
     // Click again to toggle off
     await reverseBtn.click();
     await page.waitForTimeout(300);
-    
+
     // Should not have active class
-    const hasActive = await reverseBtn.classList();
-    expect(hasActive).not.toContain('active');
+    await expect(reverseBtn).not.toHaveClass(/active/);
   });
 
   test('filter bins (sliders) are visible in DU mode', async ({ page, server }) => {

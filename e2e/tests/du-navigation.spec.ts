@@ -101,21 +101,22 @@ test.describe('Disk Usage Navigation', () => {
 
   test('sorts folders by size', async ({ page, server }) => {
     await page.goto(server.getBaseUrl() + '/#mode=du');
-    
+
     await page.waitForSelector('#du-toolbar', { timeout: 10000 });
-    
+
     // Change sort to size
     const sortBy = page.locator('#sort-by');
     await sortBy.selectOption('size');
-    
+
     // Enable reverse sort (largest first)
     const reverseBtn = page.locator('#sort-reverse-btn');
-    if (!(await reverseBtn.classList().then(c => c.includes('active')))) {
+    const isActive = await reverseBtn.evaluate((el) => el.classList.contains('active'));
+    if (!isActive) {
       await reverseBtn.click();
     }
-    
+
     await page.waitForTimeout(500);
-    
+
     // Verify sort dropdown shows size
     await expect(sortBy).toHaveValue('size');
   });

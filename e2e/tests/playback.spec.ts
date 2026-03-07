@@ -116,10 +116,9 @@ test.describe('Media Playback', () => {
     // Click again to exit theatre mode
     await page.locator('#pip-theatre').click();
     await page.waitForTimeout(300);
-    
+
     // Theatre class should be removed
-    const hasTheatre = await page.locator('#pip-player').classList();
-    expect(hasTheatre).not.toContain('theatre');
+    await expect(page.locator('#pip-player')).not.toHaveClass(/theatre/);
   });
 
   test('playback speed can be adjusted', async ({ page, server }) => {
