@@ -32,6 +32,10 @@ webcover:
 test-all: test webtest e2e
 
 # E2E Tests (requires built binary)
+e2e-init: build
+	@echo "Initializing E2E test database..."
+	./e2e/fixtures/init-db.sh
+
 e2e-install:
 	cd e2e && npm install && npx playwright install chromium
 

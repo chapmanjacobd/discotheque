@@ -25,27 +25,75 @@ Keep in `web/tests/` for fast feedback on:
 ## Quick Start
 
 ```bash
-# Install dependencies
-cd e2e
-npm install
+# First time setup - build binary and create test database
+make e2e-init
 
-# Install browsers
-npx playwright install
+# Install Playwright browsers
+cd e2e && npm install && npx playwright install
 
 # Run tests (headless)
-npm test
+make e2e
 
 # Run tests with UI
-npm run test:ui
+cd e2e && npm run test:ui
 
 # Run tests in headed mode (see browser)
-npm run test:headed
+cd e2e && npm run test:headed
 
 # Debug tests
-npm run test:debug
+cd e2e && npm run test:debug
 
 # View test report
-npm run test:report
+cd e2e && npm run test:report
+```
+
+## Test Database
+
+The test database is generated dynamically for each test run to ensure:
+- **Portability**: No absolute paths tied to specific machines
+- **Schema tracking**: Schema version is tracked in `e2e/fixtures/.schema-version`
+- **Reproducibility**: Same test data generated every time
+
+### Test Data
+
+The database is seeded with:
+- 10 sample media files (videos, audio, images, documents)
+- 7 caption entries from sidecar VTT files
+- Pre-computed metadata for fast test execution
+
+### Schema Migrations
+
+When the database schema changes:
+
+1. **Regenerate the database:**
+   ```bash
+   make e2e-init
+   ```
+
+2. **Verify tests still pass:**
+   ```bash
+   make e2e
+   ```
+
+3. **Commit the schema version:**
+   ```bash
+   git add e2e/fixtures/.schema-version
+   git commit -m "Update E2E schema to vXYZ"
+   ```
+
+The `.schema-version` file contains an MD5 hash of the schema, allowing CI to detect when the schema has changed and the database needs regeneration.
+
+### Manual Database Inspection
+
+```bash
+# View schema
+sqlite3 e2e/fixtures/test.db ".schema"
+
+# View test data
+sqlite3 e2e/fixtures/test.db "SELECT path, type, size FROM media LIMIT 5;"
+
+# View schema version
+cat e2e/fixtures/.schema-version
 ```
 
 ## Prerequisites

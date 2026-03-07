@@ -8,9 +8,6 @@ blob-report/
 playwright/.cache/
 playwright/.auth/
 
-# Test database
-fixtures/test.db
-
 # Screenshots and videos
 *.png
 *.webm

@@ -1,6 +1,5 @@
 import { test as base } from '@playwright/test';
-import { TestServer, startGlobalServer, stopGlobalServer } from './utils/test-server';
-import { seedDatabase } from './utils/seed-db';
+import { TestServer } from './utils/test-server';
 import * as path from 'path';
 import * as fs from 'fs';
 
@@ -9,22 +8,22 @@ export const test = base.extend<{
   server: TestServer;
   testDbPath: string;
 }>({
-  // Test database path
+  // Test database path (pre-committed to repo)
   testDbPath: async ({}, use) => {
-    const fixturesDir = path.join(__dirname, '../e2e/fixtures');
-    if (!fs.existsSync(fixturesDir)) {
-      fs.mkdirSync(fixturesDir, { recursive: true });
-    }
+    const fixturesDir = path.join(__dirname, './fixtures');
     const dbPath = path.join(fixturesDir, 'test.db');
+    
+    // Verify database exists
+    if (!fs.existsSync(dbPath)) {
+      throw new Error(`Test database not found at ${dbPath}. Run 'make e2e-init' to create it.`);
+    }
+    
     await use(dbPath);
   },
 
   // Test server instance
   server: async ({ testDbPath }, use) => {
-    // Seed database before starting server
-    await seedDatabase({ databasePath: testDbPath, clean: true });
-
-    // Start server
+    // Start server with pre-existing database
     const server = new TestServer({
       databasePath: testDbPath,
       port: 8080,

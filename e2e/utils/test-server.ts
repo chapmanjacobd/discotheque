@@ -30,6 +30,12 @@ export class TestServer {
         return;
       }
 
+      // Check if database exists
+      if (!fs.existsSync(this.databasePath)) {
+        reject(new Error(`Test database not found at ${this.databasePath}. Run 'make e2e-init' first.`));
+        return;
+      }
+
       const args = [
         'serve',
         this.databasePath,
