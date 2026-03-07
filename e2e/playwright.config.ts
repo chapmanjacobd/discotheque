@@ -28,8 +28,6 @@ export default defineConfig({
   ],
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
-    offline: true,
-
     /* Base URL to use in actions like `await page.goto('/')`. */
     baseURL: process.env.DISCO_BASE_URL || 'http://localhost:8080',
     viewport: { width: 1280, height: 720 },

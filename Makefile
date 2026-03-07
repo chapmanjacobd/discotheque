@@ -40,7 +40,7 @@ e2e-install:
 	cd e2e && npm install && npx playwright install
 
 e2e: build e2e-install
-	cd e2e && npx playwright test --project=firefox 'tests/*.spec.ts'
+	cd e2e && npx playwright test --project=firefox tests/*.spec.ts
 
 e2e-ui: build e2e-install
 	cd e2e && npx playwright test --ui
@@ -56,13 +56,13 @@ e2e-report:
 
 # CLI E2E Tests - Test disco CLI commands
 e2e-cli: build e2e-install
-	cd e2e && npx playwright test --project=firefox 'tests/cli-*.spec.ts'
+	cd e2e && npx playwright test tests/cli-*.spec.ts
 
 e2e-cli-ui: build e2e-install
-	cd e2e && npx playwright test --ui 'tests/cli-*.spec.ts'
+	cd e2e && npx playwright test --ui tests/cli-*.spec.ts
 
 e2e-cli-debug: build e2e-install
-	cd e2e && npx playwright test --debug 'tests/cli-*.spec.ts'
+	cd e2e && npx playwright test --debug tests/cli-*.spec.ts
 
 # Web UI E2E Tests - Test web interface (excludes CLI tests)
 e2e-web: build e2e-install
