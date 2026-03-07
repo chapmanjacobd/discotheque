@@ -1,4 +1,4 @@
-import { fetchAPI } from './api.js';
+import { fetchAPI, getCookie } from './api.js';
 import { state } from './state.js';
 import {
     formatSize,
@@ -3598,41 +3598,26 @@ document.addEventListener('DOMContentLoaded', () => {
         const modal = document.getElementById('document-modal');
         const title = document.getElementById('document-title');
         const container = document.getElementById('document-container');
-        const epubViewer = document.getElementById('epub-viewer');
-        const pdfCanvas = document.getElementById('pdf-canvas');
-        const pageInfo = document.getElementById('doc-page-info');
-        const zoomInfo = document.getElementById('doc-zoom-info');
+        const viewerContainer = document.getElementById('document-viewer-container');
+
+        openModal('document-modal');
 
         title.textContent = truncateString(item.path.split('/').pop());
         title.title = item.path;
-        epubViewer.innerHTML = '';
-        epubViewer.tabIndex = 0; // Make focusable for keyboard shortcuts
-        pdfCanvas.classList.add('hidden');
-        epubViewer.classList.add('hidden');
+
+        // Clear previous viewer content
+        container.innerHTML = '';
 
         const url = `/api/raw?path=${encodeURIComponent(item.path)}`;
-        const type = item.type || '';
-        const pathLower = item.path.toLowerCase();
 
-        // Helper to show/hide EPUB-only controls
-        const toggleEpubControls = (show) => {
-            const controls = ['doc-prev', 'doc-next', 'doc-zoom-in', 'doc-zoom-out', 'doc-zoom-info'];
-            controls.forEach(id => {
-                const el = document.getElementById(id);
-                if (el) {
-                    if (show) el.classList.remove('hidden');
-                    else el.classList.add('hidden');
-                }
-            });
-        };
-
+        // Setup fullscreen button
         const fsBtn = document.getElementById('doc-fullscreen');
-        const modalContent = modal.querySelector('.modal-content');
         if (fsBtn) {
             fsBtn.classList.remove('hidden');
-            fsBtn.onclick = () => toggleFullscreen(modalContent);
+            fsBtn.onclick = () => toggleFullscreen(viewerContainer);
         }
 
+        // Setup RSVP button
         const rsvpBtn = document.getElementById('doc-rsvp');
         if (rsvpBtn) {
             rsvpBtn.onclick = () => {
@@ -3641,61 +3626,14 @@ document.addEventListener('DOMContentLoaded', () => {
             };
         }
 
-        if (type.includes('epub') || pathLower.endsWith('.epub')) {
-            toggleEpubControls(true);
-            epubViewer.classList.remove('hidden');
-            const book = ePub(url);
-            const rendition = book.renderTo("epub-viewer", {
-                width: "100%",
-                height: "100%",
-                flow: "scrolled",
-                manager: "continuous"
-            });
-            rendition.display();
-
-            document.getElementById('doc-prev').onclick = () => rendition.prev();
-            document.getElementById('doc-next').onclick = () => rendition.next();
-
-            let zoom = 100;
-            document.getElementById('doc-zoom-in').onclick = () => {
-                zoom += 10;
-                epubViewer.style.fontSize = `${zoom}%`;
-                zoomInfo.textContent = `${zoom}%`;
-            };
-            document.getElementById('doc-zoom-out').onclick = () => {
-                zoom = Math.max(50, zoom - 10);
-                epubViewer.style.fontSize = `${zoom}%`;
-                zoomInfo.textContent = `${zoom}%`;
-            };
-            pageInfo.textContent = "";
-        } else if (type.includes('pdf') || pathLower.endsWith('.pdf')) {
-            toggleEpubControls(false);
-            // Browsers have great built-in PDF viewers, let's use iframe but in the large modal
-            const iframe = document.createElement('iframe');
-            iframe.src = url;
-            iframe.style.width = '100%';
-            iframe.style.height = '100%';
-            iframe.style.border = 'none';
-            epubViewer.classList.remove('hidden');
-            epubViewer.appendChild(iframe);
-            pageInfo.textContent = "";
-            document.getElementById('doc-prev').onclick = null;
-            document.getElementById('doc-next').onclick = null;
-        } else {
-            toggleEpubControls(false);
-            // Fallback for other text
-            const iframe = document.createElement('iframe');
-            iframe.src = url;
-            iframe.style.width = '100%';
-            iframe.style.height = '100%';
-            iframe.style.border = 'none';
-            epubViewer.classList.remove('hidden');
-            epubViewer.appendChild(iframe);
-            pageInfo.textContent = "";
-        }
-
-        openModal('document-modal');
-        epubViewer.focus();
+        // Use iframe for all document types - modern browsers have built-in PDF viewers
+        // and browser extensions handle EPUB files better than any JS library
+        const iframe = document.createElement('iframe');
+        iframe.src = url;
+        iframe.style.width = '100%';
+        iframe.style.height = '100%';
+        iframe.style.border = 'none';
+        container.appendChild(iframe);
     }
 
     function showMetadata(item) {
@@ -4859,7 +4797,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const docModal = document.getElementById('document-modal');
                     const pipPlayer = document.getElementById('pip-player');
                     if (!docModal.classList.contains('hidden')) {
-                        toggleFullscreen(docModal.querySelector('.modal-content'));
+                        toggleFullscreen(document.getElementById('document-viewer-container'));
                     } else if (!pipPlayer.classList.contains('hidden')) {
                         toggleFullscreen(pipViewer);
                     }
@@ -5017,8 +4955,19 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // --- Dev Mode Auto-Reload ---
-    function setupAutoReload() {
-        const events = new EventSource('/api/events');
+    async function setupAutoReload() {
+        const url = '/api/events';
+        try {
+            const res = await fetch(url, { credentials: 'include' });
+            if (res.status === 401) {
+                location.reload();
+                return;
+            }
+        } catch {
+            // Network error, will retry
+        }
+
+        const events = new EventSource(url);
         events.onmessage = (event) => {
             const startTime = event.data;
             if (state.applicationStartTime && state.applicationStartTime !== startTime) {
@@ -5029,7 +4978,6 @@ document.addEventListener('DOMContentLoaded', () => {
         };
         events.onerror = () => {
             events.close();
-            // Retry connection after a delay
             setTimeout(setupAutoReload, 2000);
         };
     }
