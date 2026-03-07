@@ -470,6 +470,7 @@ func MediaQuery(ctx context.Context, dbs []string, flags models.GlobalFlags) ([]
 	origLimit := flags.Limit
 	origOffset := flags.Offset
 	isEpisodic := flags.FileCounts != ""
+	isMultiDB := len(dbs) > 1
 
 	if isEpisodic {
 		// Fetch everything matching other filters so we can count directories accurately
@@ -478,9 +479,22 @@ func MediaQuery(ctx context.Context, dbs []string, flags models.GlobalFlags) ([]
 		flags.Offset = 0
 	}
 
-	resolvedFlags, err := ResolvePercentileFlags(ctx, dbs, flags)
+	// For multiple databases, we need to fetch more results from each DB
+	// to ensure we can properly merge and apply limit/offset globally
+	tempFlags := flags
+	if isMultiDB && !flags.All && flags.Limit > 0 {
+		// Fetch limit+offset from each DB to ensure we have enough results
+		// after merging and sorting. This is not perfect but handles common cases.
+		// For proper pagination across multiple DBs, we'd need to fetch all and limit client-side.
+		tempFlags.Limit = flags.Limit + flags.Offset
+		tempFlags.Offset = 0
+	}
+
+	resolvedFlags, err := ResolvePercentileFlags(ctx, dbs, tempFlags)
 	if err == nil {
 		flags = resolvedFlags
+	} else {
+		flags = tempFlags
 	}
 
 	qb := NewQueryBuilder(flags)
@@ -625,6 +639,25 @@ func MediaQuery(ctx context.Context, dbs []string, flags models.GlobalFlags) ([]
 		allMedia, err = FetchSiblings(ctx, allMedia, flags)
 		if err != nil {
 			return allMedia, err
+		}
+	}
+
+	// For multiple databases, apply limit/offset after merging and sorting
+	// This ensures consistent pagination regardless of the number of databases
+	if isMultiDB && !isEpisodic && !flags.GroupByParent && !flags.All && origLimit > 0 {
+		// Sort before applying limit/offset
+		SortMedia(allMedia, flags)
+
+		// Apply offset first
+		if origOffset > 0 {
+			if origOffset >= len(allMedia) {
+				return []models.MediaWithDB{}, nil
+			}
+			allMedia = allMedia[origOffset:]
+		}
+		// Then apply limit
+		if len(allMedia) > origLimit {
+			allMedia = allMedia[:origLimit]
 		}
 	}
 

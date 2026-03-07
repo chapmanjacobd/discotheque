@@ -4288,6 +4288,15 @@ document.addEventListener('DOMContentLoaded', () => {
             captionsByPath[item.path].push(item);
         });
 
+        // Sort captions within each group by time
+        Object.keys(captionsByPath).forEach(path => {
+            captionsByPath[path].sort((a, b) => {
+                const timeA = a.caption_time || 0;
+                const timeB = b.caption_time || 0;
+                return timeA - timeB;
+            });
+        });
+
         // Handle different view modes
         if (state.view === 'details') {
             // Details mode: show table with aggregated info per path

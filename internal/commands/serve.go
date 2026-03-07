@@ -780,9 +780,9 @@ func (c *ServeCmd) handleQuery(w http.ResponseWriter, r *http.Request) {
 					// Search with context - get all captions for matched media
 					rows, err = c.getCaptionsWithContext(ctx, queries, queryStr, int64(limit))
 				} else {
-					// No search - return up to 20 random captions
-					var rawRows []database.GetAllCaptionsRow
-					rawRows, err = queries.GetAllCaptions(ctx, int64(limit))
+					// No search - return captions ordered by path and time for captions view
+					var rawRows []database.GetAllCaptionsOrderedRow
+					rawRows, err = queries.GetAllCaptionsOrdered(ctx, int64(limit))
 					for _, r := range rawRows {
 						rows = append(rows, database.SearchCaptionsRow(r))
 					}
@@ -793,7 +793,7 @@ func (c *ServeCmd) handleQuery(w http.ResponseWriter, r *http.Request) {
 				}
 
 				if aggregate {
-					// Aggregate captions by media path
+					// Aggregate captions by media path to get counts
 					aggregated := make(map[string]*models.MediaWithDB)
 					for _, row := range rows {
 						path := row.MediaPath
@@ -824,8 +824,27 @@ func (c *ServeCmd) handleQuery(w http.ResponseWriter, r *http.Request) {
 							stat.CaptionDuration += int64(row.Time.Float64)
 						}
 					}
-					for _, m := range aggregated {
-						media = append(media, *m)
+
+					// For captions view, we want to return ALL individual caption rows
+					// but with the aggregated count attached to each row
+					for _, row := range rows {
+						path := row.MediaPath
+						stat := aggregated[path]
+						m := models.MediaWithDB{
+							Media: models.Media{
+								Path:     path,
+								Type:     models.NullStringPtr(row.Type),
+								Title:    models.NullStringPtr(row.Title),
+								Size:     models.NullInt64Ptr(row.Size),
+								Duration: models.NullInt64Ptr(row.Duration),
+							},
+							DB:              dbPath,
+							CaptionText:     row.Text.String,
+							CaptionTime:     row.Time.Float64,
+							CaptionCount:    stat.CaptionCount,
+							CaptionDuration: stat.CaptionDuration,
+						}
+						media = append(media, m)
 					}
 				} else {
 					// Return individual caption rows (legacy behavior)

@@ -102,6 +102,57 @@ func (q *Queries) GetAllCaptions(ctx context.Context, limit int64) ([]GetAllCapt
 	return items, nil
 }
 
+const getAllCaptionsOrdered = `-- name: GetAllCaptionsOrdered :many
+SELECT c.media_path, c.time, c.text, m.title, m.type, m.size, m.duration
+FROM captions c
+JOIN media m ON c.media_path = m.path
+WHERE m.time_deleted = 0
+  AND c.text IS NOT NULL AND c.text != ''
+ORDER BY c.media_path, c.time
+LIMIT ?
+`
+
+type GetAllCaptionsOrderedRow struct {
+	MediaPath string          `json:"media_path"`
+	Time      sql.NullFloat64 `json:"time"`
+	Text      sql.NullString  `json:"text"`
+	Title     sql.NullString  `json:"title"`
+	Type      sql.NullString  `json:"type"`
+	Size      sql.NullInt64   `json:"size"`
+	Duration  sql.NullInt64   `json:"duration"`
+}
+
+func (q *Queries) GetAllCaptionsOrdered(ctx context.Context, limit int64) ([]GetAllCaptionsOrderedRow, error) {
+	rows, err := q.db.QueryContext(ctx, getAllCaptionsOrdered, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetAllCaptionsOrderedRow{}
+	for rows.Next() {
+		var i GetAllCaptionsOrderedRow
+		if err := rows.Scan(
+			&i.MediaPath,
+			&i.Time,
+			&i.Text,
+			&i.Title,
+			&i.Type,
+			&i.Size,
+			&i.Duration,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getAllMediaMetadata = `-- name: GetAllMediaMetadata :many
 SELECT path, size, time_modified, time_deleted FROM media
 `

@@ -13,6 +13,7 @@ type Querier interface {
 	ClearPlaylist(ctx context.Context, playlistID int64) error
 	DeletePlaylist(ctx context.Context, arg DeletePlaylistParams) error
 	GetAllCaptions(ctx context.Context, limit int64) ([]GetAllCaptionsRow, error)
+	GetAllCaptionsOrdered(ctx context.Context, limit int64) ([]GetAllCaptionsOrderedRow, error)
 	GetAllMediaMetadata(ctx context.Context) ([]GetAllMediaMetadataRow, error)
 	GetCaptionsForMedia(ctx context.Context, mediaPath string) ([]Captions, error)
 	GetCategoryStats(ctx context.Context) ([]GetCategoryStatsRow, error)
