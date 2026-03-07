@@ -2,6 +2,26 @@
 
 End-to-end tests for Discothèque using [Playwright](https://playwright.dev/).
 
+## Test Strategy
+
+### E2E Tests (Playwright)
+Test complete user workflows with a real server:
+- Navigation and routing
+- Media playback
+- Caption display and jumping
+- Disk Usage navigation
+- Search and filtering
+- Playlist management
+- Settings persistence
+
+### Unit/Integration Tests (Vitest)
+Keep in `web/tests/` for fast feedback on:
+- Component rendering
+- State management
+- Utility functions
+- Event handlers
+- Mocked API interactions
+
 ## Quick Start
 
 ```bash

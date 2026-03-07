@@ -1,4 +1,4 @@
-.PHONY: build test cover webtest webcover e2e e2e-ui e2e-debug e2e-install clean fmt lint sql install all readme dev
+.PHONY: build test cover webtest webcover e2e e2e-ui e2e-debug e2e-install clean fmt lint sql install all readme dev test-all
 
 BINARY_NAME=disco
 BUILD_TAGS=fts5
@@ -27,6 +27,9 @@ webtest:
 
 webcover:
 	npm run cover --prefix web
+
+# Run all tests (Go + Vitest + Playwright E2E)
+test-all: test webtest e2e
 
 # E2E Tests (requires built binary)
 e2e-install:

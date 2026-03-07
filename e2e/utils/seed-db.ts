@@ -8,7 +8,7 @@ export interface SeedOptions {
 }
 
 export async function seedDatabase(options: SeedOptions = {}): Promise<string> {
-  const dbPath = options.databasePath || path.join(__dirname, '../fixtures/test.db');
+  const dbPath = options.databasePath || path.join(__dirname, '../../e2e/fixtures/test.db');
   const shouldClean = options.clean !== false;
 
   // Create fixtures directory if it doesn't exist
@@ -20,6 +20,9 @@ export async function seedDatabase(options: SeedOptions = {}): Promise<string> {
   // Remove existing database if clean
   if (shouldClean && fs.existsSync(dbPath)) {
     fs.unlinkSync(dbPath);
+    // Also remove WAL and SHM files if they exist
+    try { fs.unlinkSync(dbPath + '-wal'); } catch {}
+    try { fs.unlinkSync(dbPath + '-shm'); } catch {}
   }
 
   return new Promise((resolve, reject) => {
@@ -33,7 +36,11 @@ export async function seedDatabase(options: SeedOptions = {}): Promise<string> {
 
       // Run migrations and seed data
       db.serialize(() => {
-        // Create media table with full schema
+        // Enable foreign keys and WAL mode
+        db.run('PRAGMA foreign_keys = ON');
+        db.run('PRAGMA journal_mode = WAL');
+        
+        // Create media table with full disco schema
         db.run(`
           CREATE TABLE IF NOT EXISTS media (
             path TEXT PRIMARY KEY,
@@ -51,7 +58,17 @@ export async function seedDatabase(options: SeedOptions = {}): Promise<string> {
             time_deleted INTEGER,
             genre TEXT,
             caption_count INTEGER DEFAULT 0,
-            caption_duration INTEGER DEFAULT 0
+            caption_duration INTEGER DEFAULT 0,
+            artist TEXT,
+            album TEXT,
+            track_number INTEGER,
+            year INTEGER,
+            bitrate INTEGER,
+            fps REAL,
+            width INTEGER,
+            height INTEGER,
+            codec TEXT,
+            container TEXT
           )
         `);
 

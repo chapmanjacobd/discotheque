@@ -11,7 +11,7 @@ export const test = base.extend<{
 }>({
   // Test database path
   testDbPath: async ({}, use) => {
-    const fixturesDir = path.join(__dirname, '../fixtures');
+    const fixturesDir = path.join(__dirname, '../e2e/fixtures');
     if (!fs.existsSync(fixturesDir)) {
       fs.mkdirSync(fixturesDir, { recursive: true });
     }
