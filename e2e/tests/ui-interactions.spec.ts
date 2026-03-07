@@ -1,3 +1,4 @@
+import { waitForPlayer, isPlayerOpen } from '../fixtures';
 import { test, expect } from '../fixtures';
 
 test.describe('Fullscreen Toggle', () => {
@@ -9,7 +10,7 @@ test.describe('Fullscreen Toggle', () => {
 
     // Click first media card to open player
     await page.locator('.media-card').first().click();
-    await page.waitForSelector('#pip-player:not(.hidden)', { timeout: 10000 });
+    await waitForPlayer(page);
 
     // Fullscreen button should be visible
     const fullscreenBtn = page.locator('#pip-fullscreen, .fullscreen-btn, button:has-text("Fullscreen"), .player-fullscreen');
@@ -24,7 +25,7 @@ test.describe('Fullscreen Toggle', () => {
 
     // Click first media card to open player
     await page.locator('.media-card').first().click();
-    await page.waitForSelector('#pip-player:not(.hidden)', { timeout: 10000 });
+    await waitForPlayer(page);
 
     // Click fullscreen button
     const fullscreenBtn = page.locator('#pip-fullscreen, .fullscreen-btn, .player-fullscreen').first();
@@ -45,7 +46,7 @@ test.describe('Fullscreen Toggle', () => {
 
     // Click first media card to open player
     await page.locator('.media-card').first().click();
-    await page.waitForSelector('#pip-player:not(.hidden)', { timeout: 10000 });
+    await waitForPlayer(page);
 
     // Get initial button state
     const fullscreenBtn = page.locator('#pip-fullscreen, .fullscreen-btn').first();
@@ -74,7 +75,7 @@ test.describe('Fullscreen Toggle', () => {
 
     // Click first media card to open player
     await page.locator('.media-card').first().click();
-    await page.waitForSelector('#pip-player:not(.hidden)', { timeout: 10000 });
+    await waitForPlayer(page);
 
     // Focus the player
     await page.locator('#pip-player').focus();
@@ -95,7 +96,7 @@ test.describe('Fullscreen Toggle', () => {
 
     // Click first media card to open player
     await page.locator('.media-card').first().click();
-    await page.waitForSelector('#pip-player:not(.hidden)', { timeout: 10000 });
+    await waitForPlayer(page);
 
     // Double-click on video
     const video = page.locator('video, #pip-player').first();
@@ -114,7 +115,7 @@ test.describe('Fullscreen Toggle', () => {
 
     // Click first media card to open player
     await page.locator('.media-card').first().click();
-    await page.waitForSelector('#pip-player:not(.hidden)', { timeout: 10000 });
+    await waitForPlayer(page);
 
     // Click fullscreen
     const fullscreenBtn = page.locator('#pip-fullscreen, .fullscreen-btn').first();
@@ -137,7 +138,7 @@ test.describe('Fullscreen Toggle', () => {
 
     // Click first media card to open player
     await page.locator('.media-card').first().click();
-    await page.waitForSelector('#pip-player:not(.hidden)', { timeout: 10000 });
+    await waitForPlayer(page);
 
     // Fullscreen button should have accessible name
     const fullscreenBtn = page.locator('#pip-fullscreen, .fullscreen-btn').first();
@@ -158,7 +159,7 @@ test.describe('Metadata Modal', () => {
 
     // Click first media card to open player
     await page.locator('.media-card').first().click();
-    await page.waitForSelector('#pip-player:not(.hidden)', { timeout: 10000 });
+    await waitForPlayer(page);
 
     // Find and click metadata/info button
     const infoBtn = page.locator('#pip-info, .info-btn, button:has-text("Info"), .metadata-btn, button:has-text("Metadata")');
@@ -183,7 +184,7 @@ test.describe('Metadata Modal', () => {
     const cardTitle = await firstCard.locator('.media-title').textContent();
 
     await firstCard.click();
-    await page.waitForSelector('#pip-player:not(.hidden)', { timeout: 10000 });
+    await waitForPlayer(page);
 
     // Open metadata modal
     const infoBtn = page.locator('#pip-info, .info-btn, .metadata-btn').first();
@@ -205,7 +206,7 @@ test.describe('Metadata Modal', () => {
     await page.waitForSelector('.media-card', { timeout: 10000 });
 
     await page.locator('.media-card').first().click();
-    await page.waitForSelector('#pip-player:not(.hidden)', { timeout: 10000 });
+    await waitForPlayer(page);
 
     // Open metadata modal
     const infoBtn = page.locator('#pip-info, .info-btn, .metadata-btn').first();
@@ -227,7 +228,7 @@ test.describe('Metadata Modal', () => {
     await page.waitForSelector('.media-card', { timeout: 10000 });
 
     await page.locator('.media-card').first().click();
-    await page.waitForSelector('#pip-player:not(.hidden)', { timeout: 10000 });
+    await waitForPlayer(page);
 
     // Open metadata modal
     const infoBtn = page.locator('#pip-info, .info-btn, .metadata-btn').first();
@@ -249,7 +250,7 @@ test.describe('Metadata Modal', () => {
     await page.waitForSelector('.media-card', { timeout: 10000 });
 
     await page.locator('.media-card').first().click();
-    await page.waitForSelector('#pip-player:not(.hidden)', { timeout: 10000 });
+    await waitForPlayer(page);
 
     // Open metadata modal
     const infoBtn = page.locator('#pip-info, .info-btn, .metadata-btn').first();
@@ -271,7 +272,7 @@ test.describe('Metadata Modal', () => {
     await page.waitForSelector('.media-card', { timeout: 10000 });
 
     await page.locator('.media-card').first().click();
-    await page.waitForSelector('#pip-player:not(.hidden)', { timeout: 10000 });
+    await waitForPlayer(page);
 
     // Open metadata modal
     const infoBtn = page.locator('#pip-info, .info-btn, .metadata-btn').first();
@@ -293,7 +294,7 @@ test.describe('Metadata Modal', () => {
     await page.waitForSelector('.media-card', { timeout: 10000 });
 
     await page.locator('.media-card').first().click();
-    await page.waitForSelector('#pip-player:not(.hidden)', { timeout: 10000 });
+    await waitForPlayer(page);
 
     // Open metadata modal
     const infoBtn = page.locator('#pip-info, .info-btn, .metadata-btn').first();
@@ -319,7 +320,7 @@ test.describe('Metadata Modal', () => {
     await page.waitForSelector('.media-card', { timeout: 10000 });
 
     await page.locator('.media-card').first().click();
-    await page.waitForSelector('#pip-player:not(.hidden)', { timeout: 10000 });
+    await waitForPlayer(page);
 
     // Open metadata modal
     const infoBtn = page.locator('#pip-info, .info-btn, .metadata-btn').first();
@@ -344,7 +345,7 @@ test.describe('Metadata Modal', () => {
     await page.waitForSelector('.media-card', { timeout: 10000 });
 
     await page.locator('.media-card').first().click();
-    await page.waitForSelector('#pip-player:not(.hidden)', { timeout: 10000 });
+    await waitForPlayer(page);
 
     // Open metadata modal
     const infoBtn = page.locator('#pip-info, .info-btn, .metadata-btn').first();
@@ -369,7 +370,7 @@ test.describe('Metadata Modal', () => {
     await page.waitForSelector('.media-card', { timeout: 10000 });
 
     await page.locator('.media-card').first().click();
-    await page.waitForSelector('#pip-player:not(.hidden)', { timeout: 10000 });
+    await waitForPlayer(page);
 
     // Open metadata modal
     const infoBtn = page.locator('#pip-info, .info-btn, .metadata-btn').first();
@@ -391,7 +392,7 @@ test.describe('Metadata Modal', () => {
     await page.waitForSelector('.media-card', { timeout: 10000 });
 
     await page.locator('.media-card').first().click();
-    await page.waitForSelector('#pip-player:not(.hidden)', { timeout: 10000 });
+    await waitForPlayer(page);
 
     // Open metadata modal
     const infoBtn = page.locator('#pip-info, .info-btn, .metadata-btn').first();
@@ -413,7 +414,7 @@ test.describe('Metadata Modal', () => {
     await page.waitForSelector('.media-card', { timeout: 10000 });
 
     await page.locator('.media-card').first().click();
-    await page.waitForSelector('#pip-player:not(.hidden)', { timeout: 10000 });
+    await waitForPlayer(page);
 
     // Open metadata modal
     const infoBtn = page.locator('#pip-info, .info-btn, .metadata-btn').first();

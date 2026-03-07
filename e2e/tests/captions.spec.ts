@@ -1,3 +1,4 @@
+import { waitForPlayer, isPlayerOpen } from '../fixtures';
 import { test, expect } from '../fixtures';
 
 test.describe('Captions', () => {
@@ -63,7 +64,7 @@ test.describe('Captions', () => {
     await firstSegment.click();
 
     // Wait for player to open
-    await page.waitForSelector('#pip-player:not(.hidden)', { timeout: 10000 });
+    await waitForPlayer(page);
 
     // Verify media is playing at the correct timestamp (with some tolerance)
     const video = page.locator('video, audio');

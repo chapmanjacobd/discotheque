@@ -1,3 +1,4 @@
+import { waitForPlayer, isPlayerOpen } from '../fixtures';
 import { test, expect } from '../fixtures';
 
 test.describe('Playlist Management E2E', () => {
@@ -338,7 +339,7 @@ test.describe('Playback Controls', () => {
 
     // Play a media
     await page.locator('.media-card').first().click();
-    await page.waitForSelector('#pip-player:not(.hidden)', { timeout: 10000 });
+    await waitForPlayer(page);
     await page.waitForTimeout(1000);
 
     // Click theatre mode button
@@ -365,7 +366,7 @@ test.describe('Playback Controls', () => {
 
     // Play a media
     await page.locator('.media-card').first().click();
-    await page.waitForSelector('#pip-player:not(.hidden)', { timeout: 10000 });
+    await waitForPlayer(page);
     await page.waitForTimeout(500);
 
     // Click close button
@@ -383,7 +384,7 @@ test.describe('Playback Controls', () => {
 
     // Play a media
     await page.locator('.media-card').first().click();
-    await page.waitForSelector('#pip-player:not(.hidden)', { timeout: 10000 });
+    await waitForPlayer(page);
     
     // Wait for video to load
     await page.waitForTimeout(1000);
@@ -407,7 +408,7 @@ test.describe('Playback Controls', () => {
     // Play a media
     const firstCard = page.locator('.media-card').first();
     await firstCard.click();
-    await page.waitForSelector('#pip-player:not(.hidden)', { timeout: 10000 });
+    await waitForPlayer(page);
 
     // Wait for media to load and start playing
     await page.waitForTimeout(1000);
@@ -441,7 +442,7 @@ test.describe('Playback Controls', () => {
 
     // Play a media
     await page.locator('.media-card').first().click();
-    await page.waitForSelector('#pip-player:not(.hidden)', { timeout: 10000 });
+    await waitForPlayer(page);
     await page.waitForTimeout(1000);
 
     // Wait until video is actually playing

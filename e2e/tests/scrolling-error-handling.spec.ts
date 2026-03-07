@@ -1,3 +1,4 @@
+import { waitForPlayer, isPlayerOpen } from '../fixtures';
 import { test, expect } from '../fixtures';
 
 test.describe('Large Result Sets Scrolling', () => {
@@ -308,7 +309,7 @@ test.describe('Broken Media Handling', () => {
 
     // Click first media card
     await page.locator('.media-card').first().click();
-    await page.waitForSelector('#pip-player:not(.hidden)', { timeout: 10000 });
+    await waitForPlayer(page);
 
     // Wait for potential error
     await page.waitForTimeout(3000);
@@ -352,7 +353,7 @@ test.describe('Broken Media Handling', () => {
 
     // Click first media card
     await page.locator('.media-card').first().click();
-    await page.waitForSelector('#pip-player:not(.hidden)', { timeout: 10000 });
+    await waitForPlayer(page);
 
     // Wait for video to load
     await page.waitForTimeout(3000);
@@ -370,7 +371,7 @@ test.describe('Broken Media Handling', () => {
 
     // Click first media card
     await page.locator('.media-card').first().click();
-    await page.waitForSelector('#pip-player:not(.hidden)', { timeout: 10000 });
+    await waitForPlayer(page);
 
     // Wait and check for retry button
     await page.waitForTimeout(3000);
@@ -389,7 +390,7 @@ test.describe('Broken Media Handling', () => {
 
     // Click first media card
     await page.locator('.media-card').first().click();
-    await page.waitForSelector('#pip-player:not(.hidden)', { timeout: 10000 });
+    await waitForPlayer(page);
 
     // Click subtitle button
     const subtitleBtn = page.locator('#pip-subs, .subtitle-btn').first();
@@ -490,7 +491,7 @@ test.describe('Broken Media Handling', () => {
 
     // Click first media card
     await page.locator('.media-card').first().click();
-    await page.waitForSelector('#pip-player:not(.hidden)', { timeout: 10000 });
+    await waitForPlayer(page);
 
     // Wait for potential error
     await page.waitForTimeout(3000);

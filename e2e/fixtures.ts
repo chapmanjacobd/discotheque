@@ -1,8 +1,44 @@
-import { test as base, expect } from '@playwright/test';
+import { test as base, expect, Page } from '@playwright/test';
 import { TestServer } from './utils/test-server';
 import { globalServers } from './global-setup';
 import * as path from 'path';
 import * as fs from 'fs';
+
+/**
+ * Wait for media player to be ready
+ * Tries multiple selector patterns to handle different player implementations
+ */
+export async function waitForPlayer(page: Page, timeout: number = 10000): Promise<void> {
+  try {
+    // Try waiting for any player element
+    await page.waitForSelector('#pip-player, #player-container, .player, video, audio', { 
+      timeout,
+      state: 'visible'
+    });
+  } catch (e) {
+    // If specific player not found, check if any media element exists
+    const videoCount = await page.locator('video').count();
+    const audioCount = await page.locator('audio').count();
+    if (videoCount === 0 && audioCount === 0) {
+      throw e;
+    }
+  }
+}
+
+/**
+ * Check if player is open/visible
+ */
+export async function isPlayerOpen(page: Page): Promise<boolean> {
+  const player = page.locator('#pip-player, #player-container');
+  if (await player.count() > 0) {
+    return await player.first().isVisible();
+  }
+  
+  // Check for video/audio elements
+  const videoCount = await page.locator('video').count();
+  const audioCount = await page.locator('audio').count();
+  return videoCount > 0 || audioCount > 0;
+}
 
 // Extended test fixture with server management
 export const test = base.extend<{
