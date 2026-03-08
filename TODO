@@ -1,24 +1,14 @@
-shortcuts:
-
-e2e playhead resume, readonly and server progress tracking modes
- History Pages In Progress/Completed/Unplayed merging with local data
  
 e2e tests combining all the filters to each mode to make sure they don't exit the mode
-  
-    │ Error Handling          │ ❌ None      │ ✅ High       │ Auto-skip on media error, 120 error limit, consecutive error reset        │
-    │ Rating System           │ ❌ None      │ ✅ Yes        │ Drag-drop rating, rating buttons                                          │
-    │ Mobile Gestures         │ ❌ None      │ ❌ None       │ Touch seeking, double-tap, swipe gestures                                 │
-    │ Categorization/Curation │ ⚠️ CLI only  │ ✅ Yes        │ Web UI for keyword management not tested                                  │
-    │ Episodes/Group View     │ ❌ None      │ ✅ Yes        │ Episode grouping, parent-child relationships                              │
-    │ Race Conditions         │ ❌ None      │ ✅ Yes        │ Progress update before search pagination                                  │
-    └─────────────────────────┴──────────────┴───────────────┴───────────────────────────────────────────────────────────────────────────┘
 
-
+  Group View across all modes
+  Details View across all modes
+  pagination
+  search filtering
 
 move shortcuts to separate js file
 
 For epubs, lets serve them by streaming or ebook-convert in ~/.cache
-
 
 
     2. `GlobalFlags` is Overly Complex ⚠️ High Priority
