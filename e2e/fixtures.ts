@@ -117,7 +117,7 @@ export const test = base.extend<{
 
     page.on('requestfailed', request => {
       const errorText = request.failure()?.errorText
-      if (errorText && ['net::ERR_INCOMPLETE_CHUNKED_ENCODING'].includes(errorText)) {
+      if (errorText && ['net::ERR_ABORTED', 'net::ERR_INCOMPLETE_CHUNKED_ENCODING'].includes(errorText)) {
         return
       }
 

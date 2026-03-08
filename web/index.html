@@ -44,7 +44,6 @@
 
             <details id="details-playlists">
                 <summary>Playlists</summary>
-                <button id="now-playing-btn" class="category-btn hidden" style="width: 100%;">🎵 Now Playing</button>
 
                 <div id="playlist-list">
                     <!-- Playlists will be injected here -->
@@ -155,6 +154,24 @@
 
         <section id="content">
             <div id="theatre-anchor"></div>
+            <div id="queue-container" class="hidden">
+                <div id="now-playing-header">
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <h2>🎵 Now Playing</h2>
+                        <span id="queue-count-badge" class="badge"></span>
+                    </div>
+                    <div id="queue-controls">
+                        <button id="queue-expand-btn" class="queue-control-btn" title="Expand/Collapse Queue">↕️</button>
+                        <button id="queue-shuffle-btn" class="queue-control-btn" title="Shuffle Queue">🔀</button>
+                        <button id="queue-repeat-btn" class="queue-control-btn" title="Repeat Mode">🔁 Off</button>
+                        <button id="queue-add-mode-btn" class="queue-control-btn" title="Add Mode: End">➕ End</button>
+                        <button id="queue-clear-btn" class="queue-control-btn" title="Clear Queue">🗑️</button>
+                    </div>
+                </div>
+                <div id="queue-list">
+                    <!-- Queue items will be injected here -->
+                </div>
+            </div>
             <div id="toolbar">
                 <div id="du-toolbar" class="hidden">
                     <button id="du-back-btn" class="category-btn" title="Go to parent directory">⤴️</button>
@@ -262,6 +279,17 @@
                         <div class="toggle-text">
                             <h3>Autoplay Next</h3>
                             <p>Automatically play the next item in the list</p>
+                        </div>
+                    </div>
+
+                    <div class="full-toggle">
+                        <label class="switch">
+                            <input type="checkbox" id="setting-enable-queue">
+                            <span class="slider round"></span>
+                        </label>
+                        <div class="toggle-text">
+                            <h3>Enable Queue</h3>
+                            <p>Manage a custom playback queue</p>
                         </div>
                     </div>
 

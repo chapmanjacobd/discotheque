@@ -39,75 +39,51 @@ test.describe('Media Playback', () => {
     }
   });
 
-  test('Now Playing button appears when media is playing', async ({ page, server }) => {
+  test('Queue container appears when enabled in settings', async ({ page, server }) => {
     await page.goto(server.getBaseUrl());
 
-    await page.waitForSelector('.media-card', { timeout: 10000 });
+    // Open settings
+    await page.locator('#settings-button').click();
+    await page.waitForSelector('#settings-modal', { state: 'visible' });
 
-    // Click first non-document media card
-    await page.locator('.media-card[data-type*="video"], .media-card[data-type*="audio"], .media-card[data-type*="image"]').first().click();
+    // Enable Queue
+    const queueToggle = page.locator('#setting-enable-queue').locator('xpath=..').locator('.slider');
+    await queueToggle.click();
 
-    // Wait for player to open
-    await waitForPlayer(page);
+    // Close settings
+    await page.locator('.close-modal').first().click();
 
-    // Open Playlists section in sidebar to make Now Playing button visible
-    const playlistsSection = page.locator('#details-playlists');
-    await playlistsSection.evaluate((el: HTMLDetailsElement) => el.open = true);
-
-    // Now Playing button should be visible in sidebar
-    const nowPlayingBtn = page.locator('#now-playing-btn');
-    if (await nowPlayingBtn.count() > 0) {
-      await expect(nowPlayingBtn).toBeVisible();
-      await expect(nowPlayingBtn).not.toHaveClass(/hidden/);
-    }
+    // Queue container should be visible
+    const queueContainer = page.locator('#queue-container');
+    await expect(queueContainer).toBeVisible();
   });
 
-  test('Now Playing button shows queue count', async ({ page, server }) => {
+  test('adding to queue when enabled', async ({ page, server }) => {
     await page.goto(server.getBaseUrl());
+
+    // Enable Queue via settings
+    await page.locator('#settings-button').click();
+    await page.waitForSelector('#settings-modal', { state: 'visible' });
+    await page.locator('#setting-enable-queue').locator('xpath=..').locator('.slider').click();
+    await page.locator('.close-modal').first().click();
 
     await page.waitForSelector('.media-card', { timeout: 10000 });
 
-    // Click first non-document media card
+    // Click first non-document media card (should add to queue, not play)
     await page.locator('.media-card[data-type*="video"], .media-card[data-type*="audio"], .media-card[data-type*="image"]').first().click();
 
-    // Wait for player to open
-    await waitForPlayer(page);
+    // Queue count badge should show 1
+    const badge = page.locator('#queue-count-badge');
+    await expect(badge).toHaveText('1');
 
-    // Open Playlists section in sidebar to make Now Playing button visible
-    await page.locator('#details-playlists').evaluate((el: HTMLDetailsElement) => el.open = true);
+    // Queue item should be present
+    const queueItem = page.locator('.queue-item').first();
+    await expect(queueItem).toBeVisible();
 
-    // Now Playing button should show count if there are queued items
-    const nowPlayingBtn = page.locator('#now-playing-btn');
-    if (await nowPlayingBtn.count() > 0) {
-      const text = await nowPlayingBtn.textContent();
-
-      // Should contain "Now Playing" text
-      expect(text).toContain('Now Playing');
-    }
-  });
-
-  test('clicking Now Playing shows current queue', async ({ page, server }) => {
-    await page.goto(server.getBaseUrl());
-
-    await page.waitForSelector('.media-card', { timeout: 10000 });
-
-    // Click first non-document media card
-    await page.locator('.media-card[data-type*="video"], .media-card[data-type*="audio"], .media-card[data-type*="image"]').first().click();
-
-    // Wait for player to open
-    await waitForPlayer(page);
-
-    // Open Playlists section in sidebar to make Now Playing button visible
-    await page.locator('#details-playlists').evaluate((el: HTMLDetailsElement) => el.open = true);
-
-    // Click Now Playing button
-    const nowPlayingBtn = page.locator('#now-playing-btn');
-    if (await nowPlayingBtn.count() > 0) {
-      await nowPlayingBtn.click();
-
-      // Should navigate to playlist view
-      await expect(page.locator('.playlist-drop-zone.active, .media-card').first()).toBeVisible();
-    }
+    // Player should NOT be visible yet
+    const player = page.locator('#pip-player');
+    const isHidden = await player.count() === 0 || await player.first().evaluate(el => el.classList.contains('hidden'));
+    expect(isHidden).toBe(true);
   });
 
   test('closes player when close button clicked', async ({ page, server }) => {

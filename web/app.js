@@ -227,6 +227,9 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('setting-default-view').value = state.defaultView;
 
     document.getElementById('setting-autoplay').checked = state.autoplay;
+    const settingEnableQueue = document.getElementById('setting-enable-queue');
+    if (settingEnableQueue) settingEnableQueue.checked = state.enableQueue;
+
     const settingImageAutoplay = document.getElementById('setting-image-autoplay');
     if (settingImageAutoplay) settingImageAutoplay.checked = state.imageAutoplay;
     document.getElementById('setting-local-resume').checked = state.localResume;
@@ -705,7 +708,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Reset mode to default preference
             state.playerMode = state.defaultView;
-            state.playQueue = [];
+            state.playback.queue = [];
             closed = true;
         }
 
@@ -1360,15 +1363,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function updateNowPlayingButton() {
-        const nowPlayingBtn = document.getElementById('now-playing-btn');
-        if (!nowPlayingBtn) return;
-
-        if (state.playback.item) {
-            nowPlayingBtn.classList.remove('hidden');
-        } else {
-            nowPlayingBtn.classList.add('hidden');
-        }
-
         // Update all media cards to show/hide playing indicator
         const currentPath = state.playback.item ? state.playback.item.path : null;
         document.querySelectorAll('.media-card').forEach(card => {
@@ -1379,6 +1373,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 card.classList.remove('playing');
             }
         });
+
+        if (state.enableQueue) {
+            renderQueue();
+        }
     }
 
     async function handlePlaylistReorder(draggedItem, newIndex) {
@@ -2481,7 +2479,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (suggestionTag) {
                 const parent = suggestionTag.parentElement;
                 suggestionTag.remove();
-                
+
                 // If no suggestions left, show message
                 if (parent && parent.classList.contains('tags-cloud') && parent.querySelectorAll('.suggestion-tag').length === 0) {
                     const suggestionsArea = document.getElementById('suggestions-area');
@@ -2874,7 +2872,23 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    async function playMedia(item) {
+    async function playMedia(item, bypassQueue = false) {
+        if (state.enableQueue && !bypassQueue) {
+            const itemBasename = item.path.split('/').pop();
+            if (state.queueAddMode === 'end') {
+                state.playback.queue.push(item);
+                showToast(`Added to queue: ${itemBasename}`, '➕');
+            } else {
+                // Add to next (after current item if it's in the queue, otherwise at start)
+                const currentPath = state.playback.item ? state.playback.item.path : null;
+                const currentIndex = currentPath ? state.playback.queue.findIndex(m => m.path === currentPath) : -1;
+                state.playback.queue.splice(currentIndex + 1, 0, item);
+                showToast(`Added to next: ${itemBasename}`, '⏭️');
+            }
+            renderQueue();
+            return;
+        }
+
         if (state.playback.skipTimeout) {
             clearTimeout(state.playback.skipTimeout);
             state.playback.skipTimeout = null;
@@ -3075,6 +3089,41 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function playSibling(offset, isUser = false, isDelete = false) {
+        if (state.enableQueue) {
+            const queue = state.playback.queue || [];
+            if (queue.length === 0) return;
+
+            let currentIndex = -1;
+            if (state.playback.item) {
+                currentIndex = queue.findIndex(m => m.path === state.playback.item.path);
+            }
+
+            let nextIndex;
+            if (currentIndex === -1) {
+                nextIndex = offset > 0 ? 0 : queue.length - 1;
+            } else {
+                if (state.playback.repeatMode === 'one' && !isUser) {
+                    nextIndex = currentIndex;
+                } else {
+                    nextIndex = currentIndex + offset;
+                    if (state.playback.repeatMode === 'all') {
+                        nextIndex = (nextIndex + queue.length) % queue.length;
+                    }
+                }
+            }
+
+            if (nextIndex >= 0 && nextIndex < queue.length) {
+                openActivePlayer(queue[nextIndex], false);
+                renderQueue();
+            } else {
+                // End of queue reached
+                if (!isUser) {
+                    closeActivePlayer();
+                }
+            }
+            return;
+        }
+
         if (currentMedia.length === 0) return;
 
         if (isUser && !isDelete) {
@@ -3449,10 +3498,196 @@ document.addEventListener('DOMContentLoaded', () => {
         const speedBtn = document.getElementById('pip-speed');
         const surfBtn = document.getElementById('channel-surf-btn');
         const streamBtn = document.getElementById('pip-stream-type');
+        const theatreBtn = document.getElementById('pip-theatre');
 
         if (speedBtn) speedBtn.classList.toggle('hidden', !state.showPipSpeed);
         if (surfBtn) surfBtn.classList.toggle('hidden', !state.showPipSurf);
         if (streamBtn) streamBtn.classList.toggle('hidden', !state.showPipStream);
+
+        if (theatreBtn) {
+            const isMobile = window.innerWidth <= 768;
+            if (isMobile && !pipPlayer.classList.contains('theatre')) {
+                theatreBtn.classList.add('hidden');
+            } else {
+                theatreBtn.classList.remove('hidden');
+            }
+        }
+    }
+
+    function updateQueueVisibility() {
+        const queueContainer = document.getElementById('queue-container');
+        const queueList = document.getElementById('queue-list');
+        if (!queueContainer || !queueList) return;
+
+        if (state.enableQueue) {
+            queueContainer.classList.remove('hidden');
+            queueList.classList.toggle('expanded', state.queueExpanded);
+            renderQueue();
+        } else {
+            queueContainer.classList.add('hidden');
+        }
+    }
+
+    function renderQueue() {
+        const queueList = document.getElementById('queue-list');
+        const queueCountBadge = document.getElementById('queue-count-badge');
+        if (!queueList) return;
+
+        queueList.innerHTML = '';
+        const queue = state.playback.queue || [];
+        queueCountBadge.textContent = queue.length;
+
+        queue.forEach((item, index) => {
+            const queueItem = document.createElement('div');
+            queueItem.className = 'queue-item';
+            if (state.playback.item && state.playback.item.path === item.path) {
+                queueItem.classList.add('playing');
+            }
+
+            const type = item.type || '';
+            let icon = '📄';
+            if (type.includes('video')) icon = '🎬';
+            else if (type.includes('audio')) icon = '🎵';
+            else if (type.includes('image')) icon = '🖼️';
+
+            const itemBasename = item.path.split('/').pop();
+
+            queueItem.innerHTML = `
+                <div class="queue-item-handle" draggable="true">☰</div>
+                <div class="queue-item-thumb">${icon}</div>
+                <div class="queue-item-info">
+                    <div class="queue-item-title" title="${item.path}">${itemBasename}</div>
+                    <div class="queue-item-meta">${formatDuration(item.duration)}</div>
+                </div>
+                <div class="queue-item-actions">
+                    <button class="queue-action-btn play-now" title="Play Now">▶️</button>
+                    <button class="queue-action-btn remove" title="Remove from Queue">❌</button>
+                </div>
+            `;
+
+            queueItem.querySelector('.play-now').onclick = () => {
+                playMedia(item, true);
+            };
+
+            queueItem.querySelector('.remove').onclick = () => {
+                state.playback.queue.splice(index, 1);
+                renderQueue();
+            };
+
+            // Drag and drop for reordering
+            const handle = queueItem.querySelector('.queue-item-handle');
+            handle.ondragstart = (e) => {
+                e.dataTransfer.setData('text/plain', index);
+                queueItem.style.opacity = '0.5';
+            };
+            handle.ondragend = () => {
+                queueItem.style.opacity = '1';
+            };
+
+            queueItem.ondragover = (e) => {
+                e.preventDefault();
+                queueItem.style.borderTop = '2px solid var(--primary-color)';
+            };
+            queueItem.ondragleave = () => {
+                queueItem.style.borderTop = '';
+            };
+            queueItem.ondrop = (e) => {
+                e.preventDefault();
+                queueItem.style.borderTop = '';
+                const fromIndex = parseInt(e.dataTransfer.getData('text/plain'));
+                const toIndex = index;
+                if (fromIndex !== toIndex) {
+                    const movedItem = state.playback.queue.splice(fromIndex, 1)[0];
+                    state.playback.queue.splice(toIndex, 0, movedItem);
+                    renderQueue();
+                }
+            };
+
+            queueList.appendChild(queueItem);
+        });
+
+        // Update control button states
+        const shuffleBtn = document.getElementById('queue-shuffle-btn');
+        const repeatBtn = document.getElementById('queue-repeat-btn');
+        const addModeBtn = document.getElementById('queue-add-mode-btn');
+
+        if (shuffleBtn) {
+            shuffleBtn.classList.toggle('active', state.playback.shuffle);
+            shuffleBtn.style.color = state.playback.shuffle ? 'var(--primary-color)' : '';
+        }
+
+        if (repeatBtn) {
+            repeatBtn.textContent = `🔁 ${state.playback.repeatMode.charAt(0).toUpperCase() + state.playback.repeatMode.slice(1)}`;
+            repeatBtn.style.color = state.playback.repeatMode !== 'off' ? 'var(--primary-color)' : '';
+        }
+
+        if (addModeBtn) {
+            addModeBtn.textContent = `➕ ${state.queueAddMode.charAt(0).toUpperCase() + state.queueAddMode.slice(1)}`;
+        }
+
+        const expandBtn = document.getElementById('queue-expand-btn');
+        if (expandBtn) {
+            expandBtn.classList.toggle('active', state.queueExpanded);
+            expandBtn.style.color = state.queueExpanded ? 'var(--primary-color)' : '';
+        }
+    }
+
+    function initQueueControls() {
+        const expandBtn = document.getElementById('queue-expand-btn');
+        const shuffleBtn = document.getElementById('queue-shuffle-btn');
+        const repeatBtn = document.getElementById('queue-repeat-btn');
+        const addModeBtn = document.getElementById('queue-add-mode-btn');
+        const clearBtn = document.getElementById('queue-clear-btn');
+
+        if (expandBtn) {
+            expandBtn.onclick = () => {
+                state.queueExpanded = !state.queueExpanded;
+                localStorage.setItem('disco-queue-expanded', state.queueExpanded);
+                updateQueueVisibility();
+            };
+        }
+
+        if (shuffleBtn) {
+            shuffleBtn.onclick = () => {
+                state.playback.shuffle = !state.playback.shuffle;
+                localStorage.setItem('disco-shuffle', state.playback.shuffle);
+                if (state.playback.shuffle) {
+                    // Simple shuffle
+                    for (let i = state.playback.queue.length - 1; i > 0; i--) {
+                        const j = Math.floor(Math.random() * (i + 1));
+                        [state.playback.queue[i], state.playback.queue[j]] = [state.playback.queue[j], state.playback.queue[i]];
+                    }
+                }
+                renderQueue();
+            };
+        }
+
+        if (repeatBtn) {
+            repeatBtn.onclick = () => {
+                const modes = ['off', 'all', 'one'];
+                const currentIndex = modes.indexOf(state.playback.repeatMode);
+                state.playback.repeatMode = modes[(currentIndex + 1) % modes.length];
+                localStorage.setItem('disco-repeat-mode', state.playback.repeatMode);
+                renderQueue();
+            };
+        }
+
+        if (addModeBtn) {
+            addModeBtn.onclick = () => {
+                state.queueAddMode = state.queueAddMode === 'end' ? 'next' : 'end';
+                localStorage.setItem('disco-queue-add-mode', state.queueAddMode);
+                renderQueue();
+            };
+        }
+
+        if (clearBtn) {
+            clearBtn.onclick = () => {
+                if (confirm('Clear entire queue?')) {
+                    state.playback.queue = [];
+                    renderQueue();
+                }
+            };
+        }
     }
 
     async function openInPiP(item, isNewSession = false, isSurfing = false) {
@@ -3497,13 +3732,15 @@ document.addEventListener('DOMContentLoaded', () => {
         state.playback.hasMarkedComplete = false;
         state.playback.lastPlayedIndex = currentMedia.findIndex(m => m.path === item.path);
 
-        // Build playqueue from current media list (next items to play)
-        if (state.playback.lastPlayedIndex !== -1) {
-            // Queue up the next 120 items (or fewer if at end of list)
-            const queueEnd = Math.min(state.playback.lastPlayedIndex + 120, currentMedia.length);
-            state.playQueue = currentMedia.slice(state.playback.lastPlayedIndex + 1, queueEnd);
-        } else {
-            state.playQueue = [];
+        // Build queue from current media list (next items to play)
+        if (!state.enableQueue) {
+            if (state.playback.lastPlayedIndex !== -1) {
+                // Queue up the next 120 items (or fewer if at end of list)
+                const queueEnd = Math.min(state.playback.lastPlayedIndex + 120, currentMedia.length);
+                state.playback.queue = currentMedia.slice(state.playback.lastPlayedIndex + 1, queueEnd);
+            } else {
+                state.playback.queue = [];
+            }
         }
 
         // Update Now Playing button visibility
@@ -4516,16 +4753,82 @@ document.addEventListener('DOMContentLoaded', () => {
             // Details mode: show table with aggregated info per path
             renderCaptionsDetails(captionsByPath, fragment);
         } else if (state.view === 'group') {
-            // Group mode: same as grid for captions (already grouped by path)
-            renderCaptionsGrid(captionsByPath, fragment);
+            // Group mode: custom grouped view
+            renderCaptionsGroup(captionsByPath, fragment);
         } else {
             // Default grid view
             renderCaptionsGrid(captionsByPath, fragment);
         }
 
         resultsContainer.appendChild(fragment);
-        resultsContainer.className = state.view === 'details' ? 'details-view' : 'captions-list-view';
+        if (state.view === 'details') {
+            resultsContainer.className = 'details-view';
+        } else if (state.view === 'group') {
+            resultsContainer.className = 'captions-group-view';
+        } else {
+            resultsContainer.className = 'captions-list-view';
+        }
         updateNowPlayingButton();
+    }
+
+    function renderCaptionsGroup(captionsByPath, fragment) {
+        Object.keys(captionsByPath).forEach(path => {
+            const captions = captionsByPath[path];
+            const group = document.createElement('div');
+            group.className = 'caption-group';
+
+            const basename = path.split('/').pop();
+            const thumbUrl = `/api/thumbnail?path=${encodeURIComponent(path)}`;
+            const firstCap = captions[0];
+
+            let segmentsHtml = '';
+            captions.forEach(cap => {
+                const timeStr = formatDuration(cap.caption_time);
+                segmentsHtml += `
+                    <div class="caption-group-segment" data-time="${cap.caption_time}">
+                        <span class="caption-group-time">${timeStr}</span>
+                        <span class="caption-group-text">${cap.caption_text}</span>
+                    </div>
+                `;
+            });
+
+            group.innerHTML = `
+                <div class="caption-group-header">
+                    <img class="caption-group-thumb" src="${thumbUrl}" loading="lazy" onload="this.classList.add('loaded')">
+                    <div class="caption-group-info">
+                        <div class="caption-group-title" title="${path}">${basename}</div>
+                        <div class="caption-group-meta">${captions.length} captions found • ${formatSize(firstCap.size)}</div>
+                    </div>
+                    <button class="queue-control-btn play-group" title="Play Media">▶️ Play</button>
+                </div>
+                <div class="caption-group-segments">
+                    ${segmentsHtml}
+                </div>
+            `;
+
+            group.querySelector('.play-group').onclick = (e) => {
+                e.stopPropagation();
+                playMedia(firstCap);
+            };
+
+            group.querySelectorAll('.caption-group-segment').forEach(seg => {
+                seg.onclick = (e) => {
+                    e.stopPropagation();
+                    const time = parseFloat(seg.dataset.time);
+                    playMedia(firstCap).then(() => {
+                        const media = pipViewer.querySelector('video, audio');
+                        if (media) {
+                            media.currentTime = time;
+                            // Highlight
+                            seg.classList.add('playing');
+                            setTimeout(() => seg.classList.remove('playing'), 3000);
+                        }
+                    });
+                };
+            });
+
+            fragment.appendChild(group);
+        });
     }
 
     function renderCaptionsGrid(captionsByPath, fragment) {
@@ -5939,6 +6242,15 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
+    const settingEnableQueueOnchange = document.getElementById('setting-enable-queue');
+    if (settingEnableQueueOnchange) {
+        settingEnableQueueOnchange.addEventListener('change', (e) => {
+            state.enableQueue = e.target.checked;
+            localStorage.setItem('disco-enable-queue', state.enableQueue);
+            updateQueueVisibility();
+        });
+    }
+
     const settingRsvpWpm = document.getElementById('setting-rsvp-wpm');
     if (settingRsvpWpm) {
         settingRsvpWpm.value = state.rsvpWpm;
@@ -6296,24 +6608,6 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    const nowPlayingBtn = document.getElementById('now-playing-btn');
-    if (nowPlayingBtn) {
-        nowPlayingBtn.onclick = () => {
-            if (state.playback.item) {
-                // Show the playqueue as a special dynamic playlist
-                state.page = 'playlist';
-                state.filters.playlist = '__now_playing__';
-                state.filters.categories = [];
-                state.filters.genre = '';
-                state.filters.ratings = [];
-                updateNavActiveStates();
-                // Render the playqueue (current + upcoming items)
-                currentMedia = [state.playback.item, ...state.playQueue];
-                renderResults();
-            }
-        };
-    }
-
     if (sortBy) sortBy.onchange = () => {
         state.filters.sort = sortBy.value;
         localStorage.setItem('disco-sort', state.filters.sort);
@@ -6546,6 +6840,8 @@ document.addEventListener('DOMContentLoaded', () => {
     renderMediaTypeList(); // Render media type buttons on initial load
     renderCategoryList();
     initSidebarPersistence();
+    initQueueControls();
+    updateQueueVisibility();
     onUrlChange();
     applyTheme();
 
@@ -6596,6 +6892,8 @@ document.addEventListener('DOMContentLoaded', () => {
         showToast,
         resetFilters,
         updateSliderLabels,
+        updateQueueVisibility,
+        renderQueue,
         startSlideshow,
         stopSlideshow,
         state

@@ -56,6 +56,10 @@ export const state = {
     trackShuffleDuration: parseInt(localStorage.getItem('disco-track-shuffle-duration')) || 0,
     autoLoopMaxDuration: parseInt(localStorage.getItem('disco-auto-loop-max-duration')) || 30,
 
+    enableQueue: localStorage.getItem('disco-enable-queue') === 'true',
+    queueExpanded: localStorage.getItem('disco-queue-expanded') === 'true',
+    queueAddMode: localStorage.getItem('disco-queue-add-mode') || 'end', // 'end' or 'next'
+
     playerMode: localStorage.getItem('disco-default-view') || 'pip', // Initialize with preference
     trashcan: false,
     readOnly: false,
@@ -73,11 +77,13 @@ export const state = {
     playlists: [], // String array of titles
     newCategories: [], // Track categories added in this session to keep them at the top
     playlistItems: [], // Cache for client-side filtering
-    playQueue: [], // Queue of upcoming media items
     sidebarState: JSON.parse(localStorage.getItem('disco-sidebar-state') || '{}'),
     lastSuggestions: [],
     playback: {
         item: null,
+        queue: [], // Queue of upcoming media items
+        repeatMode: localStorage.getItem('disco-repeat-mode') || 'off', // 'off' | 'one' | 'all'
+        shuffle: localStorage.getItem('disco-shuffle') === 'true',
         timer: null,
         slideshowTimer: null,
         surfTimer: null,
