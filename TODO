@@ -1,7 +1,5 @@
 shortcuts:
 
-    │ Image Slideshow          │ Medium      │ Auto-play, timing, navigation         │
-    │ Theatre Mode Persistence │ Low         │ Setting persistence across reloads    │
     │ Subtitle File Loading    │ Medium      │ External .srt/.vtt files              │
     │ HLS Fallback             │ Medium      │ Native HLS → hls.js → direct stream   │
     │ Queue/Up Next            │ Low         │ Play queue display, management        │

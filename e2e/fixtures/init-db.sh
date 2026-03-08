@@ -19,10 +19,15 @@ echo "Media directory: $MEDIA_DIR"
 echo "Database file: $DB_FILE"
 echo ""
 
-# Clean up old database
+# Clean up old database and media
 if [ -f "$DB_FILE" ]; then
     echo "Removing old database..."
     rm -f "$DB_FILE" "${DB_FILE}-wal" "${DB_FILE}-shm"
+fi
+
+if [ -d "$MEDIA_DIR" ]; then
+    echo "Removing old media files..."
+    rm -rf "$MEDIA_DIR"
 fi
 
 # Create fixtures directory if needed
@@ -66,9 +71,18 @@ ffmpeg -y -f lavfi -i sine=frequency=330:duration=60 \
     -c:a libmp3lame -b:a 128k \
     "$MEDIA_DIR/audio/podcast.mp3" 2>/dev/null
 
-# Minimal JPEG images
-printf '\xFF\xD8\xFF\xE0\x00\x10JFIF\x00\x01\x01\x00\x00\x01\x00\x01\x00\x00\xFF\xD9' > "$MEDIA_DIR/images/photo1.jpg"
-printf '\xFF\xD8\xFF\xE0\x00\x10JFIF\x00\x01\x01\x00\x00\x01\x00\x01\x00\x00\xFF\xD9' > "$MEDIA_DIR/images/photo2.jpg"
+# Valid PNG images for slideshow testing
+ffmpeg -y -f lavfi -i color=c=red:s=640x480:d=1 \
+    -vf "drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf:fontsize=48:fontcolor=white:x=(w-text_w)/2:y=(h-text_h)/2:text='Image 1'" \
+    -frames:v 1 "$MEDIA_DIR/images/photo1.png" 2>/dev/null
+
+ffmpeg -y -f lavfi -i color=c=green:s=640x480:d=1 \
+    -vf "drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf:fontsize=48:fontcolor=white:x=(w-text_w)/2:y=(h-text_h)/2:text='Image 2'" \
+    -frames:v 1 "$MEDIA_DIR/images/photo2.png" 2>/dev/null
+
+ffmpeg -y -f lavfi -i color=c=blue:s=640x480:d=1 \
+    -vf "drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf:fontsize=48:fontcolor=white:x=(w-text_w)/2:y=(h-text_h)/2:text='Image 3'" \
+    -frames:v 1 "$MEDIA_DIR/images/photo3.png" 2>/dev/null
 
 # Create valid PDF using pandoc (or fallback to minimal PDF if pandoc not available)
 echo "# Test Document

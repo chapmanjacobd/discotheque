@@ -3611,13 +3611,17 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } else if (type.includes('image')) {
             el = document.createElement('img');
-            el.src = url;
-            el.onerror = () => handleMediaError(item);
             el.onload = () => {
                 if (state.imageAutoplay && !state.playback.isSurfing) {
                     startSlideshow();
                 }
             };
+            el.onerror = () => handleMediaError(item);
+            el.src = url;
+            // Handle cached images where load fires synchronously before handler is attached
+            if (el.complete) {
+                el.onload();
+            }
             el.ondblclick = () => toggleFullscreen(pipViewer, pipViewer);
 
             // Zoom/Pan logic for fullscreen
@@ -3785,6 +3789,7 @@ document.addEventListener('DOMContentLoaded', () => {
         state.playback.slideshowTimer = setTimeout(() => {
             state.playback.slideshowTimer = null;
             playSibling(1);
+            startSlideshow();
         }, state.slideshowDelay * 1000);
     }
 
@@ -6273,6 +6278,8 @@ document.addEventListener('DOMContentLoaded', () => {
         showToast,
         resetFilters,
         updateSliderLabels,
+        startSlideshow,
+        stopSlideshow,
         state
     };
 });
