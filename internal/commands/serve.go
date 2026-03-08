@@ -28,6 +28,20 @@ import (
 	"github.com/chapmanjacobd/discotheque/web"
 )
 
+// writeJSON writes a JSON response with proper headers and error handling
+func writeJSON(w http.ResponseWriter, status int, data any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	if err := json.NewEncoder(w).Encode(data); err != nil {
+		slog.Error("Failed to encode JSON response", "error", err)
+	}
+}
+
+// writeError writes a JSON error response
+func writeError(w http.ResponseWriter, status int, message string) {
+	writeJSON(w, status, models.ErrorResponse{Error: message})
+}
+
 func init() {
 	_ = mime.AddExtensionType(".js", "text/javascript")
 	_ = mime.AddExtensionType(".mjs", "text/javascript")
@@ -306,16 +320,13 @@ func (c *ServeCmd) GetGlobalFlags() models.GlobalFlags {
 }
 
 func (c *ServeCmd) handleDatabases(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
 	resp := models.DatabaseInfo{
 		Databases: c.Databases,
 		Trashcan:  c.Trashcan,
 		ReadOnly:  c.ReadOnly,
 		Dev:       c.Dev,
 	}
-	if err := json.NewEncoder(w).Encode(resp); err != nil {
-		slog.Error("Failed to encode databases response", "error", err)
-	}
+	writeJSON(w, http.StatusOK, resp)
 }
 
 // handleCategories returns a list of categories and their media counts.
@@ -363,9 +374,7 @@ func (c *ServeCmd) handleCategories(w http.ResponseWriter, r *http.Request) {
 		})
 		if err != nil {
 			slog.Error("Failed to fetch categories", "db", dbPath, "error", err)
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusInternalServerError)
-			json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Failed to fetch categories"})
+			writeError(w, http.StatusInternalServerError, "Failed to fetch categories")
 			return
 		}
 	}

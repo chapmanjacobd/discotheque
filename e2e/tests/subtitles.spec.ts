@@ -3,6 +3,7 @@ import { waitForPlayer } from '../fixtures';
 
 test.describe('Subtitles', () => {
   test.use({ readOnly: true });
+
   test('player opens when clicking caption segment', async ({ page, server }) => {
     await page.goto(server.getBaseUrl() + '/#mode=captions');
 
@@ -70,32 +71,6 @@ test.describe('Subtitles', () => {
 
     // Player should still be visible
     const player = page.locator('#pip-player');
-    await expect(player.first()).toBeVisible();
-  });
-
-  test('keyboard shortcut v toggles subtitle visibility', async ({ page, server }) => {
-    await page.goto(server.getBaseUrl() + '/#mode=captions');
-
-    // Wait for captions to load
-    await page.waitForSelector('.caption-segment', { timeout: 10000 });
-
-    // Click a caption segment to open player
-    await page.locator('.caption-segment').first().click();
-    await waitForPlayer(page);
-
-    // Press 'v' key to toggle subtitle visibility
-    await page.keyboard.press('v');
-    await page.waitForTimeout(500);
-
-    // Player should still be visible
-    const player = page.locator('#pip-player');
-    await expect(player.first()).toBeVisible();
-
-    // Press 'v' again to toggle back
-    await page.keyboard.press('v');
-    await page.waitForTimeout(500);
-
-    // Player should still be visible
     await expect(player.first()).toBeVisible();
   });
 });

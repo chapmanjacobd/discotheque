@@ -1,8 +1,41 @@
-calculate e2e coverage by feature rather than lines
+shortcuts:
 
-e2e tests for all shortcuts
+v toggle subtitle visibility
 
-move shortcuts to seperate js file
+. Step forward one frame. Pressing once will pause, every consecutive press will play one frame and then go into pause mode again.
+
+, Step backward one frame. Pressing once will pause, every consecutive press will play one frame in reverse and then go into pause mode again.
+
+
+
+    ┌──────────────────────────┬─────────────┬───────────────────────────────────────┐
+    │ Feature                  │ Priority    │ Notes                                 │
+    ├──────────────────────────┼─────────────┼───────────────────────────────────────┤
+    │ Mobile Touch Gestures    │ High        │ Swipe seeking, double-tap, long-press │
+    │ Audio-specific Features  │ Medium      │ Lyrics display, audio-only player     │
+    │ Image Slideshow          │ Medium      │ Auto-play, timing, navigation         │
+    │ Theatre Mode Persistence │ Low         │ Setting persistence across reloads    │
+    │ Subtitle File Loading    │ Medium      │ External .srt/.vtt files              │
+    │ HLS Fallback             │ Medium      │ Native HLS → hls.js → direct stream   │
+    │ Queue/Up Next            │ Low         │ Play queue display, management        │
+    │ MPV Integration          │ ⚠️ CLI only │ watch, listen commands                │
+    └──────────────────────────┴─────────────┴───────────────────────────────────────┘
+
+    ┌─────────────────────────┬──────────────┬───────────────┬───────────────────────────────────────────────────────────────────────────┐
+    │ Feature                 │ E2E Coverage │ Unit Coverage │ Gaps                                                                      │
+    ├─────────────────────────┼──────────────┼───────────────┼───────────────────────────────────────────────────────────────────────────┤
+    │ Progress/Resume         │ ❌ Low       │ ✅ High       │ No E2E for playhead resume, local storage sync, 90s server sync threshold │
+    │ Channel Surf            │ ❌ None      │ ✅ High       │ Random clip fetching, type-restricted surf, slideshow for images          │
+    │ History Pages           │ ❌ None      │ ✅ High       │ In Progress/Completed/Unplayed merging with local data                    │
+    │ Error Handling          │ ❌ None      │ ✅ High       │ Auto-skip on media error, 120 error limit, consecutive error reset        │
+    │ Rating System           │ ❌ None      │ ✅ Yes        │ Drag-drop rating, rating buttons                                          │
+    │ Mobile Gestures         │ ❌ None      │ ❌ None       │ Touch seeking, double-tap, swipe gestures                                 │
+    │ Categorization/Curation │ ⚠️ CLI only  │ ✅ Yes        │ Web UI for keyword management not tested                                  │
+    │ Episodes/Group View     │ ❌ None      │ ✅ Yes        │ Episode grouping, parent-child relationships                              │
+    │ Race Conditions         │ ❌ None      │ ✅ Yes        │ Progress update before search pagination                                  │
+    └─────────────────────────┴──────────────┴───────────────┴───────────────────────────────────────────────────────────────────────────┘
+
+move shortcuts to separate js file
 
 For epubs, lets serve them by streaming or ebook-convert in ~/.cache
 

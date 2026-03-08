@@ -287,115 +287,81 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    async function toggleChannelSurf(isAutomated = false, isManual = true) {
-        if (state.playback.isSurfing) {
-            if (isManual) {
-                state.playback.isSurfing = false;
-                if (state.playback.surfTimer) {
-                    clearTimeout(state.playback.surfTimer);
-                    state.playback.surfTimer = null;
+    async function playRandomMedia(maxRetries = 3) {
+        let retries = 0;
+
+        while (retries < maxRetries) {
+            try {
+                // Determine filter type based on current media
+                let type = '';
+                if (state.playback.item && state.playback.item.type) {
+                    const currentType = state.playback.item.type;
+                    if (currentType.startsWith('video')) type = 'video';
+                    else if (currentType.startsWith('audio')) type = 'audio';
+                    else if (currentType.startsWith('image')) type = 'image';
+                    else if (currentType.startsWith('text') || currentType.includes('pdf') || currentType.includes('epub') || currentType.includes('mobi')) type = 'text';
                 }
-                showToast('Channel Surf Stopped', 'ℹ️');
-                if (channelSurfBtn) channelSurfBtn.classList.remove('active');
-                return;
-            }
-        } else {
-            if (isAutomated) return;
-            state.playback.isSurfing = true;
-        }
 
-        try {
-            // Determine filter type based on current media
-            let type = '';
-            if (state.playback.item && state.playback.item.type) {
-                const currentType = state.playback.item.type;
-                if (currentType.startsWith('video')) type = 'video';
-                else if (currentType.startsWith('audio')) type = 'audio';
-                else if (currentType.startsWith('image')) type = 'image';
-                else if (currentType.startsWith('text') || currentType.includes('pdf') || currentType.includes('epub') || currentType.includes('mobi')) type = 'text';
-            }
+                const params = new URLSearchParams();
+                if (type) params.append('type', type);
 
-            const params = new URLSearchParams();
-            if (type) params.append('type', type);
+                // Add duration param
+                const duration = state.trackShuffleDuration || 0;
+                params.append('duration', duration);
 
-            // Add duration param
-            const duration = state.trackShuffleDuration || 0;
-            params.append('duration', duration);
-
-            const resp = await fetchAPI(`/api/random-clip?${params.toString()}`);
-            if (!resp.ok) {
-                if (resp.status === 403) {
-                    showToast('Access Denied', '🚫');
+                const resp = await fetchAPI(`/api/random-clip?${params.toString()}`);
+                if (!resp.ok) {
+                    if (resp.status === 403) {
+                        showToast('Access Denied', '🚫');
+                        return;
+                    }
+                    if (resp.status === 404) {
+                        showToast(`No more ${type || 'media'} found.`, 'ℹ️');
+                        return;
+                    }
+                    // For 415 or other errors, retry with different media
+                    retries++;
+                    if (retries >= maxRetries) {
+                        throw new Error('Failed to fetch playable media after ' + maxRetries + ' attempts');
+                    }
+                    continue;
+                }
+                const data = await resp.json();
+                if (!data || !data.path) {
+                    showToast(`No more ${type || 'media'} found.`, 'ℹ️');
                     return;
                 }
-                if (resp.status === 404) {
-                    showToast(`No more ${type || 'media'} found to surf.`, 'ℹ️');
-                    return;
+
+                // Open in PiP
+                await openActivePlayer(data, true, true);
+
+                // Seek to the random start time
+                const media = pipViewer.querySelector('video, audio');
+                if (media && data.start !== undefined) {
+                    media.currentTime = data.start;
                 }
-                throw new Error('Failed to fetch random clip');
-            }
-            const data = await resp.json();
-            if (!data || !data.path) {
-                showToast(`No more ${type || 'media'} found to surf.`, 'ℹ️');
+                return; // Success, exit loop
+            } catch (err) {
+                // Check if it's a media loading error (415) - retry
+                if (err.message && err.message.includes('415')) {
+                    retries++;
+                    if (retries >= maxRetries) {
+                        console.error('Failed to play random media after retries:', err);
+                        errorToast(err, 'Failed to play random media');
+                        return;
+                    }
+                    continue;
+                }
+                console.error('Failed to play random media:', err);
+                errorToast(err, 'Failed to play random media');
                 return;
             }
-
-            // Show toast about what's playing
-            const filename = data.path.split('/').pop();
-            showToast(`Channel Surf: ${filename} (${formatDuration(data.start)})`, '🔀');
-
-            if (channelSurfBtn) channelSurfBtn.classList.add('active');
-
-            // Open in PiP
-            await openActivePlayer(data, true, true);
-
-            // Seek to the random start time
-            const media = pipViewer.querySelector('video, audio');
-            if (media) {
-                media.currentTime = data.start;
-
-                // Add listener for end of clip
-                if (data.end && data.end > data.start) {
-                    const checkTime = () => {
-                        if (!state.playback.isSurfing) {
-                            media.removeEventListener('timeupdate', checkTime);
-                            return;
-                        }
-                        if (media.currentTime >= data.end) {
-                            media.removeEventListener('timeupdate', checkTime);
-                            // Trigger next surf
-                            toggleChannelSurf(true, false);
-                        }
-                    };
-                    media.addEventListener('timeupdate', checkTime);
-                }
-            } else {
-                // Handle images
-                const img = pipViewer.querySelector('img');
-                if (img) {
-                    // Use slideshow delay for images when surfing
-                    const delay = state.slideshowDelay || 5;
-                    if (state.playback.surfTimer) clearTimeout(state.playback.surfTimer);
-                    state.playback.surfTimer = setTimeout(() => {
-                        state.playback.surfTimer = null;
-                        if (!state.playback.isSurfing) return;
-                        toggleChannelSurf(true, false);
-                    }, delay * 1000);
-                }
-            }
-        } catch (err) {
-            console.error('Channel surf failed:', err);
-            errorToast(err, 'Channel surf failed');
-            state.playback.isSurfing = false;
-            if (channelSurfBtn) channelSurfBtn.classList.remove('active');
         }
     }
 
     if (channelSurfBtn) {
-        channelSurfBtn.onclick = (e) => {
-            const isAutomated = e && e.detail && e.detail.isAutomated;
-            const isManual = e && (e.isTrusted || e.detail?.isManual);
-            toggleChannelSurf(isAutomated, isManual);
+        channelSurfBtn.onclick = () => {
+            playRandomMedia();
         };
     }
 
@@ -4968,6 +4934,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         });
                     }
                     return;
+                case 'r':
+                    playRandomMedia();
+                    return;
                 case 'f':
                     // 'f' toggles fullscreen for active viewer, or exits fullscreen if no viewer
                     if (document.fullscreenElement && !hasActiveViewer) {
@@ -5072,6 +5041,25 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         };
 
+        const toggleSubtitleVisibility = () => {
+            if (!media.textTracks) return;
+            const tracks = Array.from(media.textTracks).filter(t => t.kind === 'subtitles');
+            if (tracks.length === 0) return;
+
+            // Check if any track is showing
+            const hasShowingTrack = tracks.some(t => t.mode === 'showing');
+
+            if (hasShowingTrack) {
+                // Disable all tracks
+                tracks.forEach(t => t.mode = 'disabled');
+                showToast('Subtitles: Off', '💬');
+            } else {
+                // Enable first track
+                tracks[0].mode = 'showing';
+                showToast(`Subtitles: ${tracks[0].label || 'Track 1'}`, '💬');
+            }
+        };
+
         switch (e.key.toLowerCase()) {
             case ' ':
             case 'k':
@@ -5087,6 +5075,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 } else {
                     setTime(Math.max(0, currentTime - 10));
                 }
+                break;
+            case 'v':
+                toggleSubtitleVisibility();
                 break;
             case 'l':
                 if (e.shiftKey) {
@@ -5106,9 +5097,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     media.loop = !media.loop;
                     showToast(media.loop ? 'Loop: ON' : 'Loop: OFF', '🔁');
                 }
-                break;
-            case 'r':
-                toggleChannelSurf();
                 break;
             case 'arrowleft':
                 if (currentTime < 1) {
@@ -5476,8 +5464,6 @@ document.addEventListener('DOMContentLoaded', () => {
         let touchStartY = 0;
         let touchStartTime = 0;
         let lastTapTime = 0;
-        let isLongPress = false;
-        let longPressTimeout = null;
         let initialSeekTime = 0;
         const seekIndicator = document.getElementById('seek-indicator');
         let seekTimer = null;
@@ -5524,14 +5510,8 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             lastTapTime = now;
 
-            // Long press for seeking
-            isLongPress = false;
-            if (longPressTimeout) clearTimeout(longPressTimeout);
-            longPressTimeout = setTimeout(() => {
-                if (touchStartTime === 0) return;
-                isLongPress = true;
-                if (media) initialSeekTime = media.currentTime;
-            }, 500);
+            // Initialize seek time on touch
+            if (media) initialSeekTime = media.currentTime;
 
         }, { passive: false });
 
@@ -5541,42 +5521,28 @@ document.addEventListener('DOMContentLoaded', () => {
             const diffX = touch.screenX - touchStartX;
             const diffY = touch.screenY - touchStartY;
 
-            if (isLongPress) {
-                const media = pipViewer.querySelector('video, audio');
-                if (media && !isNaN(media.duration)) {
-                    // MX Player style: movement relative to screen width
-                    const screenWidth = window.innerWidth;
-                    const sensitivity = 0.5; // Swiping full screen = half video duration
-                    const timeDiff = (diffX / screenWidth) * media.duration * sensitivity;
-                    const targetTime = Math.max(0, Math.min(media.duration, initialSeekTime + timeDiff));
-                    media.currentTime = targetTime;
+            const media = pipViewer.querySelector('video, audio');
+            if (media && !isNaN(media.duration)) {
+                // MX Player style: movement relative to screen width
+                const screenWidth = window.innerWidth;
+                const sensitivity = 0.5; // Swiping full screen = half video duration
+                const timeDiff = (diffX / screenWidth) * media.duration * sensitivity;
+                const targetTime = Math.max(0, Math.min(media.duration, initialSeekTime + timeDiff));
+                media.currentTime = targetTime;
 
-                    const timeStr = formatDuration(targetTime) + ' / ' + formatDuration(media.duration);
-                    showIndicator(timeStr);
-                    if (e.cancelable) e.preventDefault();
-                }
-                return;
+                const timeStr = formatDuration(targetTime) + ' / ' + formatDuration(media.duration);
+                showIndicator(timeStr);
+                if (e.cancelable) e.preventDefault();
             }
 
             // If it's clearly a gesture for the player, prevent page scroll
             if (Math.abs(diffX) > 10 || Math.abs(diffY) > 10) {
                 if (e.cancelable) e.preventDefault();
-                // If moving significantly before long press, cancel it
-                if (!isLongPress && (Math.abs(diffX) > 30 || Math.abs(diffY) > 30)) {
-                    clearTimeout(longPressTimeout);
-                }
             }
         }, { passive: false });
 
         pipPlayer.addEventListener('touchend', (e) => {
-            clearTimeout(longPressTimeout);
             if (touchStartTime === 0) return;
-
-            if (isLongPress) {
-                isLongPress = false;
-                touchStartTime = 0;
-                return;
-            }
 
             if (e.target.closest('.pip-controls') || e.target.closest('button') || e.target.closest('select')) {
                 touchStartTime = 0;
