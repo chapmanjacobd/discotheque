@@ -2135,6 +2135,29 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderCuration(keywordsData) {
         if (!keywordsData) keywordsData = [];
 
+        // Reorder data to put new categories at the top
+        if (state.newCategories.length > 0) {
+            const newOnes = [];
+            const oldOnes = [];
+
+            // Map for quick lookup of keywordsData by category name
+            const dataMap = new Map();
+            keywordsData.forEach(item => dataMap.set(item.category, item));
+
+            // Add new ones in order of state.newCategories
+            state.newCategories.forEach(catName => {
+                if (dataMap.has(catName)) {
+                    newOnes.push(dataMap.get(catName));
+                    dataMap.delete(catName);
+                }
+            });
+
+            // Rest are old ones (already sorted alphabetically by backend)
+            dataMap.forEach(item => oldOnes.push(item));
+
+            keywordsData = [...newOnes, ...oldOnes];
+        }
+
         resultsCount.textContent = ``;
         resultsContainer.className = 'curation-view';
         resultsContainer.innerHTML = '';
@@ -2147,11 +2170,22 @@ document.addEventListener('DOMContentLoaded', () => {
                 <h2 style="margin: 0;">Categorization</h2>
             </div>
             <p>Manage categories and keywords. Drag keywords from the suggestion pool to a category, or add them manually.</p>
-            <div style="display: flex; gap: 1rem; margin: 1.5rem 0;">
+            <div style="display: flex; align-items: center; gap: 1.5rem; margin: 1.5rem 0;">
                 <button id="run-auto-categorize" class="category-btn" style="background: var(--accent-color); color: white;">Run Categorization Now</button>
+                <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem;">
+                    <input type="checkbox" id="categorize-full-path" ${localStorage.getItem('disco-categorize-full-path') === 'true' ? 'checked' : ''}>
+                    <label for="categorize-full-path" title="Include parent directory names in keyword mining and matching">Include folder names</label>
+                </div>
             </div>
         `;
         resultsContainer.appendChild(headerEl);
+
+        const fullPathCheck = headerEl.querySelector('#categorize-full-path');
+        if (fullPathCheck) {
+            fullPathCheck.onchange = (e) => {
+                localStorage.setItem('disco-categorize-full-path', e.target.checked);
+            };
+        }
 
         const container = document.createElement('div');
         container.className = 'curation-container';
@@ -2304,7 +2338,8 @@ document.addEventListener('DOMContentLoaded', () => {
             suggestionsArea.innerHTML = '<div class="spinner" style="width: 24px; height: 24px; margin: 1rem auto;"></div>';
 
             try {
-                const resp = await fetchAPI('/api/categorize/suggest');
+                const isFullPath = fullPathCheck ? fullPathCheck.checked : false;
+                const resp = await fetchAPI(`/api/categorize/suggest?full_path=${isFullPath}`);
                 if (!resp.ok) throw new Error('Failed');
                 const suggestions = await resp.json();
                 renderSuggestionsArea(suggestions, suggestionsArea);
@@ -2338,7 +2373,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 btnRun.disabled = true;
                 btnRun.textContent = 'Running...';
                 try {
-                    const resp = await fetchAPI('/api/categorize/apply', { method: 'POST' });
+                    const isFullPath = fullPathCheck ? fullPathCheck.checked : false;
+                    const resp = await fetchAPI(`/api/categorize/apply?full_path=${isFullPath}`, { method: 'POST' });
                     if (!resp.ok) throw new Error('Apply failed');
                     const data = await resp.json();
                     showToast(`Successfully categorized ${data.count} files!`, '🏷️');
@@ -2423,6 +2459,15 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             if (!resp.ok) throw new Error('Failed');
             showToast(`Saved keyword "${keyword}" to "${category}"`);
+
+            // Add to new categories list to keep it at the top in this session
+            if (!state.newCategories.includes(category)) {
+                state.newCategories.unshift(category);
+            } else {
+                // Move to top if already exists in new list
+                state.newCategories = [category, ...state.newCategories.filter(c => c !== category)];
+            }
+
             fetchCuration(); // Refresh UI
         } catch (err) {
             console.error(err);
@@ -2435,6 +2480,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const resp = await fetchAPI(`/api/categorize/category?category=${encodeURIComponent(category)}`, { method: 'DELETE' });
             if (!resp.ok) throw new Error('Failed');
             showToast(`Deleted category "${category}"`);
+
+            // Remove from session-new list if present
+            state.newCategories = state.newCategories.filter(c => c !== category);
+
             fetchCuration();
         } catch (err) {
             console.error(err);
@@ -3638,10 +3687,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     const extMatch = codec.match(/\((srt|vtt|ass|ssa|lrc|idx|sub)\)$/i);
                     const isExt = extMatch !== null;
                     const fileExt = extMatch ? extMatch[1].toLowerCase() : null;
-                    
+
                     // Use the codec name as-is (it's already in "Language (codec)" format from backend)
                     const label = codec || `Track ${index + 1}`;
-                    
+
                     let trackUrl;
                     if (isExt && fileExt) {
                         // External subtitle: need to find the actual file
@@ -3882,7 +3931,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Use raw endpoint for unknown formats
             const url = `/api/raw?path=${encodeURIComponent(item.path)}`;
-            
+
             // Use iframe for all document types - modern browsers have built-in PDF viewers
             // and browser extensions handle EPUB files better than any JS library
             const iframe = document.createElement('iframe');
@@ -4840,9 +4889,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const curationLinkBtn = document.getElementById('categorization-link-btn');
         if (curationLinkBtn) {
             curationLinkBtn.onclick = () => {
-                state.page = 'curation';
-                updateNavActiveStates();
-                fetchCuration();
+                if (state.page === 'curation') {
+                    state.page = 'search';
+                    updateNavActiveStates();
+                    performSearch();
+                } else {
+                    state.page = 'curation';
+                    updateNavActiveStates();
+                    fetchCuration();
+                }
             };
         }
 
@@ -5251,13 +5306,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                     // Try to advance by 1 frame at a time
                     // Start with 1/60s and increase until we see a change
-                    const fps = media.webkitDecodedFrameCount && media.webkitDecodedFrameCount > 0 
-                        ? 60 
+                    const fps = media.webkitDecodedFrameCount && media.webkitDecodedFrameCount > 0
+                        ? 60
                         : (duration && duration <= 10 ? 30 : 24); // Estimate based on duration
                     let step = 1 / fps;
                     const originalTime = currentTime;
                     let newTime = Math.min(duration, originalTime + step);
-                    
+
                     // If we're very close to the end, just go to the end
                     if (duration - originalTime < step) {
                         setTime(duration);
@@ -5279,13 +5334,13 @@ document.addEventListener('DOMContentLoaded', () => {
                         media.pause();
                     }
                     // Try to go back by 1 frame at a time
-                    const fps = media.webkitDecodedFrameCount && media.webkitDecodedFrameCount > 0 
-                        ? 60 
+                    const fps = media.webkitDecodedFrameCount && media.webkitDecodedFrameCount > 0
+                        ? 60
                         : (duration && duration <= 10 ? 30 : 24);
                     let step = 1 / fps;
                     const originalTime = currentTime;
                     let newTime = Math.max(0, originalTime - step);
-                    
+
                     // Try up to 3 frames if 1 frame doesn't move
                     for (let i = 1; i <= 3 && newTime === originalTime; i++) {
                         step = i / fps;

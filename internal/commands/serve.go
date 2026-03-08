@@ -2393,6 +2393,8 @@ func (c *ServeCmd) handleRandomClip(w http.ResponseWriter, r *http.Request) {
 }
 
 func (c *ServeCmd) handleCategorizeSuggest(w http.ResponseWriter, r *http.Request) {
+	fullPath := r.URL.Query().Get("full_path") == "true"
+
 	var allMedia []models.MediaWithDB
 	for _, dbPath := range c.Databases {
 		err := c.execDB(r.Context(), dbPath, func(sqlDB *sql.DB) error {
@@ -2442,6 +2444,7 @@ func (c *ServeCmd) handleCategorizeSuggest(w http.ResponseWriter, r *http.Reques
 		DeletedFlags:     c.DeletedFlags,
 		PostActionFlags:  c.PostActionFlags,
 		Databases:        c.Databases,
+		FullPath:         fullPath,
 	}
 	// Note: mineCategories and applyCategories need to be exported or called through a wrapper
 	// Since I'm in the same package 'commands', I can call them directly.
@@ -2478,7 +2481,13 @@ func (c *ServeCmd) handleCategorizeSuggest(w http.ResponseWriter, r *http.Reques
 			// Use a map to count each word only once per file
 			uniqueWords := make(map[string]bool)
 
-			words := utils.ExtractWords(utils.PathToSentence(m.Path))
+			sentence := ""
+			if fullPath {
+				sentence = utils.PathToSentenceFull(m.Path)
+			} else {
+				sentence = utils.PathToSentence(m.Path)
+			}
+			words := utils.ExtractWords(sentence)
 			if m.Title != nil {
 				words = append(words, utils.ExtractWords(*m.Title)...)
 			}
@@ -2526,6 +2535,8 @@ func (c *ServeCmd) handleCategorizeApply(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	fullPath := r.URL.Query().Get("full_path") == "true"
+
 	var allMedia []models.MediaWithDB
 	for _, dbPath := range c.Databases {
 		err := c.execDB(r.Context(), dbPath, func(sqlDB *sql.DB) error {
@@ -2556,6 +2567,7 @@ func (c *ServeCmd) handleCategorizeApply(w http.ResponseWriter, r *http.Request)
 		DeletedFlags:     c.DeletedFlags,
 		PostActionFlags:  c.PostActionFlags,
 		Databases:        c.Databases,
+		FullPath:         fullPath,
 	}
 	compiled := cmd.CompileRegexes()
 

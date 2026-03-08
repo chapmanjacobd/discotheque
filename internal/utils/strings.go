@@ -126,6 +126,12 @@ func PathToSentence(path string) string {
 	return CleanString(s)
 }
 
+func PathToSentenceFull(path string) string {
+	re := regexp.MustCompile(`[/\\.\[\]\-\+(){}_&]`)
+	s := re.ReplaceAllString(path, " ")
+	return CleanString(s)
+}
+
 func IsGenericTitle(title string) bool {
 	title = strings.ToLower(strings.TrimSpace(title))
 	if title == "" {

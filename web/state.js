@@ -70,6 +70,7 @@ export const state = {
         duration_min: 0, duration_max: 3600
     },
     playlists: [], // String array of titles
+    newCategories: [], // Track categories added in this session to keep them at the top
     playlistItems: [], // Cache for client-side filtering
     playQueue: [], // Queue of upcoming media items
     sidebarState: JSON.parse(localStorage.getItem('disco-sidebar-state') || '{}'),

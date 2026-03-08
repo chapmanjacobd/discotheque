@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
@@ -27,7 +28,8 @@ type CategorizeCmd struct {
 
 	Databases []string `arg:"" required:"" help:"SQLite database files" type:"existingfile"`
 
-	Other bool `help:"Analyze 'other' category to find potential new categories"`
+	Other    bool `help:"Analyze 'other' category to find potential new categories"`
+	FullPath bool `help:"Use full path for categorization suggestions instead of just filename"`
 }
 
 func (c *CategorizeCmd) Run(ctx *kong.Context) error {
@@ -96,7 +98,13 @@ func (c *CategorizeCmd) applyCategories(media []models.MediaWithDB, compiled map
 	categorizedCount := 0
 	for _, m := range media {
 		foundCategories := []string{}
-		pathAndTitle := m.Path
+		pathAndTitle := ""
+		if c.FullPath {
+			pathAndTitle = m.Path
+		} else {
+			pathAndTitle = filepath.Base(m.Path)
+		}
+
 		if m.Title != nil {
 			pathAndTitle += " " + *m.Title
 		}
@@ -184,7 +192,13 @@ func (c *CategorizeCmd) mineCategories(media []models.MediaWithDB, compiled map[
 
 		if !matched {
 			unmatchedCount++
-			words := utils.ExtractWords(utils.PathToSentence(m.Path))
+			sentence := ""
+			if c.FullPath {
+				sentence = utils.PathToSentenceFull(m.Path)
+			} else {
+				sentence = utils.PathToSentence(m.Path)
+			}
+			words := utils.ExtractWords(sentence)
 			if m.Title != nil {
 				words = append(words, utils.ExtractWords(*m.Title)...)
 			}
