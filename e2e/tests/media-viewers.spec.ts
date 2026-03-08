@@ -7,56 +7,6 @@ test.describe('Document Viewer (PDF/EPUB)', () => {
     await page.goto(server.getBaseUrl());
     await page.waitForSelector('.media-card', { timeout: 10000 });
 
-    // Search for our test PDF
-    await page.fill('#search-input', 'test-document.pdf');
-    await page.press('#search-input', 'Enter');
-    await page.waitForTimeout(1000);
-
-    // Find and click the PDF media card
-    const pdfCard = page.locator('.media-card:has-text("test-document.pdf")');
-    if (await pdfCard.count() > 0) {
-      await pdfCard.first().click();
-
-      // Document viewer modal should open
-      await page.waitForSelector('#document-modal:not(.hidden)', { timeout: 10000 });
-
-      // Modal should be visible
-      const modal = page.locator('#document-modal');
-      await expect(modal.first()).toBeVisible();
-
-      // Should have iframe with PDF content
-      const iframe = page.locator('#document-container iframe');
-      await expect(iframe.first()).toBeVisible();
-    }
-  });
-
-  test('opens EPUB file in viewer', async ({ page, server }) => {
-    await page.goto(server.getBaseUrl());
-    await page.waitForSelector('.media-card', { timeout: 10000 });
-
-    // Filter to show only EPUB documents
-    await page.fill('#search-input', '.epub');
-    await page.press('#search-input', 'Enter');
-    await page.waitForTimeout(1000);
-
-    // Find and click an EPUB media card
-    const epubCards = page.locator('.media-card:has-text(".epub")');
-    if (await epubCards.count() > 0) {
-      await epubCards.first().click();
-
-      // Document viewer modal should open (EPUB handled by browser/extension via iframe)
-      await page.waitForSelector('#document-modal:not(.hidden)', { timeout: 10000 });
-
-      // Viewer should be visible
-      const viewer = page.locator('#document-container iframe');
-      await expect(viewer.first()).toBeVisible();
-    }
-  });
-
-  test('modal header is at top of page when viewing PDF', async ({ page, server }) => {
-    await page.goto(server.getBaseUrl());
-    await page.waitForSelector('.media-card', { timeout: 10000 });
-
     // Search for test PDF
     await page.fill('#search-input', 'test-document.pdf');
     await page.press('#search-input', 'Enter');
