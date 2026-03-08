@@ -2829,16 +2829,35 @@ func (c *ServeCmd) handleSubtitles(w http.ResponseWriter, r *http.Request) {
 
 	ext := strings.ToLower(filepath.Ext(path))
 	streamIndex := r.URL.Query().Get("index")
+	requestedExt := r.URL.Query().Get("ext")
 
 	// If it's a media container but no index is specified, we should try to find an external sidecar
 	if streamIndex == "" && (ext == ".mkv" || ext == ".mp4" || ext == ".m4v" || ext == ".mov" || ext == ".webm") {
 		// Try to find a sibling subtitle file
 		sidecars := utils.GetExternalSubtitles(path)
 		if len(sidecars) > 0 {
-			// Serve the first found sidecar
-			path = sidecars[0]
-			ext = strings.ToLower(filepath.Ext(path))
-			slog.Debug("Found sidecar for media file", "media", r.URL.Query().Get("path"), "sidecar", path)
+			// If a specific extension was requested, try to find a matching one
+			if requestedExt != "" {
+				for _, sub := range sidecars {
+					if strings.ToLower(filepath.Ext(sub)) == "."+requestedExt {
+						path = sub
+						ext = strings.ToLower(filepath.Ext(path))
+						slog.Debug("Found matching sidecar for media file", "media", r.URL.Query().Get("path"), "sidecar", path)
+						break
+					}
+				}
+				// If no matching extension found, use the first one anyway
+				if ext != "."+requestedExt && len(sidecars) > 0 {
+					path = sidecars[0]
+					ext = strings.ToLower(filepath.Ext(path))
+					slog.Debug("Requested extension not found, using first sidecar", "media", r.URL.Query().Get("path"), "sidecar", path)
+				}
+			} else {
+				// Serve the first found sidecar
+				path = sidecars[0]
+				ext = strings.ToLower(filepath.Ext(path))
+				slog.Debug("Found sidecar for media file", "media", r.URL.Query().Get("path"), "sidecar", path)
+			}
 		} else {
 			http.Error(w, "No index specified and no sidecar found", http.StatusNotFound)
 			return

@@ -89,7 +89,7 @@ echo "# Test Document
 
 This is a test PDF document for e2e testing.
 
-It contains multiple lines to ensure it's a valid, readable PDF." | pandoc -f markdown -t pdf -o "$MEDIA_DIR/documents/doc1.pdf"
+It contains multiple lines to ensure it's a valid, readable PDF." | pandoc -f markdown -t pdf -o "$MEDIA_DIR/documents/test-document.pdf"
 
 # VTT subtitle files (external subtitles for caption scanning)
 cat > "$MEDIA_DIR/videos/movie1.vtt" << 'VTT'

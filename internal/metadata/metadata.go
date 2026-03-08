@@ -278,10 +278,17 @@ func Extract(ctx context.Context, path string, scanSubtitles bool) (*MediaMetada
 	if scanSubtitles {
 		externalSubs := utils.GetExternalSubtitles(path)
 		for _, sub := range externalSubs {
-			ext := strings.ToLower(filepath.Ext(sub))
 			sCount++
-			sCodecs = append(sCodecs, strings.TrimPrefix(ext, "."))
+			// Use ExtractSubtitleInfo to get a nice display name with language
+			displayName, _, _ := utils.ExtractSubtitleInfo(sub)
+			if displayName != "" {
+				sCodecs = append(sCodecs, displayName)
+			} else {
+				ext := strings.ToLower(filepath.Ext(sub))
+				sCodecs = append(sCodecs, strings.TrimPrefix(ext, "."))
+			}
 
+			ext := strings.ToLower(filepath.Ext(sub))
 			if ext == ".vtt" || ext == ".srt" {
 				caps, err := parseSubtitleFile(sub, path)
 				if err == nil {

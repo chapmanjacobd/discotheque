@@ -109,6 +109,143 @@ func TestGetExternalSubtitles(t *testing.T) {
 	}
 }
 
+func TestGetExternalSubtitles_MorePatterns(t *testing.T) {
+	tmpDir, _ := os.MkdirTemp("", "subs-test-patterns")
+	defer os.RemoveAll(tmpDir)
+
+	video := filepath.Join(tmpDir, "movie.mp4")
+	os.WriteFile(video, nil, 0o644)
+
+	// Create various subtitle patterns
+	os.WriteFile(filepath.Join(tmpDir, "movie.srt"), nil, 0o644)          // exact match
+	os.WriteFile(filepath.Join(tmpDir, "movie.en.srt"), nil, 0o644)       // dot notation
+	os.WriteFile(filepath.Join(tmpDir, "movie.eng.srt"), nil, 0o644)      // 3-letter code
+	os.WriteFile(filepath.Join(tmpDir, "movie_EN.srt"), nil, 0o644)       // underscore uppercase
+	os.WriteFile(filepath.Join(tmpDir, "movie_es.srt"), nil, 0o644)       // underscore Spanish
+	os.WriteFile(filepath.Join(tmpDir, "movie - French.srt"), nil, 0o644) // dash notation
+	os.WriteFile(filepath.Join(tmpDir, "movie.ass"), nil, 0o644)          // different format
+	os.WriteFile(filepath.Join(tmpDir, "movie.ja.ass"), nil, 0o644)       // Japanese ASS
+
+	subs := GetExternalSubtitles(video)
+
+	// Should find all subtitle files
+	expectedMin := 8
+	if len(subs) < expectedMin {
+		t.Errorf("Expected at least %d subtitles, got %d: %v", expectedMin, len(subs), subs)
+	}
+
+	// Check that specific patterns are found
+	foundPatterns := make(map[string]bool)
+	for _, sub := range subs {
+		base := filepath.Base(sub)
+		foundPatterns[base] = true
+	}
+
+	expectedFiles := []string{
+		"movie.srt", "movie.en.srt", "movie.eng.srt",
+		"movie_EN.srt", "movie_es.srt", "movie.ass", "movie.ja.ass",
+	}
+
+	for _, expected := range expectedFiles {
+		if !foundPatterns[expected] {
+			t.Errorf("Expected to find %s, but it was not in the results: %v", expected, subs)
+		}
+	}
+}
+
+func TestExtractSubtitleInfo(t *testing.T) {
+	tests := []struct {
+		filename     string
+		wantDisplay  string
+		wantLangCode string
+		wantCodec    string
+	}{
+		{"movie.en.srt", "English (srt)", "en", "srt"},
+		{"movie_eng.ass", "English (ssa)", "eng", "ssa"}, // ass displayed as ssa
+		{"movie.srt", "srt", "", "srt"},
+		{"movie.EN.srt", "English (srt)", "en", "srt"},
+		{"movie.es.vtt", "Spanish (vtt)", "es", "vtt"},
+		{"movie_fra.ass", "French (ssa)", "fra", "ssa"}, // ass displayed as ssa
+		{"movie.ja.srt", "Japanese (srt)", "ja", "srt"},
+		{"movie.zh.srt", "Chinese (srt)", "zh", "srt"},
+		{"movie.kor.ass", "Korean (ssa)", "kor", "ssa"},
+		{"movie_deu.srt", "German (srt)", "deu", "srt"},
+		{"movie - English.srt", "English (srt)", "en", "srt"}, // full language name supported
+		{"movie.rus.vtt", "Russian (vtt)", "rus", "vtt"},
+		{"movie.ara.srt", "Arabic (srt)", "ara", "srt"},
+		{"movie.hin.ass", "Hindi (ssa)", "hin", "ssa"},
+		{"movie.unknown.srt", "srt", "", "srt"},                 // "unknown" is not a language code
+		{"movie.part1.srt", "srt", "", "srt"},                   // "part1" is not a language code
+		{"movie.cd1.en.srt", "English (srt)", "en", "srt"},      // should pick up "en" not "cd1"
+		{"movie_es.srt", "Spanish (srt)", "es", "srt"},          // underscore pattern
+		{"movie_ENG.srt", "English (srt)", "eng", "srt"},        // uppercase 3-letter
+		{"movie - French.srt", "French (srt)", "fr", "srt"},     // full French name
+		{"movie - Japanese.ass", "Japanese (ssa)", "ja", "ssa"}, // full name + ass
+		{"movie - Deutsch.srt", "German (srt)", "de", "srt"},    // German full name
+	}
+
+	for _, tt := range tests {
+		display, langCode, codec := ExtractSubtitleInfo(tt.filename)
+		if display != tt.wantDisplay {
+			t.Errorf("ExtractSubtitleInfo(%q) display = %q, want %q", tt.filename, display, tt.wantDisplay)
+		}
+		if langCode != tt.wantLangCode {
+			t.Errorf("ExtractSubtitleInfo(%q) langCode = %q, want %q", tt.filename, langCode, tt.wantLangCode)
+		}
+		if codec != tt.wantCodec {
+			t.Errorf("ExtractSubtitleInfo(%q) codec = %q, want %q", tt.filename, codec, tt.wantCodec)
+		}
+	}
+}
+
+func TestIsLanguageCode(t *testing.T) {
+	validCodes := []string{"en", "es", "fr", "de", "eng", "spa", "fra", "jpn", "kor", "zho"}
+	for _, code := range validCodes {
+		if !isLanguageCode(code) {
+			t.Errorf("isLanguageCode(%q) should be true", code)
+		}
+	}
+
+	invalidCodes := []string{"a", "toolong", "part1", "cd2", "extended", "x", "xyz123"}
+	for _, code := range invalidCodes {
+		if isLanguageCode(code) {
+			t.Errorf("isLanguageCode(%q) should be false", code)
+		}
+	}
+}
+
+func TestGetLanguageName(t *testing.T) {
+	tests := []struct {
+		code string
+		want string
+	}{
+		{"en", "English"},
+		{"eng", "English"},
+		{"es", "Spanish"},
+		{"spa", "Spanish"},
+		{"fr", "French"},
+		{"fra", "French"},
+		{"de", "German"},
+		{"deu", "German"},
+		{"ja", "Japanese"},
+		{"jpn", "Japanese"},
+		{"ko", "Korean"},
+		{"kor", "Korean"},
+		{"zh", "Chinese"},
+		{"zho", "Chinese"},
+		{"ru", "Russian"},
+		{"rus", "Russian"},
+		{"unknown", ""},
+	}
+
+	for _, tt := range tests {
+		got := getLanguageName(tt.code)
+		if got != tt.want {
+			t.Errorf("getLanguageName(%q) = %q, want %q", tt.code, got, tt.want)
+		}
+	}
+}
+
 func TestFilterDeleted(t *testing.T) {
 	tempDir, err := os.MkdirTemp("", "filter-deleted-test")
 	if err != nil {

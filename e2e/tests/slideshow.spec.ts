@@ -158,21 +158,47 @@ test.describe('Image Slideshow', () => {
     const video = page.locator('#media-viewer video');
     await expect(video).toBeVisible();
 
+    // Wait for video metadata to load (duration must be available)
+    await video.evaluate((v: HTMLVideoElement) => {
+      if (v.readyState < 1) {
+        return new Promise(resolve => {
+          v.addEventListener('loadedmetadata', resolve, { once: true });
+        });
+      }
+    });
+    await page.waitForTimeout(500);
+
+    // Get video duration and seek to middle
+    const duration = await video.evaluate((v: HTMLVideoElement) => v.duration);
+    console.log('Video duration:', duration);
+    const seekTime = Math.max(1, Math.min(duration - 0.5, duration / 2));
+    console.log('Seeking to:', seekTime);
+
+    // Focus the video element to ensure keyboard events are captured
+    await video.focus();
+    await page.waitForTimeout(200);
+
+    // Seek to middle of video (not at the end)
+    await video.evaluate((v: HTMLVideoElement, time) => {
+      v.currentTime = time;
+    }, seekTime);
+    await page.waitForTimeout(500);
+
     // Get initial time
     const initialTime = await video.evaluate((v: HTMLVideoElement) => v.currentTime);
     console.log('Initial video time:', initialTime);
 
     // Press . to step forward one frame
     await page.keyboard.press('.');
-    await page.waitForTimeout(100);
+    await page.waitForTimeout(300);
 
-    // Video should have advanced slightly (~1/30 second)
+    // Video should have advanced slightly (~1-3 frames, typically 1/30 to 3/30 second)
     const newTime = await video.evaluate((v: HTMLVideoElement) => v.currentTime);
     console.log('New video time:', newTime);
-    
+
     const timeDiff = newTime - initialTime;
     expect(timeDiff).toBeGreaterThan(0);
-    expect(timeDiff).toBeLessThan(1); // Should be less than 1 second
+    expect(timeDiff).toBeLessThan(0.2); // Should be less than 0.2 second (up to 3 frames at 24fps)
   });
 
   test('keyboard shortcut , steps backward one frame in video', async ({ page, server }) => {
@@ -193,11 +219,31 @@ test.describe('Image Slideshow', () => {
     // Wait for video to load and seek to middle
     const video = page.locator('#media-viewer video');
     await expect(video).toBeVisible();
-    
-    // Seek to 5 seconds first
+
+    // Wait for video metadata to load (duration must be available)
     await video.evaluate((v: HTMLVideoElement) => {
-      v.currentTime = 5;
+      if (v.readyState < 1) {
+        return new Promise(resolve => {
+          v.addEventListener('loadedmetadata', resolve, { once: true });
+        });
+      }
     });
+    await page.waitForTimeout(500);
+
+    // Get video duration and seek to middle
+    const duration = await video.evaluate((v: HTMLVideoElement) => v.duration);
+    console.log('Video duration:', duration);
+    const seekTime = Math.max(1, Math.min(duration - 0.5, duration / 2));
+    console.log('Seeking to:', seekTime);
+
+    // Focus the video element to ensure keyboard events are captured
+    await video.focus();
+    await page.waitForTimeout(200);
+
+    // Seek to middle of video (not at the beginning or end)
+    await video.evaluate((v: HTMLVideoElement, time) => {
+      v.currentTime = time;
+    }, seekTime);
     await page.waitForTimeout(500);
 
     const initialTime = await video.evaluate((v: HTMLVideoElement) => v.currentTime);
@@ -205,14 +251,14 @@ test.describe('Image Slideshow', () => {
 
     // Press , to step backward one frame
     await page.keyboard.press(',');
-    await page.waitForTimeout(100);
+    await page.waitForTimeout(300);
 
-    // Video should have gone backward slightly (~1/30 second)
+    // Video should have gone backward slightly (~1-3 frames, typically 1/30 to 3/30 second)
     const newTime = await video.evaluate((v: HTMLVideoElement) => v.currentTime);
     console.log('New video time:', newTime);
-    
+
     const timeDiff = initialTime - newTime;
     expect(timeDiff).toBeGreaterThan(0);
-    expect(timeDiff).toBeLessThan(1); // Should be less than 1 second
+    expect(timeDiff).toBeLessThan(0.2); // Should be less than 0.2 second (up to 3 frames at 24fps)
   });
 });

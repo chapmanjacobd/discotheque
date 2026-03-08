@@ -3546,17 +3546,32 @@ document.addEventListener('DOMContentLoaded', () => {
             if (item.subtitle_codecs) {
                 const codecs = item.subtitle_codecs.split(';');
                 codecs.forEach((codec, index) => {
-                    const isExt = codec.startsWith('.');
-                    const label = isExt ? `External` : (codec || `Track ${index + 1}`);
-                    const trackUrl = isExt ?
-                        `/api/subtitles?path=${encodeURIComponent(item.path.substring(0, item.path.lastIndexOf('.')) + codec)}` :
-                        `/api/subtitles?path=${encodeURIComponent(path)}&index=${index}`;
+                    // Check if this is an external subtitle (stored with format "Language (ext)" or just "ext")
+                    // External subtitles are identified by having a file extension pattern
+                    const extMatch = codec.match(/\((srt|vtt|ass|ssa|lrc|idx|sub)\)$/i);
+                    const isExt = extMatch !== null;
+                    const fileExt = extMatch ? extMatch[1].toLowerCase() : null;
+                    
+                    // Use the codec name as-is (it's already in "Language (codec)" format from backend)
+                    const label = codec || `Track ${index + 1}`;
+                    
+                    let trackUrl;
+                    if (isExt && fileExt) {
+                        // External subtitle: need to find the actual file
+                        // The backend stores the display name, but we need to construct the URL
+                        // Try to get the subtitle via the API which will find the external file
+                        trackUrl = `/api/subtitles?path=${encodeURIComponent(path)}&ext=${fileExt}`;
+                    } else {
+                        // Embedded subtitle
+                        trackUrl = `/api/subtitles?path=${encodeURIComponent(path)}&index=${index}`;
+                    }
 
-                    addTrack(trackUrl, label, index);
+                    addTrack(trackUrl, label, isExt ? 'auto' : index);
                 });
             }
 
             // 2. Always check for external subtitle file (sibling with same name)
+            // This is a fallback for when external subtitles weren't scanned during import
             if (!type.includes('image')) {
                 addTrack(`/api/subtitles?path=${encodeURIComponent(path)}`, 'External', 'auto');
             }
@@ -5118,23 +5133,55 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 break;
             case '.':
-                // Step forward one frame (~1/30s)
+                // Step forward one frame
                 if (media.tagName === 'VIDEO' || media.tagName === 'AUDIO') {
                     e.preventDefault();
                     if (isPlaying) {
                         media.pause();
                     }
-                    setTime(Math.min(duration, currentTime + 1 / 30));
+                    // Try to advance by 1 frame at a time
+                    // Start with 1/60s and increase until we see a change
+                    const fps = media.webkitDecodedFrameCount && media.webkitDecodedFrameCount > 0 
+                        ? 60 
+                        : (duration && duration <= 10 ? 30 : 24); // Estimate based on duration
+                    let step = 1 / fps;
+                    const originalTime = currentTime;
+                    let newTime = Math.min(duration, originalTime + step);
+                    
+                    // If we're very close to the end, just go to the end
+                    if (duration - originalTime < step) {
+                        setTime(duration);
+                    } else {
+                        // Try up to 3 frames if 1 frame doesn't advance
+                        for (let i = 1; i <= 3 && newTime === originalTime; i++) {
+                            step = i / fps;
+                            newTime = Math.min(duration, originalTime + step);
+                        }
+                        setTime(newTime);
+                    }
                 }
                 break;
             case ',':
-                // Step backward one frame (~1/30s)
+                // Step backward one frame
                 if (media.tagName === 'VIDEO' || media.tagName === 'AUDIO') {
                     e.preventDefault();
                     if (isPlaying) {
                         media.pause();
                     }
-                    setTime(Math.max(0, currentTime - 1 / 30));
+                    // Try to go back by 1 frame at a time
+                    const fps = media.webkitDecodedFrameCount && media.webkitDecodedFrameCount > 0 
+                        ? 60 
+                        : (duration && duration <= 10 ? 30 : 24);
+                    let step = 1 / fps;
+                    const originalTime = currentTime;
+                    let newTime = Math.max(0, originalTime - step);
+                    
+                    // Try up to 3 frames if 1 frame doesn't move
+                    for (let i = 1; i <= 3 && newTime === originalTime; i++) {
+                        step = i / fps;
+                        newTime = Math.max(0, originalTime - step);
+                    }
+                    setTime(newTime);
                 }
                 break;
         }
