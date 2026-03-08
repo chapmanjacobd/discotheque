@@ -8,14 +8,6 @@ import { waitForPlayer } from '../fixtures';
 test.describe('Read-Only Mode', () => {
   test.use({ readOnly: true });
 
-  test.beforeEach(async ({ page }) => {
-    page.on('console', msg => {
-      if (msg.type() === 'error') {
-        console.error('BROWSER ERROR:', msg.text());
-      }
-    });
-  });
-
   test('server database is not modified in read-only mode', async ({ page, server }) => {
     await page.goto(server.getBaseUrl());
     await page.waitForSelector('.media-card', { timeout: 10000 });

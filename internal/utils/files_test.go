@@ -162,7 +162,7 @@ func TestExtractSubtitleInfo(t *testing.T) {
 	}{
 		{"movie.en.srt", "English (srt)", "en", "srt"},
 		{"movie_eng.ass", "English (ssa)", "eng", "ssa"}, // ass displayed as ssa
-		{"movie.srt", "srt", "", "srt"},
+		{"movie.srt", "(srt)", "", "srt"},
 		{"movie.EN.srt", "English (srt)", "en", "srt"},
 		{"movie.es.vtt", "Spanish (vtt)", "es", "vtt"},
 		{"movie_fra.ass", "French (ssa)", "fra", "ssa"}, // ass displayed as ssa
@@ -174,8 +174,8 @@ func TestExtractSubtitleInfo(t *testing.T) {
 		{"movie.rus.vtt", "Russian (vtt)", "rus", "vtt"},
 		{"movie.ara.srt", "Arabic (srt)", "ara", "srt"},
 		{"movie.hin.ass", "Hindi (ssa)", "hin", "ssa"},
-		{"movie.unknown.srt", "srt", "", "srt"},                 // "unknown" is not a language code
-		{"movie.part1.srt", "srt", "", "srt"},                   // "part1" is not a language code
+		{"movie.unknown.srt", "(srt)", "", "srt"},               // "unknown" is not a language code
+		{"movie.part1.srt", "(srt)", "", "srt"},                 // "part1" is not a language code
 		{"movie.cd1.en.srt", "English (srt)", "en", "srt"},      // should pick up "en" not "cd1"
 		{"movie_es.srt", "Spanish (srt)", "es", "srt"},          // underscore pattern
 		{"movie_ENG.srt", "English (srt)", "eng", "srt"},        // uppercase 3-letter

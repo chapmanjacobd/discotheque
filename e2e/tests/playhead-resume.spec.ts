@@ -8,14 +8,6 @@ import { waitForPlayer, isPlayerOpen } from '../fixtures';
 test.describe('Playhead Resume', () => {
   test.use({ readOnly: false });
 
-  test.beforeEach(async ({ page }) => {
-    page.on('console', msg => {
-      if (msg.type() === 'error') {
-        console.error('BROWSER ERROR:', msg.text());
-      }
-    });
-  });
-
   test('resumes from local progress when localResume is enabled', async ({ page, server }) => {
     await page.goto(server.getBaseUrl());
     await page.waitForSelector('.media-card', { timeout: 10000 });

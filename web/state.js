@@ -52,6 +52,7 @@ export const state = {
     defaultAudioRate: parseFloat(localStorage.getItem('disco-default-audio-rate')) || 1.0,
     playbackRate: parseFloat(localStorage.getItem('disco-playback-rate')) || 1.0,
     slideshowDelay: parseInt(localStorage.getItem('disco-slideshow-delay')) || 5,
+    rsvpWpm: parseInt(localStorage.getItem('disco-rsvp-wpm')) || 250,
     trackShuffleDuration: parseInt(localStorage.getItem('disco-track-shuffle-duration')) || 0,
     autoLoopMaxDuration: parseInt(localStorage.getItem('disco-auto-loop-max-duration')) || 30,
 

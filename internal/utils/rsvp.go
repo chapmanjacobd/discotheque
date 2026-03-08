@@ -214,7 +214,9 @@ func GenerateTTS(text string, outputPath string, wpm int) error {
 		return fmt.Errorf("espeak-ng not found")
 	}
 
-	cmd := exec.Command(espeakBin, "-w", outputPath, "-s", fmt.Sprintf("%d", wpm))
+	// Boost espeak speed slightly as it tends to drift slower than the calculated word timing
+	espeakWpm := int(float64(wpm) * 1.1)
+	cmd := exec.Command(espeakBin, "-w", outputPath, "-s", fmt.Sprintf("%d", espeakWpm))
 	cmd.Stdin = strings.NewReader(text)
 	output, err := cmd.CombinedOutput()
 	if err != nil {

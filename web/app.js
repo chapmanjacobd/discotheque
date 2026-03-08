@@ -3610,7 +3610,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // Standard raw URL (possibly sliced if using fallback)
-        let url = item.rsvp ? `/api/rsvp?path=${encodeURIComponent(path)}` : `/api/raw?path=${encodeURIComponent(path)}`;
+        let url = item.rsvp ? `/api/rsvp?path=${encodeURIComponent(path)}&wpm=${state.rsvpWpm}` : `/api/raw?path=${encodeURIComponent(path)}`;
 
         if (state.playback.hlsInstance) {
             state.playback.hlsInstance.destroy();
@@ -4242,6 +4242,7 @@ document.addEventListener('DOMContentLoaded', () => {
             card.dataset.path = item.path;
             card.dataset.type = item.type || '';
             if (item.is_dir) card.dataset.isDir = 'true';
+            card._item = item;
             card.draggable = true;
 
             card.addEventListener('dragstart', (e) => {
@@ -5930,10 +5931,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     const settingAutoplay = document.getElementById('setting-autoplay');
-    if (settingAutoplay) settingAutoplay.onchange = (e) => {
-        state.autoplay = e.target.checked;
-        localStorage.setItem('disco-autoplay', state.autoplay);
-    };
+    if (settingAutoplay) {
+        settingAutoplay.checked = state.autoplay;
+        settingAutoplay.onchange = (e) => {
+            state.autoplay = e.target.checked;
+            localStorage.setItem('disco-autoplay', state.autoplay);
+        };
+    }
+
+    const settingRsvpWpm = document.getElementById('setting-rsvp-wpm');
+    if (settingRsvpWpm) {
+        settingRsvpWpm.value = state.rsvpWpm;
+        settingRsvpWpm.onchange = (e) => {
+            state.rsvpWpm = parseInt(e.target.value) || 250;
+            localStorage.setItem('disco-rsvp-wpm', state.rsvpWpm);
+        };
+    }
 
     if (settingImageAutoplay) settingImageAutoplay.onchange = (e) => {
         state.imageAutoplay = e.target.checked;

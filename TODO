@@ -1,13 +1,6 @@
-
-
-[desktop] › tests/race-conditions.spec.ts:360:7 › Race Conditions - Progress Updates & Pagination › concurrent progress updates from multiple tabs (simulated)
-
-e2e tests combining all the filters to each mode to make sure they don't exit the specific mode
-
-    Group View across all modes
-    Details View across all modes
-    pagination
-    search filtering
+- Pagination should work on all pages except for Categorization
+- Captions mode: Media Type should filter the caption media
+- Search filtering should work across all modes without exiting that mode--but you could hide the searchbox on the Categorization page as that one doesn't really need it
 
 
 
@@ -26,12 +19,6 @@ lets falsify all the tests by looking at both the code and the tests and seeing 
      - serve.go: Likely very large (web server)
      - query.go: 1723 lines - could be split by concern
      - commands/ has 50+ files with overlapping responsibilities
-
-    6. TODO Items from File
-     - "calculate e2e coverage by feature rather than lines"
-     - "e2e tests for all shortcuts"
-     - "move shortcuts to seperate js file"
-     - "For epubs, lets serve them by streaming or ebook-convert in ~/.cache"
 
     7. Schema and Queries Duplication
      - schema.sql embedded in commands

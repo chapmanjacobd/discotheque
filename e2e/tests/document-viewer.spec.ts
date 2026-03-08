@@ -6,14 +6,6 @@ import { test, expect } from '../fixtures';
 test.describe('Document Viewer', () => {
   test.use({ readOnly: true });
 
-  test.beforeEach(async ({ page }) => {
-    page.on('console', msg => {
-      if (msg.type() === 'error') {
-        console.error('BROWSER ERROR:', msg.text());
-      }
-    });
-  });
-
   test('document modal has correct title', async ({ page, server }) => {
     await page.goto(server.getBaseUrl());
     await page.waitForSelector('.media-card', { timeout: 10000 });

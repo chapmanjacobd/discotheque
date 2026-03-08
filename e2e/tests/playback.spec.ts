@@ -4,12 +4,8 @@ import { test, expect } from '../fixtures';
 test.describe('Media Playback', () => {
   test.use({ readOnly: true });
 
-  test.beforeEach(async ({ page }) => {
-    page.on('console', msg => console.log('BROWSER LOG:', msg.text()));
-    page.on('pageerror', err => console.error('BROWSER ERROR:', err.message));
-  });
+  test('toggles playback with Space key', async ({ page, server }) => {
 
-  test('opens media in PiP player when clicked', async ({ page, server }) => {
     await page.goto(server.getBaseUrl());
 
     // Wait for media to load

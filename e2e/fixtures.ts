@@ -114,6 +114,22 @@ export const test = base.extend<{
         console.log(`console.log:`, msgText);
       }
     });
+
+    page.on('requestfailed', request => {
+      const errorText = request.failure()?.errorText
+      if (errorText && ['net::ERR_INCOMPLETE_CHUNKED_ENCODING'].includes(errorText)) {
+        return
+      }
+
+      console.error(`request.failed: ${request.url()} - ${errorText}`);
+    });
+
+    page.on('response', response => {
+      if (response.status() >= 400) {
+        console.error(`response.error: ${response.url()} - status ${response.status()}`);
+      }
+    });
+
     page.on('pageerror', err => {
       console.error(`page.error:`, err.message);
     });

@@ -425,8 +425,8 @@ func ExtractSubtitleInfo(subPath string) (displayName, languageCode, codec strin
 		return langCode + " (" + codec + ")", langCode, codec
 	}
 
-	// No language detected, just return codec
-	return codec, "", codec
+	// No language detected, return codec in parentheses to match frontend's external sub regex
+	return "(" + codec + ")", "", codec
 }
 
 // isLanguageCode checks if a string looks like a language code

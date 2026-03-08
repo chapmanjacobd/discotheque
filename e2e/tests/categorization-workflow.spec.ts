@@ -7,14 +7,6 @@ import { test, expect } from '../fixtures';
 test.describe('Categorization Workflow - Full Process', () => {
   test.use({ readOnly: false });
 
-  test.beforeEach(async ({ page }) => {
-    page.on('console', msg => {
-      if (msg.type() === 'error') {
-        console.error('BROWSER ERROR:', msg.text());
-      }
-    });
-  });
-
   test('completes full categorization workflow: create category, add keywords, run categorization', async ({ page, server }) => {
     console.log('=== Starting Full Categorization Workflow Test ===');
 

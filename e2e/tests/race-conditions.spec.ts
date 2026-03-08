@@ -7,14 +7,6 @@ import { waitForPlayer } from '../fixtures';
 test.describe('Race Conditions - Progress Updates & Pagination', () => {
   test.use({ readOnly: false });
 
-  test.beforeEach(async ({ page }) => {
-    page.on('console', msg => {
-      if (msg.type() === 'error') {
-        console.error('BROWSER ERROR:', msg.text());
-      }
-    });
-  });
-
   test('progress update does not interfere with pagination navigation', async ({ page, server }) => {
     console.log('=== Testing progress update during pagination ===');
     
@@ -363,63 +355,73 @@ test.describe('Race Conditions - Progress Updates & Pagination', () => {
     await page.goto(server.getBaseUrl());
     await page.waitForSelector('.media-card', { timeout: 10000 });
 
-    // Play video in "tab 1" (simulated by rapid state changes)
-    const mediaCard = page.locator('.media-card[data-type*="video"]').first();
+    // Find test_video1.mp4 specifically (it has a known 10s duration)
+    const mediaCard = page.locator('.media-card').filter({ hasText: 'test_video1.mp4' }).first();
     const mediaPath = await mediaCard.getAttribute('data-path');
 
     await mediaCard.click();
     await waitForPlayer(page);
-    await page.waitForSelector('video', { timeout: 5000 });
+    
+    // Explicitly play to bypass auto-play restrictions if any
+    await page.evaluate(() => {
+      const v = document.querySelector('video');
+      if (v) v.play().catch(e => console.error('Play failed:', e));
+    });
+
+    // Wait for playback to actually start and advance
+    const video = page.locator('video');
+    await expect(video).toBeVisible();
     await page.waitForFunction(() => {
-      const video = document.querySelector('video');
-      return video && video.readyState >= 3;
-    }, { timeout: 10000 });
-    await page.click('video');
-    await page.waitForTimeout(500);
-    await page.waitForTimeout(2000);
+      const v = document.querySelector('video');
+      // readyState 2+ means enough data to play at least a frame
+      return v && v.readyState >= 2 && (v.currentTime > 0 || !v.paused);
+    }, { timeout: 15000 });
+    
+    console.log('Session 1 started');
+    await page.waitForTimeout(3000);
     await page.click('.close-pip');
     await page.waitForTimeout(500);
     
-    // Get progress after first session
-    const progress1 = await page.evaluate(() => {
-      const p = localStorage.getItem('disco-progress');
-      return p ? JSON.parse(p) : {};
-    });
+    // Check localStorage
+    const progress1 = await page.evaluate(() => JSON.parse(localStorage.getItem('disco-progress') || '{}'));
+    console.log('Progress 1:', progress1[mediaPath]);
     
-    console.log('Progress after session 1:', progress1[mediaPath]);
-    
-    // Simulate "second tab" by directly modifying localStorage
-    await page.evaluate((path: string) => {
-      const progress = JSON.parse(localStorage.getItem('disco-progress') || '{}');
-      progress[path] = { pos: 120, last: Date.now() };
-      localStorage.setItem('disco-progress', JSON.stringify(progress));
+    // Simulate other tab update
+    // Use pos: 3 to give plenty of room (video is 10s)
+    await page.evaluate((path) => {
+      const p = JSON.parse(localStorage.getItem('disco-progress') || '{}');
+      p[path] = { pos: 3, last: Date.now() - 5000 };
+      localStorage.setItem('disco-progress', JSON.stringify(p));
     }, mediaPath);
     
-    // Play again in "tab 1"
+    // Resume in this tab
     await mediaCard.click();
     await waitForPlayer(page);
-    await page.waitForSelector('video', { timeout: 5000 });
-    await page.waitForFunction(() => {
-      const video = document.querySelector('video');
-      return video && video.readyState >= 3;
-    }, { timeout: 10000 });
-    await page.click('video');
-    await page.waitForTimeout(500);
-    await page.waitForTimeout(2000);
-    await page.click('.close-pip');
-    await page.waitForTimeout(500);
     
-    // Check final progress
-    const progress2 = await page.evaluate(() => {
-      const p = localStorage.getItem('disco-progress');
-      return p ? JSON.parse(p) : {};
+    // Explicitly play
+    await page.evaluate(() => {
+      const v = document.querySelector('video');
+      if (v) v.play().catch(e => console.error('Play failed:', e));
     });
+
+    // Wait for it to resume at >= 3s and advance significantly
+    await page.waitForFunction((p) => {
+      const v = document.querySelector('video');
+      return v && v.readyState >= 2 && v.currentTime >= p + 1;
+    }, 3, { timeout: 15000 });
     
-    console.log('Progress after session 2:', progress2[mediaPath]);
+    console.log('Session 2 resumed and advanced');
+    await page.waitForTimeout(3000);
+    await page.click('.close-pip');
     
-    // Should have valid progress (not corrupted)
+    // Wait for final local storage update (throttled at 1s)
+    await page.waitForTimeout(1500);
+    
+    const progress2 = await page.evaluate(() => JSON.parse(localStorage.getItem('disco-progress') || '{}'));
+    console.log('Progress 2:', progress2[mediaPath]);
+    
     expect(progress2[mediaPath]).toBeTruthy();
-    expect(progress2[mediaPath].pos).toBeGreaterThan(0);
+    expect(progress2[mediaPath].pos).toBeGreaterThan(3);
   });
 
   test('UI state remains consistent during filter toggling', async ({ page, server }) => {
@@ -433,11 +435,11 @@ test.describe('Race Conditions - Progress Updates & Pagination', () => {
     
     for (const type of ['video', 'audio', 'image', 'video']) {
       await page.click(`#media-type-list button[data-type="${type}"]`);
-      await page.waitForTimeout(200);
+      await page.waitForTimeout(100);
     }
     
-    // Wait for final filter to apply
-    await page.waitForTimeout(1000);
+    // Wait for results to stabilize and spinner to disappear if any
+    await page.waitForSelector('.media-card', { timeout: 10000 });
     
     // Check active filter
     const activeBtn = page.locator('#media-type-list .category-btn.active');
@@ -447,21 +449,22 @@ test.describe('Race Conditions - Progress Updates & Pagination', () => {
     // Should be video (last selection)
     expect(activeType).toBe('video');
     
-    // All visible results should match filter
-    const results = page.locator('.media-card');
-    const count = await results.count();
+    // Wait for actual results matching the filter
+    await expect.poll(async () => {
+      const results = page.locator('.media-card');
+      return await results.count();
+    }, { timeout: 10000 }).toBeGreaterThan(0);
     
-    if (count > 0) {
-      const types = await results.evaluateAll((els: Element[]) =>
-        els.map(el => el.getAttribute('data-type'))
-      );
+    const results = page.locator('.media-card');
+    const types = await results.evaluateAll((els: Element[]) =>
+      els.map(el => el.getAttribute('data-type'))
+    );
       
-      types.forEach(type => {
-        if (type) {
-          expect(type.toLowerCase()).toContain('video');
-        }
-      });
-    }
+    types.forEach(type => {
+      if (type) {
+        expect(type.toLowerCase()).toContain('video');
+      }
+    });
   });
 
   test('progress update throttling works correctly', async ({ page, server }) => {

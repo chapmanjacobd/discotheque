@@ -479,6 +479,7 @@ func TestHandleCategorizeSuggest(t *testing.T) {
 	_, err = db.Exec(`
 		CREATE TABLE media (
 			path TEXT PRIMARY KEY,
+			fts_path TEXT,
 			title TEXT,
 			type TEXT,
 			size INTEGER,
@@ -639,6 +640,7 @@ func TestHandleCategorizeSuggest(t *testing.T) {
 		_, err = db.Exec(`
 			CREATE TABLE media (
 				path TEXT PRIMARY KEY,
+				fts_path TEXT,
 				title TEXT,
 				type TEXT,
 				size INTEGER,
@@ -734,6 +736,7 @@ func TestHandleCategorizeApply(t *testing.T) {
 	_, err = db.Exec(`
 		CREATE TABLE media (
 			path TEXT PRIMARY KEY,
+			fts_path TEXT,
 			title TEXT,
 			type TEXT,
 			size INTEGER,
@@ -905,6 +908,7 @@ func TestHandleCategorizeApply(t *testing.T) {
 		_, err = db.Exec(`
 			CREATE TABLE media (
 				path TEXT PRIMARY KEY,
+				fts_path TEXT,
 				title TEXT,
 				type TEXT,
 				size INTEGER,

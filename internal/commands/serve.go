@@ -2764,13 +2764,14 @@ func (c *ServeCmd) handleTranscode(w http.ResponseWriter, r *http.Request, path 
 
 	if err := cmd.Start(); err != nil {
 		slog.Error("Failed to start ffmpeg", "path", path, "error", err)
-		http.Error(w, "Unplayable: transcoding failed", http.StatusUnsupportedMediaType)
+		http.Error(w, fmt.Sprintf("Unplayable: ffmpeg failed to start: %v", err), http.StatusUnsupportedMediaType)
 		return
 	}
 
 	if err := cmd.Wait(); err != nil {
 		if r.Context().Err() == nil {
 			slog.Error("ffmpeg failed", "path", path, "error", err)
+			http.Error(w, fmt.Sprintf("Unplayable: ffmpeg failed: %v", err), http.StatusUnsupportedMediaType)
 		} else {
 			slog.Debug("ffmpeg finished (client disconnected)", "path", path)
 		}
@@ -3727,7 +3728,7 @@ func (c *ServeCmd) handleRSVP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	wpm := 220
+	wpm := 250
 	if wpmStr := r.URL.Query().Get("wpm"); wpmStr != "" {
 		if val, err := strconv.Atoi(wpmStr); err == nil && val > 0 {
 			wpm = val

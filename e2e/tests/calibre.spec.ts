@@ -6,14 +6,6 @@ import { test, expect } from '../fixtures';
 test.describe('Calibre EPUB Viewer', () => {
   test.use({ readOnly: true });
 
-  test.beforeEach(async ({ page }) => {
-    page.on('console', msg => {
-      if (msg.type() === 'error') {
-        console.error('BROWSER ERROR:', msg.text());
-      }
-    });
-  });
-
   test('opens EPUB in document modal with calibre conversion', async ({ page, server }) => {
     await page.goto(server.getBaseUrl());
     await page.waitForSelector('.media-card', { timeout: 10000 });

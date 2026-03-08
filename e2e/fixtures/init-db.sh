@@ -41,22 +41,22 @@ echo "Generating test media files with ffmpeg..."
 # Using common prefixes so keyword suggestions can find common words
 ffmpeg -y -f lavfi -i testsrc=duration=10:size=320x240:rate=30 \
     -f lavfi -i sine=frequency=440:duration=10 \
-    -c:v libx264 -c:a aac -movflags +faststart \
+    -c:v libx264 -pix_fmt yuv420p -c:a aac -movflags +faststart \
     "$MEDIA_DIR/videos/test_video1.mp4" 2>/dev/null
 
 ffmpeg -y -f lavfi -i testsrc=duration=8:size=320x240:rate=30 \
     -f lavfi -i sine=frequency=523:duration=8 \
-    -c:v libx264 -c:a aac -movflags +faststart \
+    -c:v libx264 -pix_fmt yuv420p -c:a aac -movflags +faststart \
     "$MEDIA_DIR/videos/test_video2.mp4" 2>/dev/null
 
 ffmpeg -y -f lavfi -i testsrc=duration=5:size=320x240:rate=30 \
     -f lavfi -i sine=frequency=659:duration=5 \
-    -c:v libx264 -c:a aac -movflags +faststart \
+    -c:v libx264 -pix_fmt yuv420p -c:a aac -movflags +faststart \
     "$MEDIA_DIR/videos/test_clip1.mp4" 2>/dev/null
 
 ffmpeg -y -f lavfi -i testsrc=duration=3:size=320x240:rate=30 \
     -f lavfi -i sine=frequency=784:duration=3 \
-    -c:v libx264 -c:a aac -movflags +faststart \
+    -c:v libx264 -pix_fmt yuv420p -c:a aac -movflags +faststart \
     "$MEDIA_DIR/videos/test_clip2.mp4" 2>/dev/null
 
 # Audio files (playable in browser)

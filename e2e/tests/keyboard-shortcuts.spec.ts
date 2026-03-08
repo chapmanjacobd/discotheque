@@ -4,11 +4,6 @@ import { waitForPlayer } from '../fixtures';
 test.describe('Keyboard Shortcuts', () => {
   test.use({ readOnly: true });
 
-  test.beforeEach(async ({ page }) => {
-    page.on('console', msg => console.log('BROWSER LOG:', msg.text()));
-    page.on('pageerror', err => console.error('BROWSER ERROR:', err.message));
-  });
-
   test.describe('Navigation Shortcuts', () => {
     test('n key plays next sibling without player open', async ({ page, server }) => {
       await page.goto(server.getBaseUrl());

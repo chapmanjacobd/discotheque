@@ -8,12 +8,6 @@ test.describe('History Pages - In Progress / Unplayed / Completed', () => {
   test.use({ readOnly: false });
 
   test.beforeEach(async ({ page, server }) => {
-    page.on('console', msg => {
-      if (msg.type() === 'error') {
-        console.error('BROWSER ERROR:', msg.text());
-      }
-    });
-
     // Enable local resume by setting localStorage before page load
     await page.context().addInitScript(() => {
       localStorage.setItem('disco-local-resume', 'true');

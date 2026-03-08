@@ -18,6 +18,7 @@ CREATE TABLE playlist_items (
 );
 CREATE TABLE media (
     path TEXT PRIMARY KEY,
+    fts_path TEXT, -- Processed path for FTS (dots replaced by spaces etc)
     title TEXT,
     duration INTEGER,
     size INTEGER,
@@ -82,7 +83,8 @@ CREATE INDEX idx_captions_path ON captions(media_path);
 CREATE VIRTUAL TABLE captions_fts USING fts5(
     media_path UNINDEXED,
     text,
-    content='captions'
+    content='captions',
+    tokenize = 'trigram'
 )
 /* captions_fts(media_path,text) */;
 CREATE TABLE IF NOT EXISTS 'captions_fts_data'(id INTEGER PRIMARY KEY, block BLOB);
@@ -129,23 +131,25 @@ CREATE INDEX idx_time_uploaded ON media(time_uploaded);
 CREATE INDEX idx_time_downloaded ON media(time_downloaded);
 CREATE VIRTUAL TABLE media_fts USING fts5(
     path,
+    fts_path,
     title,
     content='media',
-    content_rowid='rowid'
+    content_rowid='rowid',
+    tokenize = 'trigram'
 )
-/* media_fts(path,title) */;
+/* media_fts(path,fts_path,title) */;
 CREATE TABLE IF NOT EXISTS 'media_fts_data'(id INTEGER PRIMARY KEY, block BLOB);
 CREATE TABLE IF NOT EXISTS 'media_fts_idx'(segid, term, pgno, PRIMARY KEY(segid, term)) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS 'media_fts_docsize'(id INTEGER PRIMARY KEY, sz BLOB);
 CREATE TABLE IF NOT EXISTS 'media_fts_config'(k PRIMARY KEY, v) WITHOUT ROWID;
 CREATE TRIGGER media_ai AFTER INSERT ON media BEGIN
-    INSERT INTO media_fts(rowid, path, title)
-    VALUES (new.rowid, new.path, new.title);
+    INSERT INTO media_fts(rowid, path, fts_path, title)
+    VALUES (new.rowid, new.path, new.fts_path, new.title);
 END;
 CREATE TRIGGER media_ad AFTER DELETE ON media BEGIN
     DELETE FROM media_fts WHERE rowid = old.rowid;
 END;
 CREATE TRIGGER media_au AFTER UPDATE ON media BEGIN
-    INSERT INTO media_fts(media_fts, rowid, path, title) VALUES('delete', old.rowid, old.path, old.title);
-    INSERT INTO media_fts(rowid, path, title) VALUES (new.rowid, new.path, new.title);
+    INSERT INTO media_fts(media_fts, rowid, path, fts_path, title) VALUES('delete', old.rowid, old.path, old.fts_path, old.title);
+    INSERT INTO media_fts(rowid, path, fts_path, title) VALUES (new.rowid, new.path, new.fts_path, new.title);
 END;

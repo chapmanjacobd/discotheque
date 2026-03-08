@@ -4,11 +4,6 @@ import { test, expect } from '../fixtures';
 test.describe('Image Slideshow', () => {
   test.use({ readOnly: true });
 
-  test.beforeEach(async ({ page }) => {
-    page.on('console', msg => console.log('BROWSER LOG:', msg.text()));
-    page.on('pageerror', err => console.error('BROWSER ERROR:', err.message));
-  });
-
   test('slideshow continues through multiple images', async ({ page, server }) => {
     await page.goto(server.getBaseUrl());
 
