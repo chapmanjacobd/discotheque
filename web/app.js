@@ -2138,6 +2138,77 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    function createCategoryCard(cat) {
+        const card = document.createElement('div');
+        card.className = 'curation-cat-card';
+        card.dataset.category = cat.category;
+        card.style.background = 'var(--sidebar-bg)';
+        card.style.padding = '1rem';
+        card.style.borderRadius = '8px';
+        card.style.border = '1px solid var(--border-color)';
+
+        let keywordsHtml = (cat.keywords || []).map(kw =>
+            `<span class="curation-tag existing-keyword" data-keyword="${kw}" data-category="${cat.category}">
+                ${kw} <span class="remove-kw" style="cursor:pointer; margin-left:4px; opacity:0.6;">&times;</span>
+            </span>`
+        ).join('');
+
+        card.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                <h4 style="margin: 0;">${cat.category}</h4>
+                <button class="delete-cat-btn" title="Delete Category" style="background: none; border: none; cursor: pointer; opacity: 0.5;">🗑️</button>
+            </div>
+            <div class="cat-keywords" style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.5rem;">
+                ${keywordsHtml}
+            </div>
+            <button class="add-kw-btn category-btn" style="font-size: 0.8rem; padding: 2px 8px;">+ Add Keyword</button>
+        `;
+
+        // Drag & Drop: Allow dropping tags here
+        card.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            card.style.borderColor = 'var(--accent-color)';
+        });
+        card.addEventListener('dragleave', () => {
+            card.style.borderColor = 'var(--border-color)';
+        });
+        card.addEventListener('drop', async (e) => {
+            e.preventDefault();
+            card.style.borderColor = 'var(--border-color)';
+            const keyword = e.dataTransfer.getData('text/plain');
+            if (keyword) {
+                await addKeyword(cat.category, keyword);
+            }
+        });
+
+        // Delete Category
+        card.querySelector('.delete-cat-btn').onclick = async () => {
+            if (confirm(`Delete category "${cat.category}" and all its keywords?`)) {
+                await deleteCategory(cat.category);
+            }
+        };
+
+        // Add Keyword manually
+        card.querySelector('.add-kw-btn').onclick = async () => {
+            const kw = prompt(`Add keyword to "${cat.category}":`);
+            if (kw) {
+                await addKeyword(cat.category, kw);
+            }
+        };
+
+        // Remove Keyword
+        card.querySelectorAll('.remove-kw').forEach(btn => {
+            btn.onclick = async (e) => {
+                e.stopPropagation(); // prevent drag start if any
+                const tag = e.target.closest('.curation-tag');
+                const kw = tag.dataset.keyword;
+                await deleteKeyword(cat.category, kw);
+            };
+        });
+
+        return card;
+    }
+
     function renderCuration(keywordsData) {
         if (!keywordsData) keywordsData = [];
 
@@ -2234,74 +2305,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Render existing categories
         keywordsData.forEach(cat => {
-            const card = document.createElement('div');
-            card.className = 'curation-cat-card';
-            card.dataset.category = cat.category;
-            card.style.background = 'var(--sidebar-bg)';
-            card.style.padding = '1rem';
-            card.style.borderRadius = '8px';
-            card.style.border = '1px solid var(--border-color)';
-
-            let keywordsHtml = (cat.keywords || []).map(kw =>
-                `<span class="curation-tag existing-keyword" data-keyword="${kw}" data-category="${cat.category}">
-                    ${kw} <span class="remove-kw" style="cursor:pointer; margin-left:4px; opacity:0.6;">&times;</span>
-                </span>`
-            ).join('');
-
-            card.innerHTML = `
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-                    <h4 style="margin: 0;">${cat.category}</h4>
-                    <button class="delete-cat-btn" title="Delete Category" style="background: none; border: none; cursor: pointer; opacity: 0.5;">🗑️</button>
-                </div>
-                <div class="cat-keywords" style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.5rem;">
-                    ${keywordsHtml}
-                </div>
-                <button class="add-kw-btn category-btn" style="font-size: 0.8rem; padding: 2px 8px;">+ Add Keyword</button>
-            `;
-
-            // Drag & Drop: Allow dropping tags here
-            card.addEventListener('dragover', (e) => {
-                e.preventDefault();
-                card.style.borderColor = 'var(--accent-color)';
-            });
-            card.addEventListener('dragleave', () => {
-                card.style.borderColor = 'var(--border-color)';
-            });
-            card.addEventListener('drop', async (e) => {
-                e.preventDefault();
-                card.style.borderColor = 'var(--border-color)';
-                const keyword = e.dataTransfer.getData('text/plain');
-                if (keyword) {
-                    await addKeyword(cat.category, keyword);
-                }
-            });
-
-            // Delete Category
-            card.querySelector('.delete-cat-btn').onclick = async () => {
-                if (confirm(`Delete category "${cat.category}" and all its keywords?`)) {
-                    await deleteCategory(cat.category);
-                }
-            };
-
-            // Add Keyword manually
-            card.querySelector('.add-kw-btn').onclick = async () => {
-                const kw = prompt(`Add keyword to "${cat.category}":`);
-                if (kw) {
-                    await addKeyword(cat.category, kw);
-                }
-            };
-
-            // Remove Keyword
-            card.querySelectorAll('.remove-kw').forEach(btn => {
-                btn.onclick = async (e) => {
-                    e.stopPropagation(); // prevent drag start if any
-                    const tag = e.target.closest('.curation-tag');
-                    const kw = tag.dataset.keyword;
-                    await deleteKeyword(cat.category, kw);
-                };
-            });
-
-            categoriesList.appendChild(card);
+            categoriesList.appendChild(createCategoryCard(cat));
         });
 
         categoriesCol.appendChild(categoriesList);
@@ -2465,15 +2469,59 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!resp.ok) throw new Error('Failed');
             showToast(`Saved keyword "${keyword}" to "${category}"`);
 
-            // Add to new categories list to keep it at the top in this session
+            // Update state.newCategories to track session additions
             if (!state.newCategories.includes(category)) {
                 state.newCategories.unshift(category);
             } else {
-                // Move to top if already exists in new list
                 state.newCategories = [category, ...state.newCategories.filter(c => c !== category)];
             }
 
-            fetchCuration(); // Refresh UI
+            // 1. Remove from suggestions pool if it exists
+            const suggestionTag = document.querySelector(`.suggestion-tag[data-word="${CSS.escape(keyword)}"]`);
+            if (suggestionTag) {
+                const parent = suggestionTag.parentElement;
+                suggestionTag.remove();
+                
+                // If no suggestions left, show message
+                if (parent && parent.classList.contains('tags-cloud') && parent.querySelectorAll('.suggestion-tag').length === 0) {
+                    const suggestionsArea = document.getElementById('suggestions-area');
+                    if (suggestionsArea) {
+                        suggestionsArea.innerHTML = '<p>No common keywords found in uncategorized files.</p>';
+                    }
+                }
+            }
+
+            // 2. Add to category card if it exists
+            const catCard = document.querySelector(`.curation-cat-card[data-category="${CSS.escape(category)}"]`);
+            if (catCard) {
+                const kwContainer = catCard.querySelector('.cat-keywords');
+                if (kwContainer) {
+                    // Check if keyword already exists in this card to avoid duplicates
+                    if (!kwContainer.querySelector(`.existing-keyword[data-keyword="${CSS.escape(keyword)}"]`)) {
+                        const tag = document.createElement('span');
+                        tag.className = 'curation-tag existing-keyword';
+                        tag.dataset.keyword = keyword;
+                        tag.dataset.category = category;
+                        tag.innerHTML = `${keyword} <span class="remove-kw" style="cursor:pointer; margin-left:4px; opacity:0.6;">&times;</span>`;
+
+                        // Add delete handler to the new tag
+                        tag.querySelector('.remove-kw').onclick = async (e) => {
+                            e.stopPropagation();
+                            await deleteKeyword(category, keyword);
+                        };
+
+                        kwContainer.appendChild(tag);
+                    }
+                }
+            } else {
+                // Category doesn't exist yet, create it dynamically
+                const categoriesList = document.getElementById('curation-cat-list');
+                if (categoriesList) {
+                    const newCard = createCategoryCard({ category, keywords: [keyword] });
+                    // Prepend so it's at the top (matches session pinning logic)
+                    categoriesList.insertBefore(newCard, categoriesList.firstChild);
+                }
+            }
         } catch (err) {
             console.error(err);
             errorToast(err, 'Failed to save keyword');
@@ -2489,13 +2537,16 @@ document.addEventListener('DOMContentLoaded', () => {
             // Remove from session-new list if present
             state.newCategories = state.newCategories.filter(c => c !== category);
 
-            fetchCuration();
+            // Remove from UI locally
+            const catCard = document.querySelector(`.curation-cat-card[data-category="${CSS.escape(category)}"]`);
+            if (catCard) {
+                catCard.remove();
+            }
         } catch (err) {
             console.error(err);
             errorToast(err, 'Failed to delete category');
         }
     }
-
     async function deleteKeyword(category, keyword) {
         try {
             const resp = await fetchAPI('/api/categorize/keyword', {
@@ -2505,7 +2556,15 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             if (!resp.ok) throw new Error('Failed');
             showToast(`Removed keyword "${keyword}"`);
-            fetchCuration();
+
+            // Find and remove the tag from the UI locally
+            const catCard = document.querySelector(`.curation-cat-card[data-category="${CSS.escape(category)}"]`);
+            if (catCard) {
+                const tag = catCard.querySelector(`.existing-keyword[data-keyword="${CSS.escape(keyword)}"]`);
+                if (tag) {
+                    tag.remove();
+                }
+            }
         } catch (err) {
             console.error(err);
             errorToast(err, 'Failed to delete keyword');
