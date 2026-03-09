@@ -1,12 +1,10 @@
-
-
 - Pagination should work on all pages except for Categorization
+
 - Captions mode: Media Type should filter the caption media
+
 - Search filtering should work across all modes without exiting that mode--but you could hide the searchbox on the Categorization page as that one doesn't really need it
 
-
-
-lets falsify all the tests by looking at both the code and the tests and seeing if there are any gaps in coverage by returning early or giving up.
+lets falsify all the tests by looking at both the code and the tests and seeing if there are any gaps in coverage by returning early or being to lax so that we can decide whether to rewrite or remove these ineffectual or false negative tests
 
 
     3. Duplicate Query/Filter Logic

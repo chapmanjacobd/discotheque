@@ -6031,6 +6031,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     showToast(media.loop ? 'Loop: ON' : 'Loop: OFF', '🔁');
                 }
                 break;
+            case 'o':
+                // Show progression bar, elapsed time and total duration on OSD
+                if (media.tagName === 'VIDEO' || media.tagName === 'AUDIO') {
+                    const elapsed = formatDuration(currentTime);
+                    const total = formatDuration(duration);
+                    const progress = duration ? Math.round((currentTime / duration) * 100) : 0;
+                    showToast(`${elapsed} / ${total} (${progress}%)`, '📊');
+                }
+                break;
             // Seek shortcuts - arrow keys with modifiers
             case 'arrowup':
                 if (e.shiftKey) {
@@ -6306,6 +6315,42 @@ document.addEventListener('DOMContentLoaded', () => {
                 break;
         }
     });
+
+    // --- Wheel Shortcuts ---
+    pipViewer.addEventListener('wheel', (e) => {
+        // Only handle wheel events when PiP is visible
+        if (pipPlayer.classList.contains('hidden')) return;
+
+        const media = pipViewer.querySelector('video, audio');
+        if (!media) return;
+
+        e.preventDefault();
+
+        const duration = media.duration;
+        const currentTime = media.currentTime || 0;
+
+        // Handle horizontal scroll (wheel left/right)
+        if (e.deltaX !== 0) {
+            // Wheel left/right: Seek backward/forward 10 seconds
+            const delta = e.deltaX > 0 ? 10 : -10;
+            const newTime = Math.max(0, Math.min(duration, currentTime + delta));
+            state.playback.seekHistory.push(currentTime);
+            if (state.playback.seekHistory.length > 10) state.playback.seekHistory.shift();
+            media.currentTime = newTime;
+            const direction = delta > 0 ? 'forward' : 'backward';
+            showToast(`Seek ${direction} 10s`, '⏩');
+        }
+        // Handle vertical scroll (wheel up/down)
+        else if (e.deltaY !== 0) {
+            // Wheel up/down: Increase/decrease volume
+            const delta = e.deltaY > 0 ? -0.05 : 0.05;
+            const newVolume = Math.max(0, Math.min(1, media.volume + delta));
+            media.volume = newVolume;
+            const volumePercent = Math.round(newVolume * 100);
+            showToast(`Volume: ${volumePercent}%`, '🔊');
+        }
+    }, { passive: false });
+
     // --- Dev Mode Auto-Reload ---
     async function setupAutoReload() {
         const url = '/api/events';
