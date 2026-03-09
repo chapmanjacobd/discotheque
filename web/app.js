@@ -734,7 +734,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 media.onvolumechange = null;
                 media.oncanplay = null;
                 media.pause();
-                media.src = "";
+                media.removeAttribute('src');
+                media.load();
             }
             pipViewer.innerHTML = '';
             pipPlayer.classList.add('hidden');
@@ -3739,17 +3740,14 @@ document.addEventListener('DOMContentLoaded', () => {
         state.player = originalPlayer;
     }
 
-    async function handleMediaError(item) {
+    function handleMediaError(item) {
         if (pipLoading) pipLoading.classList.add('hidden');
 
-        if (!state.playback.item) {
-            return;
-        }
-        if (state.playback.item.path !== item.path) {
+        if (!state.playback.item || state.playback.item.path !== item.path) {
             return;
         }
 
-        // Clear handlers to prevent other events (like onended) from firing after error
+        // Clear handlers to prevent other events (like onended) firing after error
         const media = pipViewer.querySelector('video, audio, img');
         if (media) {
             media.onerror = null;
@@ -3758,16 +3756,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const basename = item.path.split('/').pop();
-        let is404 = false;
-        try {
-            const resp = await fetchAPI(`/api/raw?path=${encodeURIComponent(item.path)}`, { method: 'HEAD' });
-            is404 = resp.status === 404;
-        } catch (err) {
-            console.error('Failed to check media status:', err);
-        }
-
-        const msg = is404 ? `File not found: ${basename}` : `Unplayable: ${basename}`;
-        const emoji = is404 ? '🗑️' : '⚠️';
+        const msg = `Playback failed: ${basename}`;
+        const emoji = '⚠️';
 
         if (state.page === 'trash') {
             showToast(msg, '⚠️');
