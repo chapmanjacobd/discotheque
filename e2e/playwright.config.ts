@@ -122,9 +122,6 @@ export default defineConfig({
     // },
   ],
 
-  /* Ignore CLI tests temporarily */
-  testIgnore: /cli-.*\.spec\.ts/,
-
   /* Folder for test artifacts such as screenshots, videos, traces, etc. */
   outputDir: 'test-results/',
 

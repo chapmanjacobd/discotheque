@@ -4,16 +4,6 @@
 
 - Search filtering should work across all modes without exiting that mode--but you could hide the searchbox on the Categorization page as that one doesn't really need it
 
-lets falsify all the tests by looking at both the code and the tests and seeing if there are any gaps in coverage by returning early or being to lax so that we can decide whether to rewrite or remove these ineffectual or false negative tests
-
-
-    3. Duplicate Query/Filter Logic
-     - query.MediaQuery() and query.MediaQueryCount() have significant overlap
-     - Filter logic exists in both query.BuildSelect() and filter.Apply()
-     - Multiple places build similar SQL WHERE clauses
-
-    4. Inconsistent Error Handling Patterns
-    Some commands return errors, some call os.Exit(), some log and continue.
 
     5. Large Command Files
      - serve.go: Likely very large (web server)
