@@ -532,6 +532,34 @@ Flags:
         FTS table name
   -R, --related
         Find media related to the first result
+  --category
+        Filter by category
+  --genre
+        Filter by genre
+  -e, --ext
+        Filter by extensions (e.g., .mp4,.mkv)
+  --video-only
+        Only video files
+  --audio-only
+        Only audio files
+  --image-only
+        Only image files
+  --text-only
+        Only text/ebook files
+  --portrait
+        Only portrait orientation files
+  --scan-subtitles
+        Scan for external subtitles during import
+  --online-media-only
+        Exclude local media
+  --local-media-only
+        Exclude online media
+  --mime-type
+        Filter by mimetype substring (e.g., video, mp4)
+  --no-mime-type
+        Exclude by mimetype substring
+  --no-default-categories
+        Disable default categories
   -O, --play-in-order
         Play media in order
   --no-play-in-order

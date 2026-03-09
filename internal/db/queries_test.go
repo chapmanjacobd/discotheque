@@ -281,8 +281,12 @@ func TestQueries(t *testing.T) {
 		}
 
 		resCaptions, err := q.SearchCaptions(ctx, SearchCaptionsParams{
-			Query: "Hello",
-			Limit: 10,
+			Query:     "Hello",
+			VideoOnly: false,
+			AudioOnly: false,
+			ImageOnly: false,
+			TextOnly:  false,
+			Limit:     10,
 		})
 		if err != nil {
 			t.Errorf("SearchCaptions failed: %v", err)

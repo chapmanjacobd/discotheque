@@ -642,11 +642,15 @@ func (c *ServeCmd) getDatabasesForQuery(flags models.GlobalFlags) ([]string, err
 }
 
 // getCaptionsWithContext fetches captions matching a query along with 2 captions before and after each match
-func (c *ServeCmd) getCaptionsWithContext(ctx context.Context, queries *database.Queries, queryStr string, limit int64) ([]database.SearchCaptionsRow, error) {
-	// First, get the matching captions
+func (c *ServeCmd) getCaptionsWithContext(ctx context.Context, queries *database.Queries, queryStr string, limit int64, videoOnly, audioOnly, imageOnly, textOnly bool) ([]database.SearchCaptionsRow, error) {
+	// First, get the matching captions with media type filters
 	matches, err := queries.SearchCaptions(ctx, database.SearchCaptionsParams{
-		Query: queryStr,
-		Limit: limit,
+		Query:     queryStr,
+		VideoOnly: videoOnly,
+		AudioOnly: audioOnly,
+		ImageOnly: imageOnly,
+		TextOnly:  textOnly,
+		Limit:     limit,
 	})
 	if err != nil {
 		return nil, err
@@ -812,11 +816,20 @@ func (c *ServeCmd) handleQuery(w http.ResponseWriter, r *http.Request) {
 
 				if queryStr != "" {
 					// Search with context - get all captions for matched media
-					rows, err = c.getCaptionsWithContext(ctx, queries, queryStr, int64(limit))
+					rows, err = c.getCaptionsWithContext(ctx, queries, queryStr, int64(limit), flags.VideoOnly, flags.AudioOnly, flags.ImageOnly, flags.TextOnly)
 				} else {
 					// No search - return captions ordered by path and time for captions view
-					var rawRows []database.GetAllCaptionsOrderedRow
-					rawRows, err = queries.GetAllCaptionsOrdered(ctx, int64(limit))
+					// Apply media type filters
+					rawRows, err2 := queries.GetAllCaptionsOrdered(ctx, database.GetAllCaptionsOrderedParams{
+						VideoOnly: flags.VideoOnly,
+						AudioOnly: flags.AudioOnly,
+						ImageOnly: flags.ImageOnly,
+						TextOnly:  flags.TextOnly,
+						Limit:     int64(limit),
+					})
+					if err2 != nil {
+						return err2
+					}
 					for _, r := range rawRows {
 						rows = append(rows, database.SearchCaptionsRow(r))
 					}

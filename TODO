@@ -25,3 +25,9 @@ lets falsify all the tests by looking at both the code and the tests and seeing 
      - queries.sql for sqlc
      - Manual SQL in query.go
     These should be better synchronized.
+
+e2e CLI
+
+e2e web safari
+
+e2e web mobile

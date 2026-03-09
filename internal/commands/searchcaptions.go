@@ -15,10 +15,11 @@ import (
 )
 
 type SearchCaptionsCmd struct {
-	models.CoreFlags     `embed:""`
-	models.QueryFlags    `embed:""`
-	models.FTSFlags      `embed:""`
-	models.PlaybackFlags `embed:""`
+	models.CoreFlags        `embed:""`
+	models.QueryFlags       `embed:""`
+	models.FTSFlags         `embed:""`
+	models.MediaFilterFlags `embed:""`
+	models.PlaybackFlags    `embed:""`
 
 	Database string   `arg:"" required:"" help:"SQLite database file" type:"existingfile"`
 	Search   []string `arg:"" required:"" help:"Search terms"`
@@ -53,8 +54,12 @@ func (c *SearchCaptionsCmd) Run(ctx *kong.Context) error {
 	}
 
 	rows, err := queries.SearchCaptions(context.Background(), db.SearchCaptionsParams{
-		Query: queryStr,
-		Limit: limit,
+		Query:     queryStr,
+		VideoOnly: c.VideoOnly,
+		AudioOnly: c.AudioOnly,
+		ImageOnly: c.ImageOnly,
+		TextOnly:  c.TextOnly,
+		Limit:     limit,
 	})
 	if err != nil {
 		return err

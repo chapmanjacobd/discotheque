@@ -544,6 +544,40 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    function renderCaptionsMediaTypeList() {
+        const container = document.getElementById('captions-media-type-list');
+        if (!container) return;
+
+        const types = [
+            { id: 'video', label: 'Video', icon: '🎬' },
+            { id: 'audio', label: 'Audio', icon: '🎵' },
+            { id: 'text', label: 'Text', icon: '📖' },
+            { id: 'image', label: 'Image', icon: '🖼️' }
+        ];
+
+        const newHtml = types.map(t => `
+            <button class="category-btn ${state.captionsMediaTypes.includes(t.id) ? 'active' : ''}" data-caption-type="${t.id}">
+                ${t.icon} ${t.label}
+            </button>
+        `).join('');
+
+        container.innerHTML = newHtml;
+
+        container.querySelectorAll('button').forEach(btn => {
+            btn.onclick = () => {
+                const type = btn.dataset.captionType;
+                if (state.captionsMediaTypes.includes(type)) {
+                    state.captionsMediaTypes = [];
+                } else {
+                    state.captionsMediaTypes = [type];
+                }
+                localStorage.setItem('disco-captions-media-types', JSON.stringify(state.captionsMediaTypes));
+                updateNavActiveStates();
+                performSearch();
+            };
+        });
+    }
+
     function renderFilterBins() {
         // Sliders are static in index.html, no need to render bins here.
     }
@@ -798,7 +832,12 @@ document.addEventListener('DOMContentLoaded', () => {
         state.filters.sizes.forEach(b => params.append('size', getBinQueryParam(b)));
         state.filters.durations.forEach(b => params.append('duration', getBinQueryParam(b)));
 
-        state.filters.types.forEach(t => params.append('type', t));
+        // Use captions media types filter when on captions page, otherwise use regular types filter
+        if (state.page === 'captions' && state.captionsMediaTypes.length > 0) {
+            state.captionsMediaTypes.forEach(t => params.append('type', t));
+        } else {
+            state.filters.types.forEach(t => params.append('type', t));
+        }
 
         // Add database filter (send included DBs, not excluded)
         if (state.databases && state.databases.length > 0) {
@@ -4723,7 +4762,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function renderPagination() {
-        if (state.filters.all || state.page === 'trash' || state.page === 'playlist' || state.page === 'history') {
+        if (state.filters.all || state.page === 'curation') {
             paginationContainer.classList.add('hidden');
             return;
         }
@@ -6963,6 +7002,23 @@ document.addEventListener('DOMContentLoaded', () => {
             btn.classList.toggle('active', isActive);
         });
 
+        // Show/hide captions media type filter section
+        const captionsMediaTypeDetails = document.getElementById('details-captions-media-type');
+        if (captionsMediaTypeDetails) {
+            if (state.page === 'captions') {
+                captionsMediaTypeDetails.classList.remove('hidden');
+            } else {
+                captionsMediaTypeDetails.classList.add('hidden');
+                captionsMediaTypeDetails.open = false;
+            }
+        }
+
+        // Update captions media type buttons
+        document.querySelectorAll('#captions-media-type-list .category-btn').forEach(btn => {
+            const isActive = state.captionsMediaTypes.includes(btn.dataset.captionType);
+            btn.classList.toggle('active', isActive);
+        });
+
         // Update Sliders
         const epFilter = state.filters.episodes.find(f => f.value === '@p');
         if (epFilter && episodesMinSlider) {
@@ -7466,6 +7522,7 @@ document.addEventListener('DOMContentLoaded', () => {
     fetchPlaylists();
     // Filter bins are now fetched with search results via include_counts=true
     renderMediaTypeList(); // Render media type buttons on initial load
+    renderCaptionsMediaTypeList(); // Render captions media type buttons on initial load
     renderCategoryList();
     initSidebarPersistence();
     initQueueControls();

@@ -94,4 +94,57 @@ describe('Pagination Limit', () => {
         expect(window.disco.state.currentPage).toBe(1);
         expect(global.fetch).not.toHaveBeenCalledWith(expect.stringContaining('/api/query'), expect.anything());
     });
+
+    it('hides pagination only on curation page', async () => {
+        window.disco.state.totalCount = 100;
+        window.disco.state.filters.limit = 10;
+        window.disco.state.filters.all = false;
+
+        // Test curation page - pagination should be hidden
+        window.disco.state.page = 'curation';
+        window.disco.renderPagination();
+        const paginationContainer = document.getElementById('pagination-container');
+        expect(paginationContainer.classList.contains('hidden')).toBe(true);
+
+        // Test search page - pagination should be visible
+        window.disco.state.page = 'search';
+        window.disco.renderPagination();
+        expect(paginationContainer.classList.contains('hidden')).toBe(false);
+
+        // Test trash page - pagination should be visible
+        window.disco.state.page = 'trash';
+        window.disco.renderPagination();
+        expect(paginationContainer.classList.contains('hidden')).toBe(false);
+
+        // Test history page - pagination should be visible
+        window.disco.state.page = 'history';
+        window.disco.renderPagination();
+        expect(paginationContainer.classList.contains('hidden')).toBe(false);
+
+        // Test playlist page - pagination should be visible
+        window.disco.state.page = 'playlist';
+        window.disco.renderPagination();
+        expect(paginationContainer.classList.contains('hidden')).toBe(false);
+
+        // Test du page - pagination should be visible
+        window.disco.state.page = 'du';
+        window.disco.renderPagination();
+        expect(paginationContainer.classList.contains('hidden')).toBe(false);
+
+        // Test captions page - pagination should be visible
+        window.disco.state.page = 'captions';
+        window.disco.renderPagination();
+        expect(paginationContainer.classList.contains('hidden')).toBe(false);
+    });
+
+    it('hides pagination when filters.all is true', async () => {
+        window.disco.state.totalCount = 100;
+        window.disco.state.filters.limit = 10;
+        window.disco.state.filters.all = true;
+        window.disco.state.page = 'search';
+
+        window.disco.renderPagination();
+        const paginationContainer = document.getElementById('pagination-container');
+        expect(paginationContainer.classList.contains('hidden')).toBe(true);
+    });
 });

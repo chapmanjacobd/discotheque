@@ -302,17 +302,29 @@ FROM captions c
 JOIN media m ON c.media_path = m.path
 WHERE m.time_deleted = 0
   AND c.text IS NOT NULL AND c.text != ''
+  AND (
+    (@video_only = FALSE OR m.type = 'video')
+    AND (@audio_only = FALSE OR m.type IN ('audio', 'audiobook'))
+    AND (@image_only = FALSE OR m.type = 'image')
+    AND (@text_only = FALSE OR m.type = 'text')
+  )
 ORDER BY c.media_path, c.time
-LIMIT ?;
+LIMIT sqlc.arg('limit');
 
 -- name: SearchCaptions :many
 SELECT c.media_path, c.time, c.text, m.title, m.type, m.size, m.duration
 FROM captions c
 JOIN captions_fts f ON c.rowid = f.rowid
 JOIN media m ON c.media_path = m.path
-WHERE f.text MATCH sqlc.arg('query')
+WHERE f.text MATCH @query
   AND m.time_deleted = 0
   AND c.text IS NOT NULL AND c.text != ''
+  AND (
+    (@video_only = 0 OR m.type = 'video')
+    AND (@audio_only = 0 OR m.type IN ('audio', 'audiobook'))
+    AND (@image_only = 0 OR m.type = 'image')
+    AND (@text_only = 0 OR m.type = 'text')
+  )
 ORDER BY c.media_path, c.time
 LIMIT sqlc.arg('limit');
 

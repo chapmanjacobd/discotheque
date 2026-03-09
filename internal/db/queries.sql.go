@@ -108,9 +108,23 @@ FROM captions c
 JOIN media m ON c.media_path = m.path
 WHERE m.time_deleted = 0
   AND c.text IS NOT NULL AND c.text != ''
+  AND (
+    (?1 = FALSE OR m.type = 'video')
+    AND (?2 = FALSE OR m.type IN ('audio', 'audiobook'))
+    AND (?3 = FALSE OR m.type = 'image')
+    AND (?4 = FALSE OR m.type = 'text')
+  )
 ORDER BY c.media_path, c.time
-LIMIT ?
+LIMIT ?5
 `
+
+type GetAllCaptionsOrderedParams struct {
+	VideoOnly interface{} `json:"video_only"`
+	AudioOnly interface{} `json:"audio_only"`
+	ImageOnly interface{} `json:"image_only"`
+	TextOnly  interface{} `json:"text_only"`
+	Limit     int64       `json:"limit"`
+}
 
 type GetAllCaptionsOrderedRow struct {
 	MediaPath string          `json:"media_path"`
@@ -122,8 +136,14 @@ type GetAllCaptionsOrderedRow struct {
 	Duration  sql.NullInt64   `json:"duration"`
 }
 
-func (q *Queries) GetAllCaptionsOrdered(ctx context.Context, limit int64) ([]GetAllCaptionsOrderedRow, error) {
-	rows, err := q.db.QueryContext(ctx, getAllCaptionsOrdered, limit)
+func (q *Queries) GetAllCaptionsOrdered(ctx context.Context, arg GetAllCaptionsOrderedParams) ([]GetAllCaptionsOrderedRow, error) {
+	rows, err := q.db.QueryContext(ctx, getAllCaptionsOrdered,
+		arg.VideoOnly,
+		arg.AudioOnly,
+		arg.ImageOnly,
+		arg.TextOnly,
+		arg.Limit,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -1805,13 +1825,23 @@ JOIN media m ON c.media_path = m.path
 WHERE f.text MATCH ?1
   AND m.time_deleted = 0
   AND c.text IS NOT NULL AND c.text != ''
+  AND (
+    (?2 = 0 OR m.type = 'video')
+    AND (?3 = 0 OR m.type IN ('audio', 'audiobook'))
+    AND (?4 = 0 OR m.type = 'image')
+    AND (?5 = 0 OR m.type = 'text')
+  )
 ORDER BY c.media_path, c.time
-LIMIT ?2
+LIMIT ?6
 `
 
 type SearchCaptionsParams struct {
-	Query string `json:"query"`
-	Limit int64  `json:"limit"`
+	Query     string      `json:"query"`
+	VideoOnly interface{} `json:"video_only"`
+	AudioOnly interface{} `json:"audio_only"`
+	ImageOnly interface{} `json:"image_only"`
+	TextOnly  interface{} `json:"text_only"`
+	Limit     int64       `json:"limit"`
 }
 
 type SearchCaptionsRow struct {
@@ -1825,7 +1855,14 @@ type SearchCaptionsRow struct {
 }
 
 func (q *Queries) SearchCaptions(ctx context.Context, arg SearchCaptionsParams) ([]SearchCaptionsRow, error) {
-	rows, err := q.db.QueryContext(ctx, searchCaptions, arg.Query, arg.Limit)
+	rows, err := q.db.QueryContext(ctx, searchCaptions,
+		arg.Query,
+		arg.VideoOnly,
+		arg.AudioOnly,
+		arg.ImageOnly,
+		arg.TextOnly,
+		arg.Limit,
+	)
 	if err != nil {
 		return nil, err
 	}
