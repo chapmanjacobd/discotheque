@@ -291,7 +291,7 @@ describe('Playback Features', () => {
         });
     });
 
-    it('exits fullscreen when closing player with s key', async () => {
+    it('exits fullscreen when closing player with w key', async () => {
         const card = document.querySelector('.media-card');
         card.click();
 
@@ -305,8 +305,8 @@ describe('Playback Features', () => {
         // Set fullscreen state
         currentFullscreenElement = mediaViewer;
 
-        const sEvent = new KeyboardEvent('keydown', { key: 's', bubbles: true });
-        document.dispatchEvent(sEvent);
+        const wEvent = new KeyboardEvent('keydown', { key: 'w', bubbles: true });
+        document.dispatchEvent(wEvent);
 
         await vi.waitFor(() => {
             expect(document.exitFullscreen).toHaveBeenCalled();

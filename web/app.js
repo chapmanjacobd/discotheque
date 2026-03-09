@@ -3084,6 +3084,68 @@ document.addEventListener('DOMContentLoaded', () => {
         return serverCount + localCount;
     }
 
+    // Predefined playback rates for stepping
+    const PLAYBACK_RATES = [
+        0.2,
+        0.25,
+        0.33,
+        0.4,
+        0.5,
+        0.6,
+        0.7,
+        0.75,
+        0.8,
+        0.85,
+        0.9,
+        0.95,
+        1,
+        1.05,
+        1.1,
+        1.15,
+        1.2,
+        1.25,
+        1.3,
+        1.35,
+        1.4,
+        1.45,
+        1.5,
+        1.75,
+        2,
+        2.5,
+        3,
+        4,
+        6,
+        8
+    ];
+
+    // Find the nearest predefined playback rate
+    function nearestPlaybackRate(rate) {
+        let closest = PLAYBACK_RATES[0];
+        let minDist = Math.abs(rate - closest);
+
+        for (const r of PLAYBACK_RATES) {
+            const d = Math.abs(rate - r);
+            if (d < minDist) {
+                minDist = d;
+                closest = r;
+            }
+        }
+
+        return closest;
+    }
+
+    // Step playback rate up or down through predefined rates
+    function stepPlaybackRate(currentRate, direction) {
+        const nearest = nearestPlaybackRate(currentRate);
+        let i = PLAYBACK_RATES.indexOf(nearest);
+
+        i += direction; // -1 slower, +1 faster
+
+        i = Math.max(0, Math.min(PLAYBACK_RATES.length - 1, i));
+
+        return PLAYBACK_RATES[i];
+    }
+
     function setPlaybackRate(rate) {
         state.playbackRate = rate;
         localStorage.setItem('disco-playback-rate', rate);
@@ -6031,7 +6093,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     setTime(Math.min(duration, currentTime + 1));
                 } else {
                     // Right: Seek forward 5s
-                    if (!isNaN(duration) && duration - currentTime < 1) {
+                    if (isNaN(duration) || duration - currentTime < 1) {
                         playSibling(1, true);
                     } else if (!isNaN(duration)) {
                         state.playback.seekHistory.push(currentTime);
@@ -6042,17 +6104,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 break;
             // Playback speed shortcuts
             case '[':
-                // Decrease speed by 10%
+                // Decrease speed to next lower predefined rate
                 if (media.tagName === 'VIDEO' || media.tagName === 'AUDIO') {
-                    const newRate = Math.max(0.25, Math.round(state.playbackRate * 0.9 * 100) / 100);
+                    const newRate = stepPlaybackRate(state.playbackRate, -1);
                     setPlaybackRate(newRate);
                     showToast(`Speed: ${newRate}x`, '⚡');
                 }
                 break;
             case ']':
-                // Increase speed by 10%
+                // Increase speed to next higher predefined rate
                 if (media.tagName === 'VIDEO' || media.tagName === 'AUDIO') {
-                    const newRate = Math.min(16, Math.round(state.playbackRate * 1.1 * 100) / 100);
+                    const newRate = stepPlaybackRate(state.playbackRate, 1);
                     setPlaybackRate(newRate);
                     showToast(`Speed: ${newRate}x`, '⚡');
                 }
@@ -6060,7 +6122,7 @@ document.addEventListener('DOMContentLoaded', () => {
             case '{':
                 // Halve speed
                 if (media.tagName === 'VIDEO' || media.tagName === 'AUDIO') {
-                    const newRate = Math.max(0.25, state.playbackRate / 2);
+                    const newRate = Math.max(0.2, state.playbackRate / 2);
                     setPlaybackRate(newRate);
                     showToast(`Speed: ${newRate}x`, '⚡');
                 }
@@ -6068,7 +6130,7 @@ document.addEventListener('DOMContentLoaded', () => {
             case '}':
                 // Double speed
                 if (media.tagName === 'VIDEO' || media.tagName === 'AUDIO') {
-                    const newRate = Math.min(16, state.playbackRate * 2);
+                    const newRate = Math.min(8, state.playbackRate * 2);
                     setPlaybackRate(newRate);
                     showToast(`Speed: ${newRate}x`, '⚡');
                 }

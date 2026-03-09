@@ -1,6 +1,6 @@
 /**
  * Keyboard Shortcuts Edge Cases Tests
- * 
+ *
  * Tests for edge cases in keyboard shortcut handling, particularly:
  * - Fullscreen toggle behavior when viewer state changes
  * - Escape key behavior in different states
@@ -27,13 +27,13 @@ test.describe('Keyboard Shortcuts Edge Cases', () => {
       // Press 'f' to enter fullscreen
       await page.keyboard.press('f');
       await page.waitForTimeout(300);
-      
+
       // Verify fullscreen is active
       const isFullscreenAfterF = await page.evaluate(() => !!document.fullscreenElement);
       expect(isFullscreenAfterF).toBe(true);
 
-      // Press 's' to close the modal (while in fullscreen)
-      await page.keyboard.press('s');
+      // Press 'w' to close the modal (while in fullscreen)
+      await page.keyboard.press('w');
       await page.waitForTimeout(300);
 
       // Modal should be closed
@@ -65,19 +65,19 @@ test.describe('Keyboard Shortcuts Edge Cases', () => {
       // Press 'f' to enter fullscreen
       await page.keyboard.press('f');
       await page.waitForTimeout(300);
-      
+
       expect(await page.evaluate(() => !!document.fullscreenElement)).toBe(true);
 
       // Press Escape to exit fullscreen
       await page.keyboard.press('Escape');
       await page.waitForTimeout(300);
-      
+
       expect(await page.evaluate(() => !!document.fullscreenElement)).toBe(false);
 
       // Press 'f' again to re-enter fullscreen
       await page.keyboard.press('f');
       await page.waitForTimeout(300);
-      
+
       expect(await page.evaluate(() => !!document.fullscreenElement)).toBe(true);
     });
 
@@ -94,8 +94,8 @@ test.describe('Keyboard Shortcuts Edge Cases', () => {
       await pdfCard.first().click();
       await page.waitForSelector('#document-modal:not(.hidden)', { timeout: 10000 });
 
-      // Press 's' to close the modal
-      await page.keyboard.press('s');
+      // Press 'w' to close the modal
+      await page.keyboard.press('w');
       await page.waitForTimeout(300);
 
       // Modal should be closed
@@ -125,13 +125,13 @@ test.describe('Keyboard Shortcuts Edge Cases', () => {
       // Press 'f' to enter fullscreen
       await page.keyboard.press('f');
       await page.waitForTimeout(300);
-      
+
       // Verify fullscreen is active
       const isFullscreenAfterF = await page.evaluate(() => !!document.fullscreenElement);
       expect(isFullscreenAfterF).toBe(true);
 
-      // Press 's' to close the PiP player (while in fullscreen)
-      await page.keyboard.press('s');
+      // Press 'w' to close the PiP player (while in fullscreen)
+      await page.keyboard.press('w');
       await page.waitForTimeout(300);
 
       // PiP should be closed
@@ -159,19 +159,19 @@ test.describe('Keyboard Shortcuts Edge Cases', () => {
       // Press 'f' to enter fullscreen
       await page.keyboard.press('f');
       await page.waitForTimeout(300);
-      
+
       expect(await page.evaluate(() => !!document.fullscreenElement)).toBe(true);
 
       // Press Escape to exit fullscreen
       await page.keyboard.press('Escape');
       await page.waitForTimeout(300);
-      
+
       expect(await page.evaluate(() => !!document.fullscreenElement)).toBe(false);
 
       // Press 'f' again to re-enter fullscreen
       await page.keyboard.press('f');
       await page.waitForTimeout(300);
-      
+
       expect(await page.evaluate(() => !!document.fullscreenElement)).toBe(true);
     });
 
@@ -184,8 +184,8 @@ test.describe('Keyboard Shortcuts Edge Cases', () => {
       await audioCard.click();
       await page.waitForSelector('#pip-player:not(.hidden)', { timeout: 5000 });
 
-      // Press 's' to close the PiP player
-      await page.keyboard.press('s');
+      // Press 'w' to close the PiP player
+      await page.keyboard.press('w');
       await page.waitForTimeout(300);
 
       // PiP should be closed
@@ -260,7 +260,7 @@ test.describe('Keyboard Shortcuts Edge Cases', () => {
 
       // Should not crash - page should still be functional
       expect(await page.title()).toBeDefined();
-      
+
       // Fullscreen state might be either true or false depending on timing,
       // but the important thing is no error occurred
       const isFullscreen = await page.evaluate(() => !!document.fullscreenElement);

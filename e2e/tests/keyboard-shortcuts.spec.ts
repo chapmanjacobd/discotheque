@@ -365,7 +365,7 @@ test.describe('Keyboard Shortcuts', () => {
       expect(toastText).toContain('⭐');
     });
 
-    test('0 key unrates media', async ({ page, server }) => {
+    test('` key unrates media', async ({ page, server }) => {
       await page.goto(server.getBaseUrl());
       await page.waitForSelector('.media-card', { timeout: 10000 });
 
@@ -374,8 +374,8 @@ test.describe('Keyboard Shortcuts', () => {
       await waitForPlayer(page);
       await page.waitForTimeout(500);
 
-      // Press '0' to unrate
-      await page.keyboard.press('0');
+      // Press '`' to unrate
+      await page.keyboard.press('`');
       await page.waitForTimeout(500);
 
       // Toast should appear
