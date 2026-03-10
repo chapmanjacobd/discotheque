@@ -43,6 +43,42 @@ Flags:
         Path must contain all these strings
   --paths
         Exact paths to include
+  --search
+        Search terms (space-separated for AND, | for OR)
+  -S, --size
+        Size range (e.g., >100MB, 1GB%10)
+  -d, --duration
+        Duration range (e.g., >1hour, 30min%10)
+  --duration-from-size
+        Constrain media to duration of videos which match any size constraints
+  --watched
+        Filter by watched status (true/false)
+  --unfinished
+        Has playhead but not finished
+  -P, --partial
+        Filter by partial playback status
+  --play-count-min
+        Minimum play count
+  --play-count-max
+        Maximum play count
+  --completed
+        Show only completed items
+  --in-progress
+        Show only items in progress
+  --with-captions
+        Show only items with captions
+  --flexible-search
+        Flexible search (fuzzy)
+  --exact
+        Exact match for search
+  -w, --where
+        SQL where clause(s)
+  --exists
+        Filter out non-existent files
+  -o, --fetch-siblings
+        Fetch siblings of matched files (each, all, if-audiobook)
+  --fetch-siblings-max
+        Maximum number of siblings to fetch
   --category
         Filter by category
   --genre
@@ -1493,6 +1529,16 @@ Flags:
         Filter folders by total size
   --folder-counts
         Filter folders by number of subfolders
+  -u, --sort-by
+        Sort by field
+  -V, --reverse
+        Reverse sort order
+  -n, --nat-sort
+        Use natural sorting
+  -r, --random
+        Random order
+  -k, --re-rank
+        Add key/value pairs re-rank sorting by multiple attributes (COLUMN=WEIGHT)
   -c, --columns
         Columns to display
   -j, --json
@@ -2809,6 +2855,8 @@ Flags:
         Don't ask for confirmation
   -T, --timeout
         Quit after N minutes/seconds
+  --done
+        Mark as done
 ```
 
 </details>
@@ -3910,6 +3958,16 @@ Flags:
         Size of each segment to hash
   --hash-threads
         Number of threads to use for hashing a single file
+  -c, --columns
+        Columns to display
+  -j, --json
+        Output results as JSON
+  --summarize
+        Print aggregate statistics
+  -f, --frequency
+        Group statistics by time frequency (daily, weekly, monthly, yearly)
+  --tui
+        Interactive TUI mode
 ```
 
 </details>
