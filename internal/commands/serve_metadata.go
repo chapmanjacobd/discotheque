@@ -1,0 +1,322 @@
+package commands
+
+import (
+	"context"
+	"database/sql"
+	"encoding/json"
+	"log/slog"
+	"net/http"
+	"sort"
+	"strings"
+
+	database "github.com/chapmanjacobd/discotheque/internal/db"
+	"github.com/chapmanjacobd/discotheque/internal/models"
+)
+
+// handleDatabases returns server configuration.
+// GET /api/databases
+func (c *ServeCmd) handleDatabases(w http.ResponseWriter, r *http.Request) {
+	resp := models.DatabaseInfo{
+		Databases: c.Databases,
+		Trashcan:  c.Trashcan,
+		ReadOnly:  c.ReadOnly,
+		Dev:       c.Dev,
+	}
+	writeJSON(w, http.StatusOK, resp)
+}
+
+// handleCategories returns a list of categories and their media counts.
+// GET /api/categories
+func (c *ServeCmd) handleCategories(w http.ResponseWriter, r *http.Request) {
+	counts := make(map[string]int64)
+	isCustom := make(map[string]bool)
+
+	for _, dbPath := range c.Databases {
+		err := c.execDB(r.Context(), dbPath, func(sqlDB *sql.DB) error {
+			queries := database.New(sqlDB)
+
+			// 1. Get categories already assigned to media
+			rows, err := queries.GetUsedCategories(r.Context())
+			if err != nil {
+				return err
+			}
+			for _, row := range rows {
+				if row.Categories.Valid {
+					trimmed := strings.Trim(row.Categories.String, ";")
+					if trimmed == "" {
+						continue
+					}
+					cats := strings.SplitSeq(trimmed, ";")
+					for cat := range cats {
+						if cat != "" {
+							counts[cat] += row.Count
+						}
+					}
+				}
+			}
+
+			// 2. Get categories from custom keywords
+			customCats, err := queries.GetCustomCategories(r.Context())
+			if err == nil {
+				for _, cat := range customCats {
+					isCustom[cat] = true
+					if _, ok := counts[cat]; !ok {
+						counts[cat] = 0
+					}
+				}
+			}
+
+			return nil
+		})
+		if err != nil {
+			slog.Error("Failed to fetch categories", "db", dbPath, "error", err)
+			writeError(w, http.StatusInternalServerError, "Failed to fetch categories")
+			return
+		}
+	}
+
+	// 3. Add Uncategorized count
+	for _, dbPath := range c.Databases {
+		c.execDB(r.Context(), dbPath, func(sqlDB *sql.DB) error {
+			var count int64
+			err := sqlDB.QueryRowContext(r.Context(), "SELECT COUNT(*) FROM media WHERE time_deleted = 0 AND (categories IS NULL OR categories = '')").Scan(&count)
+			if err == nil {
+				counts["Uncategorized"] += count
+			}
+			return nil
+		})
+	}
+
+	var res []models.CatStat
+	for k, v := range counts {
+		res = append(res, models.CatStat{Category: k, Count: v})
+	}
+
+	sort.Slice(res, func(i, j int) bool {
+		if res[i].Category == "Uncategorized" {
+			return false
+		}
+		if res[j].Category == "Uncategorized" {
+			return true
+		}
+		if res[i].Count != res[j].Count {
+			return res[i].Count > res[j].Count
+		}
+		return res[i].Category < res[j].Category
+	})
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(res)
+}
+
+// handleGenres returns genre statistics.
+// GET /api/genres
+func (c *ServeCmd) handleGenres(w http.ResponseWriter, r *http.Request) {
+	counts := make(map[string]int64)
+
+	for _, dbPath := range c.Databases {
+		err := c.execDB(r.Context(), dbPath, func(sqlDB *sql.DB) error {
+			queries := database.New(sqlDB)
+			rows, err := queries.GetGenreStats(r.Context())
+			if err != nil {
+				return err
+			}
+			for _, row := range rows {
+				if row.Genre.Valid {
+					counts[row.Genre.String] = row.Count
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			slog.Error("Failed to fetch genres", "db", dbPath, "error", err)
+			continue
+		}
+	}
+
+	var res []models.CatStat
+	for k, v := range counts {
+		res = append(res, models.CatStat{Category: k, Count: v})
+	}
+
+	sort.Slice(res, func(i, j int) bool {
+		if res[i].Count != res[j].Count {
+			return res[i].Count > res[j].Count
+		}
+		return res[i].Category < res[j].Category
+	})
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(res)
+}
+
+// handleRatings returns rating statistics.
+// GET /api/ratings
+func (c *ServeCmd) handleRatings(w http.ResponseWriter, r *http.Request) {
+	counts := make(map[int64]int64)
+
+	for _, dbPath := range c.Databases {
+		err := c.execDB(r.Context(), dbPath, func(sqlDB *sql.DB) error {
+			queries := database.New(sqlDB)
+			stats, err := queries.GetRatingStats(r.Context())
+			if err != nil {
+				return err
+			}
+			for _, s := range stats {
+				counts[s.Rating] = counts[s.Rating] + s.Count
+			}
+			return nil
+		})
+		if err != nil {
+			slog.Error("Failed to fetch ratings", "db", dbPath, "error", err)
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Failed to fetch ratings"})
+			return
+		}
+	}
+
+	var res []models.RatStat
+	res = make([]models.RatStat, 0)
+	for k, v := range counts {
+		res = append(res, models.RatStat{Rating: k, Count: v})
+	}
+
+	sort.Slice(res, func(i, j int) bool {
+		return res[i].Rating > res[j].Rating
+	})
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(res)
+}
+
+// getCaptionsWithContext fetches captions matching a query along with 2 captions before and after each match
+func (c *ServeCmd) getCaptionsWithContext(ctx context.Context, queries *database.Queries, queryStr string, limit int64, videoOnly, audioOnly, imageOnly, textOnly bool) ([]database.SearchCaptionsRow, error) {
+	// First, get the matching captions with media type filters
+	matches, err := queries.SearchCaptions(ctx, database.SearchCaptionsParams{
+		Query:     queryStr,
+		VideoOnly: videoOnly,
+		AudioOnly: audioOnly,
+		ImageOnly: imageOnly,
+		TextOnly:  textOnly,
+		Limit:     limit,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	if len(matches) == 0 {
+		return matches, nil
+	}
+
+	// Get unique media paths that have matches
+	pathSet := make(map[string]bool)
+	for _, m := range matches {
+		pathSet[m.MediaPath] = true
+	}
+	var paths []string
+	for path := range pathSet {
+		paths = append(paths, path)
+	}
+
+	// Get all captions for those media paths
+	var allCaptions []database.Captions
+	for _, path := range paths {
+		captions, err := queries.GetCaptionsForMedia(ctx, path)
+		if err != nil {
+			slog.Warn("Failed to get captions for media", "path", path, "error", err)
+			continue
+		}
+		allCaptions = append(allCaptions, captions...)
+	}
+
+	// Create a set of match times for each path
+	matchTimes := make(map[string]map[float64]bool)
+	for _, m := range matches {
+		if matchTimes[m.MediaPath] == nil {
+			matchTimes[m.MediaPath] = make(map[float64]bool)
+		}
+		if m.Time.Valid {
+			matchTimes[m.MediaPath][m.Time.Float64] = true
+		}
+	}
+
+	// For each match, find 2 captions before and after
+	var result []database.SearchCaptionsRow
+	added := make(map[string]map[float64]bool)
+
+	for _, m := range matches {
+		if !m.Time.Valid {
+			continue
+		}
+		matchTime := m.Time.Float64
+		path := m.MediaPath
+
+		// Add the match itself
+		if added[path] == nil {
+			added[path] = make(map[float64]bool)
+		}
+		if !added[path][matchTime] {
+			result = append(result, database.SearchCaptionsRow(m))
+			added[path][matchTime] = true
+		}
+
+		// Find 2 captions before
+		beforeCount := 0
+		for _, c := range allCaptions {
+			if c.MediaPath != path || !c.Time.Valid {
+				continue
+			}
+			captionTime := c.Time.Float64
+			if captionTime < matchTime && !matchTimes[path][captionTime] {
+				if beforeCount < 2 && !added[path][captionTime] {
+					result = append(result, database.SearchCaptionsRow{
+						MediaPath: c.MediaPath,
+						Time:      c.Time,
+						Text:      c.Text,
+						Title:     sql.NullString{},
+						Type:      sql.NullString{},
+						Size:      sql.NullInt64{},
+						Duration:  sql.NullInt64{},
+					})
+					added[path][captionTime] = true
+					beforeCount++
+				}
+			}
+		}
+
+		// Find 2 captions after
+		afterCount := 0
+		for _, c := range allCaptions {
+			if c.MediaPath != path || !c.Time.Valid {
+				continue
+			}
+			captionTime := c.Time.Float64
+			if captionTime > matchTime && !matchTimes[path][captionTime] {
+				if afterCount < 2 && !added[path][captionTime] {
+					result = append(result, database.SearchCaptionsRow{
+						MediaPath: c.MediaPath,
+						Time:      c.Time,
+						Text:      c.Text,
+						Title:     sql.NullString{},
+						Type:      sql.NullString{},
+						Size:      sql.NullInt64{},
+						Duration:  sql.NullInt64{},
+					})
+					added[path][captionTime] = true
+					afterCount++
+				}
+			}
+		}
+	}
+
+	// Sort by media_path and time
+	sort.Slice(result, func(i, j int) bool {
+		if result[i].MediaPath != result[j].MediaPath {
+			return result[i].MediaPath < result[j].MediaPath
+		}
+		return result[i].Time.Float64 < result[j].Time.Float64
+	})
+
+	return result, nil
+}

@@ -1,20 +1,3 @@
-- Pagination should work on all pages except for Categorization
-
-- Captions mode: Media Type should filter the caption media
-
-- Search filtering should work across all modes without exiting that mode--but you could hide the searchbox on the Categorization page as that one doesn't really need it
-
-
-    5. Large Command Files
-     - serve.go: Likely very large (web server)
-     - query.go: 1723 lines - could be split by concern
-     - commands/ has 50+ files with overlapping responsibilities
-
-    7. Schema and Queries Duplication
-     - schema.sql embedded in commands
-     - queries.sql for sqlc
-     - Manual SQL in query.go
-    These should be better synchronized.
 
 e2e CLI
 
