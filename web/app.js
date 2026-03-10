@@ -3042,10 +3042,21 @@ document.addEventListener('DOMContentLoaded', () => {
                         setLocalStorageItem('disco-play-counts', counts);
                     }
                 } else {
-                    progress[item.path] = {
-                        pos: Math.floor(playhead),
-                        last: now
-                    };
+                    // Latest wins merging with position preference
+                    const existing = progress[item.path];
+                    const existingLast = existing && typeof existing === 'object' ? existing.last : 0;
+                    const existingPos = existing && typeof existing === 'object' ? existing.pos : 0;
+                    const newPos = Math.floor(playhead);
+                    
+                    // Update if: new timestamp is significantly newer (>5s), OR timestamps are close and new position is higher
+                    // This prevents overwriting better progress from another session with worse local progress
+                    const timeDiff = now - existingLast;
+                    if (timeDiff > 5000 || (timeDiff >= 0 && timeDiff <= 5000 && newPos > existingPos)) {
+                        progress[item.path] = {
+                            pos: newPos,
+                            last: now
+                        };
+                    }
                 }
                 setLocalStorageItem('disco-progress', progress);
                 state.playback.lastLocalUpdate = now;
@@ -3362,7 +3373,16 @@ document.addEventListener('DOMContentLoaded', () => {
         if (state.readOnly) {
             // Local update for read-only mode
             const progress = getLocalStorageItem('disco-progress', {});
-            progress[item.path] = { pos: 0, last: Date.now() };
+            const now = Date.now();
+            // Latest wins merging with position preference
+            const existing = progress[item.path];
+            const existingLast = existing && typeof existing === 'object' ? existing.last : 0;
+            const existingPos = existing && typeof existing === 'object' ? existing.pos : 0;
+            // Marking as played (pos: 0) always takes precedence as it represents completion
+            const timeDiff = now - existingLast;
+            if (timeDiff > 5000 || (timeDiff >= 0 && timeDiff <= 5000)) {
+                progress[item.path] = { pos: 0, last: now };
+            }
             setLocalStorageItem('disco-progress', progress);
 
             const counts = getLocalStorageItem('disco-play-counts', {});
