@@ -1,4 +1,5 @@
 import { defineConfig, devices } from '@playwright/test';
+import path from 'path';
 
 /**
  * Read environment variables from file.
@@ -24,7 +25,7 @@ export default defineConfig({
   reporter: [
     ['html', { open: 'never' }],
     ['list'],
-    ['json', { outputFile: 'test-results/results.json' }]
+    ['json', { outputFile: path.join(__dirname, 'test-results', 'results.json') }]
   ],
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
@@ -123,7 +124,7 @@ export default defineConfig({
   ],
 
   /* Folder for test artifacts such as screenshots, videos, traces, etc. */
-  outputDir: 'test-results/',
+  outputDir: path.join(__dirname, 'test-results'),
 
   /* Global setup and teardown */
   globalSetup: require.resolve('./global-setup'),
