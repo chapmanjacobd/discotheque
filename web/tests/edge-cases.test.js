@@ -311,16 +311,16 @@ describe('Subtitle Handling', () => {
             }
         });
 
-        // Simulate shift+S for subtitle cycling
-        const sEvent = new KeyboardEvent('keydown', {
-            key: 's',
+        // Simulate shift+J for subtitle cycling
+        const jEvent = new KeyboardEvent('keydown', {
+            key: 'j',
             shiftKey: true,
             bubbles: true
         });
-        document.dispatchEvent(sEvent);
+        document.dispatchEvent(jEvent);
 
         // Just verify event was dispatched
-        expect(sEvent.shiftKey).toBe(true);
+        expect(jEvent.shiftKey).toBe(true);
     });
 });
 
