@@ -1,28 +1,29 @@
 import { test as base, expect, Page } from '@playwright/test';
 import { TestServer } from './utils/test-server';
 import { globalServers } from './global-setup';
+import { MediaPage } from './pages/media-page';
+import { SidebarPage } from './pages/sidebar-page';
+import { ViewerPage } from './pages/viewer-page';
 import * as path from 'path';
 import * as fs from 'fs';
 
 /**
  * Wait for media player to be ready
- * Tries multiple selector patterns to handle different player implementations
+ * Uses robust waiting strategy without hard timeouts
  */
 export async function waitForPlayer(page: Page, timeout: number = 10000): Promise<void> {
-  try {
-    // Try waiting for any player element
-    await page.waitForSelector('#pip-player, #player-container, .player, video, audio', {
-      timeout,
-      state: 'visible'
-    });
-  } catch (e) {
-    // If specific player not found, check if any media element exists
-    const videoCount = await page.locator('video').count();
-    const audioCount = await page.locator('audio').count();
-    if (videoCount === 0 && audioCount === 0) {
-      throw e;
-    }
-  }
+  const player = page.locator('#pip-player');
+  await player.waitFor({ state: 'visible', timeout });
+  
+  // Wait for media element inside player
+  const media = page.locator('#pip-player video, #pip-player audio');
+  await media.waitFor({ state: 'visible', timeout });
+  
+  // Wait for media to have loaded metadata
+  await page.waitForFunction(() => {
+    const media = document.querySelector('#pip-player video, #pip-player audio') as HTMLMediaElement;
+    return media && (media.readyState >= 1); // HAVE_METADATA
+  }, { timeout });
 }
 
 /**
@@ -40,11 +41,14 @@ export async function isPlayerOpen(page: Page): Promise<boolean> {
   return videoCount > 0 || audioCount > 0;
 }
 
-// Extended test fixture with server management
+// Extended test fixture with server management and page objects
 export const test = base.extend<{
   server: TestServer;
   testDbPath: string;
   readOnly: boolean;
+  mediaPage: MediaPage;
+  sidebarPage: SidebarPage;
+  viewerPage: ViewerPage;
 }>({
   // Test database path (pre-committed to repo)
   testDbPath: async ({}, use) => {
@@ -57,6 +61,19 @@ export const test = base.extend<{
     }
 
     await use(dbPath);
+  },
+
+  // Page Objects
+  mediaPage: async ({ page }, use) => {
+    await use(new MediaPage(page));
+  },
+
+  sidebarPage: async ({ page }, use) => {
+    await use(new SidebarPage(page));
+  },
+
+  viewerPage: async ({ page }, use) => {
+    await use(new ViewerPage(page));
   },
 
   // Whether this test is read-only (doesn't modify server state)
