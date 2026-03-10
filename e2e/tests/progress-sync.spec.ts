@@ -74,6 +74,9 @@ test.describe('Progress Synchronization', () => {
       localStorage.setItem('disco-progress', JSON.stringify(p));
     }, videoPath);
 
+    // Wait for player to sync with the concurrent update
+    await page.waitForTimeout(2000);
+
     // Close player
     await page.click('.close-pip');
     await page.waitForTimeout(1500);

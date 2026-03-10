@@ -340,7 +340,8 @@ test.describe('Keyboard Shortcuts', () => {
         return video ? video.style.aspectRatio : '';
       });
 
-      expect(aspectRatio).toBe('16/9');
+      // Normalize aspect ratio (browser may add spaces: '16 / 9' vs '16/9')
+      expect(aspectRatio.replace(/\s/g, '')).toBe('16/9');
 
       // Toast should appear
       const toast = page.locator('#toast');
