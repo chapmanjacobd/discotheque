@@ -2,6 +2,7 @@ import { spawn, ChildProcess } from 'child_process';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as net from 'net';
+import * as http from 'http';
 
 export interface TestServerOptions {
   databasePath?: string;
@@ -23,6 +24,36 @@ async function findFreePort(): Promise<number> {
     });
     server.on('error', reject);
   });
+}
+
+// Poll the health endpoint until the server is ready
+async function waitForHealth(baseUrl: string, timeoutMs: number = 10000): Promise<void> {
+  const startTime = Date.now();
+  const intervalMs = 100;
+
+  while (Date.now() - startTime < timeoutMs) {
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const req = http.get(`${baseUrl}/health`, (res) => {
+          if (res.statusCode === 200) {
+            resolve();
+          } else {
+            reject(new Error(`Health check returned ${res.statusCode}`));
+          }
+        });
+        req.on('error', reject);
+        req.setTimeout(1000, () => {
+          req.destroy();
+          reject(new Error('Health check timeout'));
+        });
+      });
+      return; // Health check passed
+    } catch {
+      // Health check failed, retry after interval
+      await new Promise(resolve => setTimeout(resolve, intervalMs));
+    }
+  }
+  throw new Error(`Server health check failed after ${timeoutMs}ms`);
 }
 
 export class TestServer {
@@ -84,19 +115,26 @@ export class TestServer {
         }
       }, 10000);
 
+      // Wait for health check endpoint to be ready
+      waitForHealth(this.baseUrl)
+        .then(() => {
+          started = true;
+          clearTimeout(timeout);
+          if (process.env.DEBUG) {
+            console.log('[disco] Server is healthy and ready');
+          }
+          resolve();
+        })
+        .catch((err) => {
+          started = true;
+          clearTimeout(timeout);
+          reject(new Error(`Server health check failed: ${err.message}`));
+        });
+
       this.process.stdout?.on('data', (data) => {
         const output = data.toString();
         if (process.env.DEBUG) {
           console.log('[disco]', output.trim());
-        }
-        // Check for various startup messages
-        if (output.includes('Starting server') ||
-            output.includes('listening') ||
-            output.includes('addr=') ||
-            output.includes('Server starting')) {
-          started = true;
-          clearTimeout(timeout);
-          resolve();
         }
       });
 
@@ -104,15 +142,6 @@ export class TestServer {
         const output = data.toString();
         if (process.env.DEBUG) {
           console.error('[disco error]', output.trim());
-        }
-        // Also check stderr for startup messages (disco logs startup info to stderr)
-        if (output.includes('Starting server') ||
-            output.includes('listening') ||
-            output.includes('addr=') ||
-            output.includes('Server starting')) {
-          started = true;
-          clearTimeout(timeout);
-          resolve();
         }
       });
 
