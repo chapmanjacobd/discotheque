@@ -3806,7 +3806,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             } catch (e) {
                 console.error('Failed to verify media status:', e);
-                msg = `Connection lost: ${basename}`;
+                msg = `Network error: ${basename}`;
                 emoji = '🌐';
             }
         }

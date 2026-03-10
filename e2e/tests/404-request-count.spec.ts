@@ -63,8 +63,10 @@ test('counts requests for 404 media', async ({ page, server }) => {
   console.log(`Target raw requests: ${targetRawRequests.length}`);
   console.log(`Root requests: ${rootRequests.length}`);
 
-  // Expecting 1 raw request (the tag trying to load the source)
-  // and 0 root requests (because we use removeAttribute('src') instead of src="")
-  expect(targetRawRequests.length).toBe(1);
+  // Expecting 2 raw requests:
+  // 1. The media element trying to load the source
+  // 2. The verification HEAD request to check file status
+  // and 0 root requests
+  expect(targetRawRequests.length).toBe(2);
   expect(rootRequests.length).toBe(0);
 });

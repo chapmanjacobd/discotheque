@@ -56,7 +56,7 @@ func ReRankMedia(media []models.MediaWithDB, flags models.GlobalFlags) []models.
 	}
 
 	weights := make(map[string]float64)
-	for _, p := range strings.Fields(flags.ReRank) {
+	for p := range strings.FieldsSeq(flags.ReRank) {
 		kv := strings.Split(p, "=")
 		weight := 1.0
 		if len(kv) == 2 {
