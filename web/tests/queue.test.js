@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { setupTestEnvironment } from './test-helper';
-import { state } from '../state';
 
 describe('Queue Management', () => {
     let state;

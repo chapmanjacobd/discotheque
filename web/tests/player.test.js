@@ -1,6 +1,22 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { setupTestEnvironment } from './test-helper';
 
+// Mock hls.js module
+vi.mock('hls.js', () => {
+    return {
+        default: class {
+            static isSupported() { return true; }
+            loadSource() { }
+            attachMedia() { }
+            on(event, handler) {
+                if (window.onHlsEvent) window.onHlsEvent(event, handler);
+            }
+            destroy() { }
+            static get Events() { return { ERROR: 'hlsError', MANIFEST_PARSED: 'hlsManifestParsed' }; }
+        }
+    };
+});
+
 describe('Player Logic', () => {
     beforeEach(async () => {
         await setupTestEnvironment();
@@ -31,22 +47,17 @@ describe('Player Logic', () => {
         vi.spyOn(HTMLMediaElement.prototype, 'canPlayType').mockReturnValue('');
         
         let fatalErrorHandler;
-        global.Hls = class {
-            static isSupported() { return true; }
-            loadSource() { }
-            attachMedia() { }
-            on(event, handler) { 
-                if (event === 'hlsError') fatalErrorHandler = handler;
-            }
-            destroy() { }
-            static get Events() { return { ERROR: 'hlsError', MANIFEST_PARSED: 'hlsManifestParsed' }; }
+        window.onHlsEvent = (event, handler) => {
+            if (event === 'hlsError') fatalErrorHandler = handler;
         };
 
         await window.disco.openInPiP(item);
         const video = document.querySelector('video');
         
         // Trigger fatal HLS error
-        fatalErrorHandler('hlsError', { fatal: true, type: 'networkError' });
+        if (fatalErrorHandler) {
+            fatalErrorHandler('hlsError', { fatal: true, type: 'networkError' });
+        }
         
         // Should fall back to direct stream
         expect(video.src).toContain('/api/raw');

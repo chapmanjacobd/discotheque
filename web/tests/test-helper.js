@@ -207,7 +207,7 @@ export async function setupTestEnvironment(initialLocalStorage) {
     }
     vi.resetModules();
 
-    await import('../app.js');
+    await import('../src/main.ts');
     document.dispatchEvent(new Event('DOMContentLoaded'));
 
     // Wait for async init and multiple renders

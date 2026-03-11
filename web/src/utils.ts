@@ -11,8 +11,8 @@ export function formatRelativeDate(timestamp: number | null): string {
     return `${Math.floor(diff / 31536000)}y ago`;
 }
 
-export function formatSize(bytes: number | undefined): string {
-    if (bytes === undefined || bytes === null) return '-';
+export function formatSize(bytes: number | undefined | null): string {
+    if (bytes === undefined || bytes === null || bytes === 0) return '-';
     let b = bytes;
     const units = ['B', 'KB', 'MB', 'GB', 'TB'];
     let i = 0;

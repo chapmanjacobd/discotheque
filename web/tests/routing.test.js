@@ -37,7 +37,7 @@ describe('Routing', () => {
         // after changing the hash if we want to test restoration.
         // Or we could pass initial state.
 
-        // Since setupTestEnvironment imports app.js, it already called readUrl once.
+        // Since setupTestEnvironment imports main.ts, it already called readUrl once.
         // We can call it manually now.
         window.disco.readUrl();
 
