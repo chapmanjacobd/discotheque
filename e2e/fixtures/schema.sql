@@ -48,30 +48,13 @@ CREATE TABLE media (
     album TEXT,
     artist TEXT,
     genre TEXT,
-    mood TEXT,
-    bpm INTEGER,
-    key TEXT,
-    decade TEXT,
     categories TEXT,
-    city TEXT,
-    country TEXT,
     description TEXT,
     language TEXT,
 
-    -- Online / Social metadata
-    webpath TEXT,
-    uploader TEXT,
-    time_uploaded INTEGER,
-    time_downloaded INTEGER,
-    view_count INTEGER,
-    num_comments INTEGER,
-    favorite_count INTEGER,
-    score REAL,
-    upvote_ratio REAL,
-
-    -- Location
-    latitude REAL,
-    longitude REAL
+    -- Metadata
+    time_downloaded INTEGER, -- Repurposed as Time First Scanned
+    score REAL
 );
 CREATE TABLE captions (
     media_path TEXT NOT NULL,
@@ -122,34 +105,32 @@ CREATE INDEX idx_genre ON media(genre);
 CREATE INDEX idx_artist ON media(artist);
 CREATE INDEX idx_album ON media(album);
 CREATE INDEX idx_categories ON media(categories);
-CREATE INDEX idx_uploader ON media(uploader);
 CREATE INDEX idx_score ON media(score);
-CREATE INDEX idx_view_count ON media(view_count);
 CREATE INDEX idx_time_created ON media(time_created);
 CREATE INDEX idx_time_modified ON media(time_modified);
-CREATE INDEX idx_time_uploaded ON media(time_uploaded);
 CREATE INDEX idx_time_downloaded ON media(time_downloaded);
 CREATE VIRTUAL TABLE media_fts USING fts5(
     path,
     fts_path,
     title,
+    description,
     content='media',
     content_rowid='rowid',
     tokenize = 'trigram'
 )
-/* media_fts(path,fts_path,title) */;
+/* media_fts(path,fts_path,title,description) */;
 CREATE TABLE IF NOT EXISTS 'media_fts_data'(id INTEGER PRIMARY KEY, block BLOB);
 CREATE TABLE IF NOT EXISTS 'media_fts_idx'(segid, term, pgno, PRIMARY KEY(segid, term)) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS 'media_fts_docsize'(id INTEGER PRIMARY KEY, sz BLOB);
 CREATE TABLE IF NOT EXISTS 'media_fts_config'(k PRIMARY KEY, v) WITHOUT ROWID;
 CREATE TRIGGER media_ai AFTER INSERT ON media BEGIN
-    INSERT INTO media_fts(rowid, path, fts_path, title)
-    VALUES (new.rowid, new.path, new.fts_path, new.title);
+    INSERT INTO media_fts(rowid, path, fts_path, title, description)
+    VALUES (new.rowid, new.path, new.fts_path, new.title, new.description);
 END;
 CREATE TRIGGER media_ad AFTER DELETE ON media BEGIN
     DELETE FROM media_fts WHERE rowid = old.rowid;
 END;
 CREATE TRIGGER media_au AFTER UPDATE ON media BEGIN
-    INSERT INTO media_fts(media_fts, rowid, path, fts_path, title) VALUES('delete', old.rowid, old.path, old.fts_path, old.title);
-    INSERT INTO media_fts(rowid, path, fts_path, title) VALUES (new.rowid, new.path, new.fts_path, new.title);
+    INSERT INTO media_fts(media_fts, rowid, path, fts_path, title, description) VALUES('delete', old.rowid, old.path, old.fts_path, old.title, old.description);
+    INSERT INTO media_fts(rowid, path, fts_path, title, description) VALUES (new.rowid, new.path, new.fts_path, new.title, new.description);
 END;

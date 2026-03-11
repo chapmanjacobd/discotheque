@@ -28,7 +28,6 @@ export const state = {
         browseCol: '',
         browseVal: ''
     },
-    captionsMediaTypes: JSON.parse(localStorage.getItem('disco-captions-media-types') || '[]'),
     activeModal: null,
     duPath: '',
     draggedItem: null,

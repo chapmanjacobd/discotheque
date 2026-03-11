@@ -1172,7 +1172,7 @@ header {
 }
 
 .toggle-text p {
-    margin: 0.2rem 0 0 0;
+    margin: 0.2rem 0 0 0.4rem;
     font-size: 0.85rem;
     color: var(--text-muted);
 }
@@ -2126,12 +2126,19 @@ body.has-pip #content {
 
     #sort-group,
     #view-toggle {
-        flex: 1;
+        flex: 1 1 auto;
         min-width: 140px;
         justify-content: center;
     }
 
-    /* DU Toolbar mobile fix - stack vertically */
+    /* Force toolbar components to stack vertically when DU toolbar is present */
+    #du-toolbar:not(.hidden),
+    #du-toolbar:not(.hidden) ~ #view-toggle,
+    #du-toolbar:not(.hidden) ~ #sort-group {
+        flex: 1 1 100%;
+    }
+
+    /* DU Toolbar mobile fix - stack vertically internal elements */
     #du-toolbar {
         flex-direction: column;
         align-items: stretch;
