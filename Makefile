@@ -1,9 +1,9 @@
-.PHONY: build build-fts5 build-bleve build-nofts test cover webtest webcover e2e clean fmt lint sql install all readme dev ubuntu-deps go-deps
+.PHONY: build build-fts5 build-bleve build-nofts test cover webtest webcover e2e clean fmt lint sql install all readme dev ubuntu-deps go-deps web-install webbuild e2e-install e2e-init e2e-cli e2e-web release-build
 
 BINARY_NAME=disco
 BUILD_TAGS=fts5
 
-all: fmt lint sql test build webtest webbuild readme
+all: webbuild fmt lint sql test build webtest readme
 
 ubuntu-deps:
 	sudo apt-get update && sudo apt-get install -y \
