@@ -282,10 +282,10 @@ JOIN media m ON c.media_path = m.path
 WHERE m.time_deleted = 0
   AND c.text IS NOT NULL AND c.text != ''
   AND (
-    (@video_only = FALSE OR m.type = 'video')
-    AND (@audio_only = FALSE OR m.type IN ('audio', 'audiobook'))
-    AND (@image_only = FALSE OR m.type = 'image')
-    AND (@text_only = FALSE OR m.type = 'text')
+    (@video_only = 0 OR m.type = 'video')
+    AND (@audio_only = 0 OR m.type IN ('audio', 'audiobook'))
+    AND (@image_only = 0 OR m.type = 'image')
+    AND (@text_only = 0 OR m.type = 'text')
   )
 ORDER BY c.media_path, c.time
 LIMIT sqlc.arg('limit');

@@ -50,7 +50,7 @@ func (c *ServeCmd) handleQuery(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if q.Get("view") == "captions" || q.Get("captions") == "true" {
-		var media []models.MediaWithDB
+		media := []models.MediaWithDB{}
 		queryStr := strings.Join(flags.Search, " ")
 		limit := flags.Limit
 		if limit <= 0 {
@@ -184,9 +184,25 @@ func (c *ServeCmd) handleQuery(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
+		// Check if filter counts are requested
+		includeCounts := q.Get("include_counts") == "true"
+		var filterCounts *models.FilterBinsResponse
+		if includeCounts {
+			filterCounts = c.calculateFilterCounts(ctx, flags, dbs)
+		}
+
 		w.Header().Set("X-Total-Count", strconv.Itoa(totalCount))
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(media)
+
+		if includeCounts && filterCounts != nil {
+			response := map[string]any{
+				"items":  media,
+				"counts": filterCounts,
+			}
+			json.NewEncoder(w).Encode(response)
+		} else {
+			json.NewEncoder(w).Encode(media)
+		}
 		return
 	}
 
@@ -197,6 +213,9 @@ func (c *ServeCmd) handleQuery(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Query failed: " + err.Error()})
 		return
+	}
+	if media == nil {
+		media = []models.MediaWithDB{}
 	}
 
 	// Check if filter counts are requested

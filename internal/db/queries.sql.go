@@ -109,10 +109,10 @@ JOIN media m ON c.media_path = m.path
 WHERE m.time_deleted = 0
   AND c.text IS NOT NULL AND c.text != ''
   AND (
-    (?1 = FALSE OR m.type = 'video')
-    AND (?2 = FALSE OR m.type IN ('audio', 'audiobook'))
-    AND (?3 = FALSE OR m.type = 'image')
-    AND (?4 = FALSE OR m.type = 'text')
+    (?1 = 0 OR m.type = 'video')
+    AND (?2 = 0 OR m.type IN ('audio', 'audiobook'))
+    AND (?3 = 0 OR m.type = 'image')
+    AND (?4 = 0 OR m.type = 'text')
   )
 ORDER BY c.media_path, c.time
 LIMIT ?5

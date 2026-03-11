@@ -2692,9 +2692,24 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const params = new URLSearchParams();
 
-            appendFilterParams(params);
-            params.append('sort', state.filters.sort);
+            if (state.page === 'trash') {
+                params.append('trash', 'true');
+            } else if (state.page === 'history') {
+                params.append('watched', 'true');
+            } else if (state.page === 'captions') {
+                params.append('captions', 'true');
+                params.append('aggregate', 'true');
+            }
 
+            appendFilterParams(params);
+            
+            // Sidebar captions filter (when not in full captions mode)
+            if (state.filters.captions && state.page !== 'captions') {
+                params.append('captions', 'true');
+                params.append('aggregate', 'true');
+            }
+
+            params.append('sort', state.filters.sort);
             if (state.filters.reverse) params.append('reverse', 'true');
 
             if (state.filters.all) {
@@ -2702,20 +2717,6 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 params.append('limit', state.filters.limit);
                 params.append('offset', (state.currentPage - 1) * state.filters.limit);
-            }
-
-            if (state.page === 'captions' || state.filters.captions) {
-                params.append('captions', 'true');
-                // Use aggregation for better performance
-                params.append('aggregate', 'true');
-            }
-
-            if (state.page === 'trash') {
-                params.append('trash', 'true');
-            } else if (state.page === 'history') {
-                params.append('watched', 'true');
-            } else if (state.page === 'captions') {
-                params.append('captions', 'true');
             }
 
             // Add search type parameter
@@ -2746,10 +2747,14 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!data) data = [];
 
             // Extract filter counts if included in response
-            if (data && typeof data === 'object' && data.items && data.counts) {
+            if (data && typeof data === 'object' && !Array.isArray(data) && data.items && data.counts) {
                 state.filterBins = data.counts;
                 data = data.items;
                 renderFilterBins();
+            }
+            if (!Array.isArray(data)) {
+                console.error('Expected array of media items but got:', data);
+                data = [];
             }
 
             // Merge local progress if enabled
@@ -5243,6 +5248,18 @@ document.addEventListener('DOMContentLoaded', () => {
             item.caption_text && item.caption_text.trim() !== '' &&
             item.caption_time !== null && item.caption_time !== undefined
         );
+
+        if (itemsWithCaptions.length === 0) {
+            resultsContainer.className = 'no-results-container';
+            resultsContainer.innerHTML = `
+                <div class="no-results" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 2rem; text-align: center; color: var(--text-muted); max-width: 500px; margin: 0 auto;">
+                    <div style="font-size: 4rem; margin-bottom: 1rem; opacity: 0.5;">💬</div>
+                    <h2 style="margin: 0 0 0.5rem 0; color: var(--text);">No captions found</h2>
+                    <p style="margin: 0; max-width: 400px;">Try adjusting your search or filters.</p>
+                </div>
+            `;
+            return;
+        }
 
         // Group captions by media path
         const captionsByPath = {};
