@@ -3,6 +3,7 @@ package db
 import (
 	"database/sql"
 	"fmt"
+	"path/filepath"
 	"regexp"
 	"strings"
 )
@@ -108,6 +109,7 @@ func migrateColumns(db *sql.DB) error {
 		{"playlists", "title", "TEXT"},
 		{"playlist_items", "time_added", "INTEGER DEFAULT 0"},
 		{"media", "fts_path", "TEXT"},
+		{"media", "extension", "TEXT"},
 	}
 
 	for _, c := range cols {
@@ -149,9 +151,65 @@ func migrateColumns(db *sql.DB) error {
 					return fmt.Errorf("failed to populate fts_path: %w", err)
 				}
 			}
+
+			if c.table == "media" && c.column == "extension" {
+				// New column added, populate it for existing rows
+				if err := populateExtension(db); err != nil {
+					return fmt.Errorf("failed to populate extension: %w", err)
+				}
+			}
 		}
 	}
 	return nil
+}
+
+func populateExtension(db *sql.DB) error {
+	rows, err := db.Query("SELECT path FROM media WHERE extension IS NULL")
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	var updates []struct {
+		path string
+		ext  string
+	}
+	for rows.Next() {
+		var path string
+		if err := rows.Scan(&path); err != nil {
+			return err
+		}
+		ext := strings.ToLower(filepath.Ext(path))
+		updates = append(updates, struct {
+			path string
+			ext  string
+		}{path, ext})
+	}
+	rows.Close()
+
+	if len(updates) == 0 {
+		return nil
+	}
+
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	stmt, err := tx.Prepare("UPDATE media SET extension = ? WHERE path = ?")
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
+	for _, u := range updates {
+		if _, err := stmt.Exec(u.ext, u.path); err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit()
 }
 
 func populateFtsPath(db *sql.DB) error {
@@ -308,6 +366,7 @@ func migrateIndexes(db *sql.DB) error {
 		"CREATE INDEX IF NOT EXISTS idx_time_modified ON media(time_modified)",
 		"CREATE INDEX IF NOT EXISTS idx_time_uploaded ON media(time_uploaded)",
 		"CREATE INDEX IF NOT EXISTS idx_time_downloaded ON media(time_downloaded)",
+		"CREATE INDEX IF NOT EXISTS idx_extension ON media(extension)",
 	}
 
 	for _, idx := range indexes {

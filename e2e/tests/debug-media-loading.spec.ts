@@ -1,68 +1,57 @@
 /**
  * Media Loading Debug Test
- * 
+ *
  * This test captures and logs all network requests during media playback to help
- * diagnose streaming issues. It's useful for:
- * - Identifying 4xx/5xx errors from API endpoints
- * - Tracking ERR_INCOMPLETE_CHUNKED_ENCODING issues (often false positives from Range requests)
- * - Verifying thumbnail generation works correctly
- * - Debugging media element loading issues
- * 
- * Run with: npx playwright test debug-media-loading --trace on
- * 
- * Note: ERR_INCOMPLETE_CHUNKED_ENCODING and ERR_ABORTED on 206 Partial Content responses
- * are expected browser behavior when streaming media and do not indicate actual errors.
+ * diagnose streaming issues.
  */
 import { test, expect } from '../fixtures';
 
 test.describe('Debug Media Loading', () => {
-  test('load audio file and capture network requests', async ({ page, server }) => {
+  test('load audio file and capture network requests', async ({ mediaPage, viewerPage, server }) => {
     // Enable request/response logging
     const requests: { url: string; method: string; status?: number; error?: string; type?: string }[] = [];
-    
-    page.on('request', request => {
+
+    mediaPage.page.on('request', request => {
       requests.push({
         url: request.url(),
         method: request.method(),
         type: request.resourceType(),
       });
     });
-    
-    page.on('response', response => {
+
+    mediaPage.page.on('response', response => {
       const req = requests.find(r => r.url === response.url());
       if (req) {
         req.status = response.status();
       }
     });
-    
-    page.on('requestfailed', request => {
+
+    mediaPage.page.on('requestfailed', request => {
       const req = requests.find(r => r.url === request.url());
       if (req) {
         req.error = request.failure()?.errorText || 'Unknown error';
       }
     });
 
-    await page.goto(server.getBaseUrl());
-    await page.waitForSelector('.media-card', { timeout: 10000 });
+    await mediaPage.goto(server.getBaseUrl());
 
-    // Find and click an audio media card
-    const audioCard = page.locator('.media-card[data-type*="audio"]').first();
+    // Find and click an audio media card using POM
+    const audioCard = mediaPage.getFirstMediaCardByType('audio');
     await expect(audioCard).toBeVisible();
     await audioCard.click();
 
-    // Wait for player to open
-    await page.waitForSelector('#pip-player:not(.hidden)', { timeout: 5000 });
-    
-    // Wait for media to load
-    await page.waitForTimeout(3000);
+    // Wait for player to open using POM
+    await viewerPage.waitForPlayer();
 
-    // Check for audio element
-    const audioEl = page.locator('audio');
-    const isAudioVisible = await audioEl.isVisible();
+    // Wait for media to load using POM
+    await mediaPage.page.waitForTimeout(3000);
+
+    // Check for audio element using POM
+    const isAudioVisible = await viewerPage.audioElement.isVisible();
     console.log('Audio element visible:', isAudioVisible);
 
-    // Get audio element properties
-    const audioProps = await audioEl.evaluate((el: HTMLAudioElement) => ({
+    // Get audio element properties using POM
+    const audioProps = await viewerPage.audioElement.evaluate((el: HTMLAudioElement) => ({
       src: el.src,
       paused: el.paused,
       duration: el.duration,
@@ -71,50 +60,61 @@ test.describe('Debug Media Loading', () => {
       networkState: el.networkState,
       readyState: el.readyState,
     })).catch(() => null);
-    
+
     console.log('Audio properties:', audioProps);
 
     // Filter and log failed requests
     const failedReqs = requests.filter(r => r.error || (r.status && r.status >= 400));
     console.log('Failed requests:', failedReqs);
 
-    // Log all requests with errors or 4xx/5xx status
-    console.log('All requests with issues:');
-    requests.filter(r => r.error || (r.status && r.status >= 400)).forEach(r => {
-      console.log(`  ${r.method} ${r.url} - Status: ${r.status}, Error: ${r.error}, Type: ${r.type}`);
-    });
-
-    // Log all /api/raw and /api/thumbnail requests
-    const apiRequests = requests.filter(r => r.url.includes('/api/'));
-    console.log('API requests:', apiRequests.map(r => ({
-      url: r.url.substring(r.url.indexOf('/api/')),
-      method: r.method,
-      status: r.status,
-      error: r.error,
-      type: r.type,
-    })));
+    // Verify audio loaded successfully
+    expect(audioProps?.readyState).toBeGreaterThanOrEqual(1);
   });
 
-  test('load video file and check transcode status', async ({ page, server }) => {
-    await page.goto(server.getBaseUrl());
-    await page.waitForSelector('.media-card', { timeout: 10000 });
+  test('load video file and capture network requests', async ({ mediaPage, viewerPage, server }) => {
+    // Enable request/response logging
+    const requests: { url: string; method: string; status?: number; error?: string }[] = [];
 
-    // Find and click a video media card
-    const videoCard = page.locator('.media-card[data-type*="video"]').first();
+    mediaPage.page.on('request', request => {
+      requests.push({
+        url: request.url(),
+        method: request.method(),
+      });
+    });
+
+    mediaPage.page.on('response', response => {
+      const req = requests.find(r => r.url === response.url());
+      if (req) {
+        req.status = response.status();
+      }
+    });
+
+    mediaPage.page.on('requestfailed', request => {
+      const req = requests.find(r => r.url === request.url());
+      if (req) {
+        req.error = request.failure()?.errorText || 'Unknown error';
+      }
+    });
+
+    await mediaPage.goto(server.getBaseUrl());
+
+    // Find and click a video media card using POM
+    const videoCard = mediaPage.getFirstMediaCardByType('video');
     await expect(videoCard).toBeVisible();
     await videoCard.click();
 
-    // Wait for player to open
-    await page.waitForSelector('#pip-player:not(.hidden)', { timeout: 5000 });
-    await page.waitForTimeout(2000);
+    // Wait for player to open using POM
+    await viewerPage.waitForPlayer();
 
-    // Check for video element
-    const videoEl = page.locator('video');
-    const isVideoVisible = await videoEl.isVisible();
+    // Wait for media to load using POM
+    await mediaPage.page.waitForTimeout(3000);
+
+    // Check for video element using POM
+    const isVideoVisible = await viewerPage.videoElement.isVisible();
     console.log('Video element visible:', isVideoVisible);
 
-    // Get video element properties
-    const videoProps = await videoEl.evaluate((el: HTMLVideoElement) => ({
+    // Get video element properties using POM
+    const videoProps = await viewerPage.videoElement.evaluate((el: HTMLVideoElement) => ({
       src: el.src,
       paused: el.paused,
       duration: el.duration,
@@ -122,16 +122,93 @@ test.describe('Debug Media Loading', () => {
       error: el.error ? { code: el.error.code, message: el.error.message } : null,
       networkState: el.networkState,
       readyState: el.readyState,
-      videoWidth: el.videoWidth,
-      videoHeight: el.videoHeight,
     })).catch(() => null);
-    
+
     console.log('Video properties:', videoProps);
 
-    // Check if HLS is being used
-    const hlsInstance = await page.evaluate(() => {
-      return !!(window as any).disco?.playback?.hlsInstance;
+    // Filter and log failed requests
+    const failedReqs = requests.filter(r => r.error || (r.status && r.status >= 400));
+    console.log('Failed requests:', failedReqs);
+
+    // Verify video loaded successfully
+    expect(videoProps?.readyState).toBeGreaterThanOrEqual(1);
+  });
+
+  test('load image file and verify display', async ({ mediaPage, viewerPage, server }) => {
+    await mediaPage.goto(server.getBaseUrl());
+
+    // Find and click an image media card using POM
+    const imageCard = mediaPage.getFirstMediaCardByType('image');
+    if (await imageCard.count() > 0) {
+      await imageCard.click();
+
+      // Wait for image to load using POM
+      await viewerPage.waitForImageLoad();
+
+      // Check for image element using POM
+      const isImageVisible = await viewerPage.getImageElement().isVisible();
+      console.log('Image element visible:', isImageVisible);
+
+      // Get image properties using POM
+      const imgProps = await viewerPage.getImageElement().evaluate((el: HTMLImageElement) => ({
+        src: el.src,
+        naturalWidth: el.naturalWidth,
+        naturalHeight: el.naturalHeight,
+        complete: el.complete,
+        error: el.complete && el.naturalWidth === 0,
+      })).catch(() => null);
+
+      console.log('Image properties:', imgProps);
+
+      // Verify image loaded successfully
+      expect(imgProps?.complete).toBe(true);
+      expect(imgProps?.naturalWidth).toBeGreaterThan(0);
+    }
+  });
+
+  test('load document file and verify iframe', async ({ mediaPage, viewerPage, server }) => {
+    await mediaPage.goto(server.getBaseUrl());
+
+    // Find and click a document media card using POM
+    const docCard = mediaPage.getFirstMediaCardByType('text');
+    if (await docCard.count() > 0) {
+      await docCard.click();
+
+      // Wait for document modal to open using POM
+      await viewerPage.waitForDocumentModal();
+
+      // Check for iframe using POM
+      const iframe = viewerPage.getDocumentIframe();
+      const isIframeVisible = await iframe.first().isVisible();
+      console.log('Document iframe visible:', isIframeVisible);
+
+      // Verify document loaded
+      expect(isIframeVisible).toBe(true);
+    }
+  });
+
+  test('handles 404 media gracefully', async ({ mediaPage, viewerPage, server }) => {
+    await mediaPage.goto(server.getBaseUrl());
+
+    // Mock a 404 response for media files
+    await mediaPage.page.route('**/api/raw*', route => {
+      route.fulfill({
+        status: 404,
+        body: 'Not Found'
+      });
     });
-    console.log('HLS instance exists:', hlsInstance);
+
+    // Click first media card using POM
+    await mediaPage.getMediaCard(0).click();
+    await mediaPage.page.waitForTimeout(2000);
+
+    // Error toast should appear using POM
+    if (await mediaPage.toast.isVisible()) {
+      const toastText = await mediaPage.getToastMessage();
+      expect(toastText).toBeTruthy();
+    }
+
+    // Page should not crash using POM
+    await expect(mediaPage.resultsContainer).toBeVisible();
   });
 });

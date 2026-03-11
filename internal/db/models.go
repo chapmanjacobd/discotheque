@@ -78,6 +78,7 @@ type Media struct {
 	UpvoteRatio     sql.NullFloat64 `json:"upvote_ratio"`
 	Latitude        sql.NullFloat64 `json:"latitude"`
 	Longitude       sql.NullFloat64 `json:"longitude"`
+	Extension       sql.NullString  `json:"extension"`
 }
 
 type MediaFts struct {

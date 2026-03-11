@@ -102,6 +102,7 @@ var (
 	AudioExtensionMap = make(map[string]bool)
 	ImageExtensionMap = make(map[string]bool)
 	TextExtensionMap  = make(map[string]bool)
+	ArchiveExtensionMap = make(map[string]bool)
 	MediaExtensionMap = make(map[string]bool)
 )
 
@@ -120,6 +121,10 @@ func init() {
 	}
 	for _, ext := range TextExtensions {
 		TextExtensionMap["."+ext] = true
+		MediaExtensionMap["."+ext] = true
+	}
+	for _, ext := range ArchiveExtensions {
+		ArchiveExtensionMap["."+ext] = true
 		MediaExtensionMap["."+ext] = true
 	}
 }

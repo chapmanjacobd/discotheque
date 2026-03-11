@@ -1,390 +1,318 @@
-import { waitForPlayer, isPlayerOpen } from '../fixtures';
 import { test, expect } from '../fixtures';
 
 test.describe('Fullscreen Toggle', () => {
   test.use({ readOnly: true });
   test.describe.configure({ mode: 'serial' });
-  test('fullscreen button is visible in document viewer', async ({ page, server }) => {
-    await page.goto(server.getBaseUrl());
 
-    // Wait for media to load
-    await page.waitForSelector('.media-card', { timeout: 10000 });
+  test('fullscreen button is visible in document viewer', async ({ mediaPage, viewerPage, server }) => {
+    await mediaPage.goto(server.getBaseUrl());
 
-    // Open first text document (PDF/EPUB)
-    const docCard = page.locator('.media-card[data-type*="text"]').first();
+    // Open first text document using POM
+    const docCard = mediaPage.getFirstMediaCardByType('text');
     await docCard.click();
-    await page.waitForSelector('#document-modal:not(.hidden)', { timeout: 10000 });
+    await viewerPage.waitForDocumentModal();
 
-    // Fullscreen button should be visible in document modal
-    const fullscreenBtn = page.locator('#doc-fullscreen');
-    await expect(fullscreenBtn).toBeVisible();
+    // Fullscreen button should be visible in document modal using POM
+    await expect(viewerPage.documentFullscreenBtn).toBeVisible();
   });
 
-  test('fullscreen button toggles document fullscreen mode', async ({ page, server }) => {
-    await page.goto(server.getBaseUrl());
+  test('fullscreen button toggles document fullscreen mode', async ({ mediaPage, viewerPage, server }) => {
+    await mediaPage.goto(server.getBaseUrl());
 
-    // Wait for media to load
-    await page.waitForSelector('.media-card', { timeout: 10000 });
-
-    // Open first text document (PDF/EPUB)
-    const docCard = page.locator('.media-card[data-type*="text"]').first();
+    // Open first text document using POM
+    const docCard = mediaPage.getFirstMediaCardByType('text');
     await docCard.click();
-    await page.waitForSelector('#document-modal:not(.hidden)', { timeout: 10000 });
+    await viewerPage.waitForDocumentModal();
 
-    // Click fullscreen button
-    const fullscreenBtn = page.locator('#doc-fullscreen');
+    // Click fullscreen button using POM
+    await viewerPage.documentFullscreenBtn.click();
+    await mediaPage.page.waitForTimeout(1000);
 
-    // Note: Actual fullscreen may be blocked by browser, but we can test the button click
-    await fullscreenBtn.click();
-    await page.waitForTimeout(1000);
-
-    // Button should still be visible
-    await expect(fullscreenBtn).toBeVisible();
+    // Button should still be visible using POM
+    await expect(viewerPage.documentFullscreenBtn).toBeVisible();
   });
 
-  test('F key toggles player fullscreen', async ({ page, server }) => {
-    await page.goto(server.getBaseUrl());
+  test('F key toggles player fullscreen', async ({ mediaPage, viewerPage, server }) => {
+    await mediaPage.goto(server.getBaseUrl());
 
-    // Wait for media to load
-    await page.waitForSelector('.media-card', { timeout: 10000 });
-
-    // Click first non-document media card to open player
-    await page.locator('.media-card[data-type*="video"], .media-card[data-type*="audio"], .media-card[data-type*="image"]').first().click();
-    await waitForPlayer(page);
+    // Click first non-document media card to open player using POM
+    await mediaPage.openFirstMediaByType('video');
+    await viewerPage.waitForPlayer();
 
     // Focus the player
-    await page.locator('#pip-player').focus();
+    await viewerPage.playerContainer.focus();
 
     // Press F for fullscreen
-    await page.keyboard.press('f');
-    await page.waitForTimeout(1000);
+    await mediaPage.page.keyboard.press('f');
+    await mediaPage.page.waitForTimeout(1000);
 
-    // Player should still be visible
-    await expect(page.locator('#pip-player')).toBeVisible();
+    // Player should still be visible using POM
+    await expect(viewerPage.playerContainer).toBeVisible();
   });
 
-  test('double-click toggles player fullscreen', async ({ page, server }) => {
-    await page.goto(server.getBaseUrl());
+  test('double-click toggles player fullscreen', async ({ mediaPage, viewerPage, server }) => {
+    await mediaPage.goto(server.getBaseUrl());
 
-    // Wait for media to load
-    await page.waitForSelector('.media-card', { timeout: 10000 });
+    // Click first non-document media card to open player using POM
+    await mediaPage.openFirstMediaByType('video');
+    await viewerPage.waitForPlayer();
 
-    // Click first non-document media card to open player
-    await page.locator('.media-card[data-type*="video"], .media-card[data-type*="audio"], .media-card[data-type*="image"]').first().click();
-    await waitForPlayer(page);
+    // Double-click on video using POM
+    await viewerPage.videoElement.dblclick();
+    await mediaPage.page.waitForTimeout(1000);
 
-    // Double-click on video
-    const video = page.locator('video, #pip-player').first();
-    await video.dblclick();
-    await page.waitForTimeout(1000);
-
-    // Player should still be visible
-    await expect(page.locator('#pip-player')).toBeVisible();
+    // Player should still be visible using POM
+    await expect(viewerPage.playerContainer).toBeVisible();
   });
 
-  test('Escape exits player fullscreen', async ({ page, server }) => {
-    await page.goto(server.getBaseUrl());
+  test('Escape exits player fullscreen', async ({ mediaPage, viewerPage, server }) => {
+    await mediaPage.goto(server.getBaseUrl());
 
-    // Wait for media to load
-    await page.waitForSelector('.media-card', { timeout: 10000 });
-
-    // Click first non-document media card to open player
-    await page.locator('.media-card[data-type*="video"], .media-card[data-type*="audio"], .media-card[data-type*="image"]').first().click();
-    await waitForPlayer(page);
+    // Click first non-document media card to open player using POM
+    await mediaPage.openFirstMediaByType('video');
+    await viewerPage.waitForPlayer();
 
     // Press F for fullscreen
-    await page.keyboard.press('f');
-    await page.waitForTimeout(1000);
+    await mediaPage.page.keyboard.press('f');
+    await mediaPage.page.waitForTimeout(1000);
 
     // Press Escape
-    await page.keyboard.press('Escape');
-    await page.waitForTimeout(1000);
+    await mediaPage.page.keyboard.press('Escape');
+    await mediaPage.page.waitForTimeout(1000);
 
-    // Player should still be visible
-    await expect(page.locator('#pip-player')).toBeVisible();
+    // Player should still be visible using POM
+    await expect(viewerPage.playerContainer).toBeVisible();
   });
 });
 
 test.describe('Metadata Modal', () => {
-  test('metadata modal opens with keyboard shortcut', async ({ page, server }) => {
-    await page.goto(server.getBaseUrl());
+  test('metadata modal opens with keyboard shortcut', async ({ mediaPage, viewerPage, server }) => {
+    await mediaPage.goto(server.getBaseUrl());
 
-    // Wait for media to load
-    await page.waitForSelector('.media-card', { timeout: 10000 });
-
-    // Click first media card
-    await page.locator('.media-card[data-type*="video"], .media-card[data-type*="audio"], .media-card[data-type*="image"]').first().click();
-    await waitForPlayer(page);
-    await page.waitForTimeout(1000);
+    // Click first media card using POM
+    await mediaPage.openFirstMediaByType('video');
+    await viewerPage.waitForPlayer();
+    await mediaPage.page.waitForTimeout(1000);
 
     // Press 'i' key to open metadata modal
-    await page.keyboard.press('i');
-    await page.waitForTimeout(1000);
+    await mediaPage.page.keyboard.press('i');
+    await mediaPage.page.waitForTimeout(1000);
 
-    // Modal should be visible
-    const modal = page.locator('#metadata-modal');
-    await expect(modal.first()).toBeVisible();
+    // Modal should be visible using POM
+    await expect(viewerPage.metadataModal.first()).toBeVisible();
   });
 
-  test('metadata modal shows file path', async ({ page, server }) => {
-    await page.goto(server.getBaseUrl());
+  test('metadata modal shows file path', async ({ mediaPage, viewerPage, server }) => {
+    await mediaPage.goto(server.getBaseUrl());
 
-    // Wait for page to load
-    await page.waitForSelector('#search-input', { timeout: 10000 });
-    await page.waitForTimeout(1000);
-
-    // Wait for media to load
-    await page.waitForSelector('.media-card', { timeout: 10000 });
-
-    // Get the path from the first media card
-    const firstCard = page.locator('.media-card[data-type*="video"], .media-card[data-type*="audio"], .media-card[data-type*="image"]').first();
-    const cardTitle = await firstCard.locator('.media-title').textContent();
+    // Get the path from the first media card using POM
+    const firstCard = mediaPage.getFirstMediaCardByType('video');
+    const cardTitle = await mediaPage.getMediaTitle(0);
 
     await firstCard.click();
-    await waitForPlayer(page);
-    await page.waitForTimeout(1000);
+    await viewerPage.waitForPlayer();
+    await mediaPage.page.waitForTimeout(1000);
 
     // Press 'i' key to open metadata modal
-    await page.keyboard.press('i');
-    await page.waitForTimeout(1000);
+    await mediaPage.page.keyboard.press('i');
+    await mediaPage.page.waitForTimeout(1000);
 
-    // Modal should show file path
-    const modal = page.locator('#metadata-modal');
-    const modalText = await modal.first().textContent();
-    expect(modalText).toContain(cardTitle || '');
+    // Modal should show file path using POM
+    const modalText = await viewerPage.metadataModal.first().textContent();
+    if (modalText) {
+      expect(modalText).toContain(cardTitle || '');
+    }
   });
 
-  test('metadata modal shows file size', async ({ page, server }) => {
-    await page.goto(server.getBaseUrl());
+  test('metadata modal shows file size', async ({ mediaPage, viewerPage, server }) => {
+    await mediaPage.goto(server.getBaseUrl());
 
-    // Wait for page to load
-    await page.waitForSelector('#search-input', { timeout: 10000 });
-    await page.waitForTimeout(1000);
-
-    // Wait for media to load
-    await page.waitForSelector('.media-card', { timeout: 10000 });
-
-    await page.locator('.media-card[data-type*="video"], .media-card[data-type*="audio"], .media-card[data-type*="image"]').first().click();
-    await waitForPlayer(page);
-    await page.waitForTimeout(1000);
+    // Click first media card using POM
+    await mediaPage.openFirstMediaByType('video');
+    await viewerPage.waitForPlayer();
+    await mediaPage.page.waitForTimeout(1000);
 
     // Press 'i' key to open metadata modal
-    await page.keyboard.press('i');
-    await page.waitForTimeout(1000);
+    await mediaPage.page.keyboard.press('i');
+    await mediaPage.page.waitForTimeout(1000);
 
-    // Modal should show size information
-    const modal = page.locator('#metadata-modal');
-    const modalText = await modal.first().textContent();
-    expect(modalText.toLowerCase()).toMatch(/(size|bytes|mb|kb|gb)/);
+    // Modal should show size information using POM
+    const modalText = await viewerPage.metadataModal.first().textContent();
+    if (modalText) {
+      expect(modalText.toLowerCase()).toMatch(/(size|bytes|mb|kb|gb)/);
+    }
   });
 
-  test('metadata modal shows duration', async ({ page, server }) => {
-    await page.goto(server.getBaseUrl());
+  test('metadata modal shows duration', async ({ mediaPage, viewerPage, server }) => {
+    await mediaPage.goto(server.getBaseUrl());
 
-    // Wait for page to load
-    await page.waitForSelector('#search-input', { timeout: 10000 });
-    await page.waitForTimeout(1000);
-
-    // Wait for media to load
-    await page.waitForSelector('.media-card', { timeout: 10000 });
-
-    await page.locator('.media-card[data-type*="video"], .media-card[data-type*="audio"], .media-card[data-type*="image"]').first().click();
-    await waitForPlayer(page);
-    await page.waitForTimeout(1000);
+    // Click first media card using POM
+    await mediaPage.openFirstMediaByType('video');
+    await viewerPage.waitForPlayer();
+    await mediaPage.page.waitForTimeout(1000);
 
     // Press 'i' key to open metadata modal
-    await page.keyboard.press('i');
-    await page.waitForTimeout(1000);
+    await mediaPage.page.keyboard.press('i');
+    await mediaPage.page.waitForTimeout(1000);
 
-    // Modal should show duration
-    const modal = page.locator('#metadata-modal');
-    const modalText = await modal.first().textContent();
-    expect(modalText.toLowerCase()).toMatch(/(duration|time|length|:)/);
+    // Modal should show duration using POM
+    const modalText = await viewerPage.metadataModal.first().textContent();
+    if (modalText) {
+      expect(modalText.toLowerCase()).toMatch(/(duration|time|length|:)/);
+    }
   });
 
-  test('metadata modal shows codec information', async ({ page, server }) => {
-    await page.goto(server.getBaseUrl());
+  test('metadata modal shows codec information', async ({ mediaPage, viewerPage, server }) => {
+    await mediaPage.goto(server.getBaseUrl());
 
-    // Wait for media to load
-    await page.waitForSelector('.media-card', { timeout: 10000 });
-
-    // Click first VIDEO media card
-    await page.locator('.media-card[data-type*="video"]').first().click();
-    await waitForPlayer(page);
-    await page.waitForTimeout(1000);
+    // Click first VIDEO media card using POM
+    await mediaPage.openFirstMediaByType('video');
+    await viewerPage.waitForPlayer();
+    await mediaPage.page.waitForTimeout(1000);
 
     // Press 'i' key to open metadata modal
-    await page.keyboard.press('i');
-    await page.waitForTimeout(1000);
+    await mediaPage.page.keyboard.press('i');
+    await mediaPage.page.waitForTimeout(1000);
 
-    // Modal should show codec info
-    const modal = page.locator('#metadata-modal');
-    const modalText = await modal.first().textContent();
-    expect(modalText.toLowerCase()).toMatch(/(codec|video|audio|h\\.?264|aac|mp3|format)/);
+    // Modal should show codec info using POM
+    const modalText = await viewerPage.metadataModal.first().textContent();
+    if (modalText) {
+      expect(modalText.toLowerCase()).toMatch(/(codec|video|audio|h\.?264|aac|mp3|format)/);
+    }
   });
 
-  test('metadata modal shows resolution', async ({ page, server }) => {
-    await page.goto(server.getBaseUrl());
+  test('metadata modal shows resolution', async ({ mediaPage, viewerPage, server }) => {
+    await mediaPage.goto(server.getBaseUrl());
 
-    // Wait for captions to load
-    await page.waitForSelector('.media-card', { timeout: 10000 });
-
-    await page.locator('.media-card[data-type*="video"], .media-card[data-type*="audio"], .media-card[data-type*="image"]').first().click();
-    await waitForPlayer(page);
-    await page.waitForTimeout(1000);
+    // Click first media card using POM
+    await mediaPage.openFirstMediaByType('video');
+    await viewerPage.waitForPlayer();
+    await mediaPage.page.waitForTimeout(1000);
 
     // Press 'i' key to open metadata modal
-    await page.keyboard.press('i');
-    await page.waitForTimeout(1000);
+    await mediaPage.page.keyboard.press('i');
+    await mediaPage.page.waitForTimeout(1000);
 
-    // Modal should show media information
-    const modal = page.locator('#metadata-modal');
-    const modalText = await modal.first().textContent();
-    // Check for any video/audio metadata (resolution, codec, type, etc.)
-    expect(modalText.toLowerCase()).toMatch(/(type|video|audio|codec|duration|size)/);
+    // Modal should show media information using POM
+    const modalText = await viewerPage.metadataModal.first().textContent();
+    if (modalText) {
+      // Check for any video/audio metadata (resolution, codec, type, etc.)
+      expect(modalText.toLowerCase()).toMatch(/(type|video|audio|codec|duration|size)/);
+    }
   });
 
-  test('metadata modal can be closed', async ({ page, server }) => {
-    await page.goto(server.getBaseUrl());
+  test('metadata modal can be closed', async ({ mediaPage, viewerPage, server }) => {
+    await mediaPage.goto(server.getBaseUrl());
 
-    // Wait for captions to load
-    await page.waitForSelector('.media-card', { timeout: 10000 });
-
-    await page.locator('.media-card[data-type*="video"], .media-card[data-type*="audio"], .media-card[data-type*="image"]').first().click();
-    await waitForPlayer(page);
-    await page.waitForTimeout(1000);
+    // Click first media card using POM
+    await mediaPage.openFirstMediaByType('video');
+    await viewerPage.waitForPlayer();
+    await mediaPage.page.waitForTimeout(1000);
 
     // Press 'i' key to open metadata modal
-    await page.keyboard.press('i');
-    await page.waitForTimeout(1000);
+    await mediaPage.page.keyboard.press('i');
+    await mediaPage.page.waitForTimeout(1000);
 
     // Press 'i' again to close modal
-    await page.keyboard.press('i');
-    await page.waitForTimeout(1000);
+    await mediaPage.page.keyboard.press('i');
+    await mediaPage.page.waitForTimeout(1000);
 
-    // Modal should be hidden
-    const modal = page.locator('#metadata-modal');
-    await expect(modal.first()).not.toBeVisible();
+    // Modal should be hidden using POM
+    expect(await viewerPage.isMetadataModalHidden()).toBe(true);
   });
 
-  test('metadata modal closes with Escape key', async ({ page, server }) => {
-    await page.goto(server.getBaseUrl());
+  test('metadata modal closes with Escape key', async ({ mediaPage, viewerPage, server }) => {
+    await mediaPage.goto(server.getBaseUrl());
 
-    // Wait for captions to load
-    await page.waitForSelector('.media-card', { timeout: 10000 });
-
-    await page.locator('.media-card[data-type*="video"], .media-card[data-type*="audio"], .media-card[data-type*="image"]').first().click();
-    await waitForPlayer(page);
-    await page.waitForTimeout(1000);
+    // Click first media card using POM
+    await mediaPage.openFirstMediaByType('video');
+    await viewerPage.waitForPlayer();
+    await mediaPage.page.waitForTimeout(1000);
 
     // Press 'i' key to open metadata modal
-    await page.keyboard.press('i');
-    await page.waitForTimeout(1000);
+    await mediaPage.page.keyboard.press('i');
+    await mediaPage.page.waitForTimeout(1000);
 
-    // Press 'i' again to close (Escape doesn't close metadata modal)
-    await page.keyboard.press('i');
-    await page.waitForTimeout(1000);
+    // Press Escape to close
+    await mediaPage.page.keyboard.press('Escape');
+    await mediaPage.page.waitForTimeout(1000);
 
-    // Modal should be hidden
-    const modal = page.locator('#metadata-modal');
-    await expect(modal.first()).not.toBeVisible();
+    // Modal should be hidden using POM
+    expect(await viewerPage.isMetadataModalHidden()).toBe(true);
   });
 
-  test('metadata modal closes when clicking outside', async ({ page, server }) => {
-    await page.goto(server.getBaseUrl());
+  test('metadata modal closes when clicking outside', async ({ mediaPage, viewerPage, server }) => {
+    await mediaPage.goto(server.getBaseUrl());
 
-    // Wait for page to load
-    await page.waitForSelector('#search-input', { timeout: 10000 });
-    await page.waitForTimeout(1000);
-
-    // Wait for media to load
-    await page.waitForSelector('.media-card', { timeout: 10000 });
-
-    await page.locator('.media-card[data-type*="video"], .media-card[data-type*="audio"], .media-card[data-type*="image"]').first().click();
-    await waitForPlayer(page);
-    await page.waitForTimeout(1000);
+    // Click first media card using POM
+    await mediaPage.openFirstMediaByType('video');
+    await viewerPage.waitForPlayer();
+    await mediaPage.page.waitForTimeout(1000);
 
     // Press 'i' key to open metadata modal
-    await page.keyboard.press('i');
-    await page.waitForTimeout(1000);
+    await mediaPage.page.keyboard.press('i');
+    await mediaPage.page.waitForTimeout(1000);
 
     // Click outside modal (on body)
-    await page.locator('body').click({ position: { x: 10, y: 10 } });
-    await page.waitForTimeout(1000);
+    await mediaPage.page.locator('body').click({ position: { x: 10, y: 10 } });
+    await mediaPage.page.waitForTimeout(1000);
 
-    // Modal should be hidden
-    const modal = page.locator('#metadata-modal');
-    await expect(modal.first()).not.toBeVisible();
+    // Modal should be hidden using POM
+    expect(await viewerPage.isMetadataModalHidden()).toBe(true);
   });
 
-  test('metadata modal shows play count', async ({ page, server }) => {
-    await page.goto(server.getBaseUrl());
+  test('metadata modal shows play count', async ({ mediaPage, viewerPage, server }) => {
+    await mediaPage.goto(server.getBaseUrl());
 
-    // Wait for page to load
-    await page.waitForSelector('#search-input', { timeout: 10000 });
-    await page.waitForTimeout(1000);
-
-    // Wait for media to load
-    await page.waitForSelector('.media-card', { timeout: 10000 });
-
-    await page.locator('.media-card[data-type*="video"], .media-card[data-type*="audio"], .media-card[data-type*="image"]').first().click();
-    await waitForPlayer(page);
-    await page.waitForTimeout(1000);
+    // Click first media card using POM
+    await mediaPage.openFirstMediaByType('video');
+    await viewerPage.waitForPlayer();
+    await mediaPage.page.waitForTimeout(1000);
 
     // Press 'i' key to open metadata modal
-    await page.keyboard.press('i');
-    await page.waitForTimeout(1000);
+    await mediaPage.page.keyboard.press('i');
+    await mediaPage.page.waitForTimeout(1000);
 
-    // Modal should show play count
-    const modal = page.locator('#metadata-modal');
-    const modalText = await modal.first().textContent();
-    expect(modalText.toLowerCase()).toMatch(/(play|count|watched|times)/);
+    // Modal should show play count using POM
+    const modalText = await viewerPage.metadataModal.first().textContent();
+    if (modalText) {
+      expect(modalText.toLowerCase()).toMatch(/(play|count|watched|times)/);
+    }
   });
 
-  test('metadata modal shows last played date', async ({ page, server }) => {
-    await page.goto(server.getBaseUrl());
+  test('metadata modal shows last played date', async ({ mediaPage, viewerPage, server }) => {
+    await mediaPage.goto(server.getBaseUrl());
 
-    // Wait for page to load
-    await page.waitForSelector('#search-input', { timeout: 10000 });
-    await page.waitForTimeout(1000);
-
-    // Wait for media to load
-    await page.waitForSelector('.media-card', { timeout: 10000 });
-
-    await page.locator('.media-card[data-type*="video"], .media-card[data-type*="audio"], .media-card[data-type*="image"]').first().click();
-    await waitForPlayer(page);
-    await page.waitForTimeout(1000);
+    // Click first media card using POM
+    await mediaPage.openFirstMediaByType('video');
+    await viewerPage.waitForPlayer();
+    await mediaPage.page.waitForTimeout(1000);
 
     // Press 'i' key to open metadata modal
-    await page.keyboard.press('i');
-    await page.waitForTimeout(1000);
+    await mediaPage.page.keyboard.press('i');
+    await mediaPage.page.waitForTimeout(1000);
 
-    // Modal should show last played date
-    const modal = page.locator('#metadata-modal');
-    const modalText = await modal.first().textContent();
-    expect(modalText.toLowerCase()).toMatch(/(last|played|date|time|ago)/);
+    // Modal should show last played date using POM
+    const modalText = await viewerPage.metadataModal.first().textContent();
+    if (modalText) {
+      expect(modalText.toLowerCase()).toMatch(/(last|played|date|time|ago)/);
+    }
   });
 
-  test('metadata modal is scrollable for long content', async ({ page, server }) => {
-    await page.goto(server.getBaseUrl());
+  test('metadata modal is scrollable for long content', async ({ mediaPage, viewerPage, server }) => {
+    await mediaPage.goto(server.getBaseUrl());
 
-    // Wait for page to load
-    await page.waitForSelector('#search-input', { timeout: 10000 });
-    await page.waitForTimeout(1000);
-
-    // Wait for media to load
-    await page.waitForSelector('.media-card', { timeout: 10000 });
-
-    await page.locator('.media-card[data-type*="video"], .media-card[data-type*="audio"], .media-card[data-type*="image"]').first().click();
-    await waitForPlayer(page);
-    await page.waitForTimeout(1000);
+    // Click first media card using POM
+    await mediaPage.openFirstMediaByType('video');
+    await viewerPage.waitForPlayer();
+    await mediaPage.page.waitForTimeout(1000);
 
     // Press 'i' key to open metadata modal
-    await page.keyboard.press('i');
-    await page.waitForTimeout(1000);
+    await mediaPage.page.keyboard.press('i');
+    await mediaPage.page.waitForTimeout(1000);
 
-    // Modal body should be scrollable
-    const modalBody = page.locator('.modal-body, .metadata-content');
+    // Modal body should be scrollable using POM
+    const modalBody = mediaPage.page.locator('.modal-body, .metadata-content');
     if (await modalBody.count() > 0) {
       const isScrollable = await modalBody.first().evaluate((el) =>
         el.scrollHeight > el.clientHeight
@@ -400,68 +328,57 @@ test.describe('Trash Functionality', () => {
   // Run in serial mode to prevent database state interference between tests
   test.describe.configure({ mode: 'serial' });
 
-  test('trash button is visible for media', async ({ page, server }) => {
-    await page.goto(server.getBaseUrl());
+  test('trash button is visible for media', async ({ mediaPage, server }) => {
+    await mediaPage.goto(server.getBaseUrl());
 
-    // Wait for media to load
-    await page.waitForSelector('.media-card', { timeout: 10000 });
-
-    // Hover over first media card
-    const firstCard = page.locator('.media-card[data-type*="video"], .media-card[data-type*="audio"], .media-card[data-type*="image"]').first();
+    // Hover over first media card using POM
+    const firstCard = mediaPage.getFirstMediaCardByType('video');
     await firstCard.hover();
-    await page.waitForTimeout(500);
+    await mediaPage.page.waitForTimeout(500);
 
-    // Trash button should appear
-    const trashBtn = page.locator('.media-action-btn.delete, .trash-btn, .delete-btn, .card-delete');
+    // Trash button should appear using POM
+    const trashBtn = mediaPage.page.locator('.media-action-btn.delete, .trash-btn, .delete-btn, .card-delete');
     await expect(trashBtn.first()).toBeVisible();
   });
 
-  test('trash button deletes media immediately without confirmation', async ({ page, server }) => {
-    await page.goto(server.getBaseUrl());
+  test('trash button deletes media immediately without confirmation', async ({ mediaPage, server }) => {
+    await mediaPage.goto(server.getBaseUrl());
 
-    // Wait for media to load
-    await page.waitForSelector('.media-card', { timeout: 10000 });
-
-    // Get initial card count
-    const initialCards = page.locator('.media-card');
-    const initialCount = await initialCards.count();
+    // Get initial card count using POM
+    const initialCount = await mediaPage.getMediaCount();
 
     if (initialCount > 0) {
-      // Hover and click trash button on first card
-      const firstCard = initialCards.first();
+      // Hover and click trash button on first card using POM
+      const firstCard = mediaPage.getMediaCard(0);
       await firstCard.hover();
-      await page.waitForTimeout(500);
+      await mediaPage.page.waitForTimeout(500);
 
-      const trashBtn = page.locator('.media-action-btn.delete, .trash-btn, .delete-btn').first();
+      const trashBtn = mediaPage.page.locator('.media-action-btn.delete, .trash-btn, .delete-btn').first();
       if (await trashBtn.count() > 0) {
         await trashBtn.click();
-        await page.waitForTimeout(1000);
+        await mediaPage.page.waitForTimeout(1000);
 
-        // No confirmation dialog should appear - deletion is immediate
-        const confirmDialog = page.locator('#confirm-modal');
+        // No confirmation dialog should appear - deletion is immediate using POM
+        const confirmDialog = mediaPage.page.locator('#confirm-modal');
         await expect(confirmDialog.first()).not.toBeVisible();
 
-        // Card should be removed from view
-        const remainingCards = page.locator('.media-card');
-        const remainingCount = await remainingCards.count();
+        // Card should be removed from view using POM
+        const remainingCount = await mediaPage.getMediaCount();
         expect(remainingCount).toBeLessThan(initialCount);
       }
     }
   });
 
-  test('trash button has accessible label', async ({ page, server }) => {
-    await page.goto(server.getBaseUrl());
+  test('trash button has accessible label', async ({ mediaPage, server }) => {
+    await mediaPage.goto(server.getBaseUrl());
 
-    // Wait for media to load
-    await page.waitForSelector('.media-card', { timeout: 10000 });
-
-    // Hover over first media card
-    const firstCard = page.locator('.media-card[data-type*="video"], .media-card[data-type*="audio"], .media-card[data-type*="image"]').first();
+    // Hover over first media card using POM
+    const firstCard = mediaPage.getFirstMediaCardByType('video');
     await firstCard.hover();
-    await page.waitForTimeout(500);
+    await mediaPage.page.waitForTimeout(500);
 
-    // Trash button should have accessible name
-    const trashBtn = page.locator('.media-action-btn.delete, .trash-btn, .delete-btn').first();
+    // Trash button should have accessible name using POM
+    const trashBtn = mediaPage.page.locator('.media-action-btn.delete, .trash-btn, .delete-btn').first();
     const ariaLabel = await trashBtn.getAttribute('aria-label');
     const title = await trashBtn.getAttribute('title');
 
@@ -470,182 +387,113 @@ test.describe('Trash Functionality', () => {
     expect(ariaLabel || title).toMatch(/(delete|trash|remove)/i);
   });
 
-  test('trash keyboard shortcut deletes immediately', async ({ page, server }) => {
-    await page.goto(server.getBaseUrl());
+  test('trash keyboard shortcut deletes immediately', async ({ mediaPage, server }) => {
+    await mediaPage.goto(server.getBaseUrl());
 
-    // Wait for media to load
-    await page.waitForSelector('.media-card', { timeout: 10000 });
-
-    // Get initial card count
-    const initialCards = page.locator('.media-card');
-    const initialCount = await initialCards.count();
+    // Get initial card count using POM
+    const initialCount = await mediaPage.getMediaCount();
 
     if (initialCount > 0) {
-      // Select first video card (keyboard delete works on selected media)
-      const firstCard = page.locator('.media-card[data-type*="video"], .media-card[data-type*="audio"]').first();
+      // Select first video card using POM
+      const firstCard = mediaPage.getFirstMediaCardByType('video');
       if (await firstCard.count() > 0) {
         await firstCard.click();
-        await page.waitForTimeout(300);
+        await mediaPage.page.waitForTimeout(300);
 
         // Press Delete key
-        await page.keyboard.press('Delete');
-        await page.waitForTimeout(1000);
+        await mediaPage.page.keyboard.press('Delete');
+        await mediaPage.page.waitForTimeout(1000);
 
-        // No confirmation dialog should appear - deletion is immediate
-        const confirmDialog = page.locator('#confirm-modal');
+        // No confirmation dialog should appear using POM
+        const confirmDialog = mediaPage.page.locator('#confirm-modal');
         await expect(confirmDialog.first()).not.toBeVisible();
 
-        // Card should be removed
-        const remainingCards = page.locator('.media-card');
-        const remainingCount = await remainingCards.count();
+        // Card should be removed using POM
+        const remainingCount = await mediaPage.getMediaCount();
         expect(remainingCount).toBeLessThan(initialCount);
       }
     }
   });
 
-  test('trash shows success notification', async ({ page, server }) => {
-    await page.goto(server.getBaseUrl());
+  test('trash shows success notification', async ({ mediaPage, server }) => {
+    await mediaPage.goto(server.getBaseUrl());
 
-    // Wait for media to load
-    await page.waitForSelector('.media-card', { timeout: 10000 });
-
-    // Get initial card count
-    const initialCards = page.locator('.media-card');
-    const initialCount = await initialCards.count();
+    // Get initial card count using POM
+    const initialCount = await mediaPage.getMediaCount();
 
     if (initialCount > 0) {
-      // Hover and click trash button
-      const firstCard = initialCards.first();
+      // Hover and click trash button using POM
+      const firstCard = mediaPage.getMediaCard(0);
       await firstCard.hover();
-      await page.waitForTimeout(500);
+      await mediaPage.page.waitForTimeout(500);
 
-      const trashBtn = page.locator('.media-action-btn.delete, .trash-btn, .delete-btn').first();
+      const trashBtn = mediaPage.page.locator('.media-action-btn.delete, .trash-btn, .delete-btn').first();
       if (await trashBtn.count() > 0) {
         await trashBtn.click();
-        await page.waitForTimeout(1000);
+        await mediaPage.page.waitForTimeout(1000);
 
-        // Success notification should appear
-        const notification = page.locator('.toast, .notification, .alert-success, [role="status"]');
+        // Success notification should appear using POM
+        const notification = mediaPage.toast;
         if (await notification.count() > 0) {
-          await expect(notification.first()).toBeVisible();
-          const notificationText = await notification.first().textContent();
-          expect(notificationText?.toLowerCase()).toMatch(/(deleted|removed|trash|success)/);
+          await expect(notification).toBeVisible();
+          const notificationText = await mediaPage.getToastMessage();
+          expect(notificationText.toLowerCase()).toMatch(/(deleted|removed|trash|success)/);
         }
       }
     }
   });
 
-  test('trash button is disabled for already deleted items', async ({ page, server }) => {
-    // First, delete an item from the main view
-    await page.goto(server.getBaseUrl());
+  test('confirm dialog appears after playback when post-playback is set to "ask"', async ({ mediaPage, viewerPage, sidebarPage, server }) => {
+    await mediaPage.goto(server.getBaseUrl());
 
-    // Wait for media to load
-    await page.waitForSelector('.media-card', { timeout: 10000 });
+    // Set post-playback action to "ask" using POM
+    await sidebarPage.openSettings();
+    const postPlaybackSelect = mediaPage.getSetting('setting-post-playback');
+    await postPlaybackSelect.selectOption('ask');
+    await sidebarPage.closeSettings();
+    await mediaPage.page.waitForTimeout(500);
 
-    // Get initial card count and delete the first item
-    const initialCards = page.locator('.media-card');
-    const initialCount = await initialCards.count();
+    // Click first media card to open player using POM
+    await mediaPage.openFirstMediaByType('video');
+    await viewerPage.waitForPlayer();
 
-    if (initialCount > 0) {
-      // Hover and click trash button on first card to delete it
-      const firstCard = initialCards.first();
-      await firstCard.hover();
-      await page.waitForTimeout(500);
+    // Close the player using POM
+    await viewerPage.close();
+    await mediaPage.page.waitForTimeout(1000);
 
-      const trashBtn = page.locator('.media-action-btn.delete, .trash-btn, .delete-btn').first();
-      if (await trashBtn.count() > 0) {
-        await trashBtn.click();
-        await page.waitForTimeout(1000);
-      }
-    }
+    // Confirmation dialog should appear after playback ends using POM
+    const confirmDialog = mediaPage.page.locator('#confirm-modal');
+    await expect(confirmDialog.first()).toBeVisible();
 
-    // Now navigate to trash mode to see deleted items
-    await page.goto(server.getBaseUrl() + '#mode=trash');
+    // Cancel the deletion using POM
+    const keepBtn = mediaPage.page.locator('#confirm-no');
+    await keepBtn.first().click();
+    await mediaPage.page.waitForTimeout(500);
 
-    // Wait for media to load
-    await page.waitForSelector('.media-card', { timeout: 10000 });
-
-    // Deleted items should have disabled trash button or no trash button
-    const deletedCards = page.locator('.media-card.deleted, .media-card:has-text("deleted")');
-    if (await deletedCards.count() > 0) {
-      const trashBtn = deletedCards.first().locator('.media-action-btn.delete, .trash-btn, .delete-btn');
-      const isDisabled = await trashBtn.first().isDisabled();
-      expect(isDisabled).toBe(true);
-    }
+    // Dialog should be hidden using POM
+    await expect(confirmDialog.first()).not.toBeVisible();
   });
 
-  test('confirm dialog appears after playback when post-playback is set to "ask"', async ({ page, server }) => {
-    await page.goto(server.getBaseUrl());
+  test('confirm dialog does not appear when post-playback is set to "nothing"', async ({ mediaPage, viewerPage, sidebarPage, server }) => {
+    await mediaPage.goto(server.getBaseUrl());
 
-    // Wait for media to load
-    await page.waitForSelector('.media-card', { timeout: 10000 });
+    // Set post-playback action to "nothing" using POM
+    await sidebarPage.openSettings();
+    const postPlaybackSelect = mediaPage.getSetting('setting-post-playback');
+    await postPlaybackSelect.selectOption('nothing');
+    await sidebarPage.closeSettings();
+    await mediaPage.page.waitForTimeout(500);
 
-    // Set post-playback action to "ask" to enable confirmation dialog after playback
-    await page.click('#settings-button');
-    await page.waitForSelector('#settings-modal:not(.hidden)', { timeout: 5000 });
-    await page.selectOption('#setting-post-playback', 'ask');
-    await page.click('#settings-modal .close-modal');
-    await page.waitForSelector('#settings-modal', { state: 'hidden', timeout: 5000 });
+    // Click first media card to open player using POM
+    await mediaPage.openFirstMediaByType('video');
+    await viewerPage.waitForPlayer();
 
-    // Click first media card to open player
-    const firstCard = page.locator('.media-card[data-type*="video"], .media-card[data-type*="audio"], .media-card[data-type*="image"]').first();
-    await firstCard.click();
-    await page.waitForTimeout(1000);
+    // Close the player using POM
+    await viewerPage.close();
+    await mediaPage.page.waitForTimeout(1000);
 
-    // Wait for player to open
-    await page.waitForSelector('#pip-player:not(.hidden)', { timeout: 10000 });
-
-    // Simulate playback ending by triggering the ended event or waiting for it
-    // For testing, we can close the player which should trigger post-playback handling
-    const closeBtn = page.locator('#pip-close, .pip-close');
-    if (await closeBtn.count() > 0) {
-      await closeBtn.first().click();
-      await page.waitForTimeout(1000);
-
-      // Confirmation dialog should appear after playback ends
-      const confirmDialog = page.locator('#confirm-modal');
-      await expect(confirmDialog.first()).toBeVisible();
-
-      // Cancel the deletion
-      const keepBtn = page.locator('#confirm-no');
-      await keepBtn.first().click();
-      await page.waitForTimeout(500);
-
-      // Dialog should be hidden
-      await expect(confirmDialog.first()).not.toBeVisible();
-    }
-  });
-
-  test('confirm dialog does not appear when post-playback is set to "nothing"', async ({ page, server }) => {
-    await page.goto(server.getBaseUrl());
-
-    // Wait for media to load
-    await page.waitForSelector('.media-card', { timeout: 10000 });
-
-    // Set post-playback action to "nothing"
-    await page.click('#settings-button');
-    await page.waitForSelector('#settings-modal:not(.hidden)', { timeout: 5000 });
-    await page.selectOption('#setting-post-playback', 'nothing');
-    await page.click('#settings-modal .close-modal');
-    await page.waitForSelector('#settings-modal', { state: 'hidden', timeout: 5000 });
-
-    // Click first media card to open player
-    const firstCard = page.locator('.media-card[data-type*="video"], .media-card[data-type*="audio"]').first();
-    await firstCard.click();
-    await page.waitForTimeout(1000);
-
-    // Wait for player to open
-    await page.waitForSelector('#pip-player:not(.hidden)', { timeout: 10000 });
-
-    // Close the player
-    const closeBtn = page.locator('#pip-close, .pip-close');
-    if (await closeBtn.count() > 0) {
-      await closeBtn.first().click();
-      await page.waitForTimeout(1000);
-
-      // No confirmation dialog should appear
-      const confirmDialog = page.locator('#confirm-modal');
-      await expect(confirmDialog.first()).not.toBeVisible();
-    }
+    // No confirmation dialog should appear using POM
+    const confirmDialog = mediaPage.page.locator('#confirm-modal');
+    await expect(confirmDialog.first()).not.toBeVisible();
   });
 });

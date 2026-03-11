@@ -18,7 +18,7 @@ test.describe('Progress Synchronization', () => {
 
     // Open first video using POM
     const videoCard = mediaPage.getFirstMediaCardByType('video');
-    const videoPath = await videoCard.getAttribute('data-path');
+    const videoPath = await videoCard.getAttribute('data-path') || '';
     console.log('Testing with video:', videoPath);
 
     await videoCard.click();
@@ -47,7 +47,7 @@ test.describe('Progress Synchronization', () => {
 
     // Open first video using POM
     const videoCard = mediaPage.getFirstMediaCardByType('video');
-    const videoPath = await videoCard.getAttribute('data-path');
+    const videoPath = await videoCard.getAttribute('data-path') || '';
     console.log('Testing concurrent updates for:', videoPath);
 
     // Simulate existing progress from another session using POM
@@ -82,7 +82,7 @@ test.describe('Progress Synchronization', () => {
 
     // Open first video using POM
     const videoCard = mediaPage.getFirstMediaCardByType('video');
-    const videoPath = await videoCard.getAttribute('data-path');
+    const videoPath = await videoCard.getAttribute('data-path') || '';
 
     await videoCard.click();
     await viewerPage.waitForPlayer();
@@ -114,7 +114,7 @@ test.describe('Progress Synchronization', () => {
 
     // Open first video using POM
     const videoCard = mediaPage.getFirstMediaCardByType('video');
-    const videoPath = await videoCard.getAttribute('data-path');
+    const videoPath = await videoCard.getAttribute('data-path') || '';
 
     // Set progress using POM
     await mediaPage.setProgress(videoPath, 30, Date.now());
@@ -146,8 +146,8 @@ test.describe('Progress Synchronization', () => {
     const count = await videoCards.count();
     expect(count).toBeGreaterThanOrEqual(2);
 
-    const video1Path = await videoCards.nth(0).getAttribute('data-path');
-    const video2Path = await videoCards.nth(1).getAttribute('data-path');
+    const video1Path = await videoCards.nth(0).getAttribute('data-path') || '';
+    const video2Path = await videoCards.nth(1).getAttribute('data-path') || '';
     console.log('Video 1:', video1Path);
     console.log('Video 2:', video2Path);
 
@@ -176,7 +176,7 @@ test.describe('Progress Synchronization', () => {
 
     // Open first audio using POM
     const audioCard = mediaPage.getFirstMediaCardByType('audio');
-    const audioPath = await audioCard.getAttribute('data-path');
+    const audioPath = await audioCard.getAttribute('data-path') || '';
     console.log('Testing with audio:', audioPath);
 
     await audioCard.click();
@@ -230,7 +230,7 @@ test.describe('Progress Synchronization', () => {
 
     // Open first video using POM
     const videoCard = mediaPage.getFirstMediaCardByType('video');
-    const videoPath = await videoCard.getAttribute('data-path');
+    const videoPath = await videoCard.getAttribute('data-path') || '';
 
     // Set initial progress using POM
     const time1 = Date.now();

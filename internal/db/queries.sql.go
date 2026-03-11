@@ -2038,7 +2038,7 @@ INSERT INTO media (
     path, fts_path, title, duration, size, time_created, time_modified,
     type, width, height, fps,
     video_codecs, audio_codecs, subtitle_codecs,
-    video_count, audio_count, subtitle_count,
+    video_count, audio_count, subtitle_count, extension,
     album, artist, genre, 
     mood, bpm, key, decade, categories, city, country,
     description, language,
@@ -2049,7 +2049,7 @@ INSERT INTO media (
     ?, ?, ?, ?, ?, ?, ?,
     ?, ?, ?, ?,
     ?, ?, ?,
-    ?, ?, ?,
+    ?, ?, ?, ?,
     ?, ?, ?,
     ?, ?, ?, ?, ?, ?, ?,
     ?, ?,
@@ -2073,6 +2073,7 @@ ON CONFLICT(path) DO UPDATE SET
     video_count = excluded.video_count,
     audio_count = excluded.audio_count,
     subtitle_count = excluded.subtitle_count,
+    extension = excluded.extension,
     album = excluded.album,
     artist = excluded.artist,
     genre = excluded.genre,
@@ -2116,6 +2117,7 @@ type UpsertMediaParams struct {
 	VideoCount     sql.NullInt64   `json:"video_count"`
 	AudioCount     sql.NullInt64   `json:"audio_count"`
 	SubtitleCount  sql.NullInt64   `json:"subtitle_count"`
+	Extension      sql.NullString  `json:"extension"`
 	Album          sql.NullString  `json:"album"`
 	Artist         sql.NullString  `json:"artist"`
 	Genre          sql.NullString  `json:"genre"`
@@ -2160,6 +2162,7 @@ func (q *Queries) UpsertMedia(ctx context.Context, arg UpsertMediaParams) error 
 		arg.VideoCount,
 		arg.AudioCount,
 		arg.SubtitleCount,
+		arg.Extension,
 		arg.Album,
 		arg.Artist,
 		arg.Genre,

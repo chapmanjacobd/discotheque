@@ -142,7 +142,7 @@ test.describe('Progress Sync with POM', () => {
     expect(Math.abs(resumedPosition - position)).toBeLessThan(5);
   });
 
-  test('progress bar shows on media cards', async ({ mediaPage, server }) => {
+  test('progress bar shows on media cards', async ({ mediaPage, viewerPage, server }) => {
     await mediaPage.goto(server.getBaseUrl());
 
     // Open and play media briefly

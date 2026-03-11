@@ -4,11 +4,11 @@ export { SidebarPage } from './pages/sidebar-page';
 export { ViewerPage } from './pages/viewer-page';
 
 // Custom matchers and utilities
-export { 
-  customExpect, 
+export {
+  customExpect,
   expect,
-  toHaveMediaCount, 
-  toBeInMode, 
+  toHaveMediaCount,
+  toBeInMode,
   toHaveJsonOutput,
   toHaveProgress,
   toBePlaying,
@@ -22,4 +22,4 @@ export {
 
 // Existing utilities
 export { TestServer } from './utils/test-server';
-export { CliRunner } from './utils/cli-runner';
+export { CLIRunner } from './utils/cli-runner';

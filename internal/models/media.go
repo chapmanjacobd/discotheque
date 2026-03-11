@@ -22,6 +22,7 @@ type Media struct {
 	PlayCount       *int64   `json:"play_count,omitempty"`
 	Playhead        *int64   `json:"playhead,omitempty"`
 	Type            *string  `json:"type,omitempty"`
+	Extension       *string  `json:"extension,omitempty"`
 	Width           *int64   `json:"width,omitempty"`
 	Height          *int64   `json:"height,omitempty"`
 	Fps             *float64 `json:"fps,omitempty"`
@@ -130,6 +131,7 @@ type MediaWithDB struct {
 	EpisodeCount    int64   `json:"episode_count"`
 	TotalSize       int64   `json:"total_size"`
 	TotalDuration   int64   `json:"total_duration"`
+	SortValue       string  `json:"sort_value,omitempty"`
 }
 
 // FolderStats aggregates media by folder
@@ -198,6 +200,7 @@ func FromDB(m db.Media) Media {
 		UpvoteRatio:     NullFloat64Ptr(m.UpvoteRatio),
 		Latitude:        NullFloat64Ptr(m.Latitude),
 		Longitude:       NullFloat64Ptr(m.Longitude),
+		Extension:       NullStringPtr(m.Extension),
 	}
 }
 
@@ -227,6 +230,7 @@ func ToDBUpsert(m Media) db.UpsertMediaParams {
 		VideoCount:     ToNullInt64(m.VideoCount),
 		AudioCount:     ToNullInt64(m.AudioCount),
 		SubtitleCount:  ToNullInt64(m.SubtitleCount),
+		Extension:      ToNullString(m.Extension),
 		Album:          ToNullString(m.Album),
 		Artist:         ToNullString(m.Artist),
 		Genre:          ToNullString(m.Genre),

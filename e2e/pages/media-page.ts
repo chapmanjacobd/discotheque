@@ -149,7 +149,8 @@ export class MediaPage {
    * Get current view mode
    */
   async getCurrentViewMode(): Promise<'grid' | 'details'> {
-    const gridActive = await this.viewGridButton.classList().then(classes => classes.includes('active'));
+    const classes = await this.viewGridButton.getAttribute('class') || '';
+    const gridActive = classes.includes('active');
     return gridActive ? 'grid' : 'details';
   }
 

@@ -238,6 +238,16 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('setting-default-video-rate').value = state.defaultVideoRate;
     document.getElementById('setting-default-audio-rate').value = state.defaultAudioRate;
 
+    const settingDebugMode = document.getElementById('setting-debug-mode');
+    if (settingDebugMode) {
+        settingDebugMode.checked = state.debugMode;
+        settingDebugMode.onchange = (e) => {
+            state.debugMode = e.target.checked;
+            localStorage.setItem('disco-debug-mode', state.debugMode);
+            performSearch();
+        };
+    }
+
     const settingShowPipSpeed = document.getElementById('setting-show-pip-speed');
     const settingShowPipSurf = document.getElementById('setting-show-pip-surf');
     const settingShowPipStream = document.getElementById('setting-show-pip-stream');
@@ -1806,17 +1816,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const parts = path.split('/').filter(p => p);
         const breadcrumbs = [];
-        
+
         // Root
         breadcrumbs.push(`<span class="du-breadcrumb-item" data-path="/">/</span>`);
-        
+
         // Build breadcrumb trail
         let currentPath = '';
         for (let i = 0; i < parts.length; i++) {
             const part = parts[i];
             currentPath += '/' + part;
             const isLast = i === parts.length - 1;
-            
+
             breadcrumbs.push(`<span class="du-breadcrumb-sep">›</span>`);
             if (isLast) {
                 breadcrumbs.push(`<span class="du-breadcrumb-item current">${part}</span>`);
@@ -2207,6 +2217,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 const title = item.title || item.path.split('/').pop();
                 const thumbUrl = `/api/thumbnail?path=${encodeURIComponent(item.path)}`;
 
+                const debugHtml = (state.debugMode && item.sort_value) ? `
+                    <div class="media-debug" style="font-family: monospace; font-size: 0.6rem; color: #e67e22; margin-top: 0.2rem; border-top: 1px dashed #e67e22; padding-top: 0.1rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                        ${item.sort_value}
+                    </div>
+                ` : '';
+
                 card.innerHTML = `
                     <div class="media-thumb">
                         <img src="${thumbUrl}" loading="lazy" onload="this.classList.add('loaded')">
@@ -2218,6 +2234,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             <span>${formatSize(item.size)}</span>
                             <span>${item.video_codecs || ''}</span>
                         </div>
+                        ${debugHtml}
                     </div>
                 `;
 
@@ -3124,7 +3141,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const existingLast = existing && typeof existing === 'object' ? existing.last : 0;
                     const existingPos = existing && typeof existing === 'object' ? existing.pos : 0;
                     const newPos = Math.floor(playhead);
-                    
+
                     // Update if: new timestamp is significantly newer (>5s), OR timestamps are close and new position is higher
                     // This prevents overwriting better progress from another session with worse local progress
                     const timeDiff = now - existingLast;
@@ -3883,7 +3900,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Verify status on server
                 const resp = await fetchAPI(`/api/raw?path=${encodeURIComponent(item.path)}`, { method: 'HEAD' });
                 if (resp.status === 404) {
-                    msg = `File not found (removed from view): ${basename}`;
+                    msg = `File not found: ${basename}`;
                     emoji = '🗑️';
                     removeFile = true;
                 } else if (resp.status === 403) {
@@ -5100,6 +5117,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
             ` : '';
 
+            const debugHtml = (state.debugMode && item.sort_value) ? `
+                <div class="media-debug" style="font-family: monospace; font-size: 0.7rem; color: #e67e22; margin-top: 0.3rem; border-top: 1px dashed #e67e22; padding-top: 0.2rem;">
+                    Sort: ${item.sort_value}
+                </div>
+            ` : '';
+
             const isTrash = state.page === 'trash';
             const isPlaylist = state.page === 'playlist';
 
@@ -5151,6 +5174,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
                     ${progressHtml}
                     ${captionHtml}
+                    ${debugHtml}
                 </div>
             `;
 
@@ -5338,6 +5362,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const thumbUrl = `/api/thumbnail?path=${encodeURIComponent(path)}`;
             const firstCap = captions[0];
 
+            const debugHtml = (state.debugMode && firstCap.sort_value) ? `
+                <div class="media-debug" style="font-family: monospace; font-size: 0.65rem; color: #e67e22; margin-top: 0.2rem; border-top: 1px dashed #e67e22; padding-top: 0.1rem;">
+                    Sort: ${firstCap.sort_value}
+                </div>
+            ` : '';
+
             let segmentsHtml = '';
             captions.forEach(cap => {
                 const timeStr = formatDuration(cap.caption_time);
@@ -5355,6 +5385,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div class="caption-group-info">
                         <div class="caption-group-title" title="${path}">${basename}</div>
                         <div class="caption-group-meta">${captions.length} captions found • ${formatSize(firstCap.size)}</div>
+                        ${debugHtml}
                     </div>
                     <button class="queue-control-btn play-group" title="Play Media">▶️ Play</button>
                 </div>
@@ -5398,9 +5429,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const basename = path.split('/').pop();
             const thumbUrl = `/api/thumbnail?path=${encodeURIComponent(path)}`;
+            const firstCap = captions[0];
+
+            const debugHtml = (state.debugMode && firstCap.sort_value) ? `
+                <div class="media-debug" style="font-family: monospace; font-size: 0.65rem; color: #e67e22; margin-top: 0.2rem; border-top: 1px dashed #e67e22; padding-top: 0.1rem;">
+                    Sort: ${firstCap.sort_value}
+                </div>
+            ` : '';
 
             // Get caption count from aggregated data or count manually
-            const captionCount = captions[0].caption_count || captions.length;
+            const captionCount = firstCap.caption_count || captions.length;
 
             // Build caption segments HTML - show all segments
             let captionsHtml = '';
@@ -5424,6 +5462,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
                     <div class="media-info">
                         <div class="media-title" title="${path}">${basename}</div>
+                        ${debugHtml}
                     </div>
                 </div>
                 <div class="caption-segments-container">
@@ -5471,6 +5510,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <th>Size</th>
                     <th>Duration</th>
                     <th>Captions</th>
+                    ${state.debugMode ? `<th>Sort Value</th>` : ''}
                     <th>First Caption</th>
                 </tr>
             </thead>
@@ -5494,6 +5534,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <td>${size}</td>
                 <td>${duration}</td>
                 <td>${captions.length}</td>
+                ${state.debugMode ? `<td style="font-family: monospace; font-size: 0.75rem; color: #e67e22;">${firstCap.sort_value || ''}</td>` : ''}
                 <td>${firstCap.caption_text ? firstCap.caption_text.substring(0, 50) + (firstCap.caption_text.length > 50 ? '...' : '') : ''}</td>
             `;
 
@@ -5530,6 +5571,10 @@ document.addEventListener('DOMContentLoaded', () => {
             <th data-sort="type">Type ${sortIcon('type')}</th>
             ${isTrash ? `<th data-sort="time_deleted">Deleted ${sortIcon('time_deleted')}</th>` : `<th data-sort="play_count">Plays ${sortIcon('play_count')}</th>`}
         `;
+
+        if (state.debugMode) {
+            headers += `<th>Sort Value</th>`;
+        }
 
         if (isPlaylist) {
             headers = `<th>#</th>` + headers;
@@ -5665,6 +5710,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 <td>${item.type || ''}</td>
                 <td>${isTrash ? formatRelativeDate(item.time_deleted) : (getPlayCount(item) || '')}</td>
             `;
+
+            if (state.debugMode) {
+                cells += `<td style="font-family: monospace; font-size: 0.75rem; color: #e67e22;">${item.sort_value || ''}</td>`;
+            }
 
             if (isPlaylist) {
                 const trackDisplay = !state.readOnly ? `<input type="number" class="track-number-input" value="${item.track_number || ''}" min="1">` : `<span>${item.track_number || ''}</span>`;
@@ -7725,5 +7774,3 @@ document.addEventListener('DOMContentLoaded', () => {
         state
     };
 });
-
-

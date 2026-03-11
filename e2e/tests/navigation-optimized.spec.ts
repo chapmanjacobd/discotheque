@@ -4,87 +4,128 @@ test.describe('Basic Navigation (Read-Only)', () => {
   // All tests in this describe block are read-only
   test.use({ readOnly: true });
 
-  // Helper to open sidebar on mobile
-  async function openSidebar(page) {
-    const menuToggle = page.locator('#menu-toggle');
-    if (await menuToggle.isVisible()) {
-      await menuToggle.click();
-      await page.waitForTimeout(300);
-    }
-  }
+  test('loads the home page', async ({ mediaPage, server }) => {
+    await mediaPage.goto(server.getBaseUrl());
 
-  test('loads the home page', async ({ page, server }) => {
-    await page.goto(server.getBaseUrl());
-
-    // Wait for page to load
-    await page.waitForSelector('#search-input', { timeout: 10000 });
-
-    // Verify key elements are present
-    await expect(page.locator('#search-input')).toBeVisible();
-    await expect(page.locator('#results-container')).toBeVisible();
+    // Verify key elements are present using POM
+    await expect(mediaPage.searchInput).toBeVisible();
+    await expect(mediaPage.resultsContainer).toBeVisible();
   });
 
-  test('navigates to Disk Usage view', async ({ page, server }) => {
-    await page.goto(server.getBaseUrl());
+  test('navigates to Disk Usage view', async ({ mediaPage, sidebarPage, server }) => {
+    await mediaPage.goto(server.getBaseUrl());
 
-    // Open sidebar on mobile
-    await openSidebar(page);
+    // Use sidebar POM to navigate to DU view
+    await sidebarPage.openDiskUsage();
 
-    // Click DU button
-    await page.click('#du-btn');
-
-    // Should show DU toolbar
-    await expect(page.locator('#du-toolbar')).toBeVisible();
-    await expect(page.locator('#du-path-input')).toBeVisible();
+    // Should show DU toolbar using POM
+    await expect(mediaPage.getDUTToolbar()).toBeVisible();
+    await expect(mediaPage.getDUPathInput()).toBeVisible();
   });
 
-  test('navigates to Captions view', async ({ page, server }) => {
-    await page.goto(server.getBaseUrl());
+  test('navigates to Captions view', async ({ mediaPage, sidebarPage, server }) => {
+    await mediaPage.goto(server.getBaseUrl());
 
-    // Open sidebar on mobile
-    await openSidebar(page);
+    // Use sidebar POM to navigate to Captions view
+    await sidebarPage.openCaptions();
 
-    // Click Captions button
-    await page.click('#captions-btn');
-
-    // Should show captions (or error if no captions in DB)
-    // This test may fail if test DB has no caption data
-    await page.waitForTimeout(1000);
-    const hasCaptions = await page.locator('.caption-media-card').count() > 0;
+    // Should show captions (or error if no captions in DB) using POM
+    await mediaPage.page.waitForTimeout(1000);
+    const hasCaptions = await mediaPage.getCaptionCards().count() > 0;
     if (hasCaptions) {
-      await expect(page.locator('.caption-media-card').first()).toBeVisible();
+      await expect(mediaPage.getCaptionCards().first()).toBeVisible();
     }
   });
 
-  test('opens and closes settings modal', async ({ page, server }) => {
-    await page.goto(server.getBaseUrl());
+  test('opens and closes settings modal', async ({ mediaPage, sidebarPage, server }) => {
+    await mediaPage.goto(server.getBaseUrl());
 
-    // Open settings
-    await page.click('#settings-button');
+    // Use sidebar POM to open settings
+    await sidebarPage.openSettings();
 
-    const modal = page.locator('#settings-modal');
+    const modal = mediaPage.getSettingsModal();
     await expect(modal).toBeVisible();
 
-    // Close settings
-    await page.click('#settings-modal .close-modal');
+    // Use sidebar POM to close settings
+    await sidebarPage.closeSettings();
     await expect(modal).not.toBeVisible();
   });
 
-  test('toggles view modes (grid/details)', async ({ page, server }) => {
-    await page.goto(server.getBaseUrl());
+  test('toggles view modes (grid/details)', async ({ mediaPage, server }) => {
+    await mediaPage.goto(server.getBaseUrl());
 
-    // Open sidebar on mobile
-    await openSidebar(page);
+    // Should start in grid view using POM
+    await expect(mediaPage.viewGridButton).toHaveClass(/active/);
 
-    // Should start in grid view
-    await expect(page.locator('#view-grid')).toHaveClass(/active/);
+    // Switch to details view using POM
+    await mediaPage.switchToDetailsView();
+    await expect(mediaPage.viewDetailsButton).toHaveClass(/active/);
 
-    // Switch to details view
-    await page.click('#view-details');
-    await expect(page.locator('#view-details')).toHaveClass(/active/);
+    // Switch back to grid using POM
+    await mediaPage.switchToGridView();
+    await expect(mediaPage.viewGridButton).toHaveClass(/active/);
+  });
 
-    // Switch back to grid
-    await page.click('#view-grid');
-    await expect(page.locator('#view-grid')).toHaveClass(/active/);
+  test('navigates to History pages', async ({ mediaPage, sidebarPage, server }) => {
+    await mediaPage.goto(server.getBaseUrl());
+
+    // Navigate to In Progress using POM
+    await sidebarPage.expandHistorySection();
+    await sidebarPage.clickHistoryInProgress();
+    await mediaPage.page.waitForTimeout(1000);
+    await expect(mediaPage.resultsContainer).toBeVisible();
+
+    // Navigate to Unplayed using POM
+    await sidebarPage.clickHistoryUnplayed();
+    await mediaPage.page.waitForTimeout(1000);
+    await expect(mediaPage.resultsContainer).toBeVisible();
+
+    // Navigate to Completed using POM
+    await sidebarPage.clickHistoryCompleted();
+    await mediaPage.page.waitForTimeout(1000);
+    await expect(mediaPage.resultsContainer).toBeVisible();
+  });
+
+  test('search input is functional', async ({ mediaPage, server }) => {
+    await mediaPage.goto(server.getBaseUrl());
+
+    // Search for something using POM
+    await mediaPage.search('test');
+
+    // Results should update using POM
+    const searchCount = await mediaPage.getMediaCount();
+    expect(searchCount).toBeGreaterThanOrEqual(0);
+
+    // Clear search using POM
+    await mediaPage.clearSearch();
+  });
+
+  test('sort options work', async ({ mediaPage, server }) => {
+    await mediaPage.goto(server.getBaseUrl());
+
+    // Change sort option using POM
+    await mediaPage.setSortBy('size');
+    await mediaPage.page.waitForTimeout(500);
+
+    // Verify sort changed using POM
+    await expect(mediaPage.sortBySelect).toHaveValue('size');
+  });
+
+  test('sidebar can be toggled on mobile', async ({ mediaPage, sidebarPage, server }) => {
+    await mediaPage.goto(server.getBaseUrl());
+
+    // Check if menu toggle is visible (mobile) using POM
+    const isMobile = await sidebarPage.menuToggle.isVisible();
+
+    if (isMobile) {
+      // Open sidebar using POM
+      await sidebarPage.open();
+      expect(await sidebarPage.isVisible()).toBe(true);
+
+      // Close sidebar using POM
+      await sidebarPage.close();
+      expect(await sidebarPage.isVisible()).toBe(false);
+    }
+    // On desktop, sidebar is always visible
   });
 });

@@ -237,7 +237,8 @@ export class ViewerPage {
    */
   async isSlideshowActive(): Promise<boolean> {
     const classes = await this.slideshowBtn.getAttribute('class') || '';
-    return this.slideshowBtn.isVisible() && !classes.includes('hidden');
+    const isVisible = await this.slideshowBtn.isVisible();
+    return isVisible && !classes.includes('hidden');
   }
 
   /**

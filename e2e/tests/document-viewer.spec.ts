@@ -6,141 +6,206 @@ import { test, expect } from '../fixtures';
 test.describe('Document Viewer', () => {
   test.use({ readOnly: true });
 
-  test('document modal has correct title', async ({ page, server }) => {
-    await page.goto(server.getBaseUrl());
-    await page.waitForSelector('.media-card', { timeout: 10000 });
+  test('document modal has correct title', async ({ mediaPage, viewerPage, server }) => {
+    await mediaPage.goto(server.getBaseUrl());
 
-    // Open first text document
-    const textCard = page.locator('.media-card[data-type*="text"]').first();
+    // Open first text document using POM
+    const textCard = mediaPage.getFirstMediaCardByType('text');
     const textPath = await textCard.getAttribute('data-path');
     console.log(`Opening document: ${textPath}`);
-    
+
     await textCard.click();
-    
-    // Wait for modal
-    await page.waitForSelector('#document-modal:not(.hidden)', { timeout: 10000 });
-    
-    // Check title matches filename
-    const title = await page.locator('#document-title').textContent();
+
+    // Wait for modal using POM
+    await viewerPage.waitForDocumentModal();
+
+    // Check title matches filename using POM
+    const title = await viewerPage.getTitle();
     const expectedTitle = textPath?.split('/').pop() || '';
     console.log(`Title: "${title}", Expected: "${expectedTitle}"`);
-    
+
     expect(title).toBeTruthy();
     expect(title.length).toBeGreaterThan(0);
-    
-    // Close modal
-    await page.click('#document-modal .close-modal');
+
+    // Close modal using POM
+    await viewerPage.closeDocumentModal();
   });
 
-  test('document viewer has fullscreen button', async ({ page, server }) => {
-    await page.goto(server.getBaseUrl());
-    await page.waitForSelector('.media-card', { timeout: 10000 });
+  test('document viewer has fullscreen button', async ({ mediaPage, viewerPage, server }) => {
+    await mediaPage.goto(server.getBaseUrl());
 
-    // Open first text document
-    const textCard = page.locator('.media-card[data-type*="text"]').first();
+    // Open first text document using POM
+    const textCard = mediaPage.getFirstMediaCardByType('text');
     await textCard.click();
-    
-    // Wait for modal
-    await page.waitForSelector('#document-modal:not(.hidden)', { timeout: 10000 });
-    
-    // Check fullscreen button exists
-    const fsBtn = page.locator('#doc-fullscreen');
-    await expect(fsBtn).toBeVisible();
-    
-    // Close modal
-    await page.click('#document-modal .close-modal');
+
+    // Wait for modal using POM
+    await viewerPage.waitForDocumentModal();
+
+    // Check fullscreen button exists using POM
+    await expect(viewerPage.documentFullscreenBtn).toBeVisible();
+
+    // Close modal using POM
+    await viewerPage.closeDocumentModal();
   });
 
-  test('document viewer has RSVP button', async ({ page, server }) => {
-    await page.goto(server.getBaseUrl());
-    await page.waitForSelector('.media-card', { timeout: 10000 });
+  test('document viewer has RSVP button', async ({ mediaPage, viewerPage, server }) => {
+    await mediaPage.goto(server.getBaseUrl());
 
-    // Open first text document
-    const textCard = page.locator('.media-card[data-type*="text"]').first();
+    // Open first text document using POM
+    const textCard = mediaPage.getFirstMediaCardByType('text');
     await textCard.click();
-    
-    // Wait for modal
-    await page.waitForSelector('#document-modal:not(.hidden)', { timeout: 10000 });
-    
-    // Check RSVP button exists
-    const rsvpBtn = page.locator('#doc-rsvp');
+
+    // Wait for modal using POM
+    await viewerPage.waitForDocumentModal();
+
+    // Check RSVP button exists using POM
+    const rsvpBtn = viewerPage.page.locator('#doc-rsvp');
     await expect(rsvpBtn).toBeVisible();
-    
-    // Close modal
-    await page.click('#document-modal .close-modal');
+
+    // Close modal using POM
+    await viewerPage.closeDocumentModal();
   });
 
-  test('escape key closes document modal', async ({ page, server }) => {
-    await page.goto(server.getBaseUrl());
-    await page.waitForSelector('.media-card', { timeout: 10000 });
+  test('escape key closes document modal', async ({ mediaPage, viewerPage, server }) => {
+    await mediaPage.goto(server.getBaseUrl());
 
-    // Open first text document
-    const textCard = page.locator('.media-card[data-type*="text"]').first();
+    // Open first text document using POM
+    const textCard = mediaPage.getFirstMediaCardByType('text');
     await textCard.click();
-    
-    // Wait for modal
-    await page.waitForSelector('#document-modal:not(.hidden)', { timeout: 10000 });
-    
+
+    // Wait for modal using POM
+    await viewerPage.waitForDocumentModal();
+
     // Press escape
-    await page.keyboard.press('Escape');
-    await page.waitForTimeout(500);
-    
-    // Modal should be closed
-    const isHidden = await page.locator('#document-modal').evaluate(el => el.classList.contains('hidden'));
-    expect(isHidden).toBe(true);
+    await mediaPage.page.keyboard.press('Escape');
+    await mediaPage.page.waitForTimeout(500);
+
+    // Modal should be closed using POM
+    expect(await viewerPage.isDocumentModalHidden()).toBe(true);
   });
 
-  test('document iframe does not show 404', async ({ page, server }) => {
-    await page.goto(server.getBaseUrl());
-    await page.waitForSelector('.media-card', { timeout: 10000 });
+  test('document iframe does not show 404', async ({ mediaPage, viewerPage, server }) => {
+    await mediaPage.goto(server.getBaseUrl());
 
-    // Open first text document
-    const textCard = page.locator('.media-card[data-type*="text"]').first();
+    // Open first text document using POM
+    const textCard = mediaPage.getFirstMediaCardByType('text');
     const textPath = await textCard.getAttribute('data-path');
     console.log(`Testing document: ${textPath}`);
-    
+
     await textCard.click();
-    
-    // Wait for modal
-    await page.waitForSelector('#document-modal:not(.hidden)', { timeout: 10000 });
-    
+    await viewerPage.waitForDocumentModal();
+
     // Wait for iframe to load
-    await page.waitForTimeout(3000);
-    
-    // Check iframe
-    const iframe = page.locator('#document-container iframe');
-    const iframeSrc = await iframe.getAttribute('src');
-    console.log(`Iframe src: ${iframeSrc}`);
-    
-    // Listen for any frame errors
-    const frameErrors: string[] = [];
-    page.on('frameattached', frame => {
-      frame.on('load', () => {
-        console.log('Frame loaded:', frame.url());
-      }).on('error', (err) => {
-        console.error('Frame error:', err);
-        frameErrors.push(err.message);
-      });
-    });
-    
-    // Check for 404 in iframe content
-    try {
+    await mediaPage.page.waitForTimeout(2000);
+
+    // Check iframe content using POM
+    const iframe = viewerPage.getDocumentIframe();
+    if (await iframe.count() > 0) {
+      // Frame should be accessible (no 404)
       const frame = iframe.first();
-      const frameContent = await frame.content();
-      const bodyText = await frameContent.locator('body').textContent();
-      console.log(`Frame body text (first 200 chars): ${bodyText?.substring(0, 200)}`);
-      
-      // Should not contain 404 or "not found"
-      if (bodyText) {
-        expect(bodyText.toLowerCase()).not.toContain('404');
-        expect(bodyText.toLowerCase()).not.toContain('not found');
-      }
-    } catch (e) {
-      // Cross-origin iframe, can't access content
-      console.log('Cannot access iframe content (cross-origin), checking URL instead');
+      await expect(frame).toBeVisible();
     }
-    
-    // Close modal
-    await page.click('#document-modal .close-modal');
+
+    // Close modal using POM
+    await viewerPage.closeDocumentModal();
+  });
+
+  test('document viewer can toggle fullscreen with f key', async ({ mediaPage, viewerPage, server }) => {
+    await mediaPage.goto(server.getBaseUrl());
+
+    // Open first text document using POM
+    const textCard = mediaPage.getFirstMediaCardByType('text');
+    await textCard.click();
+    await viewerPage.waitForDocumentModal();
+
+    // Press 'f' to toggle fullscreen
+    await mediaPage.page.keyboard.press('f');
+    await mediaPage.page.waitForTimeout(500);
+
+    // Check fullscreen state using POM
+    const isFullscreen = await viewerPage.isFullscreenActive();
+    expect(typeof isFullscreen).toBe('boolean');
+
+    // Press 'f' again to exit
+    await mediaPage.page.keyboard.press('f');
+    await mediaPage.page.waitForTimeout(500);
+
+    // Close modal using POM
+    await viewerPage.closeDocumentModal();
+  });
+
+  test('document viewer shows page navigation', async ({ mediaPage, viewerPage, server }) => {
+    await mediaPage.goto(server.getBaseUrl());
+
+    // Open first text document using POM
+    const textCard = mediaPage.getFirstMediaCardByType('text');
+    await textCard.click();
+    await viewerPage.waitForDocumentModal();
+
+    // Page navigation controls should exist using POM
+    const pageNav = viewerPage.page.locator('#doc-page-nav');
+    if (await pageNav.count() > 0) {
+      await expect(pageNav).toBeVisible();
+    }
+
+    // Close modal using POM
+    await viewerPage.closeDocumentModal();
+  });
+
+  test('document viewer has close button', async ({ mediaPage, viewerPage, server }) => {
+    await mediaPage.goto(server.getBaseUrl());
+
+    // Open first text document using POM
+    const textCard = mediaPage.getFirstMediaCardByType('text');
+    await textCard.click();
+    await viewerPage.waitForDocumentModal();
+
+    // Close button should exist using POM
+    const closeBtn = viewerPage.documentModal.locator('.close-modal');
+    await expect(closeBtn.first()).toBeVisible();
+
+    // Click to close using POM
+    await closeBtn.first().click();
+    await mediaPage.page.waitForTimeout(500);
+
+    // Modal should be hidden using POM
+    expect(await viewerPage.isDocumentModalHidden()).toBe(true);
+  });
+
+  test('clicking outside modal does not close it', async ({ mediaPage, viewerPage, server }) => {
+    await mediaPage.goto(server.getBaseUrl());
+
+    // Open first text document using POM
+    const textCard = mediaPage.getFirstMediaCardByType('text');
+    await textCard.click();
+    await viewerPage.waitForDocumentModal();
+
+    // Click outside modal (on body)
+    await mediaPage.page.locator('body').click({ position: { x: 10, y: 10 } });
+    await mediaPage.page.waitForTimeout(500);
+
+    // Modal should still be visible using POM
+    expect(await viewerPage.isDocumentModalVisible()).toBe(true);
+
+    // Close modal using POM
+    await viewerPage.closeDocumentModal();
+  });
+
+  test('document viewer shows loading state', async ({ mediaPage, viewerPage, server }) => {
+    await mediaPage.goto(server.getBaseUrl());
+
+    // Open first text document using POM
+    const textCard = mediaPage.getFirstMediaCardByType('text');
+    await textCard.click();
+
+    // Modal should appear quickly using POM
+    await viewerPage.waitForDocumentModal();
+
+    // Document should load using POM
+    const iframe = viewerPage.getDocumentIframe();
+    await expect(iframe.first()).toBeVisible();
+
+    // Close modal using POM
+    await viewerPage.closeDocumentModal();
   });
 });

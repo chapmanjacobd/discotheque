@@ -8,171 +8,146 @@
 import { test, expect } from '../fixtures';
 
 test.describe('Delete Shortcut - Sibling Navigation', () => {
-  test('delete in PiP plays next sibling', async ({ page, server }) => {
-    await page.goto(server.getBaseUrl());
-    await page.waitForSelector('.media-card', { timeout: 10000 });
+  test('delete in PiP plays next sibling', async ({ mediaPage, viewerPage, server }) => {
+    await mediaPage.goto(server.getBaseUrl());
 
-    // Get the first audio card
-    const firstCard = page.locator('.media-card[data-type*="audio"]').first();
+    // Get the first audio card using POM
+    const firstCard = mediaPage.getFirstMediaCardByType('audio');
     const firstTitleText = await firstCard.textContent();
-    const firstFileName = firstTitleText.split('/').pop()?.trim();
+    const firstFileName = firstTitleText?.split('/').pop()?.trim();
     expect(firstFileName).toBeTruthy();
 
-    // Click first audio to open player
+    // Click first audio to open player using POM
     await firstCard.click();
-    await page.waitForSelector('#pip-player:not(.hidden)', { timeout: 5000 });
-    await page.waitForSelector('audio', { timeout: 5000 });
-    await page.waitForFunction(() => {
-      const audio = document.querySelector('audio');
-      return audio && audio.readyState >= 3;
-    }, { timeout: 10000 });
-    await page.click('audio');
-    await page.waitForTimeout(500);
-    await page.waitForTimeout(500);
+    await viewerPage.waitForPlayer();
+    await viewerPage.audioElement.waitFor({ state: 'visible', timeout: 5000 });
+    await viewerPage.waitForMediaData();
+    await viewerPage.play();
+    await mediaPage.page.waitForTimeout(500);
 
     // Press Delete (without shift) - should delete and play next
-    await page.keyboard.press('Delete');
-    await page.waitForTimeout(2000);
+    await mediaPage.page.keyboard.press('Delete');
+    await mediaPage.page.waitForTimeout(2000);
 
-    // PiP should still be visible (playing next media)
-    const isPipVisible = await page.locator('#pip-player').isVisible();
-    expect(isPipVisible).toBe(true);
+    // PiP should still be visible (playing next media) using POM
+    expect(await viewerPage.isOpen()).toBe(true);
 
-    // Title should have changed to different media
-    const newTitle = await page.locator('#media-title').textContent();
+    // Title should have changed to different media using POM
+    const newTitle = await viewerPage.getTitle();
     expect(newTitle).not.toContain(firstFileName);
   });
 
-  test('delete last item plays previous sibling', async ({ page, server }) => {
-    await page.goto(server.getBaseUrl());
-    await page.waitForSelector('.media-card', { timeout: 10000 });
+  test('delete last item plays previous sibling', async ({ mediaPage, viewerPage, server }) => {
+    await mediaPage.goto(server.getBaseUrl());
 
-    // Get total media count
-    const allCards = page.locator('.media-card');
-    const totalCount = await allCards.count();
+    // Get total media count using POM
+    const totalCount = await mediaPage.getMediaCount();
     expect(totalCount).toBeGreaterThanOrEqual(2);
 
-    // Click the LAST media card (any type)
-    const lastCard = allCards.last();
+    // Click the LAST media card (any type) using POM
+    const lastCard = mediaPage.getMediaCard(totalCount - 1);
     const lastTitleText = await lastCard.textContent();
-    const lastFileName = lastTitleText.split('/').pop()?.trim();
+    const lastFileName = lastTitleText?.split('/').pop()?.trim();
     expect(lastFileName).toBeTruthy();
 
-    // Click last card to open player
+    // Click last card to open player using POM
     await lastCard.click();
-    await page.waitForTimeout(1000);
+    await mediaPage.page.waitForTimeout(1000);
 
     // Press Delete (without shift) - should delete and play previous (since no next)
-    await page.keyboard.press('Delete');
-    await page.waitForTimeout(2000);
+    await mediaPage.page.keyboard.press('Delete');
+    await mediaPage.page.waitForTimeout(2000);
 
-    // Either PiP or modal should be visible (playing previous media)
-    const isPipVisible = await page.locator('#pip-player').isVisible().catch(() => false);
-    const isModalVisible = await page.locator('#document-modal').isVisible().catch(() => false);
+    // Either PiP or modal should be visible (playing previous media) using POM
+    const isPipVisible = await viewerPage.isOpen();
+    const isModalVisible = await viewerPage.isDocumentModalVisible();
     expect(isPipVisible || isModalVisible).toBe(true);
 
-    // Title should have changed (not the deleted file)
+    // Title should have changed (not the deleted file) using POM
     let newTitle = '';
     if (isPipVisible) {
-      newTitle = await page.locator('#media-title').textContent();
+      newTitle = await viewerPage.getTitle();
     } else if (isModalVisible) {
-      newTitle = await page.locator('#document-title').textContent();
+      newTitle = await viewerPage.documentTitle.textContent() || '';
     }
     expect(newTitle).not.toContain(lastFileName);
   });
 
-  test('delete in document modal plays next sibling', async ({ page, server }) => {
-    await page.goto(server.getBaseUrl());
-    await page.waitForSelector('.media-card', { timeout: 10000 });
+  test('delete in document modal plays next sibling', async ({ mediaPage, viewerPage, server }) => {
+    await mediaPage.goto(server.getBaseUrl());
 
-    // Find first document card
-    const firstDoc = page.locator('.media-card[data-type*="document"], .media-card[data-type="text"]').first();
+    // Find first document card using POM
+    const firstDoc = mediaPage.page.locator('.media-card[data-type*="document"], .media-card[data-type="text"]').first();
     expect(await firstDoc.count()).toBeGreaterThan(0);
 
     const firstTitleText = await firstDoc.textContent();
-    const firstFileName = firstTitleText.split('/').pop()?.trim();
+    const firstFileName = firstTitleText?.split('/').pop()?.trim();
     expect(firstFileName).toBeTruthy();
 
-    // Click to open modal
+    // Click to open modal using POM
     await firstDoc.click();
-    await page.waitForSelector('#document-modal:not(.hidden)', { timeout: 10000 });
-    await page.waitForTimeout(500);
+    await viewerPage.waitForDocumentModal();
+    await mediaPage.page.waitForTimeout(500);
 
-    // Click on the modal header (outside iframe) to ensure focus
-    await page.click('#document-modal .modal-header');
-    await page.waitForTimeout(100);
+    // Press Delete (without shift) - should delete and play next
+    await mediaPage.page.keyboard.press('Delete');
+    await mediaPage.page.waitForTimeout(2000);
 
-    // Press Delete (without shift) - should delete and play next sibling
-    await page.keyboard.press('Delete');
-    await page.waitForTimeout(2000);
-
-    // Either PiP or document modal should be visible
-    const isPipVisible = await page.locator('#pip-player').isVisible().catch(() => false);
-    const isModalVisible = await page.locator('#document-modal').isVisible().catch(() => false);
+    // Either PiP or modal should be visible using POM
+    const isPipVisible = await viewerPage.isOpen();
+    const isModalVisible = await viewerPage.isDocumentModalVisible();
     expect(isPipVisible || isModalVisible).toBe(true);
 
-    // Title should have changed
+    // Title should have changed using POM
     let newTitle = '';
     if (isPipVisible) {
-      newTitle = await page.locator('#media-title').textContent();
+      newTitle = await viewerPage.getTitle();
     } else if (isModalVisible) {
-      newTitle = await page.locator('#document-title').textContent();
+      newTitle = await viewerPage.documentTitle.textContent() || '';
     }
     expect(newTitle).not.toContain(firstFileName);
-
-    // Close modal if open
-    if (isModalVisible) {
-      await page.click('#document-modal .close-modal, #document-modal .modal-close, button[aria-label="Close"]');
-    }
   });
 
-  test('shift+delete in PiP stops playback', async ({ page, server }) => {
-    await page.goto(server.getBaseUrl());
-    await page.waitForSelector('.media-card', { timeout: 10000 });
+  test('shift+delete in PiP stops playback', async ({ mediaPage, viewerPage, server }) => {
+    await mediaPage.goto(server.getBaseUrl());
 
-    // Click first audio to open player
-    const firstCard = page.locator('.media-card[data-type*="audio"]').first();
+    // Click first audio to open player using POM
+    const firstCard = mediaPage.getFirstMediaCardByType('audio');
     await firstCard.click();
-    await page.waitForSelector('#pip-player:not(.hidden)', { timeout: 5000 });
-    await page.waitForTimeout(500);
+    await viewerPage.waitForPlayer();
+    await mediaPage.page.waitForTimeout(500);
 
     // Press Shift+Delete - should delete and stop
-    await page.keyboard.press('Shift+Delete');
-    await page.waitForTimeout(1500);
+    await mediaPage.page.keyboard.press('Shift+Delete');
+    await mediaPage.page.waitForTimeout(2000);
 
-    // PiP should be closed
-    const isPipVisible = await page.locator('#pip-player').isVisible();
-    expect(isPipVisible).toBe(false);
+    // PiP should be hidden using POM
+    expect(await viewerPage.isHidden()).toBe(true);
 
-    // Toast should appear
-    const toastVisible = await page.locator('#toast').isVisible();
-    expect(toastVisible).toBe(true);
+    // Toast should appear using POM
+    await mediaPage.waitForToast();
+    const toastText = await mediaPage.getToastMessage();
+    expect(toastText).toContain('Trashed');
   });
 
-  test('shift+delete in document modal closes without playing', async ({ page, server }) => {
-    await page.goto(server.getBaseUrl());
-    await page.waitForSelector('.media-card', { timeout: 10000 });
+  test('shift+delete in document modal closes modal', async ({ mediaPage, viewerPage, server }) => {
+    await mediaPage.goto(server.getBaseUrl());
 
-    // Click first document to open modal
-    const firstDoc = page.locator('.media-card[data-type*="document"], .media-card[data-type="text"]').first();
+    // Open first document using POM
+    const firstDoc = mediaPage.page.locator('.media-card[data-type*="document"], .media-card[data-type="text"]').first();
     await firstDoc.click();
-    await page.waitForSelector('#document-modal:not(.hidden)', { timeout: 10000 });
-    await page.waitForTimeout(500);
+    await viewerPage.waitForDocumentModal();
 
-    // Press Shift+Delete - should delete and close (no playback)
-    await page.keyboard.press('Shift+Delete');
-    await page.waitForTimeout(1500);
+    // Press Shift+Delete - should delete and close
+    await mediaPage.page.keyboard.press('Shift+Delete');
+    await mediaPage.page.waitForTimeout(2000);
 
-    // Document modal should be closed
-    const isModalVisible = await page.locator('#document-modal').isVisible();
-    expect(isModalVisible).toBe(false);
+    // Modal should be closed using POM
+    expect(await viewerPage.isDocumentModalHidden()).toBe(true);
 
-    // PiP should NOT be visible
-    const isPipVisible = await page.locator('#pip-player').isVisible();
-    expect(isPipVisible).toBe(false);
-
-    // Toast should appear
-    const toastVisible = await page.locator('#toast').isVisible();
-    expect(toastVisible).toBe(true);
+    // Toast should appear using POM
+    await mediaPage.waitForToast();
+    const toastText = await mediaPage.getToastMessage();
+    expect(toastText).toContain('Trashed');
   });
 });

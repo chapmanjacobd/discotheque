@@ -48,6 +48,7 @@ CREATE TABLE IF NOT EXISTS media (
     subtitle_count INTEGER DEFAULT 0,
 
     -- Extra metadata
+    extension TEXT,
     album TEXT,
     artist TEXT,
     genre TEXT,
@@ -138,6 +139,7 @@ CREATE INDEX IF NOT EXISTS idx_time_created ON media(time_created);
 CREATE INDEX IF NOT EXISTS idx_time_modified ON media(time_modified);
 CREATE INDEX IF NOT EXISTS idx_time_uploaded ON media(time_uploaded);
 CREATE INDEX IF NOT EXISTS idx_time_downloaded ON media(time_downloaded);
+CREATE INDEX IF NOT EXISTS idx_extension ON media(extension);
 
 -- Optional FTS table
 CREATE VIRTUAL TABLE IF NOT EXISTS media_fts USING fts5(

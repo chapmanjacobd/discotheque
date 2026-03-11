@@ -85,6 +85,7 @@ func Extract(ctx context.Context, path string, scanSubtitles bool) (*MediaMetada
 		TimeCreated:  utils.ToNullInt64(stat.ModTime().Unix()),
 		TimeModified: utils.ToNullInt64(stat.ModTime().Unix()),
 		Type:         utils.ToNullString(mediaType),
+		Extension:    utils.ToNullString(strings.ToLower(filepath.Ext(path))),
 	}
 
 	// Fallback title to filename (without extension)

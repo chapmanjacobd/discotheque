@@ -14,7 +14,7 @@ test.describe('History Pages - In Progress / Unplayed / Completed', () => {
     });
   });
 
-  test('In Progress page shows media with local progress', async ({ mediaPage, viewerPage, server }) => {
+  test('In Progress page shows media with local progress', async ({ mediaPage, viewerPage, page, server }) => {
     await mediaPage.goto(server.getBaseUrl());
 
     // Play a video to create local progress using POM
@@ -23,7 +23,7 @@ test.describe('History Pages - In Progress / Unplayed / Completed', () => {
     console.log(`Testing In Progress with: ${mediaPath}`);
 
     await mediaCard.click();
-    await viewerPage.waitForPlayer();
+    await mediaPage.page.waitForSelector('#pip-player', { timeout: 10000 });
     await viewerPage.videoElement.waitFor({ state: 'visible', timeout: 5000 });
 
     // Wait for video to be ready and start playing using POM
@@ -51,7 +51,7 @@ test.describe('History Pages - In Progress / Unplayed / Completed', () => {
     expect(Object.keys(progress).length).toBeGreaterThan(0);
 
     // Navigate to In Progress page using POM
-    await mediaPage.expandDetailSection('details-history');
+    await mediaPage.expandDetailsSection('details-history');
     await mediaPage.page.waitForTimeout(500);
     await mediaPage.clickCategoryButton('#history-in-progress-btn');
     await mediaPage.page.waitForTimeout(2000);
@@ -70,7 +70,7 @@ test.describe('History Pages - In Progress / Unplayed / Completed', () => {
     expect(paths.some(p => p && progressPaths.some(pp => p.includes(pp)))).toBe(true);
   });
 
-  test('In Progress page respects type filters', async ({ mediaPage, sidebarPage, server }) => {
+  test('In Progress page respects type filters', async ({ mediaPage, viewerPage, sidebarPage, server }) => {
     await mediaPage.goto(server.getBaseUrl());
 
     // Play a video to create progress using POM
@@ -144,7 +144,7 @@ test.describe('History Pages - In Progress / Unplayed / Completed', () => {
 
     // Get a media path using POM
     const mediaCard = mediaPage.getMediaCard(0);
-    const mediaPath = await mediaCard.getAttribute('data-path');
+    const mediaPath = await mediaCard.getAttribute('data-path') || '';
     console.log(`Testing with: ${mediaPath}`);
 
     // Simulate local play count using POM
@@ -183,7 +183,7 @@ test.describe('History Pages - In Progress / Unplayed / Completed', () => {
 
     // Get a media path using POM
     const mediaCard = mediaPage.getMediaCard(0);
-    const mediaPath = await mediaCard.getAttribute('data-path');
+    const mediaPath = await mediaCard.getAttribute('data-path') || '';
     console.log(`Testing with: ${mediaPath}`);
 
     // Simulate local play count using POM
@@ -270,7 +270,7 @@ test.describe('History Pages - In Progress / Unplayed / Completed', () => {
     expect(allMediaActive2).toBe(true);
   });
 
-  test('In Progress works with Group view', async ({ mediaPage, sidebarPage, server }) => {
+  test('In Progress works with Group view', async ({ mediaPage, viewerPage, sidebarPage, server }) => {
     await mediaPage.goto(server.getBaseUrl());
 
     // Play a video to create progress using POM
@@ -308,7 +308,7 @@ test.describe('History Pages - In Progress / Unplayed / Completed', () => {
     await mediaPage.goto(server.getBaseUrl());
 
     // Navigate to In Progress using POM
-    await mediaPage.expandDetailSection('details-history');
+    await mediaPage.expandDetailsSection('details-history');
     await mediaPage.clickCategoryButton('#history-in-progress-btn');
     await mediaPage.page.waitForTimeout(2000);
 

@@ -458,6 +458,7 @@ func (fb *FilterBuilder) OverrideSort(s string) string {
 	s = strings.ReplaceAll(s, "priorityfast", "ntile(1000) over (order by size) desc, duration")
 	s = strings.ReplaceAll(s, "priority", "ntile(1000) over (order by size/duration) desc")
 	s = strings.ReplaceAll(s, "bitrate", "size/duration")
+	s = strings.ReplaceAll(s, "extension", "LOWER(extension)")
 
 	return s
 }
@@ -614,6 +615,7 @@ func NewSortBuilder(flags models.GlobalFlags) *SortBuilder {
 }
 
 func (sb *SortBuilder) Sort(media []models.MediaWithDB) {
+	defer sb.PopulateSortValues(media)
 	if sb.flags.Random {
 		r := rand.New(rand.NewSource(time.Now().UnixNano()))
 		r.Shuffle(len(media), func(i, j int) {
@@ -642,6 +644,59 @@ func (sb *SortBuilder) Sort(media []models.MediaWithDB) {
 	sb.SortBasic(media)
 }
 
+func (sb *SortBuilder) PopulateSortValues(media []models.MediaWithDB) {
+	sortBy := sb.flags.SortBy
+	if sortBy == "" {
+		sortBy = "path"
+	}
+
+	for i := range media {
+		switch sortBy {
+		case "path":
+			media[i].SortValue = media[i].Path
+		case "size":
+			media[i].SortValue = fmt.Sprintf("%d bytes (%s)", utils.Int64Value(media[i].Size), utils.FormatSize(utils.Int64Value(media[i].Size)))
+		case "duration":
+			media[i].SortValue = fmt.Sprintf("%d seconds (%s)", utils.Int64Value(media[i].Duration), utils.FormatDuration(int(utils.Int64Value(media[i].Duration))))
+		case "play_count":
+			media[i].SortValue = fmt.Sprintf("%d plays", utils.Int64Value(media[i].PlayCount))
+		case "time_last_played":
+			v := utils.Int64Value(media[i].TimeLastPlayed)
+			if v == 0 {
+				media[i].SortValue = "Never played"
+			} else {
+				media[i].SortValue = fmt.Sprintf("%d (%s)", v, utils.RelativeDatetime(v))
+			}
+		case "progress":
+			d := float64(utils.Int64Value(media[i].Duration))
+			p := float64(utils.Int64Value(media[i].Playhead))
+			if d > 0 {
+				media[i].SortValue = fmt.Sprintf("%.2f%% (%d/%d)", (p/d)*100, int64(p), int64(d))
+			} else {
+				media[i].SortValue = "0%"
+			}
+		case "time_created":
+			v := utils.Int64Value(media[i].TimeCreated)
+			media[i].SortValue = fmt.Sprintf("%d (%s)", v, utils.RelativeDatetime(v))
+		case "time_modified":
+			v := utils.Int64Value(media[i].TimeModified)
+			media[i].SortValue = fmt.Sprintf("%d (%s)", v, utils.RelativeDatetime(v))
+		case "bitrate":
+			d := utils.Int64Value(media[i].Duration)
+			if d > 0 {
+				media[i].SortValue = fmt.Sprintf("%d B/s", utils.Int64Value(media[i].Size)/d)
+			}
+		case "extension":
+			media[i].SortValue = utils.StringValue(media[i].Extension)
+		}
+
+		if sb.flags.PlayInOrder != "" {
+			// If SortAdvanced was used, it might have overwritten or we want more info
+			media[i].SortValue = fmt.Sprintf("PIO(%s): %s", sb.flags.PlayInOrder, media[i].SortValue)
+		}
+	}
+}
+
 func (sb *SortBuilder) SortBasic(media []models.MediaWithDB) {
 	sortBy := sb.flags.SortBy
 	reverse := sb.flags.Reverse
@@ -649,7 +704,7 @@ func (sb *SortBuilder) SortBasic(media []models.MediaWithDB) {
 
 	// Special handling for sparse fields where we want 0/nulls at the bottom always
 	if sortBy == "play_count" || sortBy == "time_last_played" || sortBy == "progress" {
-		sort.Slice(media, func(i, j int) bool {
+		sort.SliceStable(media, func(i, j int) bool {
 			var vI, vJ float64
 
 			switch sortBy {
@@ -748,15 +803,28 @@ func (sb *SortBuilder) SortBasic(media []models.MediaWithDB) {
 				return reverse
 			}
 			return utils.StringValue(media[i].Type) < utils.StringValue(media[j].Type)
+		case "extension":
+			iNil := media[i].Extension == nil || *media[i].Extension == ""
+			jNil := media[j].Extension == nil || *media[j].Extension == ""
+			if iNil && jNil {
+				return false
+			}
+			if iNil {
+				return !reverse
+			}
+			if jNil {
+				return reverse
+			}
+			return utils.StringValue(media[i].Extension) < utils.StringValue(media[j].Extension)
 		default:
 			return utils.NaturalLess(media[i].Path, media[j].Path)
 		}
 	}
 
 	if reverse {
-		sort.Slice(media, func(i, j int) bool { return !less(i, j) })
+		sort.SliceStable(media, func(i, j int) bool { return !less(i, j) })
 	} else {
-		sort.Slice(media, less)
+		sort.SliceStable(media, less)
 	}
 }
 

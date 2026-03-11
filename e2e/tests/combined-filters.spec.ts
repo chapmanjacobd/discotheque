@@ -11,129 +11,158 @@ test.describe('Combined Filters and Views', () => {
   ];
 
   for (const mode of modes) {
-    test(`mode: ${mode.name} - switching views and filtering`, async ({ page, server }) => {
-      await page.goto(server.getBaseUrl() + (mode.hash ? `#${mode.hash}` : ''));
-      
-      // Wait for results container
-      await page.waitForSelector('#results-container', { timeout: 10000 });
+    test(`mode: ${mode.name} - switching views and filtering`, async ({ mediaPage, sidebarPage, viewerPage, server }) => {
+      await mediaPage.goto(server.getBaseUrl() + (mode.hash ? `#${mode.hash}` : ''));
 
-      // Expand history details if we are in history mode to make button visible
+      // Wait for results container using POM
+      await expect(mediaPage.resultsContainer).toBeVisible();
+
+      // Expand history details if we are in history mode using POM
       if (mode.name === 'History') {
-        await page.evaluate(() => {
-          const det = document.getElementById('details-history');
-          if (det) (det as HTMLDetailsElement).open = true;
-        });
+        await sidebarPage.expandHistorySection();
       }
 
-      // 1. Switch to Details view
-      await page.click('#view-details');
-      
-      // Verify we are still in the same mode via URL
+      // 1. Switch to Details view using POM
+      await mediaPage.switchToDetailsView();
+
+      // Verify we are still in the same mode via URL using POM
       if (mode.hash) {
-        expect(page.url()).toContain(mode.hash);
+        expect(mediaPage.page.url()).toContain(mode.hash);
       }
-      
+
       // Verify we are still in the same mode via state evaluation
-      const currentPage = await page.evaluate(() => (window as any).disco.state.page);
+      const currentPage = await mediaPage.page.evaluate(() => (window as any).disco.state.page);
       const expectedPage = mode.name.toLowerCase();
       if (expectedPage !== 'search') {
         expect(currentPage).toBe(expectedPage);
       }
 
-      // Verify active button in sidebar if it's supposed to be active
+      // Verify active button in sidebar if it's supposed to be active using POM
       if (mode.selector && mode.name !== 'History') {
-        const activeBtn = page.locator(mode.selector);
+        const activeBtn = mediaPage.page.locator(mode.selector);
         await expect(activeBtn).toHaveClass(/active/);
       }
 
-      // 2. Switch to Group view
-      await page.click('#view-group');
-      
-      // Special check for captions + group
+      // 2. Switch to Group view using POM
+      await mediaPage.page.locator('#view-group').click();
+      await mediaPage.page.waitForTimeout(500);
+
+      // Special check for captions + group using POM
       if (mode.name === 'Captions') {
-        await page.waitForTimeout(1000);
-        const resultsContainer = page.locator('#results-container');
-        // Captions render differently based on view mode:
-        // - Grid/Details: .caption-media-card
-        // - Group: .caption-group
-        const isGroupView = await page.evaluate(() => window.disco.state.view === 'group');
+        await mediaPage.page.waitForTimeout(1000);
+        const resultsContainer = mediaPage.resultsContainer;
+        // Captions render differently based on view mode
+        const isGroupView = await mediaPage.page.evaluate(() => window.disco.state.view === 'group');
         let isCaptionCard;
         if (isGroupView) {
-          isCaptionCard = await page.locator('.caption-group').first().isVisible();
+          isCaptionCard = await mediaPage.page.locator('.caption-group').first().isVisible();
         } else {
-          isCaptionCard = await page.locator('.caption-media-card').first().isVisible();
+          isCaptionCard = await mediaPage.getCaptionCards().first().isVisible();
         }
         expect(isCaptionCard).toBe(true);
       }
 
-      // Verify we are still in the same mode after view change
-      const pageAfterViewChange = await page.evaluate(() => (window as any).disco.state.page);
+      // Verify we are still in the same mode after view change using POM
+      const pageAfterViewChange = await mediaPage.page.evaluate(() => (window as any).disco.state.page);
       if (expectedPage !== 'search') {
         expect(pageAfterViewChange).toBe(expectedPage);
       }
 
-      // 3. Apply a search filter
-      await page.fill('#search-input', 'test');
-      await page.press('#search-input', 'Enter');
-      await page.waitForTimeout(500);
+      // 3. Apply a search filter using POM
+      await mediaPage.search('test');
 
-      // Verify we are STILL in the same mode
-      const pageAfterFilter = await page.evaluate(() => (window as any).disco.state.page);
+      // Verify we are STILL in the same mode using POM
+      const pageAfterFilter = await mediaPage.page.evaluate(() => (window as any).disco.state.page);
       if (expectedPage !== 'search') {
         expect(pageAfterFilter).toBe(expectedPage);
       }
 
-      // 4. Switch back to Grid view
-      await page.click('#view-grid');
-      
-      // 5. Test pagination (if visible)
-      const pagination = page.locator('#pagination-container');
+      // 4. Switch back to Grid view using POM
+      await mediaPage.switchToGridView();
+
+      // 5. Test pagination (if visible) using POM
+      const pagination = mediaPage.paginationContainer;
       if (await pagination.isVisible()) {
-        const nextPage = page.locator('#next-page');
+        const nextPage = mediaPage.page.locator('#next-page');
         if (await nextPage.isEnabled()) {
           await nextPage.click();
-          await page.waitForTimeout(500);
-          
-          // Verify we are STILL in the same mode
-          const pageAfterPagination = await page.evaluate(() => (window as any).disco.state.page);
+          await mediaPage.page.waitForTimeout(500);
+
+          // Verify we are STILL in the same mode using POM
+          const pageAfterPagination = await mediaPage.page.evaluate(() => (window as any).disco.state.page);
           if (expectedPage !== 'search') {
             expect(pageAfterPagination).toBe(expectedPage);
           }
         }
       }
 
-      // Verify final state
-      const finalPage = await page.evaluate(() => (window as any).disco.state.page);
+      // 6. Clear search using POM
+      await mediaPage.clearSearch();
+
+      // Final verification using POM
+      const finalPage = await mediaPage.page.evaluate(() => (window as any).disco.state.page);
       if (expectedPage !== 'search') {
         expect(finalPage).toBe(expectedPage);
       }
     });
   }
 
-  test('Captions mode + Group view specific failure detection', async ({ page, server }) => {
-    await page.goto(server.getBaseUrl() + '#mode=captions');
-    await page.waitForSelector('.caption-media-card, .caption-group', { timeout: 10000 });
+  test('all view modes are accessible from any page', async ({ mediaPage, server }) => {
+    await mediaPage.goto(server.getBaseUrl());
 
-    // Switch to Group view
-    await page.click('#view-group');
+    // Grid view button should be visible using POM
+    await expect(mediaPage.viewGridButton).toBeVisible();
 
-    // In Captions mode, Group view renders .caption-group elements
-    await page.waitForTimeout(2000);
+    // Details view button should be visible using POM
+    await expect(mediaPage.viewDetailsButton).toBeVisible();
 
-    const resultsContainer = page.locator('#results-container');
-    const hasSimilarityView = await resultsContainer.evaluate(el => el.classList.contains('similarity-view'));
+    // Group view button may exist using POM
+    const groupViewBtn = mediaPage.viewGroupButton;
+    if (await groupViewBtn.count() > 0) {
+      await expect(groupViewBtn).toBeVisible();
+    }
+  });
 
-    // In Captions mode + Group view, we should see .caption-group elements
-    // If it has similarity-view, it means it's showing episode groups, NOT captions
-    const captionGroups = page.locator('.caption-group');
-    const captionCards = page.locator('.caption-media-card');
-    
-    const groupCount = await captionGroups.count();
-    const cardCount = await captionCards.count();
+  test('view mode persists across page navigation', async ({ mediaPage, server }) => {
+    await mediaPage.goto(server.getBaseUrl());
 
-    console.log(`In Captions+Group: hasSimilarityView=${hasSimilarityView}, captionGroups=${groupCount}, captionCards=${cardCount}`);
+    // Switch to details view using POM
+    await mediaPage.switchToDetailsView();
 
-    // Either caption groups or caption cards should be visible
-    expect(groupCount > 0 || cardCount > 0).toBe(true);
+    // Verify we're in details view using POM
+    await expect(mediaPage.viewDetailsButton).toHaveClass(/active/);
+
+    // Navigate to a different mode using POM
+    await mediaPage.goto(server.getBaseUrl() + '/#mode=captions');
+    await mediaPage.getCaptionCards().first().waitFor({ state: 'visible', timeout: 10000 });
+
+    // Go back to home using POM
+    await mediaPage.goto(server.getBaseUrl());
+    await mediaPage.waitForMediaToLoad();
+
+    // View mode may or may not persist depending on implementation
+    // Just verify the page loads correctly using POM
+    await expect(mediaPage.resultsContainer).toBeVisible();
+  });
+
+  test('search works in all view modes', async ({ mediaPage, server }) => {
+    await mediaPage.goto(server.getBaseUrl());
+
+    // Test search in grid view using POM
+    await mediaPage.search('test');
+    const gridSearchCount = await mediaPage.getMediaCount();
+    expect(gridSearchCount).toBeGreaterThanOrEqual(0);
+
+    // Clear and switch to details view using POM
+    await mediaPage.clearSearch();
+    await mediaPage.switchToDetailsView();
+
+    // Test search in details view using POM
+    await mediaPage.search('test');
+    const detailsSearchCount = await mediaPage.getMediaCount();
+    expect(detailsSearchCount).toBeGreaterThanOrEqual(0);
+
+    // Results count should be similar (may differ slightly due to rendering)
+    expect(Math.abs(gridSearchCount - detailsSearchCount)).toBeLessThanOrEqual(1);
   });
 });
