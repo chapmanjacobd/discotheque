@@ -9,7 +9,7 @@ test.describe('CLI: History Commands', () => {
 
     await cli.runAndVerify(['history-add', testDbPath, videoPath]);
 
-    const queryResult = await cli.runJson<any[]>(['print', testDbPath, '--all', '--json', '--played']);
+    const queryResult = await cli.runJson<any[]>(['print', testDbPath, '--all', '--json', '--played-after', '1970-01-01']);
     expect(queryResult.length).toBe(1);
   });
 
@@ -36,7 +36,7 @@ test.describe('CLI: History Commands', () => {
 
     await cli.runAndVerify(['mpv-watchlater', testDbPath, '--watch-later-dir', watchlaterDir]);
 
-    const queryResult = await cli.runJson<any[]>(['print', testDbPath, '--all', '--json', '--played']);
+    const queryResult = await cli.runJson<any[]>(['print', testDbPath, '--all', '--json', '--played-after', '1970-01-01']);
     expect(queryResult.length).toBe(1);
     expect(queryResult[0].playhead).toBeCloseTo(123.456, 0);
   });
