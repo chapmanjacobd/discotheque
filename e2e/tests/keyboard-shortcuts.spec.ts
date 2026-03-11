@@ -170,7 +170,7 @@ test.describe('Keyboard Shortcuts', () => {
       await mediaPage.page.waitForTimeout(500);
 
       // Press 'l' to toggle loop using POM
-      await viewerPage.toggleLoop();
+      await mediaPage.page.keyboard.press('l');
       await mediaPage.page.waitForTimeout(500);
 
       // Toast should appear indicating loop state

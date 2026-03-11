@@ -13,8 +13,7 @@ test.describe('Delete Shortcut - Sibling Navigation', () => {
 
     // Get the first audio card using POM
     const firstCard = mediaPage.getFirstMediaCardByType('audio');
-    const firstTitleText = await firstCard.textContent();
-    const firstFileName = firstTitleText?.split('/').pop()?.trim();
+    const firstFileName = await firstCard.getAttribute('data-path');
     expect(firstFileName).toBeTruthy();
 
     // Click first audio to open player using POM
@@ -46,8 +45,7 @@ test.describe('Delete Shortcut - Sibling Navigation', () => {
 
     // Click the LAST media card (any type) using POM
     const lastCard = mediaPage.getMediaCard(totalCount - 1);
-    const lastTitleText = await lastCard.textContent();
-    const lastFileName = lastTitleText?.split('/').pop()?.trim();
+    const lastFileName = await lastCard.getAttribute('data-path');
     expect(lastFileName).toBeTruthy();
 
     // Click last card to open player using POM
@@ -80,8 +78,7 @@ test.describe('Delete Shortcut - Sibling Navigation', () => {
     const firstDoc = mediaPage.page.locator('.media-card[data-type*="document"], .media-card[data-type="text"]').first();
     expect(await firstDoc.count()).toBeGreaterThan(0);
 
-    const firstTitleText = await firstDoc.textContent();
-    const firstFileName = firstTitleText?.split('/').pop()?.trim();
+    const firstFileName = await firstDoc.getAttribute('data-path');
     expect(firstFileName).toBeTruthy();
 
     // Click to open modal using POM

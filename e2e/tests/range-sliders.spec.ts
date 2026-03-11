@@ -54,12 +54,12 @@ test.describe('Range Sliders', () => {
     // Expand duration section using POM
     await sidebarPage.expandDurationSection();
 
-    // Get duration slider using POM
-    const slider = sidebarPage.getDurationSlider();
+    // Get duration slider using POM (use max slider to avoid strict mode violation)
+    const slider = mediaPage.page.locator('#duration-max-slider');
     if (await slider.count() > 0) {
       // Get slider max value
       const maxValue = await slider.getAttribute('max');
-      
+
       if (maxValue) {
         // Set slider to filter (e.g., 50% of max)
         const halfValue = Math.floor(parseInt(maxValue) / 2);
@@ -85,12 +85,12 @@ test.describe('Range Sliders', () => {
     // Expand size section using POM
     await sidebarPage.expandSizeSection();
 
-    // Get size slider using POM
-    const slider = sidebarPage.getSizeSlider();
+    // Get size slider using POM (use max slider to avoid strict mode violation)
+    const slider = mediaPage.page.locator('#size-max-slider');
     if (await slider.count() > 0) {
       // Get slider max value
       const maxValue = await slider.getAttribute('max');
-      
+
       if (maxValue) {
         // Set slider to filter (e.g., 50% of max)
         const halfValue = Math.floor(parseInt(maxValue) / 2);
@@ -113,8 +113,8 @@ test.describe('Range Sliders', () => {
     // Expand duration section using POM
     await sidebarPage.expandDurationSection();
 
-    // Get duration slider using POM
-    const slider = sidebarPage.getDurationSlider();
+    // Get duration slider using POM (use max slider to avoid strict mode violation)
+    const slider = mediaPage.page.locator('#duration-max-slider');
     if (await slider.count() > 0) {
       // Set slider value
       const maxValue = await slider.getAttribute('max');
@@ -151,8 +151,8 @@ test.describe('Range Sliders', () => {
     // Get initial count using POM
     const initialCount = await mediaPage.getMediaCount();
 
-    // Apply duration filter using POM
-    const durationSlider = sidebarPage.getDurationSlider();
+    // Apply duration filter using POM (use max slider to avoid strict mode violation)
+    const durationSlider = mediaPage.page.locator('#duration-max-slider');
     if (await durationSlider.count() > 0) {
       const maxDuration = await durationSlider.getAttribute('max');
       if (maxDuration) {
@@ -161,8 +161,8 @@ test.describe('Range Sliders', () => {
       }
     }
 
-    // Apply size filter using POM
-    const sizeSlider = sidebarPage.getSizeSlider();
+    // Apply size filter using POM (use max slider to avoid strict mode violation)
+    const sizeSlider = mediaPage.page.locator('#size-max-slider');
     if (await sizeSlider.count() > 0) {
       const maxSize = await sizeSlider.getAttribute('max');
       if (maxSize) {
@@ -193,8 +193,8 @@ test.describe('Range Sliders', () => {
     const episodesLabel = mediaPage.episodesSliderContainer.locator('label');
 
     // At least some labels should exist
-    const hasLabels = (await durationLabel.count() > 0) || 
-                      (await sizeLabel.count() > 0) || 
+    const hasLabels = (await durationLabel.count() > 0) ||
+                      (await sizeLabel.count() > 0) ||
                       (await episodesLabel.count() > 0);
     expect(hasLabels).toBe(true);
   });
@@ -208,16 +208,16 @@ test.describe('Range Sliders', () => {
     // Expand duration section using POM
     await sidebarPage.expandDurationSection();
 
-    // Get duration slider using POM
-    const slider = sidebarPage.getDurationSlider();
+    // Get duration slider using POM (use max slider to avoid strict mode violation)
+    const slider = mediaPage.page.locator('#duration-max-slider');
     if (await slider.count() > 0) {
       // Check slider has valid attributes
       const min = await slider.getAttribute('min');
       const max = await slider.getAttribute('max');
-      
+
       expect(min).toBeTruthy();
       expect(max).toBeTruthy();
-      
+
       if (min && max) {
         expect(parseInt(min)).toBeLessThanOrEqual(parseInt(max));
       }

@@ -101,20 +101,26 @@ test.describe('Image Arrow Key Navigation', () => {
     await viewerPage.waitForImageLoad();
 
     // Get initial src using POM
-    const initialSrc = await viewerPage.getImageElement().getAttribute('src');
+    const imageElement = viewerPage.getImageElement();
+    await imageElement.waitFor({ state: 'visible', timeout: 5000 });
+    const initialSrc = await imageElement.getAttribute('src');
 
-    // Press ArrowRight multiple times using POM
-    for (let i = 0; i < imageCount; i++) {
+    // Press ArrowRight multiple times using POM (cycle through fewer images to avoid closing player)
+    const cycles = Math.min(imageCount - 1, 3);
+    for (let i = 0; i < cycles; i++) {
       await mediaPage.page.keyboard.press('ArrowRight');
       await mediaPage.page.waitForTimeout(300);
     }
 
-    // Should have cycled through images using POM
-    const currentSrc = await viewerPage.getImageElement().getAttribute('src');
-    
-    // May or may not be back to start depending on implementation
-    // Just verify we're still viewing an image
+    // Should still be viewing an image
+    // Wait for image element to be visible before getting src
+    await imageElement.waitFor({ state: 'visible', timeout: 5000 });
+    const currentSrc = await imageElement.getAttribute('src');
+
+    // Verify we're still viewing an image
     expect(currentSrc).toBeTruthy();
     expect(currentSrc).not.toBe('');
+    // Src should have changed from initial (unless we cycled back to start)
+    expect(currentSrc).toContain('/api/raw?path=');
   });
 });

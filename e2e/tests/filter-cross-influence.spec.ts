@@ -126,16 +126,17 @@ test.describe('Cross-Filter Influence', () => {
       await sidebarPage.expandSizeSection();
       await sidebarPage.expandDurationSection();
 
-      const sizeSlider = sidebarPage.getSizeSlider();
-      const durationSlider = sidebarPage.getDurationSlider();
+      // Use specific slider selectors to avoid strict mode violation
+      const sizeMaxSlider = mediaPage.page.locator('#size-max-slider');
+      const durationMaxSlider = mediaPage.page.locator('#duration-max-slider');
 
-      if (await sizeSlider.count() > 0) {
-        const sizeMax = await sizeSlider.getAttribute('max');
+      if (await sizeMaxSlider.count() > 0) {
+        const sizeMax = await sizeMaxSlider.getAttribute('max');
         expect(sizeMax).toBeTruthy();
       }
 
-      if (await durationSlider.count() > 0) {
-        const durationMax = await durationSlider.getAttribute('max');
+      if (await durationMaxSlider.count() > 0) {
+        const durationMax = await durationMaxSlider.getAttribute('max');
         expect(durationMax).toBeTruthy();
       }
     });
@@ -159,16 +160,17 @@ test.describe('Cross-Filter Influence', () => {
       await sidebarPage.expandSizeSection();
       await sidebarPage.expandDurationSection();
 
-      const sizeSlider = sidebarPage.getSizeSlider();
-      const durationSlider = sidebarPage.getDurationSlider();
+      // Use specific slider selectors to avoid strict mode violation
+      const sizeMaxSlider = mediaPage.page.locator('#size-max-slider');
+      const durationMaxSlider = mediaPage.page.locator('#duration-max-slider');
 
-      if (await sizeSlider.count() > 0) {
-        const sizeMax = await sizeSlider.getAttribute('max');
+      if (await sizeMaxSlider.count() > 0) {
+        const sizeMax = await sizeMaxSlider.getAttribute('max');
         expect(sizeMax).toBeTruthy();
       }
 
-      if (await durationSlider.count() > 0) {
-        const durationMax = await durationSlider.getAttribute('max');
+      if (await durationMaxSlider.count() > 0) {
+        const durationMax = await durationMaxSlider.getAttribute('max');
         expect(durationMax).toBeTruthy();
       }
     });
@@ -186,19 +188,19 @@ test.describe('Cross-Filter Influence', () => {
       await sidebarPage.expandSizeSection();
       await sidebarPage.expandDurationSection();
 
-      // Get initial slider max values using POM
-      const initialSizeSlider = sidebarPage.getSizeSlider();
-      const initialDurationSlider = sidebarPage.getDurationSlider();
+      // Get initial slider max values using POM (use specific selectors to avoid strict mode violation)
+      const initialSizeMaxSlider = mediaPage.page.locator('#size-max-slider');
+      const initialDurationMaxSlider = mediaPage.page.locator('#duration-max-slider');
 
       let initialSizeMax = '0';
       let initialDurationMax = '0';
 
-      if (await initialSizeSlider.count() > 0) {
-        initialSizeMax = await initialSizeSlider.getAttribute('max') || '0';
+      if (await initialSizeMaxSlider.count() > 0) {
+        initialSizeMax = await initialSizeMaxSlider.getAttribute('max') || '0';
       }
 
-      if (await initialDurationSlider.count() > 0) {
-        initialDurationMax = await initialDurationSlider.getAttribute('max') || '0';
+      if (await initialDurationMaxSlider.count() > 0) {
+        initialDurationMax = await initialDurationMaxSlider.getAttribute('max') || '0';
       }
 
       // Search for specific term using POM
@@ -209,18 +211,18 @@ test.describe('Cross-Filter Influence', () => {
       const searchCount = await mediaPage.getMediaCount();
       expect(searchCount).toBeLessThanOrEqual(initialCount);
 
-      // Get updated slider max values using POM
-      const newSizeSlider = sidebarPage.getSizeSlider();
-      const newDurationSlider = sidebarPage.getDurationSlider();
+      // Get updated slider max values using POM (use specific selectors)
+      const newSizeMaxSlider = mediaPage.page.locator('#size-max-slider');
+      const newDurationMaxSlider = mediaPage.page.locator('#duration-max-slider');
 
-      if (await newSizeSlider.count() > 0) {
-        const newSizeMax = await newSizeSlider.getAttribute('max') || '0';
+      if (await newSizeMaxSlider.count() > 0) {
+        const newSizeMax = await newSizeMaxSlider.getAttribute('max') || '0';
         // Size max may be same or different depending on search results
         expect(newSizeMax).toBeDefined();
       }
 
-      if (await newDurationSlider.count() > 0) {
-        const newDurationMax = await newDurationSlider.getAttribute('max') || '0';
+      if (await newDurationMaxSlider.count() > 0) {
+        const newDurationMax = await newDurationMaxSlider.getAttribute('max') || '0';
         // Duration max may be same or different depending on search results
         expect(newDurationMax).toBeDefined();
       }
@@ -232,11 +234,11 @@ test.describe('Cross-Filter Influence', () => {
       // Expand filter sections using POM
       await sidebarPage.expandSizeSection();
 
-      // Get initial size slider max using POM
-      const initialSizeSlider = sidebarPage.getSizeSlider();
+      // Get initial size slider max using POM (use specific selector)
+      const initialSizeMaxSlider = mediaPage.page.locator('#size-max-slider');
       let initialSizeMax = '0';
-      if (await initialSizeSlider.count() > 0) {
-        initialSizeMax = await initialSizeSlider.getAttribute('max') || '0';
+      if (await initialSizeMaxSlider.count() > 0) {
+        initialSizeMax = await initialSizeMaxSlider.getAttribute('max') || '0';
       }
 
       // Search using POM
@@ -247,10 +249,10 @@ test.describe('Cross-Filter Influence', () => {
       await mediaPage.clearSearch();
       await mediaPage.page.waitForTimeout(1000);
 
-      // Get restored size slider max using POM
-      const restoredSizeSlider = sidebarPage.getSizeSlider();
-      if (await restoredSizeSlider.count() > 0) {
-        const restoredSizeMax = await restoredSizeSlider.getAttribute('max') || '0';
+      // Get restored size slider max using POM (use specific selector)
+      const restoredSizeMaxSlider = mediaPage.page.locator('#size-max-slider');
+      if (await restoredSizeMaxSlider.count() > 0) {
+        const restoredSizeMax = await restoredSizeMaxSlider.getAttribute('max') || '0';
         // May or may not be exactly the same depending on implementation
         expect(restoredSizeMax).toBeDefined();
       }

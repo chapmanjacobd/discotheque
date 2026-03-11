@@ -180,7 +180,7 @@ test.describe('Categorization Workflow - Full Process', () => {
 
     // Create a test category using POM
     const newCategoryBtn = mediaPage.page.locator('#new-category-btn');
-    mediaPage.page.on('dialog', async dialog => {
+    mediaPage.page.once('dialog', async dialog => {
       if (dialog.type() === 'prompt') {
         await dialog.accept('Test Keywords Category');
       }
@@ -200,7 +200,7 @@ test.describe('Categorization Workflow - Full Process', () => {
         const firstSuggestion = suggestions.first();
         const keyword = await firstSuggestion.getAttribute('data-word');
 
-        mediaPage.page.on('dialog', async dialog => {
+        mediaPage.page.once('dialog', async dialog => {
           if (dialog.type() === 'prompt') {
             await dialog.accept('Test Keywords Category');
           }
@@ -331,15 +331,20 @@ test.describe('Categorization Workflow - Full Process', () => {
       for (let i = 0; i < Math.min(count, 3); i++) {
         const suggestion = suggestions.nth(i);
         const word = await suggestion.getAttribute('data-word');
-        const frequency = await suggestion.getAttribute('data-frequency');
+        const title = await suggestion.getAttribute('title');
 
         expect(word).toBeTruthy();
         if (word) {
           expect(word.length).toBeGreaterThan(0);
         }
-        expect(frequency).toBeTruthy();
-        if (frequency) {
-          expect(parseInt(frequency)).toBeGreaterThan(0);
+        // Title attribute contains the frequency count
+        expect(title).toBeTruthy();
+        if (title) {
+          // Title format: "X uncategorized files contain this word"
+          const countMatch = title.match(/(\d+)/);
+          if (countMatch) {
+            expect(parseInt(countMatch[1])).toBeGreaterThan(0);
+          }
         }
       }
     }

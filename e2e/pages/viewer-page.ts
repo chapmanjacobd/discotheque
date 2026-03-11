@@ -535,9 +535,14 @@ export class ViewerPage {
    * Close document modal
    */
   async closeDocumentModal(): Promise<void> {
-    const closeBtn = this.documentModal.locator('.close-modal').first();
-    await closeBtn.click();
-    await this.documentModal.first().waitFor({ state: 'hidden' });
+    // Exit fullscreen first if active, then close modal
+    if (await this.isFullscreenActive()) {
+      await this.page.keyboard.press('Escape');
+      await this.page.waitForTimeout(300);
+    }
+    // Close the modal with Escape
+    await this.page.keyboard.press('Escape');
+    await this.documentModal.first().waitFor({ state: 'hidden', timeout: 5000 });
   }
 
   /**
