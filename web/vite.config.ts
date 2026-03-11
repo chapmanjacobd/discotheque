@@ -6,6 +6,7 @@ export default defineConfig({
     emptyOutDir: true,
     target: 'esnext',
     assetsInlineLimit: 0,
+    chunkSizeWarningLimit: 1000,
     rollupOptions: {
       output: {
         entryFileNames: `[name].js`,

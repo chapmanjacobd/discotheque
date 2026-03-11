@@ -39,6 +39,7 @@ func writeError(w http.ResponseWriter, status int, message string) {
 func init() {
 	_ = mime.AddExtensionType(".js", "text/javascript")
 	_ = mime.AddExtensionType(".mjs", "text/javascript")
+	_ = mime.AddExtensionType(".ts", "text/javascript")
 }
 
 // LsEntry represents a directory listing entry
@@ -201,7 +202,7 @@ func (c *ServeCmd) Mux() http.Handler {
 		}
 		defer f.Close()
 
-		if strings.HasSuffix(path, ".js") || strings.HasSuffix(path, ".mjs") {
+		if strings.HasSuffix(path, ".js") || strings.HasSuffix(path, ".mjs") || strings.HasSuffix(path, ".ts") {
 			w.Header().Set("Content-Type", "text/javascript")
 		}
 		stat, _ := f.Stat()
@@ -218,6 +219,10 @@ func (c *ServeCmd) Mux() http.Handler {
 			HttpOnly: false, // Frontend needs to read it for CSRF/Auth headers
 			SameSite: http.SameSiteStrictMode,
 		})
+
+		if strings.HasSuffix(r.URL.Path, ".js") || strings.HasSuffix(r.URL.Path, ".mjs") || strings.HasSuffix(r.URL.Path, ".ts") {
+			w.Header().Set("Content-Type", "text/javascript")
+		}
 
 		if c.PublicDir != "" {
 			http.FileServer(http.Dir(c.PublicDir)).ServeHTTP(w, r)

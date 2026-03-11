@@ -95,7 +95,7 @@ export class TestServer {
         this.databasePath,
         '--port', this.port.toString(),
         '--dev',
-        '--public-dir', path.resolve(__dirname, '../../web'),
+        '--public-dir', path.resolve(__dirname, '../../web/dist'),
       ];
 
       this.process = spawn(binaryPath, args, {
