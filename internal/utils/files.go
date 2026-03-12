@@ -6,9 +6,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"sync"
 
@@ -149,76 +147,6 @@ func GetFileStats(path string) (FileStats, error) {
 	}, nil
 }
 
-// IsFileOpen checks if a file is currently open by any process
-func IsFileOpen(path string) bool {
-	if runtime.GOOS == "windows" {
-		// On Windows, try to open the file with exclusive access
-		f, err := os.OpenFile(path, os.O_RDWR, 0)
-		if err != nil {
-			return true
-		}
-		f.Close()
-		return false
-	}
-
-	if runtime.GOOS == "darwin" {
-		absPath, err := filepath.Abs(path)
-		if err != nil {
-			absPath = path
-		}
-		// On macOS, use lsof -t to check if any process has the file open
-		cmd := exec.Command("lsof", "-t", absPath)
-		if err := cmd.Run(); err == nil {
-			return true
-		}
-		return false
-	}
-
-	if runtime.GOOS == "linux" {
-		absPath, err := filepath.Abs(path)
-		if err != nil {
-			absPath = path
-		}
-
-		files, err := os.ReadDir("/proc")
-		if err != nil {
-			return false
-		}
-
-		for _, f := range files {
-			if !f.IsDir() {
-				continue
-			}
-			// Check if name is a number (PID)
-			isPid := true
-			for _, r := range f.Name() {
-				if r < '0' || r > '9' {
-					isPid = false
-					break
-				}
-			}
-			if !isPid {
-				continue
-			}
-
-			fdDir := filepath.Join("/proc", f.Name(), "fd")
-			fds, err := os.ReadDir(fdDir)
-			if err != nil {
-				continue
-			}
-
-			for _, fd := range fds {
-				link, err := os.Readlink(filepath.Join(fdDir, fd.Name()))
-				if err == nil && link == absPath {
-					return true
-				}
-			}
-		}
-	}
-
-	return false
-}
-
 // DetectMimeType returns the mimetype of a file
 func DetectMimeType(path string) string {
 	ext := strings.ToLower(filepath.Ext(path))
@@ -302,11 +230,12 @@ func CommonPath(paths []string) string {
 		return filepath.Dir(paths[0])
 	}
 
-	sep := string(filepath.Separator)
-	parts := strings.Split(filepath.Clean(paths[0]), sep)
+	// Use forward slashes internally for consistent splitting
+	p0 := filepath.ToSlash(filepath.Clean(paths[0]))
+	parts := strings.Split(p0, "/")
 
 	for i := 1; i < len(paths); i++ {
-		p := strings.Split(filepath.Clean(paths[i]), sep)
+		p := strings.Split(filepath.ToSlash(filepath.Clean(paths[i])), "/")
 		if len(p) < len(parts) {
 			parts = parts[:len(p)]
 		}
@@ -318,10 +247,7 @@ func CommonPath(paths []string) string {
 		}
 	}
 
-	if len(parts) == 0 {
-		return sep
-	}
-	return strings.Join(parts, sep)
+	return filepath.FromSlash(strings.Join(parts, "/"))
 }
 
 // CommonPathFull returns a common path prefix.
@@ -405,7 +331,7 @@ func ExtractSubtitleInfo(subPath string) (displayName, languageCode, codec strin
 	// Try dot first
 	if dotIdx != -1 {
 		potentialLang := nameWithoutExt[dotIdx+1:]
-		if isLanguageCode(potentialLang) {
+		if IsLanguageCode(potentialLang) {
 			langCode = strings.ToLower(potentialLang)
 		}
 	}
@@ -413,7 +339,7 @@ func ExtractSubtitleInfo(subPath string) (displayName, languageCode, codec strin
 	// If not found with dot, try underscore
 	if langCode == "" && underscoreIdx != -1 {
 		potentialLang := nameWithoutExt[underscoreIdx+1:]
-		if isLanguageCode(potentialLang) {
+		if IsLanguageCode(potentialLang) {
 			langCode = strings.ToLower(potentialLang)
 		}
 	}
@@ -424,7 +350,7 @@ func ExtractSubtitleInfo(subPath string) (displayName, languageCode, codec strin
 		if dashIdx != -1 {
 			potentialLang := nameWithoutExt[dashIdx+3:]
 			// Try to match full language name directly
-			code := getLanguageCode(potentialLang)
+			code := GetLanguageCode(potentialLang)
 			if code != "" {
 				langCode = code
 			}
@@ -432,7 +358,7 @@ func ExtractSubtitleInfo(subPath string) (displayName, languageCode, codec strin
 	}
 
 	if langCode != "" {
-		langName := getLanguageName(langCode)
+		langName := GetLanguageName(langCode)
 		if langName != "" {
 			return langName + " (" + codec + ")", langCode, codec
 		}
@@ -443,8 +369,8 @@ func ExtractSubtitleInfo(subPath string) (displayName, languageCode, codec strin
 	return "(" + codec + ")", "", codec
 }
 
-// isLanguageCode checks if a string looks like a language code
-func isLanguageCode(s string) bool {
+// IsLanguageCode checks if a string looks like a language code
+func IsLanguageCode(s string) bool {
 	if len(s) < 2 || len(s) > 4 {
 		return false
 	}
@@ -481,8 +407,8 @@ func isLanguageCode(s string) bool {
 	return validCodes[strings.ToLower(s)]
 }
 
-// getLanguageName converts a language code to its full name
-func getLanguageName(code string) string {
+// GetLanguageName converts a language code to its full name
+func GetLanguageName(code string) string {
 	code = strings.ToLower(code)
 
 	// 2-letter to name mapping
@@ -538,8 +464,8 @@ func getLanguageName(code string) string {
 	return ""
 }
 
-// getLanguageCode converts a full language name to its code
-func getLanguageCode(name string) string {
+// GetLanguageCode converts a full language name to its code
+func GetLanguageCode(name string) string {
 	name = strings.ToLower(strings.TrimSpace(name))
 
 	// Name to 2-letter code mapping (includes native names)

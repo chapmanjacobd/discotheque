@@ -51,8 +51,17 @@ func TrimPathSegments(path string, desiredLength int) string {
 	sep := string(filepath.Separator)
 	pre := ""
 	if filepath.IsAbs(path) {
-		pre = sep
-		dir = strings.TrimPrefix(dir, sep)
+		if strings.HasPrefix(path, "/") || strings.HasPrefix(path, "\\") {
+			pre = sep
+			dir = strings.TrimLeft(dir, "/\\")
+		} else if len(path) >= 2 && path[1] == ':' {
+			pre = path[:2]
+			dir = path[2:]
+			if len(dir) > 0 && (dir[0] == '/' || dir[0] == '\\') {
+				pre += sep
+				dir = strings.TrimLeft(dir, "/\\")
+			}
+		}
 	}
 
 	segments := strings.Split(dir, sep)
@@ -102,6 +111,7 @@ func SafeJoin(base string, userPath string) string {
 
 // Relativize removes leading slashes and drive letters
 func Relativize(path string) string {
+	path = filepath.FromSlash(path)
 	// Remove drive letter on Windows
 	if len(path) >= 2 && path[1] == ':' {
 		path = path[2:]
@@ -193,12 +203,16 @@ func CleanPath(path string, opts CleanPathOptions) string {
 
 	pre := ""
 	sep := string(filepath.Separator)
-	if strings.HasPrefix(path, sep) {
+	if strings.HasPrefix(path, "/") || strings.HasPrefix(path, "\\") {
 		pre = sep
-		path = strings.TrimPrefix(path, sep)
+		path = strings.TrimLeft(path, "/\\")
 	} else if len(path) >= 2 && path[1] == ':' {
 		pre = path[:2]
 		path = path[2:]
+		if len(path) > 0 && (path[0] == '/' || path[0] == '\\') {
+			pre += sep
+			path = strings.TrimLeft(path, "/\\")
+		}
 	}
 
 	ext := filepath.Ext(path)

@@ -11,10 +11,10 @@ import (
 type SearchMode int
 
 const (
-	SearchModeUnknown SearchMode = iota
-	SearchModeSubstring          // LIKE-based search
-	SearchModeFTS5               // SQLite FTS5
-	SearchModeBleve              // Bleve full-text search
+	SearchModeUnknown   SearchMode = iota
+	SearchModeSubstring            // LIKE-based search
+	SearchModeFTS5                 // SQLite FTS5
+	SearchModeBleve                // Bleve full-text search
 )
 
 func (s SearchMode) String() string {

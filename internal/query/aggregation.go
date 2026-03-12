@@ -259,12 +259,12 @@ func updateStats(f *models.FolderStats, m models.MediaWithDB, isFolder bool) {
 func finalizeStats(groups map[string]*models.FolderStats) []models.FolderStats {
 	// Identify parents to count subdirectories
 	for path := range groups {
-		p := filepath.Dir(filepath.Clean(path))
+		p := filepath.ToSlash(filepath.Dir(filepath.Clean(path)))
 		for p != "." && p != "/" {
 			if _, ok := groups[p]; ok {
 				groups[p].FolderCount++
 			}
-			p = filepath.Dir(p)
+			p = filepath.ToSlash(filepath.Dir(filepath.FromSlash(p)))
 		}
 		if p == "/" {
 			if _, ok := groups[p]; ok {

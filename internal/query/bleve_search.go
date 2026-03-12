@@ -1,6 +1,8 @@
 package query
 
 import (
+	"strings"
+
 	"github.com/chapmanjacobd/discoteca/internal/bleve"
 )
 
@@ -12,15 +14,15 @@ func BleveSearch(searchTerms []string, limit int) ([]string, error) {
 	}
 
 	// Join search terms for Bleve query
-	query := ""
+	var query strings.Builder
 	for i, term := range searchTerms {
 		if i > 0 {
-			query += " "
+			query.WriteString(" ")
 		}
-		query += term
+		query.WriteString(term)
 	}
 
-	ids, _, err := bleve.Search(query, limit)
+	ids, _, err := bleve.Search(query.String(), limit)
 	return ids, err
 }
 
