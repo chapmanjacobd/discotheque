@@ -31,11 +31,15 @@ func TestSecurity_Blocklist(t *testing.T) {
 		{"\\etc\\passwd", http.StatusForbidden},
 		{"\\home\\user\\.ssh\\id_rsa", http.StatusForbidden},
 		{"C:\\Windows\\System32\\config\\sam", http.StatusForbidden},
+		{"D:\\Windows\\System32\\config\\sam", http.StatusForbidden},
 		{"C:\\Users\\user\\.ssh\\id_rsa", http.StatusForbidden},
+		{"\\\\server\\share\\etc\\passwd", http.StatusForbidden},
 
-		// Mixed separators
+		// Mixed separators and case sensitivity
 		{"/home\\user\\.ssh/id_rsa", http.StatusForbidden},
 		{"\\etc/passwd", http.StatusForbidden},
+		{"c:/windows/system32/config/SAM", http.StatusForbidden},
+		{"C:\\USERS\\USER\\.SSH\\ID_RSA", http.StatusForbidden},
 	}
 
 	for _, tc := range testCases {

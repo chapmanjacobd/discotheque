@@ -46,7 +46,7 @@ func TestFindMedia(t *testing.T) {
 	for _, ef := range expectedFiles {
 		matched := false
 		for path := range found {
-			if filepath.Base(path) == ef {
+			if filepath.ToSlash(filepath.Base(path)) == filepath.ToSlash(ef) {
 				matched = true
 				break
 			}

@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/chapmanjacobd/discoteca/internal/models"
+	"github.com/chapmanjacobd/discoteca/internal/utils/pathutil"
 )
 
 // RandomString returns a random hexadecimal string of the given length
@@ -37,63 +38,66 @@ func TrimPathSegments(path string, desiredLength int) string {
 		return path
 	}
 
-	// Normalize to forward slashes for internal logic
-	workPath := filepath.ToSlash(path)
-	ext := filepath.Ext(workPath)
-	base := filepath.Base(workPath)
-	dir := filepath.Dir(workPath)
-
-	if dir == "." || dir == "/" || dir == "" {
-		if len(path) > desiredLength {
-			return ShortenMiddle(path, desiredLength)
-		}
-		return path
+	parts, isAbs := pathutil.Split(path)
+	if len(parts) == 0 {
+		return ShortenMiddle(path, desiredLength)
 	}
 
-	pre := ""
-	if filepath.IsAbs(path) {
-		if strings.HasPrefix(workPath, "/") {
-			pre = "/"
-			dir = strings.TrimPrefix(dir, "/")
-		} else if len(workPath) >= 2 && workPath[1] == ':' {
-			pre = workPath[:2] + "/"
-			dir = strings.TrimPrefix(dir, workPath[:2])
-			dir = strings.TrimLeft(dir, "/")
-		}
-	}
-
-	// Split on forward slash since we normalized above
-	segments := strings.Split(dir, "/")
-	if len(segments) == 1 && segments[0] == "" {
-		segments = []string{}
-	}
+	ext := filepath.Ext(path)
+	base := parts[len(parts)-1]
+	dirParts := parts[:len(parts)-1]
 
 	// Try shortening segments from left to right (grandparents first)
-	for i := range segments {
-		joined := pre + strings.Join(append(segments, base), "/")
+	for i := range dirParts {
+		joined := pathutil.Join(append(dirParts, base), isAbs)
 		if len(joined) <= desiredLength {
 			break
 		}
-		if len(segments[i]) > 1 {
-			segments[i] = string([]rune(segments[i])[0])
+		// Don't shorten Windows drive letters (e.g., "C:")
+		if len(dirParts[i]) > 1 && !strings.HasSuffix(dirParts[i], ":") {
+			dirParts[i] = string([]rune(dirParts[i])[0])
 		}
 	}
 
-	res := pre + strings.Join(append(segments, base), "/")
+	// Collapse middle segments if they are all shortened
+	if len(dirParts) > 3 {
+		allShortened := true
+		startIdx := 1
+		// If first part is a drive letter, don't include it in ellipsis logic
+		if strings.HasSuffix(dirParts[0], ":") {
+			startIdx = 2
+		}
+
+		if len(dirParts) > startIdx+1 {
+			for i := startIdx; i < len(dirParts)-1; i++ {
+				if len(dirParts[i]) > 1 {
+					allShortened = false
+					break
+				}
+			}
+			if allShortened {
+				newSegments := append([]string{}, dirParts[:startIdx]...)
+				newSegments = append(newSegments, "...")
+				newSegments = append(newSegments, dirParts[len(dirParts)-1:]...)
+				dirParts = newSegments
+			}
+		}
+	}
+
+	res := pathutil.Join(append(dirParts, base), isAbs)
 	if len(res) > desiredLength {
 		// If still too long, shorten the base name
-		available := desiredLength - len(pre+strings.Join(segments, "/")) - 1
+		available := desiredLength - len(pathutil.Join(dirParts, isAbs)) - 1
 		if available > 3 {
 			stem := strings.TrimSuffix(base, ext)
 			shortenedBase := ShortenMiddle(stem, available-len(ext)) + ext
-			res = pre + strings.Join(append(segments, shortenedBase), "/")
+			res = pathutil.Join(append(dirParts, shortenedBase), isAbs)
 		} else {
 			res = ShortenMiddle(res, desiredLength)
 		}
 	}
 
-	// Convert back to OS-specific separators
-	return filepath.FromSlash(res)
+	return res
 }
 
 // SafeJoin joins a base path with a user-provided path, preventing directory traversal

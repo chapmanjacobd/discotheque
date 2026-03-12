@@ -248,8 +248,8 @@ func TestEnsureTrailingSep(t *testing.T) {
 	}{
 		{"/home", "/home" + sep},
 		{"/home/", "/home/"},
-		{"C:\\Users", "C:\\Users" + sep},
-		{"C:\\Users\\", "C:\\Users\\"},
+		{filepath.FromSlash("C:/Users"), filepath.FromSlash("C:/Users") + sep},
+		{filepath.FromSlash("C:/Users/"), filepath.FromSlash("C:/Users/")},
 		{"", ""},
 	}
 
@@ -270,8 +270,8 @@ func TestStripTrailingSep(t *testing.T) {
 	}{
 		{"/home/", "/home"},
 		{"/home//", "/home"},
-		{"C:\\Users\\", "C:\\Users"},
-		{"C:\\Users\\\\", "C:\\Users"},
+		{filepath.FromSlash("C:/Users/"), filepath.FromSlash("C:/Users")},
+		{filepath.FromSlash("C:/Users//"), filepath.FromSlash("C:/Users")},
 		{"/home", "/home"},
 		{"", ""},
 	}

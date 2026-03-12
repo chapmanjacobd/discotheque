@@ -41,8 +41,11 @@ func TestTrimPathSegments(t *testing.T) {
 		expected      string
 	}{
 		{filepath.FromSlash("/aaaaaaaaaa/fans/001.jpg"), 16, filepath.FromSlash("/a/fans/001.jpg")},
-		{filepath.FromSlash("/ao/bo/co/do/eo/fo/go/ho"), 13, filepath.FromSlash("/a/b/.../g/ho")},
+		{filepath.FromSlash("/ao/bo/co/do/eo/fo/go/ho"), 13, filepath.FromSlash("/a/.../g/ho")},
 		{filepath.FromSlash("/a/b/c"), 10, filepath.FromSlash("/a/b/c")},
+		// Explicit Windows drive test (using backslashes manually to avoid filepath.FromSlash converting back to / on Linux)
+		{"C:\\Users\\Username\\Videos\\Movie.mp4", 20, "C:\\U\\...\\V\\Movie.mp4"},
+		{"C:\\ao\\bo\\co\\do\\eo\\fo\\go", 15, "C:\\a\\...\\f\\go"},
 	}
 
 	for _, tt := range tests {

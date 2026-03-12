@@ -16,22 +16,28 @@ func Split(path string) ([]string, bool) {
 		return []string{}, false
 	}
 
-	// Check if path is absolute (Unix, Windows, or UNC)
 	isAbs := IsAbs(path)
 
-	// Handle Windows drive letter specially
+	// Handle Windows drive letter (C:\...)
 	if len(path) >= 2 && path[1] == ':' {
-		// Extract drive letter as first component
 		drive := path[:2]
 		rest := path[2:]
-		// Split the rest
-		restParts := strings.FieldsFunc(rest, func(r rune) bool {
+		parts := strings.FieldsFunc(rest, func(r rune) bool {
 			return r == '/' || r == '\\'
 		})
-		return append([]string{drive}, restParts...), isAbs
+		return append([]string{drive}, parts...), isAbs
 	}
 
-	// Split on both separators
+	// Handle UNC path (\\server\share\...)
+	if len(path) >= 2 && (path[:2] == "\\\\" || path[:2] == "//") {
+		// This is a simplified UNC split
+		parts := strings.FieldsFunc(path, func(r rune) bool {
+			return r == '/' || r == '\\'
+		})
+		return parts, isAbs
+	}
+
+	// Standard split for Unix absolute or any relative paths
 	parts := strings.FieldsFunc(path, func(r rune) bool {
 		return r == '/' || r == '\\'
 	})
@@ -43,29 +49,28 @@ func Split(path string) ([]string, bool) {
 // If addLeadingSep is true, adds a leading separator (for absolute paths).
 // Special handling: if first part looks like a drive letter (C:), adds separator after it.
 func Join(parts []string, addLeadingSep bool) string {
+	sep := string(filepath.Separator)
+
 	if len(parts) == 0 {
 		if addLeadingSep {
-			return string(filepath.Separator)
+			return sep
 		}
 		return ""
 	}
 
-	result := filepath.Join(parts...)
-
+	var result string
 	// Check if first part is a Windows drive letter
 	if len(parts[0]) == 2 && parts[0][1] == ':' {
-		// Drive letter needs separator after it
 		if len(parts) > 1 {
-			// filepath.Join should have added separator, but ensure it's the OS separator
-			if !strings.HasPrefix(result, parts[0]+string(filepath.Separator)) {
-				result = parts[0] + string(filepath.Separator) + filepath.Join(parts[1:]...)
-			}
-		} else if addLeadingSep || !strings.HasSuffix(result, string(filepath.Separator)) {
-			// Single drive letter, ensure trailing separator
-			result = parts[0] + string(filepath.Separator)
+			result = parts[0] + sep + strings.Join(parts[1:], sep)
+		} else {
+			result = parts[0] + sep
 		}
-	} else if addLeadingSep && !strings.HasPrefix(result, string(filepath.Separator)) {
-		result = string(filepath.Separator) + result
+	} else {
+		result = strings.Join(parts, sep)
+		if addLeadingSep {
+			result = sep + result
+		}
 	}
 
 	return result
@@ -78,18 +83,13 @@ func IsAbs(path string) bool {
 		return false
 	}
 
-	// Unix absolute path
-	if path[0] == '/' {
+	// Unix or Windows absolute path starting with separator
+	if path[0] == '/' || path[0] == '\\' {
 		return true
 	}
 
 	// Windows drive letter (C:\)
 	if len(path) >= 2 && path[1] == ':' {
-		return true
-	}
-
-	// UNC path (\\server\share)
-	if len(path) >= 2 && path[0] == '\\' && path[1] == '\\' {
 		return true
 	}
 

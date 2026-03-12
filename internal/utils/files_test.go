@@ -186,7 +186,7 @@ func TestFilterDeleted(t *testing.T) {
 	paths := []string{f1, f2}
 	got := FilterDeleted(paths)
 
-	if len(got) != 1 || got[0] != f1 {
+	if len(got) != 1 || filepath.ToSlash(got[0]) != filepath.ToSlash(f1) {
 		t.Errorf("Expected [%s], got %v", f1, got)
 	}
 }

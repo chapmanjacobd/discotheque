@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"os"
+	"path/filepath"
 	"testing"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -51,8 +52,8 @@ func setupTestDB(t *testing.T) (*sql.DB, string) {
 
 func TestTracker_UpdatePlayback(t *testing.T) {
 	sqlDB, dbPath := setupTestDB(t)
-	defer sqlDB.Close()
 	defer os.Remove(dbPath)
+	defer sqlDB.Close()
 
 	path := "/test/video.mp4"
 	if _, err := sqlDB.Exec("INSERT INTO media (path) VALUES (?)", path); err != nil {
@@ -84,7 +85,7 @@ func TestTracker_UpdatePlayback(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to query history: %v", err)
 	}
-	if hPath != path {
+	if filepath.ToSlash(hPath) != filepath.ToSlash(path) {
 		t.Errorf("Expected history path %s, got %s", path, hPath)
 	}
 	if hPlayhead != 100 {
@@ -98,7 +99,10 @@ func TestUpdateHistorySimple(t *testing.T) {
 	defer os.Remove(dbPath)
 
 	// Re-open to insert test data
-	dbConn, _ := sql.Open("sqlite3", dbPath)
+	dbConn, err := sql.Open("sqlite3", dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
 	path := "/test/audio.mp3"
 	dbConn.Exec("INSERT INTO media (path) VALUES (?)", path)
 	dbConn.Close()
@@ -108,11 +112,14 @@ func TestUpdateHistorySimple(t *testing.T) {
 	}
 
 	// Verify
-	dbConn, _ = sql.Open("sqlite3", dbPath)
-	defer dbConn.Close()
+	dbVerify, err := sql.Open("sqlite3", dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer dbVerify.Close()
 
 	var done int64
-	err := dbConn.QueryRow("SELECT done FROM history WHERE media_path = ?", path).Scan(&done)
+	err = dbVerify.QueryRow("SELECT done FROM history WHERE media_path = ?", path).Scan(&done)
 	if err != nil {
 		t.Fatalf("Failed to query history: %v", err)
 	}
@@ -150,7 +157,10 @@ func TestUpdateHistoryWithTime(t *testing.T) {
 	defer os.Remove(dbPath)
 
 	path := "old.mp3"
-	dbConn, _ := sql.Open("sqlite3", dbPath)
+	dbConn, err := sql.Open("sqlite3", dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
 	dbConn.Exec("INSERT INTO media (path) VALUES (?)", path)
 	dbConn.Close()
 
@@ -159,10 +169,13 @@ func TestUpdateHistoryWithTime(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	dbConn, _ = sql.Open("sqlite3", dbPath)
-	defer dbConn.Close()
+	dbVerify, err := sql.Open("sqlite3", dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer dbVerify.Close()
 	var lastPlayed int64
-	dbConn.QueryRow("SELECT time_last_played FROM media WHERE path = ?", path).Scan(&lastPlayed)
+	dbVerify.QueryRow("SELECT time_last_played FROM media WHERE path = ?", path).Scan(&lastPlayed)
 	if lastPlayed != customTime {
 		t.Errorf("Expected lastPlayed %d, got %d", customTime, lastPlayed)
 	}
@@ -170,8 +183,8 @@ func TestUpdateHistoryWithTime(t *testing.T) {
 
 func TestDeleteHistoryByPaths(t *testing.T) {
 	sqlDB, dbPath := setupTestDB(t)
-	defer sqlDB.Close()
 	defer os.Remove(dbPath)
+	defer sqlDB.Close()
 
 	path := "todelete.mp4"
 	sqlDB.Exec("INSERT INTO media (path, play_count) VALUES (?, 5)", path)

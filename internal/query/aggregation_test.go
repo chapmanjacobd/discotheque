@@ -201,4 +201,23 @@ func TestAggregatePostFilteringExtra(t *testing.T) {
 	if len(got) != 2 {
 		t.Errorf("FoldersOnly failed: %v", got)
 	}
+
+	t.Run("WindowsStyleBackslashes", func(t *testing.T) {
+		winMedia := []models.MediaWithDB{
+			{Media: models.Media{Path: "C:\\videos\\funny\\cat.mp4", Size: &size100}},
+			{Media: models.Media{Path: "C:\\videos\\funny\\dog.mp4", Size: &size100}},
+		}
+		// Aggregate at depth 2 (C:\videos\funny)
+		agg := AggregateMedia(winMedia, models.GlobalFlags{AggregateFlags: models.AggregateFlags{Depth: 2}})
+		if len(agg) != 1 {
+			t.Errorf("Expected 1 aggregated folder, got %d", len(agg))
+		}
+		expected := filepath.FromSlash("C:/videos")
+		if agg[0].Path != expected {
+			t.Errorf("Expected %s, got %s", expected, agg[0].Path)
+		}
+		if agg[0].Count != 2 {
+			t.Errorf("Expected count 2, got %d", agg[0].Count)
+		}
+	})
 }
