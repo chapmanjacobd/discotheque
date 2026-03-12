@@ -241,7 +241,7 @@ func TestCommonPath(t *testing.T) {
 		"/home/user/vids/v2.mp4",
 		"/home/user/music/a1.mp3",
 	}
-	expected := filepath.FromSlash("/home/user")
+	expected := "/home/user"
 	got := CommonPath(paths)
 	if got != expected {
 		t.Errorf("CommonPath expected %q, got %q", expected, got)
@@ -254,8 +254,8 @@ func TestCommonPathFull(t *testing.T) {
 		"/home/user/vids/action_movie_part2.mp4",
 		"/home/user/vids/action_movie_part3.mp4",
 	}
+	expected := "/home/user/vids"
 	got := CommonPathFull(paths)
-	expected := filepath.FromSlash("/home/user/vids")
 	if got != expected {
 		t.Errorf("CommonPathFull expected %q, got %q", expected, got)
 	}

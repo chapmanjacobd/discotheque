@@ -222,6 +222,7 @@ func AltName(path string) string {
 }
 
 // CommonPath returns the longest common path prefix
+// Always returns forward slashes for cross-platform consistency
 func CommonPath(paths []string) string {
 	if len(paths) == 0 {
 		return ""
@@ -247,14 +248,7 @@ func CommonPath(paths []string) string {
 		}
 	}
 
-	// Preserve original separator style: if any input path has backslashes, use backslashes
-	result := strings.Join(parts, "/")
-	for _, p := range paths {
-		if strings.Contains(p, "\\") {
-			return filepath.FromSlash(result)
-		}
-	}
-	return result
+	return strings.Join(parts, "/")
 }
 
 // CommonPathFull returns a common path prefix.
