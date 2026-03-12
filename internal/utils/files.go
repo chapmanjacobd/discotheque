@@ -231,12 +231,25 @@ func CommonPath(paths []string) string {
 		return filepath.Dir(paths[0])
 	}
 
-	// Use forward slashes internally for consistent splitting
-	p0 := filepath.ToSlash(filepath.Clean(paths[0]))
-	parts := strings.Split(p0, "/")
+	// Clean all paths and split into components
+	// filepath.Clean normalizes separators, but we split on both for cross-platform consistency
+	splitPath := func(p string) []string {
+		p = filepath.Clean(p)
+		// Handle both forward and back slashes
+		parts := strings.FieldsFunc(p, func(r rune) bool {
+			return r == '/' || r == '\\'
+		})
+		// Preserve leading slash for absolute paths
+		if len(p) > 0 && (p[0] == '/' || p[0] == '\\') {
+			parts = append([]string{""}, parts...)
+		}
+		return parts
+	}
+
+	parts := splitPath(paths[0])
 
 	for i := 1; i < len(paths); i++ {
-		p := strings.Split(filepath.ToSlash(filepath.Clean(paths[i])), "/")
+		p := splitPath(paths[i])
 		if len(p) < len(parts) {
 			parts = parts[:len(p)]
 		}
@@ -248,7 +261,19 @@ func CommonPath(paths []string) string {
 		}
 	}
 
-	return strings.Join(parts, "/")
+	// Use filepath.Join to reconstruct the path properly
+	if len(parts) == 0 {
+		return ""
+	}
+	if len(parts) == 1 && parts[0] == "" {
+		return string(filepath.Separator)
+	}
+	result := filepath.Join(parts...)
+	// Ensure leading slash for absolute paths
+	if len(parts) > 0 && parts[0] == "" && !strings.HasPrefix(result, string(filepath.Separator)) {
+		result = string(filepath.Separator) + result
+	}
+	return result
 }
 
 // CommonPathFull returns a common path prefix.

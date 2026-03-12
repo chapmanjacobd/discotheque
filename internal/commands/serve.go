@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -101,7 +100,7 @@ func (c *ServeCmd) authMiddleware(next http.HandlerFunc) http.HandlerFunc {
 
 // isPathBlacklisted checks if a path should be denied access
 func (c *ServeCmd) isPathBlacklisted(path string) bool {
-	p := strings.ToLower(filepath.ToSlash(path))
+	p := strings.ToLower(path)
 	blacklisted := []string{
 		"/etc/passwd",
 		"/etc/shadow",

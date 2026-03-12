@@ -96,10 +96,10 @@ func (m *Media) Extension() string {
 }
 
 func (m *Media) ParentAtDepth(depth int) string {
-	slashPath := filepath.ToSlash(m.Path)
-	isAbs := strings.HasPrefix(slashPath, "/") || (len(slashPath) >= 2 && slashPath[1] == ':')
+	// Check if path is absolute (Unix or Windows)
+	isAbs := strings.HasPrefix(m.Path, "/") || (len(m.Path) >= 2 && m.Path[1] == ':')
 
-	dir := filepath.ToSlash(filepath.Dir(m.Path))
+	dir := filepath.Dir(m.Path)
 	if dir == "." || dir == "" {
 		if depth <= 0 && isAbs {
 			vol := filepath.VolumeName(m.Path)
@@ -122,22 +122,35 @@ func (m *Media) ParentAtDepth(depth int) string {
 		return "."
 	}
 
-	vol := filepath.ToSlash(filepath.VolumeName(m.Path))
+	vol := filepath.VolumeName(m.Path)
 	relDir := strings.TrimPrefix(dir, vol)
-	parts := strings.Split(strings.Trim(relDir, "/"), "/")
+	// Split on both separators for cross-platform support
+	parts := strings.FieldsFunc(relDir, func(r rune) bool {
+		return r == '/' || r == '\\'
+	})
 
 	if depth > len(parts) {
 		depth = len(parts)
 	}
 
-	res := strings.Join(parts[:depth], "/")
+	// Use filepath.Join to reconstruct properly
+	if depth == 0 {
+		if vol != "" {
+			return vol + string(filepath.Separator)
+		}
+		if isAbs {
+			return string(filepath.Separator)
+		}
+		return "."
+	}
+	result := filepath.Join(parts[:depth]...)
 	if vol != "" {
-		return filepath.FromSlash(vol + "/" + res)
+		return vol + string(filepath.Separator) + result
 	}
 	if isAbs {
-		return filepath.FromSlash("/" + res)
+		return string(filepath.Separator) + result
 	}
-	return filepath.FromSlash(res)
+	return result
 }
 
 // MediaWithDB wraps Media with the database path it came from

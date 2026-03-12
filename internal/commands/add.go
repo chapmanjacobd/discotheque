@@ -118,12 +118,10 @@ func (c *AddCmd) Run(ctx *kong.Context) error {
 
 		// Check if this path or a parent is already a playlist
 		isSubpath := false
-		slashRoot := filepath.ToSlash(absRoot)
 		for _, pl := range existingPlaylists {
 			if pl.Path.Valid {
-				slashPl := filepath.ToSlash(pl.Path.String)
-				if slashRoot == slashPl || strings.HasPrefix(slashRoot, slashPl+"/") {
-					slog.Info("Path already covered by existing scan root", "path", filepath.FromSlash(absRoot), "root", filepath.FromSlash(pl.Path.String))
+				if absRoot == pl.Path.String || strings.HasPrefix(absRoot, pl.Path.String+"/") {
+					slog.Info("Path already covered by existing scan root", "path", absRoot, "root", pl.Path.String)
 					isSubpath = true
 					break
 				}
@@ -133,10 +131,9 @@ func (c *AddCmd) Run(ctx *kong.Context) error {
 			continue
 		}
 
-		// Record this new scan root - normalize to forward slashes
-		normalizedRoot := filepath.ToSlash(absRoot)
+		// Record this new scan root
 		queries.InsertPlaylist(context.Background(), db.InsertPlaylistParams{
-			Path:         sql.NullString{String: normalizedRoot, Valid: true},
+			Path:         sql.NullString{String: absRoot, Valid: true},
 			ExtractorKey: sql.NullString{String: "Local", Valid: true},
 		})
 

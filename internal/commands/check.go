@@ -73,8 +73,8 @@ func (c *CheckCmd) Run(ctx *kong.Context) error {
 			err = filepath.WalkDir(absRoot, func(path string, d os.DirEntry, err error) error {
 				if err == nil && !d.IsDir() {
 					absPath, _ := filepath.Abs(path)
-					// Normalize to forward slashes for cross-platform consistency
-					presenceSet[filepath.ToSlash(absPath)] = true
+					// Use path as-is
+					presenceSet[absPath] = true
 				}
 				return nil
 			})

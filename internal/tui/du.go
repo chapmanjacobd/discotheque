@@ -66,9 +66,9 @@ func (m *DUModel) updateList() {
 	if m.currentPath == "" {
 		currentMedia = m.allMedia
 	} else {
-		currentPath := filepath.ToSlash(m.currentPath)
+		currentPath := m.currentPath
 		for _, med := range m.allMedia {
-			if strings.HasPrefix(filepath.ToSlash(med.Path), currentPath) {
+			if strings.HasPrefix(med.Path, currentPath) {
 				currentMedia = append(currentMedia, med)
 			}
 		}
@@ -77,7 +77,7 @@ func (m *DUModel) updateList() {
 	// Determine next depth
 	depth := 1
 	if m.currentPath != "" {
-		depth = strings.Count(filepath.ToSlash(filepath.Clean(m.currentPath)), "/") + 1
+		depth = strings.Count(filepath.Clean(m.currentPath), "/") + 1
 	}
 
 	tempFlags := m.flags
@@ -98,7 +98,7 @@ func (m *DUModel) updateList() {
 	m.totalSize = maxSize
 
 	l := list.New(items, duDelegate{maxSize: maxSize}, 0, 0)
-	l.Title = "🪩  " + StyleLogoPrefix.Render("Disco") + StyleLogoSuffix.Render("theque") + " Disk Usage: " + filepath.FromSlash(m.currentPath)
+	l.Title = "🪩  " + StyleLogoPrefix.Render("Disco") + StyleLogoSuffix.Render("theque") + " Disk Usage: " + m.currentPath
 	if m.currentPath == "" {
 		l.Title = "🪩  " + StyleLogoPrefix.Render("Disco") + StyleLogoSuffix.Render("theque") + " Disk Usage: Root"
 	}

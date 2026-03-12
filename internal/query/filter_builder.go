@@ -897,7 +897,7 @@ func ScanMedia(rows *sql.Rows, dbPath string) ([]models.MediaWithDB, error) {
 			val := values[i]
 			switch strings.ToLower(col) {
 			case "path":
-				m.Path = filepath.ToSlash(utils.GetString(val))
+				m.Path = utils.GetString(val)
 			case "title":
 				m.Title = sql.NullString{String: utils.GetString(val), Valid: true}
 			case "duration":
@@ -1253,8 +1253,8 @@ func (qe *QueryExecutor) FetchSiblings(ctx context.Context, media []models.Media
 	parentToFiles := make(map[string][]models.MediaWithDB)
 	for _, m := range media {
 		dir := m.Parent()
-		if !strings.HasSuffix(dir, string(filepath.Separator)) {
-			dir += string(filepath.Separator)
+		if !strings.HasSuffix(dir, "/") {
+			dir += "/"
 		}
 		parentToFiles[dir] = append(parentToFiles[dir], m)
 	}

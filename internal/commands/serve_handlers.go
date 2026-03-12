@@ -873,8 +873,8 @@ func (c *ServeCmd) handleDU(w http.ResponseWriter, r *http.Request) {
 	flags := c.parseFlags(r)
 	path := r.URL.Query().Get("path")
 
-	// Clean and normalize the path to use forward slashes
-	cleanPath := filepath.ToSlash(filepath.Clean(path))
+	// Clean the path
+	cleanPath := filepath.Clean(path)
 	if cleanPath == "." || cleanPath == "/" {
 		cleanPath = ""
 	}
@@ -923,8 +923,7 @@ func (c *ServeCmd) handleDU(w http.ResponseWriter, r *http.Request) {
 
 	for i := range allMedia {
 		media := &allMedia[i]
-		// Normalize media path to use forward slashes for internal logic and API response
-		media.Path = filepath.ToSlash(media.Path)
+		// Use path as-is
 		filePath := media.Path
 
 		// Calculate the file's depth (number of path components)

@@ -85,9 +85,8 @@ func (c *DiskUsageCmd) Run(ctx *kong.Context) error {
 				return nil
 			}
 
-			// Normalize to forward slashes for cross-platform consistency
-			normalizedPath := filepath.ToSlash(path)
-			meta, err := metadata.Extract(context.Background(), normalizedPath, flags.ScanSubtitles)
+			// Use path as-is
+			meta, err := metadata.Extract(context.Background(), path, flags.ScanSubtitles)
 			if err != nil {
 				return nil
 			}

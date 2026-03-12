@@ -135,7 +135,7 @@ func PathToMpvWatchLaterMD5(path string) string {
 		}
 	}
 	// mpv uses forward slashes even on Windows for its MD5 hash
-	slashPath := filepath.ToSlash(abs)
+	slashPath := strings.ReplaceAll(abs, "\\", "/")
 	hash := md5.Sum([]byte(slashPath))
 	return strings.ToUpper(hex.EncodeToString(hash[:]))
 }
