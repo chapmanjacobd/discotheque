@@ -36,8 +36,32 @@ func (c *ReadmeCmd) Run(ctx *kong.Context) error {
 
 	sb.WriteString("# discoteca\n\n")
 	sb.WriteString("Golang implementation of xklb/library\n\n")
-	sb.WriteString("## Install\n\n")
-	sb.WriteString("    go install github.com/chapmanjacobd/discoteca/cmd/disco@latest\n\n")
+	sb.WriteString("## Quick Install\n\n")
+	sb.WriteString("```bash\n")
+	sb.WriteString("go install github.com/chapmanjacobd/discoteca/cmd/disco@latest\n")
+	sb.WriteString("```\n\n")
+
+	sb.WriteString("## Dependencies\n\n")
+	sb.WriteString("**Required:** None (SQLite is embedded via CGO)\n\n")
+	sb.WriteString("**Optional:**\n")
+	sb.WriteString("- `ffmpeg` - Media transcoding, streaming, duration detection\n")
+	sb.WriteString("- `calibre` - Ebook conversion (EPUB, MOBI, PDF)\n")
+	sb.WriteString("- `espeak-ng` - Text-to-speech generation\n")
+	sb.WriteString("- `mpv` - Playback control\n\n")
+	sb.WriteString("See [INSTALL.md](INSTALL.md) for installation instructions on your platform.\n\n")
+
+	sb.WriteString("## Pre-built Binaries\n\n")
+	sb.WriteString("Download from [GitHub Releases](https://github.com/chapmanjacobd/discoteca/releases) for:\n")
+	sb.WriteString("- **Linux**: amd64, arm64\n")
+	sb.WriteString("- **Windows**: amd64\n")
+	sb.WriteString("- **macOS**: amd64, arm64 (Apple Silicon)\n\n")
+	sb.WriteString("## Build from Source\n\n")
+	sb.WriteString("```bash\n")
+	sb.WriteString("git clone https://github.com/chapmanjacobd/discoteca.git\n")
+	sb.WriteString("cd discoteca\n")
+	sb.WriteString("go build -tags \"fts5\" -o disco ./cmd/disco\n")
+	sb.WriteString("```\n\n")
+
 	sb.WriteString("## Usage\n\n")
 
 	examples := map[string][]string{

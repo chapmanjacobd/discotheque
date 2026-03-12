@@ -107,11 +107,13 @@ func whichFilename() string {
 func doUpdate(url string) bool {
 	curp, err := os.Executable()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "couldn't get os.Executable:", err)
+		fmt.Fprintln(Stderr,
+			"couldn't get os.Executable:", err)
 		return false
 	}
 	if doUpdateAt(curp, url) {
-		fmt.Fprintln(os.Stderr, "new version downloaded, exiting to get restarted")
+		fmt.Fprintln(Stderr,
+			"new version downloaded, exiting to get restarted")
 		return true
 	}
 	return false
@@ -161,20 +163,23 @@ func doUpdateAt(curp, url string) bool {
 
 	f, err := os.Create(newp)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "couldn't make file to update:", err)
+		fmt.Fprintln(Stderr,
+			"couldn't make file to update:", err)
 		return false
 	}
 	defer f.Close()
 
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "error creating request:", err)
+		fmt.Fprintln(Stderr,
+			"error creating request:", err)
 		return false
 	}
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "couldn't download update:", err)
+		fmt.Fprintln(Stderr,
+			"couldn't download update:", err)
 		return false
 	}
 	defer resp.Body.Close()
@@ -182,40 +187,47 @@ func doUpdateAt(curp, url string) bool {
 	// 1. Read the update into a buffer so we can checksum it
 	data, err := io.ReadAll(resp.Body)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "couldn't read update:", err)
+		fmt.Fprintln(Stderr,
+			"couldn't read update:", err)
 		return false
 	}
 
 	// 2. Download checksum if available
 	if err := verifyChecksum(ctx, url, data); err != nil {
-		fmt.Fprintln(os.Stderr, "checksum verification failed:", err)
+		fmt.Fprintln(Stderr,
+			"checksum verification failed:", err)
 		return false
 	}
 
 	// 3. Decompress and write
 	xzr, err := xz.NewReader(bytes.NewReader(data))
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "couldn't decompress update:", err)
+		fmt.Fprintln(Stderr,
+			"couldn't decompress update:", err)
 		return false
 	}
 
 	if _, err = io.Copy(f, xzr); err != nil {
-		fmt.Fprintln(os.Stderr, "couldn't write update:", err)
+		fmt.Fprintln(Stderr,
+			"couldn't write update:", err)
 		return false
 	}
 
 	if err := os.Chmod(newp, 0o755); err != nil {
-		fmt.Fprintln(os.Stderr, "couldn't chmod update:", err)
+		fmt.Fprintln(Stderr,
+			"couldn't chmod update:", err)
 		return false
 	}
 
 	if err := os.Rename(curp, oldp); err != nil {
-		fmt.Fprintln(os.Stderr, "couldn't rename original file:", err)
+		fmt.Fprintln(Stderr,
+			"couldn't rename original file:", err)
 		return false
 	}
 
 	if err := os.Rename(newp, curp); err != nil {
-		fmt.Fprintln(os.Stderr, "couldn't rename new file:", err)
+		fmt.Fprintln(Stderr,
+			"couldn't rename new file:", err)
 		os.Rename(oldp, curp) // Try to rollback
 		return false
 	}

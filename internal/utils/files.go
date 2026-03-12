@@ -6,6 +6,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -160,6 +161,19 @@ func IsFileOpen(path string) bool {
 		return false
 	}
 
+	if runtime.GOOS == "darwin" {
+		absPath, err := filepath.Abs(path)
+		if err != nil {
+			absPath = path
+		}
+		// On macOS, use lsof -t to check if any process has the file open
+		cmd := exec.Command("lsof", "-t", absPath)
+		if err := cmd.Run(); err == nil {
+			return true
+		}
+		return false
+	}
+
 	if runtime.GOOS == "linux" {
 		absPath, err := filepath.Abs(path)
 		if err != nil {
@@ -234,7 +248,7 @@ func DetectMimeType(path string) string {
 // Rename renames a file, respecting simulation mode
 func Rename(flags models.GlobalFlags, src, dst string) error {
 	if flags.Simulate {
-		fmt.Printf("rename %s %s\n", src, dst)
+		fmt.Fprintf(Stdout, "rename %s %s\n", src, dst)
 		return nil
 	}
 	slog.Debug("rename", "src", src, "dst", dst)
@@ -244,7 +258,7 @@ func Rename(flags models.GlobalFlags, src, dst string) error {
 // Unlink deletes a file, respecting simulation mode
 func Unlink(flags models.GlobalFlags, path string) error {
 	if flags.Simulate {
-		fmt.Printf("unlink %s\n", path)
+		fmt.Fprintf(Stdout, "unlink %s\n", path)
 		return nil
 	}
 	slog.Debug("unlink", "path", path)
@@ -254,7 +268,7 @@ func Unlink(flags models.GlobalFlags, path string) error {
 // Rmtree deletes a directory tree, respecting simulation mode
 func Rmtree(flags models.GlobalFlags, path string) error {
 	if flags.Simulate {
-		fmt.Printf("rmtree %s\n", path)
+		fmt.Fprintf(Stdout, "rmtree %s\n", path)
 		return nil
 	}
 	slog.Debug("rmtree", "path", path)

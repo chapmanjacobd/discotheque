@@ -9,7 +9,7 @@ else
 	EXE=
 endif
 
-all: fmt lint sql test build webtest webbuild readme
+all: fmt lint sql test webtest webbuild build readme
 
 ubuntu-deps:
 	sudo apt-get update && sudo apt-get install -y \
@@ -39,7 +39,6 @@ macos-deps:
 	brew install ffmpeg pandoc calibre sqlite
 
 go-deps:
-
 	go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest
 	go install honnef.co/go/tools/cmd/staticcheck@latest
 	go install golang.org/x/tools/cmd/goimports@latest
@@ -47,13 +46,13 @@ go-deps:
 	go install github.com/daixiang0/gci@latest
 
 web-install:
-	npm install --prefix web
+	cd web && npm install
 
 webbuild:
-	npm run build --prefix web
+	cd web && npm run build
 
 build: webbuild
-	go build -tags "$(BUILD_TAGS)" -o $(BINARY_NAME) ./cmd/disco
+	go build -tags "$(BUILD_TAGS)" -o $(BINARY_NAME)$(EXE) ./cmd/disco
 
 # Build with FTS5 support (default)
 build-fts5:
@@ -82,10 +81,10 @@ cover:
 	go tool cover -func=coverage.out | awk '{n=split($$NF,a,"%%"); if (a[1] < 85) print $$0}' | sort -k3 -n
 
 webtest:
-	npm test --prefix web
+	cd web && npm test
 
 webcover:
-	npm run cover --prefix web
+	cd web && npm run cover
 
 e2e-install:
 	cd e2e && npm install && npx playwright install --with-deps
@@ -121,6 +120,7 @@ sql:
 clean:
 	rm -f $(BINARY_NAME)
 	rm -f test.db
+	rm -f $(BINARY_NAME).exe
 	rm -f coverage.out
 
 # Install the binary to $GOPATH/bin
@@ -129,4 +129,4 @@ install:
 
 release-build: webbuild
 	mkdir -p dist
-	GOOS=$(GOOS) GOARCH=$(GOARCH) go build -tags "$(BUILD_TAGS)" -o dist/$(BINARY_NAME)-$(GOOS)-$(GOARCH) ./cmd/disco
+	GOOS=$(GOOS) GOARCH=$(GOARCH) go build -tags "$(BUILD_TAGS)" -o dist/$(BINARY_NAME)-$(GOOS)-$(GOARCH)$(EXE) ./cmd/disco

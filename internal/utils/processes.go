@@ -3,7 +3,6 @@ package utils
 import (
 	"context"
 	"fmt"
-	"os"
 	"os/exec"
 	"strings"
 	"syscall"
@@ -59,9 +58,9 @@ func CmdDetach(name string, args ...string) error {
 // CmdInteractive runs a command connected to the current process's terminal
 func CmdInteractive(name string, args ...string) error {
 	cmd := exec.Command(name, args...)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	cmd.Stdin = os.Stdin
+	cmd.Stdout = Stdout
+	cmd.Stderr = Stderr
+	cmd.Stdin = Stdin
 
 	return cmd.Run()
 }

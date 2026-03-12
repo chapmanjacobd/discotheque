@@ -2,30 +2,11 @@
 
 Golang implementation of xklb/library
 
-## Install
-
-### Quick Install
+## Quick Install
 
 ```bash
 go install github.com/chapmanjacobd/discoteca/cmd/disco@latest
 ```
-
-### Pre-built Binaries
-
-Download from [GitHub Releases](https://github.com/chapmanjacobd/discoteca/releases) for:
-- **Linux**: amd64, arm64
-- **Windows**: amd64
-- **macOS**: amd64, arm64 (Apple Silicon)
-
-### Build from Source
-
-```bash
-git clone https://github.com/chapmanjacobd/discoteca.git
-cd discoteca
-go build -tags "fts5" -o disco ./cmd/disco
-```
-
-See [INSTALL.md](INSTALL.md) for detailed platform-specific instructions and optional dependencies.
 
 ## Dependencies
 
@@ -38,6 +19,21 @@ See [INSTALL.md](INSTALL.md) for detailed platform-specific instructions and opt
 - `mpv` - Playback control
 
 See [INSTALL.md](INSTALL.md) for installation instructions on your platform.
+
+## Pre-built Binaries
+
+Download from [GitHub Releases](https://github.com/chapmanjacobd/discoteca/releases) for:
+- **Linux**: amd64, arm64
+- **Windows**: amd64
+- **macOS**: amd64, arm64 (Apple Silicon)
+
+## Build from Source
+
+```bash
+git clone https://github.com/chapmanjacobd/discoteca.git
+cd discoteca
+go build -tags "fts5" -o disco ./cmd/disco
+```
 
 ## Usage
 
@@ -412,6 +408,8 @@ Flags:
         Use full-text search if available
   --fts-table
         FTS table name
+  --use-bleve
+        Use Bleve full-text search index
   -R, --related
         Find media related to the first result
 ```
@@ -571,6 +569,8 @@ Flags:
         Use full-text search if available
   --fts-table
         FTS table name
+  --use-bleve
+        Use Bleve full-text search index
   -R, --related
         Find media related to the first result
 ```
@@ -607,6 +607,8 @@ Flags:
         Use full-text search if available
   --fts-table
         FTS table name
+  --use-bleve
+        Use Bleve full-text search index
   -R, --related
         Find media related to the first result
   --category
@@ -2248,6 +2250,8 @@ Flags:
         Use full-text search if available
   --fts-table
         FTS table name
+  --use-bleve
+        Use Bleve full-text search index
   -R, --related
         Find media related to the first result
   -O, --play-in-order
@@ -2507,6 +2511,8 @@ Flags:
         Use full-text search if available
   --fts-table
         FTS table name
+  --use-bleve
+        Use Bleve full-text search index
   -R, --related
         Find media related to the first result
   -O, --play-in-order
@@ -3503,6 +3509,8 @@ Flags:
         Use full-text search if available
   --fts-table
         FTS table name
+  --use-bleve
+        Use Bleve full-text search index
   -R, --related
         Find media related to the first result
 ```
@@ -3755,6 +3763,8 @@ Flags:
         Use full-text search if available
   --fts-table
         FTS table name
+  --use-bleve
+        Use Bleve full-text search index
   -R, --related
         Find media related to the first result
   -O, --play-in-order

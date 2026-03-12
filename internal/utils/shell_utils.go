@@ -14,7 +14,7 @@ import (
 // RenameMoveFile moves a file from src to dst, creating parent directories if needed
 func RenameMoveFile(flags models.GlobalFlags, src, dst string) error {
 	if flags.Simulate {
-		fmt.Printf("mv %s %s\n", shellquote.ShellQuote(src), shellquote.ShellQuote(dst))
+		fmt.Fprintf(Stdout, "mv %s %s\n", shellquote.ShellQuote(src), shellquote.ShellQuote(dst))
 		return nil
 	}
 
@@ -61,7 +61,7 @@ func Trash(flags models.GlobalFlags, path string) error {
 	}
 
 	if flags.Simulate {
-		fmt.Printf("trash %s\n", shellquote.ShellQuote(path))
+		fmt.Fprintf(Stdout, "trash %s\n", shellquote.ShellQuote(path))
 		return nil
 	}
 

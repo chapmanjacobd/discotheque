@@ -12,6 +12,7 @@ import (
 var (
 	Stdin  io.Reader = os.Stdin
 	Stdout io.Writer = os.Stdout
+	Stderr io.Writer = os.Stderr
 )
 
 func FileExists(path string) bool {

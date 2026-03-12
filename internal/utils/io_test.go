@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"io"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -97,7 +98,12 @@ line2`
 
 func TestConfirm(t *testing.T) {
 	origStdin := Stdin
-	defer func() { Stdin = origStdin }()
+	origStdout := Stdout
+	defer func() {
+		Stdin = origStdin
+		Stdout = origStdout
+	}()
+	Stdout = io.Discard
 
 	tests := []struct {
 		input string
@@ -122,7 +128,12 @@ func TestConfirm(t *testing.T) {
 
 func TestPrompt(t *testing.T) {
 	origStdin := Stdin
-	defer func() { Stdin = origStdin }()
+	origStdout := Stdout
+	defer func() {
+		Stdin = origStdin
+		Stdout = origStdout
+	}()
+	Stdout = io.Discard
 
 	input := "test response\n"
 	Stdin = strings.NewReader(input)
