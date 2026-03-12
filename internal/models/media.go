@@ -79,7 +79,7 @@ func PlaylistFromDB(p db.Playlists, dbPath string) Playlist {
 }
 
 func (m *Media) Parent() string {
-	return filepath.ToSlash(filepath.Dir(m.Path))
+	return filepath.Dir(m.Path)
 }
 
 func (m *Media) Stem() string {
@@ -96,23 +96,56 @@ func (m *Media) Extension() string {
 }
 
 func (m *Media) ParentAtDepth(depth int) string {
-	dir := filepath.ToSlash(filepath.Dir(m.Path))
-	if dir == "." || dir == "/" || dir == "" {
-		return "/"
+	dir := filepath.Clean(m.Path)
+	if !filepath.IsAbs(dir) {
+		// For relative paths, we might want to handle them differently or just use Dir
+		dir = filepath.Dir(dir)
+	} else {
+		dir = filepath.Dir(dir)
 	}
 
-	parts := strings.Split(strings.TrimPrefix(dir, "/"), "/")
+	if dir == "." || dir == string(filepath.Separator) || dir == "" {
+		return string(filepath.Separator)
+	}
+
+	// Split by system separator
+	parts := strings.Split(dir, string(filepath.Separator))
+
+	// Handle leading separator for absolute paths
+	isAbs := filepath.IsAbs(dir)
+	if isAbs && len(parts) > 0 && parts[0] == "" {
+		// Unix-like absolute path /dir/sub
+		if depth <= 0 {
+			return string(filepath.Separator)
+		}
+		if depth >= len(parts) {
+			return dir
+		}
+		return strings.Join(parts[:depth+1], string(filepath.Separator))
+	}
+
+	if !isAbs {
+		if depth <= 0 {
+			return "."
+		}
+		if depth >= len(parts) {
+			return dir
+		}
+		return strings.Join(parts[:depth], string(filepath.Separator))
+	}
+
+	// Windows absolute path C:\dir\sub
 	if depth <= 0 {
-		return "/"
+		// Drive root
+		if len(parts) > 0 && strings.Contains(parts[0], ":") {
+			return parts[0] + string(filepath.Separator)
+		}
+		return string(filepath.Separator)
 	}
-	if depth > len(parts) {
-		depth = len(parts)
+	if depth >= len(parts) {
+		return dir
 	}
-	res := "/" + strings.Join(parts[:depth], "/")
-	if res == "//" {
-		return "/"
-	}
-	return res
+	return strings.Join(parts[:depth+1], string(filepath.Separator))
 }
 
 // MediaWithDB wraps Media with the database path it came from

@@ -36,9 +36,9 @@ func TestTrimPathSegments(t *testing.T) {
 		desiredLength int
 		expected      string
 	}{
-		{"/aaaaaaaaaa/fans/001.jpg", 16, filepath.FromSlash("/a/fans/001.jpg")},
-		{"/ao/bo/co/do/eo/fo/go/ho", 13, filepath.FromSlash("/a/b/.../g/ho")},
-		{"/a/b/c", 10, filepath.FromSlash("/a/b/c")},
+		{filepath.FromSlash("/aaaaaaaaaa/fans/001.jpg"), 16, filepath.FromSlash("/a/fans/001.jpg")},
+		{filepath.FromSlash("/ao/bo/co/do/eo/fo/go/ho"), 13, filepath.FromSlash("/a/b/.../g/ho")},
+		{filepath.FromSlash("/a/b/c"), 10, filepath.FromSlash("/a/b/c")},
 	}
 
 	for _, tt := range tests {
@@ -50,7 +50,7 @@ func TestTrimPathSegments(t *testing.T) {
 }
 
 func TestRelativize(t *testing.T) {
-	if got := Relativize("/home/user/file"); got != filepath.FromSlash("home/user/file") {
+	if got := Relativize(filepath.FromSlash("/home/user/file")); got != filepath.FromSlash("home/user/file") {
 		t.Errorf("Relativize(/home/user/file) = %q, want home/user/file", got)
 	}
 }

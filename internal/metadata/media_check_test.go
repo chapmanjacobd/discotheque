@@ -7,22 +7,49 @@ import (
 	"testing"
 )
 
+func createMock(t *testing.T, tmpDir, name, content string) string {
+	fullName := name
+	if runtime.GOOS == "windows" {
+		fullName += ".bat"
+	}
+	path := filepath.Join(tmpDir, fullName)
+
+	actualContent := content
+	if runtime.GOOS == "windows" {
+		if name == "ffmpeg" {
+			actualContent = `@echo off
+for %%a in (%*) do (
+    if "%%a"=="20.00" exit /b 1
+)
+exit /b 0`
+		} else if name == "ffprobe" {
+			// On Windows, escaping JSON for echo in a .bat is painful.
+			// We'll use a slightly more robust approach by escaping quotes.
+			escaped := strings.ReplaceAll(content, "\"", "^\"")
+			actualContent = "@echo off\necho " + escaped
+		}
+	} else {
+		actualContent = "#!/bin/sh\n" + content
+	}
+
+	if err := os.WriteFile(path, []byte(actualContent), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
 func TestDecodeQuickScan_MockFFmpeg(t *testing.T) {
 	tmpDir, _ := os.MkdirTemp("", "mock-ffmpeg-path")
 	defer os.RemoveAll(tmpDir)
 
-	mockFFmpeg := filepath.Join(tmpDir, "ffmpeg")
-	// Mock ffmpeg that succeeds for some inputs and fails for others
-	script := `#!/bin/sh
-# If -ss 20.00 is present, fail
+	createMock(t, tmpDir, "ffmpeg", `
 for arg in "$@"; do
     if [ "$arg" = "20.00" ]; then
         exit 1
     fi
 done
 exit 0
-`
-	os.WriteFile(mockFFmpeg, []byte(script), 0o755)
+`)
 
 	oldPath := os.Getenv("PATH")
 	os.Setenv("PATH", tmpDir+string(os.PathListSeparator)+oldPath)
@@ -41,9 +68,7 @@ func TestDecodeFullScan_MockFFProbe(t *testing.T) {
 	tmpDir, _ := os.MkdirTemp("", "mock-ffprobe-path")
 	defer os.RemoveAll(tmpDir)
 
-	mockFFProbe := filepath.Join(tmpDir, "ffprobe")
-	script := `#!/bin/sh
-echo '{
+	createMock(t, tmpDir, "ffprobe", `echo '{
   "streams": [
     {
       "r_frame_rate": "30/1",
@@ -53,9 +78,7 @@ echo '{
   "format": {
     "duration": "100.0"
   }
-}'
-`
-	os.WriteFile(mockFFProbe, []byte(script), 0o755)
+}'`)
 
 	oldPath := os.Getenv("PATH")
 	os.Setenv("PATH", tmpDir+string(os.PathListSeparator)+oldPath)

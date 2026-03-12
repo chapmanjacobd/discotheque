@@ -20,9 +20,9 @@ func TestFileCountsFiltering(t *testing.T) {
 	if err := testutils.InitTestDBNoFTS(dbConn); err != nil {
 		t.Fatalf("Failed to init test DB: %v", err)
 	}
-	dbConn.Exec("INSERT INTO media (path) VALUES ('/show/s1e1.mp4')")
-	dbConn.Exec("INSERT INTO media (path) VALUES ('/show/s1e2.mp4')")
-	dbConn.Exec("INSERT INTO media (path) VALUES ('/movie/m1.mp4')")
+	dbConn.Exec("INSERT INTO media (path) VALUES (?)", filepath.FromSlash("/show/s1e1.mp4"))
+	dbConn.Exec("INSERT INTO media (path) VALUES (?)", filepath.FromSlash("/show/s1e2.mp4"))
+	dbConn.Exec("INSERT INTO media (path) VALUES (?)", filepath.FromSlash("/movie/m1.mp4"))
 	dbConn.Close()
 
 	ctx := context.Background()
@@ -45,7 +45,7 @@ func TestFileCountsFiltering(t *testing.T) {
 	if len(got) != 1 {
 		t.Errorf("Expected 1 result, got %d", len(got))
 	}
-	if got[0].Path != "/movie/m1.mp4" {
+	if got[0].Path != filepath.FromSlash("/movie/m1.mp4") {
 		t.Errorf("Expected movie file, got %s", got[0].Path)
 	}
 }
@@ -60,10 +60,10 @@ func TestFileCountsMediaQueryCount(t *testing.T) {
 	if err := testutils.InitTestDBNoFTS(dbConn); err != nil {
 		t.Fatalf("Failed to init test DB: %v", err)
 	}
-	dbConn.Exec("INSERT INTO media (path) VALUES ('/show/s1e1.mp4')")
-	dbConn.Exec("INSERT INTO media (path) VALUES ('/show/s1e2.mp4')")
-	dbConn.Exec("INSERT INTO media (path) VALUES ('/show/s1e3.mp4')")
-	dbConn.Exec("INSERT INTO media (path) VALUES ('/movie/m1.mp4')")
+	dbConn.Exec("INSERT INTO media (path) VALUES (?)", filepath.FromSlash("/show/s1e1.mp4"))
+	dbConn.Exec("INSERT INTO media (path) VALUES (?)", filepath.FromSlash("/show/s1e2.mp4"))
+	dbConn.Exec("INSERT INTO media (path) VALUES (?)", filepath.FromSlash("/show/s1e3.mp4"))
+	dbConn.Exec("INSERT INTO media (path) VALUES (?)", filepath.FromSlash("/movie/m1.mp4"))
 	dbConn.Close()
 
 	ctx := context.Background()
@@ -102,13 +102,13 @@ func TestFetchSiblings(t *testing.T) {
 	if err := testutils.InitTestDBNoFTS(dbConn); err != nil {
 		t.Fatalf("Failed to init test DB: %v", err)
 	}
-	dbConn.Exec("INSERT INTO media (path) VALUES ('/dir/file1.mp4')")
-	dbConn.Exec("INSERT INTO media (path) VALUES ('/dir/file2.mp4')")
-	dbConn.Exec("INSERT INTO media (path) VALUES ('/other/file3.mp4')")
+	dbConn.Exec("INSERT INTO media (path) VALUES (?)", filepath.FromSlash("/dir/file1.mp4"))
+	dbConn.Exec("INSERT INTO media (path) VALUES (?)", filepath.FromSlash("/dir/file2.mp4"))
+	dbConn.Exec("INSERT INTO media (path) VALUES (?)", filepath.FromSlash("/other/file3.mp4"))
 	dbConn.Close()
 
 	media := []models.MediaWithDB{
-		{Media: models.Media{Path: "/dir/file1.mp4"}, DB: dbPath},
+		{Media: models.Media{Path: filepath.FromSlash("/dir/file1.mp4")}, DB: dbPath},
 	}
 
 	// Fetch all siblings in the same directory

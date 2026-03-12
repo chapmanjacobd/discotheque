@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"path/filepath"
 	"testing"
 
 	"github.com/chapmanjacobd/discoteca/internal/models"
@@ -11,9 +12,9 @@ func TestDUModel(t *testing.T) {
 	v1Size := int64(1000)
 	v2Size := int64(2000)
 	media := []models.MediaWithDB{
-		{Media: models.Media{Path: "/home/user/vids/v1.mp4", Size: &v1Size}},
-		{Media: models.Media{Path: "/home/user/vids/v2.mp4", Size: &v2Size}},
-		{Media: models.Media{Path: "/home/user/music/m1.mp3", Size: &v2Size}},
+		{Media: models.Media{Path: filepath.FromSlash("/home/user/vids/v1.mp4"), Size: &v1Size}},
+		{Media: models.Media{Path: filepath.FromSlash("/home/user/vids/v2.mp4"), Size: &v2Size}},
+		{Media: models.Media{Path: filepath.FromSlash("/home/user/music/m1.mp3"), Size: &v2Size}},
 	}
 
 	m := NewDUModel(media, models.GlobalFlags{})
@@ -57,7 +58,7 @@ func TestDUModel(t *testing.T) {
 
 func TestDUItem(t *testing.T) {
 	stats := models.FolderStats{
-		Path:          "/test/path",
+		Path:          filepath.FromSlash("/test/path"),
 		Count:         5,
 		TotalSize:     5000,
 		TotalDuration: 120,
@@ -66,7 +67,7 @@ func TestDUItem(t *testing.T) {
 	if item.Title() != "📁 path" {
 		t.Errorf("Unexpected title: %s", item.Title())
 	}
-	if item.FilterValue() != "/test/path" {
+	if item.FilterValue() != filepath.FromSlash("/test/path") {
 		t.Errorf("Unexpected filter value: %s", item.FilterValue())
 	}
 	desc := item.Description()

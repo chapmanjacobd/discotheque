@@ -34,9 +34,15 @@ func Repair(dbPath string) error {
 		return nil
 	}
 
-	if _, err := exec.LookPath("sqlite3"); err != nil {
-		return fmt.Errorf("sqlite3 command line tool is required for auto-repair")
+	sqliteTool := "sqlite3"
+	if _, err := exec.LookPath(sqliteTool); err != nil {
+		if _, err := exec.LookPath("sqlite3.exe"); err == nil {
+			sqliteTool = "sqlite3.exe"
+		} else {
+			return fmt.Errorf("sqlite3 command line tool is required for auto-repair. Please ensure it is in your PATH")
+		}
 	}
+	slog.Debug("Using sqlite3 tool", "path", sqliteTool)
 
 	// 4. Backup
 	now := time.Now().Unix()
@@ -67,7 +73,7 @@ func Repair(dbPath string) error {
 	repairStepSuccess := false
 	slog.Info("Trying recovery via .dump...")
 	// On Windows, use cmd /c and redirection instead of bash
-	cmdDump := exec.Command("cmd", "/c", fmt.Sprintf("sqlite3 %s \".dump\" | sqlite3 %s", quotedCorrupt, quotedDB))
+	cmdDump := exec.Command("cmd", "/c", fmt.Sprintf("%s %s \".dump\" | %s %s", sqliteTool, quotedCorrupt, sqliteTool, quotedDB))
 	out, err := cmdDump.CombinedOutput()
 	if err == nil {
 		slog.Info("Initial recovery step successful via .dump")
@@ -77,7 +83,7 @@ func Repair(dbPath string) error {
 		os.Remove(dbPath)
 
 		// Fallback to .recover
-		cmdRecover := exec.Command("cmd", "/c", fmt.Sprintf("sqlite3 %s \".recover\" \".quit\" | sqlite3 %s", quotedCorrupt, quotedDB))
+		cmdRecover := exec.Command("cmd", "/c", fmt.Sprintf("%s %s \".recover\" \".quit\" | %s %s", sqliteTool, quotedCorrupt, sqliteTool, quotedDB))
 		out, err = cmdRecover.CombinedOutput()
 		if err == nil {
 			slog.Info("Initial recovery step successful via .recover")

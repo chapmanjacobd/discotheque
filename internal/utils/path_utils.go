@@ -34,7 +34,7 @@ func RandomFilename(path string) string {
 // It uses a fish-shell style where parent/grandparent segments are reduced to their first letter.
 func TrimPathSegments(path string, desiredLength int) string {
 	if len(path) <= desiredLength {
-		return path
+		return filepath.FromSlash(path)
 	}
 
 	ext := filepath.Ext(path)

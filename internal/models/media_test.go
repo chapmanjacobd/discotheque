@@ -10,7 +10,7 @@ import (
 
 func TestFromDB(t *testing.T) {
 	dbMedia := db.Media{
-		Path:     "/test/movie.mp4",
+		Path:     filepath.FromSlash("/test/movie.mp4"),
 		Title:    sql.NullString{String: "Test Movie", Valid: true},
 		Size:     sql.NullInt64{Int64: 1024, Valid: true},
 		Duration: sql.NullInt64{Valid: false},
@@ -18,8 +18,8 @@ func TestFromDB(t *testing.T) {
 
 	media := FromDB(dbMedia)
 
-	if media.Path != "/test/movie.mp4" {
-		t.Errorf("Expected path /test/movie.mp4, got %s", media.Path)
+	if media.Path != filepath.FromSlash("/test/movie.mp4") {
+		t.Errorf("Expected path %s, got %s", filepath.FromSlash("/test/movie.mp4"), media.Path)
 	}
 
 	if media.Title == nil || *media.Title != "Test Movie" {
@@ -45,19 +45,19 @@ func TestFromDB(t *testing.T) {
 func TestPlaylistFromDB(t *testing.T) {
 	dbPlaylist := db.Playlists{
 		ID:           1,
-		Path:         sql.NullString{String: "/test/playlist", Valid: true},
+		Path:         sql.NullString{String: filepath.FromSlash("/test/playlist"), Valid: true},
 		Title:        sql.NullString{String: "Test Playlist", Valid: true},
 		ExtractorKey: sql.NullString{Valid: false},
 	}
-	dbPath := "/path/to/db"
+	dbPath := filepath.FromSlash("/path/to/db")
 
 	p := PlaylistFromDB(dbPlaylist, dbPath)
 
 	if p.ID != 1 {
 		t.Errorf("Expected ID 1, got %d", p.ID)
 	}
-	if p.Path == nil || *p.Path != "/test/playlist" {
-		t.Errorf("Expected path /test/playlist, got %v", p.Path)
+	if p.Path == nil || *p.Path != filepath.FromSlash("/test/playlist") {
+		t.Errorf("Expected path %s, got %v", filepath.FromSlash("/test/playlist"), p.Path)
 	}
 	if p.Title == nil || *p.Title != "Test Playlist" {
 		t.Errorf("Expected title Test Playlist, got %v", p.Title)
@@ -73,7 +73,7 @@ func TestPlaylistFromDB(t *testing.T) {
 func TestMedia_Parent(t *testing.T) {
 	m := Media{Path: filepath.FromSlash("/dir/sub/file.mp4")}
 	if got := m.Parent(); got != filepath.FromSlash("/dir/sub") {
-		t.Errorf("Parent() = %v, want /dir/sub", got)
+		t.Errorf("Parent() = %v, want %v", got, filepath.FromSlash("/dir/sub"))
 	}
 }
 
@@ -122,14 +122,14 @@ func TestMedia_ParentAtDepth(t *testing.T) {
 
 func TestFromDBWithDB(t *testing.T) {
 	dbMedia := db.Media{
-		Path: "/test/movie.mp4",
+		Path: filepath.FromSlash("/test/movie.mp4"),
 	}
-	dbPath := "/path/to/db"
+	dbPath := filepath.FromSlash("/path/to/db")
 
 	mWithDB := FromDBWithDB(dbMedia, dbPath)
 
-	if mWithDB.Path != "/test/movie.mp4" {
-		t.Errorf("Expected path /test/movie.mp4, got %s", mWithDB.Path)
+	if mWithDB.Path != filepath.FromSlash("/test/movie.mp4") {
+		t.Errorf("Expected path %s, got %s", filepath.FromSlash("/test/movie.mp4"), mWithDB.Path)
 	}
 	if mWithDB.DB != dbPath {
 		t.Errorf("Expected DB %s, got %s", dbPath, mWithDB.DB)
@@ -142,7 +142,7 @@ func TestToDBUpsert(t *testing.T) {
 	fps := 23.976
 
 	m := Media{
-		Path:     "/test/movie.mp4",
+		Path:     filepath.FromSlash("/test/movie.mp4"),
 		Title:    &title,
 		Duration: &duration,
 		Fps:      &fps,
@@ -164,7 +164,7 @@ func TestToDBUpsert(t *testing.T) {
 	}
 
 	// Test nil values
-	m2 := Media{Path: "/test/m2.mp4"}
+	m2 := Media{Path: filepath.FromSlash("/test/m2.mp4")}
 	params2 := ToDBUpsert(m2)
 	if params2.Title.Valid {
 		t.Errorf("Expected title invalid for nil input")

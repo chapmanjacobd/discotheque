@@ -1,6 +1,7 @@
 package query
 
 import (
+	"path/filepath"
 	"testing"
 
 	"github.com/chapmanjacobd/discoteca/internal/models"
@@ -66,9 +67,9 @@ func TestAggregateSizeBuckets(t *testing.T) {
 
 func TestAggregateByDepth(t *testing.T) {
 	media := []models.MediaWithDB{
-		{Media: models.Media{Path: "/home/user/vids/v1.mp4"}},
-		{Media: models.Media{Path: "/home/user/vids/v2.mp4"}},
-		{Media: models.Media{Path: "/home/user/music/a1.mp3"}},
+		{Media: models.Media{Path: filepath.FromSlash("/home/user/vids/v1.mp4")}},
+		{Media: models.Media{Path: filepath.FromSlash("/home/user/vids/v2.mp4")}},
+		{Media: models.Media{Path: filepath.FromSlash("/home/user/music/a1.mp3")}},
 	}
 
 	// Depth 3: /home/user/vids and /home/user/music
@@ -90,9 +91,9 @@ func TestAggregateByDepthExtended(t *testing.T) {
 	size200 := int64(200)
 	size300 := int64(300)
 	media := []models.MediaWithDB{
-		{Media: models.Media{Path: "/dir1/f1.mp4", Size: &size100}},
-		{Media: models.Media{Path: "/dir1/f2.mp4", Size: &size200}},
-		{Media: models.Media{Path: "/dir2/f3.mp4", Size: &size300}},
+		{Media: models.Media{Path: filepath.FromSlash("/dir1/f1.mp4"), Size: &size100}},
+		{Media: models.Media{Path: filepath.FromSlash("/dir1/f2.mp4"), Size: &size200}},
+		{Media: models.Media{Path: filepath.FromSlash("/dir2/f3.mp4"), Size: &size300}},
 	}
 
 	got := AggregateByDepth(media, models.GlobalFlags{AggregateFlags: models.AggregateFlags{Depth: 1}})
@@ -101,7 +102,7 @@ func TestAggregateByDepthExtended(t *testing.T) {
 	}
 
 	for _, g := range got {
-		if g.Path == "/dir1" {
+		if g.Path == filepath.FromSlash("/dir1") {
 			if g.ExistsCount != 2 {
 				t.Errorf("Expected 2 files in /dir1, got %d", g.ExistsCount)
 			}
@@ -144,14 +145,14 @@ func TestAggregateMediaAllModes(t *testing.T) {
 func TestAggregatePostFilteringExtra(t *testing.T) {
 	size100 := int64(100)
 	media := []models.MediaWithDB{
-		{Media: models.Media{Path: "/dir1/f1.mp4", Size: &size100}},
-		{Media: models.Media{Path: "/dir1/f2.mp4", Size: &size100}},
-		{Media: models.Media{Path: "/dir2/f1.mp4", Size: &size100}},
+		{Media: models.Media{Path: filepath.FromSlash("/dir1/f1.mp4"), Size: &size100}},
+		{Media: models.Media{Path: filepath.FromSlash("/dir1/f2.mp4"), Size: &size100}},
+		{Media: models.Media{Path: filepath.FromSlash("/dir2/f1.mp4"), Size: &size100}},
 	}
 
 	// Filter by FileCounts > 1
 	got := AggregateMedia(media, models.GlobalFlags{AggregateFlags: models.AggregateFlags{Depth: 1, FileCounts: ">1"}})
-	if len(got) != 1 || got[0].Path != "/dir1" {
+	if len(got) != 1 || got[0].Path != filepath.FromSlash("/dir1") {
 		t.Errorf("FileCounts filtering failed: %v", got)
 	}
 

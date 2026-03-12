@@ -19,10 +19,10 @@ func TestMediaDocument(t *testing.T) {
 	title := "Test Title"
 	description := "Test Description"
 	mediaType := "video"
-	ftsPath := "/test/path"
+	ftsPath := filepath.FromSlash("/test/path")
 
 	media := models.Media{
-		Path:        "/test/path/video.mp4",
+		Path:        filepath.FromSlash("/test/path/video.mp4"),
 		Size:        &size,
 		Duration:    &duration,
 		Title:       &title,
@@ -33,14 +33,14 @@ func TestMediaDocument(t *testing.T) {
 
 	doc := ToBleveDoc(media)
 
-	if doc.ID != "/test/path/video.mp4" {
-		t.Errorf("Expected ID /test/path/video.mp4, got %s", doc.ID)
+	if doc.ID != filepath.FromSlash("/test/path/video.mp4") {
+		t.Errorf("Expected ID %s, got %s", filepath.FromSlash("/test/path/video.mp4"), doc.ID)
 	}
-	if doc.Path != "/test/path/video.mp4" {
-		t.Errorf("Expected Path /test/path/video.mp4, got %s", doc.Path)
+	if doc.Path != filepath.FromSlash("/test/path/video.mp4") {
+		t.Errorf("Expected Path %s, got %s", filepath.FromSlash("/test/path/video.mp4"), doc.Path)
 	}
-	if doc.FtsPath != "/test/path" {
-		t.Errorf("Expected FtsPath /test/path, got %s", doc.FtsPath)
+	if doc.FtsPath != filepath.FromSlash("/test/path") {
+		t.Errorf("Expected FtsPath %s, got %s", filepath.FromSlash("/test/path"), doc.FtsPath)
 	}
 	if doc.Title != "Test Title" {
 		t.Errorf("Expected Title Test Title, got %s", doc.Title)
@@ -61,16 +61,16 @@ func TestMediaDocument(t *testing.T) {
 
 func TestMediaDocumentNilFields(t *testing.T) {
 	media := models.Media{
-		Path: "/test/path/video.mp4",
+		Path: filepath.FromSlash("/test/path/video.mp4"),
 	}
 
 	doc := ToBleveDoc(media)
 
-	if doc.ID != "/test/path/video.mp4" {
-		t.Errorf("Expected ID /test/path/video.mp4, got %s", doc.ID)
+	if doc.ID != filepath.FromSlash("/test/path/video.mp4") {
+		t.Errorf("Expected ID %s, got %s", filepath.FromSlash("/test/path/video.mp4"), doc.ID)
 	}
-	if doc.Path != "/test/path/video.mp4" {
-		t.Errorf("Expected Path /test/path/video.mp4, got %s", doc.Path)
+	if doc.Path != filepath.FromSlash("/test/path/video.mp4") {
+		t.Errorf("Expected Path %s, got %s", filepath.FromSlash("/test/path/video.mp4"), doc.Path)
 	}
 	if doc.FtsPath != "" {
 		t.Errorf("Expected empty FtsPath, got %s", doc.FtsPath)
@@ -210,8 +210,8 @@ func TestIndexDocument(t *testing.T) {
 
 	doc := &MediaDocument{
 		ID:          "test-id-1",
-		Path:        "/test/path/video.mp4",
-		FtsPath:     "/test/path",
+		Path:        filepath.FromSlash("/test/path/video.mp4"),
+		FtsPath:     filepath.FromSlash("/test/path"),
 		Title:       "Test Video",
 		Description: "A test video file",
 		Type:        "video",
@@ -240,7 +240,7 @@ func TestIndexDocumentWithoutInit(t *testing.T) {
 
 	doc := &MediaDocument{
 		ID:   "test-id",
-		Path: "/test/path.mp4",
+		Path: filepath.FromSlash("/test/path.mp4"),
 	}
 
 	err := IndexDocument(doc)
@@ -267,8 +267,8 @@ func TestDeleteDocument(t *testing.T) {
 	// Index a document
 	doc := &MediaDocument{
 		ID:      "test-id-1",
-		Path:    "/test/path/video.mp4",
-		FtsPath: "/test/path",
+		Path:    filepath.FromSlash("/test/path/video.mp4"),
+		FtsPath: filepath.FromSlash("/test/path"),
 		Title:   "Test Video",
 	}
 
@@ -327,24 +327,24 @@ func TestSearch(t *testing.T) {
 	docs := []*MediaDocument{
 		{
 			ID:          "doc-1",
-			Path:        "/media/videos/sample-video1.mp4",
-			FtsPath:     "/media/videos/sample-video1",
+			Path:        filepath.FromSlash("/media/videos/sample-video1.mp4"),
+			FtsPath:     filepath.FromSlash("/media/videos/sample-video1"),
 			Title:       "Sample Video One",
 			Description: "A sample video file",
 			Type:        "video",
 		},
 		{
 			ID:          "doc-2",
-			Path:        "/media/videos/sample-video2.mp4",
-			FtsPath:     "/media/videos/sample-video2",
+			Path:        filepath.FromSlash("/media/videos/sample-video2.mp4"),
+			FtsPath:     filepath.FromSlash("/media/videos/sample-video2"),
 			Title:       "Sample Video Two",
 			Description: "Another sample video clip",
 			Type:        "video",
 		},
 		{
 			ID:          "doc-3",
-			Path:        "/media/music/sample-audio.mp3",
-			FtsPath:     "/media/music/sample-audio",
+			Path:        filepath.FromSlash("/media/music/sample-audio.mp3"),
+			FtsPath:     filepath.FromSlash("/media/music/sample-audio"),
 			Title:       "Sample Audio",
 			Description: "A sample audio track",
 			Type:        "audio",
@@ -419,20 +419,20 @@ func TestSearchPath(t *testing.T) {
 	docs := []*MediaDocument{
 		{
 			ID:      "doc-1",
-			Path:    "/home/user/videos/movie.mp4",
-			FtsPath: "/home/user/videos/movie",
+			Path:    filepath.FromSlash("/home/user/videos/movie.mp4"),
+			FtsPath: filepath.FromSlash("/home/user/videos/movie"),
 			Title:   "Movie",
 		},
 		{
 			ID:      "doc-2",
-			Path:    "/home/user/videos/clip.mp4",
-			FtsPath: "/home/user/videos/clip",
+			Path:    filepath.FromSlash("/home/user/videos/clip.mp4"),
+			FtsPath: filepath.FromSlash("/home/user/videos/clip"),
 			Title:   "Clip",
 		},
 		{
 			ID:      "doc-3",
-			Path:    "/home/user/music/song.mp3",
-			FtsPath: "/home/user/music/song",
+			Path:    filepath.FromSlash("/home/user/music/song.mp3"),
+			FtsPath: filepath.FromSlash("/home/user/music/song"),
 			Title:   "Song",
 		},
 	}
@@ -444,7 +444,7 @@ func TestSearchPath(t *testing.T) {
 	}
 
 	// Test path search with wildcard
-	ids, err := SearchPath("/home/user/videos/", 10)
+	ids, err := SearchPath(filepath.FromSlash("/home/user/videos/"), 10)
 	if err != nil {
 		t.Errorf("SearchPath failed: %v", err)
 	}
@@ -453,7 +453,7 @@ func TestSearchPath(t *testing.T) {
 	}
 
 	// Test path search with limit
-	ids, err = SearchPath("/home/user/", 1)
+	ids, err = SearchPath(filepath.FromSlash("/home/user/"), 1)
 	if err != nil {
 		t.Errorf("SearchPath with limit failed: %v", err)
 	}
@@ -465,7 +465,7 @@ func TestSearchPath(t *testing.T) {
 func TestSearchPathWithoutInit(t *testing.T) {
 	CloseIndex()
 
-	ids, err := SearchPath("/test", 10)
+	ids, err := SearchPath(filepath.FromSlash("/test"), 10)
 	if err == nil {
 		t.Error("Expected error when searching path without initialization")
 	}
@@ -499,8 +499,8 @@ func TestCount(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		doc := &MediaDocument{
 			ID:      fmt.Sprintf("doc-%d", i),
-			Path:    fmt.Sprintf("/test/path%d.mp4", i),
-			FtsPath: "/test/path",
+			Path:    filepath.FromSlash(fmt.Sprintf("/test/path%d.mp4", i)),
+			FtsPath: filepath.FromSlash("/test/path"),
 			Title:   "Test",
 		}
 		if err := IndexDocument(doc); err != nil {
@@ -545,8 +545,8 @@ func TestReindexAll(t *testing.T) {
 	for i := 0; i < 3; i++ {
 		doc := &MediaDocument{
 			ID:      fmt.Sprintf("doc-%d", i),
-			Path:    fmt.Sprintf("/test/path%d.mp4", i),
-			FtsPath: "/test/path",
+			Path:    filepath.FromSlash(fmt.Sprintf("/test/path%d.mp4", i)),
+			FtsPath: filepath.FromSlash("/test/path"),
 			Title:   "Test",
 		}
 		if err := IndexDocument(doc); err != nil {
@@ -603,8 +603,8 @@ func TestIndexUpdateDocument(t *testing.T) {
 	// Index a document
 	doc1 := &MediaDocument{
 		ID:      "doc-1",
-		Path:    "/test/old.mp4",
-		FtsPath: "/test/old",
+		Path:    filepath.FromSlash("/test/old.mp4"),
+		FtsPath: filepath.FromSlash("/test/old"),
 		Title:   "Old Title",
 	}
 	if err := IndexDocument(doc1); err != nil {
@@ -614,8 +614,8 @@ func TestIndexUpdateDocument(t *testing.T) {
 	// Update the same document with new data
 	doc2 := &MediaDocument{
 		ID:      "doc-1",
-		Path:    "/test/new.mp4",
-		FtsPath: "/test/new",
+		Path:    filepath.FromSlash("/test/new.mp4"),
+		FtsPath: filepath.FromSlash("/test/new"),
 		Title:   "New Title",
 	}
 	if err := IndexDocument(doc2); err != nil {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -237,7 +238,7 @@ func TestFilterBuilder_Build(t *testing.T) {
 		{
 			"Path-like Search (absolute)",
 			models.GlobalFlags{
-				FilterFlags:  models.FilterFlags{Search: []string{"/home/"}},
+				FilterFlags:  models.FilterFlags{Search: []string{filepath.FromSlash("/home/")}},
 				QueryFlags:   models.QueryFlags{Limit: 10},
 				DeletedFlags: models.DeletedFlags{HideDeleted: true},
 			},
@@ -246,7 +247,7 @@ func TestFilterBuilder_Build(t *testing.T) {
 		{
 			"Path-like Search (relative)",
 			models.GlobalFlags{
-				FilterFlags:  models.FilterFlags{Search: []string{"./home/"}},
+				FilterFlags:  models.FilterFlags{Search: []string{filepath.FromSlash("./home/")}},
 				QueryFlags:   models.QueryFlags{Limit: 10},
 				DeletedFlags: models.DeletedFlags{HideDeleted: true},
 			},
@@ -357,8 +358,9 @@ func TestSortMedia(t *testing.T) {
 
 func TestSortMediaAdvanced(t *testing.T) {
 	media := []models.MediaWithDB{
-		{Media: models.Media{Path: "dir2/file.mp4"}},
-		{Media: models.Media{Path: "dir1/file.mp4"}},
+		{Media: models.Media{Path: filepath.FromSlash("dir2/file.mp4")}},
+		{Media: models.Media{Path: filepath.FromSlash("dir1/file.mp4")}},
+	}
 	}
 
 	NewSortBuilder(models.GlobalFlags{}).SortAdvanced(media, "natural_parent")
@@ -404,7 +406,7 @@ func TestQueryDatabase(t *testing.T) {
 	}
 
 	insert := `INSERT INTO media (path, title, duration, size, type) VALUES (?, ?, ?, ?, ?)`
-	dbConn.Exec(insert, "/test/movie.mp4", "Test Movie", 7200, 1000000, "video")
+	dbConn.Exec(insert, filepath.FromSlash("/test/movie.mp4"), "Test Movie", 7200, 1000000, "video")
 	dbConn.Close()
 
 	ctx := context.Background()
@@ -416,8 +418,8 @@ func TestQueryDatabase(t *testing.T) {
 	if len(results) != 1 {
 		t.Fatalf("Expected 1 result, got %d", len(results))
 	}
-	if results[0].Path != "/test/movie.mp4" {
-		t.Errorf("Expected path /test/movie.mp4, got %s", results[0].Path)
+	if results[0].Path != filepath.FromSlash("/test/movie.mp4") {
+		t.Errorf("Expected path %s, got %s", filepath.FromSlash("/test/movie.mp4"), results[0].Path)
 	}
 }
 

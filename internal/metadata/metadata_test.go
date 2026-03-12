@@ -4,8 +4,31 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"runtime"
+	"strings"
 	"testing"
 )
+
+func createMock(t *testing.T, tmpDir, name, content string) string {
+	fullName := name
+	if runtime.GOOS == "windows" {
+		fullName += ".bat"
+	}
+	path := filepath.Join(tmpDir, fullName)
+
+	actualContent := content
+	if runtime.GOOS == "windows" {
+		escaped := strings.ReplaceAll(content, "\"", "^\"")
+		actualContent = "@echo off\necho " + escaped
+	} else {
+		actualContent = "#!/bin/sh\n" + content
+	}
+
+	if err := os.WriteFile(path, []byte(actualContent), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
 
 func TestExtract_BasicInfo(t *testing.T) {
 	f, err := os.CreateTemp("", "meta-test-*.txt")
@@ -50,7 +73,6 @@ func TestExtract_MimeTypes(t *testing.T) {
 		meta, _ := Extract(context.Background(), name, false)
 		if meta != nil && meta.Media.Type.String != tt.expected {
 			// Note: DetectMimeType might depend on extension if content is empty
-			// Actually DetectMimeType uses filepath.Ext if it's a known extension
 		}
 	}
 }
@@ -67,9 +89,7 @@ func TestExtract_WithMockFFProbe(t *testing.T) {
 	tmpDir, _ := os.MkdirTemp("", "mock-path")
 	defer os.RemoveAll(tmpDir)
 
-	mockFFProbe := filepath.Join(tmpDir, "ffprobe")
-	script := `#!/bin/sh
-echo '{
+	createMock(t, tmpDir, "ffprobe", `{
   "streams": [
     {
       "codec_type": "video",
@@ -96,9 +116,7 @@ echo '{
       "tags": { "title": "Chapter 1" }
     }
   ]
-}'
-`
-	os.WriteFile(mockFFProbe, []byte(script), 0o755)
+}`)
 
 	// Add tmpDir to PATH
 	oldPath := os.Getenv("PATH")
