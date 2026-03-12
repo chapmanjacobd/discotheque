@@ -74,9 +74,9 @@ export class MediaPage {
   /**
    * Navigate to the home page and wait for media to load
    */
-  async goto(baseUrl: string): Promise<void> {
+  async goto(baseUrl: string, timeout: number = 10000): Promise<void> {
     await this.page.goto(baseUrl);
-    await this.waitForMediaToLoad();
+    await this.waitForMediaToLoad(timeout);
   }
 
   /**

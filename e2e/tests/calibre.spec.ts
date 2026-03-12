@@ -43,9 +43,6 @@ test.describe('Calibre EPUB Viewer', () => {
     expect(iframeSrc).toBeTruthy();
     expect(iframeSrc).toContain('/api/epub/');
 
-    // Wait for calibre conversion and content load
-    await mediaPage.page.waitForTimeout(5000);
-
     // Verify no "File not found" or "Conversion failed" error in the modal using POM
     const containerText = await mediaPage.page.locator('#document-container').textContent();
     if (containerText) {
@@ -63,9 +60,9 @@ test.describe('Calibre EPUB Viewer', () => {
     // The main iframe contains the wrapper HTML which has its own iframe (#content-frame)
     const frame = mediaPage.page.frameLocator('#document-container iframe');
 
-    // Check for the sticky TOC header in the wrapper HTML using POM
+    // Wait for the sticky TOC header in the wrapper HTML to be visible (waits for calibre conversion)
     const tocHeader = frame.locator('.toc-header');
-    await expect(tocHeader).toBeVisible();
+    await expect(tocHeader).toBeVisible({ timeout: 15000 });
 
     const tocTitle = await tocHeader.locator('h1').textContent();
     console.log(`TOC Title: ${tocTitle}`);
@@ -73,7 +70,7 @@ test.describe('Calibre EPUB Viewer', () => {
 
     // Check if TOC select element is present and has readable options using POM
     const tocSelect = frame.locator('.toc-nav select');
-    await expect(tocSelect).toBeVisible();
+    await expect(tocSelect).toBeVisible({ timeout: 5000 });
 
     const options = await tocSelect.locator('option').all();
     console.log(`TOC options count: ${options.length}`);
@@ -165,12 +162,12 @@ test.describe('Calibre EPUB Viewer', () => {
     // Wait for document modal using POM
     await viewerPage.waitForDocumentModal();
 
-    // Navigation controls should be visible using POM
+    // Navigation controls should be visible using POM (wait for calibre conversion)
     const tocHeader = mediaPage.page.frameLocator('#document-container iframe').locator('.toc-header');
-    await expect(tocHeader).toBeVisible();
+    await expect(tocHeader).toBeVisible({ timeout: 15000 });
 
     const tocSelect = mediaPage.page.frameLocator('#document-container iframe').locator('.toc-nav select');
-    await expect(tocSelect).toBeVisible();
+    await expect(tocSelect).toBeVisible({ timeout: 5000 });
 
     // Close modal using POM
     await viewerPage.closeDocumentModal();

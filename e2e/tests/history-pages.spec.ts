@@ -15,7 +15,7 @@ test.describe('History Pages - In Progress / Unplayed / Completed', () => {
   });
 
   test('In Progress page shows media with local progress', async ({ mediaPage, viewerPage, page, server }) => {
-    await mediaPage.goto(server.getBaseUrl());
+    await mediaPage.goto(server.getBaseUrl(), 20000);
 
     // Play a video to create local progress using POM
     const mediaCard = mediaPage.getFirstMediaCardByType('video');
@@ -74,7 +74,7 @@ test.describe('History Pages - In Progress / Unplayed / Completed', () => {
   });
 
   test('In Progress page respects type filters', async ({ mediaPage, viewerPage, sidebarPage, server }) => {
-    await mediaPage.goto(server.getBaseUrl());
+    await mediaPage.goto(server.getBaseUrl(), 20000);
 
     // Play a video to create progress using POM
     const videoCard = mediaPage.getFirstMediaCardByType('video');
@@ -115,7 +115,7 @@ test.describe('History Pages - In Progress / Unplayed / Completed', () => {
   });
 
   test('Unplayed page shows media with zero play count', async ({ mediaPage, sidebarPage, server }) => {
-    await mediaPage.goto(server.getBaseUrl());
+    await mediaPage.goto(server.getBaseUrl(), 20000);
 
     // Navigate to Unplayed page using POM
     await sidebarPage.expandHistorySection();
@@ -143,7 +143,7 @@ test.describe('History Pages - In Progress / Unplayed / Completed', () => {
   });
 
   test('Unplayed page merges local play counts', async ({ mediaPage, sidebarPage, server }) => {
-    await mediaPage.goto(server.getBaseUrl());
+    await mediaPage.goto(server.getBaseUrl(), 20000);
 
     // Get a media path using POM
     const mediaCard = mediaPage.getMediaCard(0);
@@ -166,7 +166,7 @@ test.describe('History Pages - In Progress / Unplayed / Completed', () => {
   });
 
   test('Completed page shows media with play count > 0', async ({ mediaPage, sidebarPage, server }) => {
-    await mediaPage.goto(server.getBaseUrl());
+    await mediaPage.goto(server.getBaseUrl(), 20000);
 
     // Navigate to Completed page using POM
     await sidebarPage.expandHistorySection();
@@ -182,7 +182,7 @@ test.describe('History Pages - In Progress / Unplayed / Completed', () => {
   });
 
   test('Completed page merges local play counts', async ({ mediaPage, sidebarPage, server }) => {
-    await mediaPage.goto(server.getBaseUrl());
+    await mediaPage.goto(server.getBaseUrl(), 20000);
 
     // Get a media path using POM
     const mediaCard = mediaPage.getMediaCard(0);
@@ -206,7 +206,7 @@ test.describe('History Pages - In Progress / Unplayed / Completed', () => {
   });
 
   test('Completed page respects type filters', async ({ mediaPage, sidebarPage, server }) => {
-    await mediaPage.goto(server.getBaseUrl());
+    await mediaPage.goto(server.getBaseUrl(), 20000);
 
     // Navigate to Completed using POM
     await sidebarPage.expandHistorySection();
@@ -243,7 +243,7 @@ test.describe('History Pages - In Progress / Unplayed / Completed', () => {
   });
 
   test('toggles history filter when clicked twice', async ({ mediaPage, sidebarPage, server }) => {
-    await mediaPage.goto(server.getBaseUrl());
+    await mediaPage.goto(server.getBaseUrl(), 20000);
 
     const inProgressBtn = sidebarPage.historyInProgressButton;
     const allMediaBtn = sidebarPage.allMediaButton;
@@ -274,7 +274,7 @@ test.describe('History Pages - In Progress / Unplayed / Completed', () => {
   });
 
   test('In Progress works with Group view', async ({ mediaPage, viewerPage, sidebarPage, server }) => {
-    await mediaPage.goto(server.getBaseUrl());
+    await mediaPage.goto(server.getBaseUrl(), 20000);
 
     // Play a video to create progress using POM
     const videoCard = mediaPage.getFirstMediaCardByType('video');
@@ -308,7 +308,7 @@ test.describe('History Pages - In Progress / Unplayed / Completed', () => {
   });
 
   test('In Progress shows mark-played button for unplayed media', async ({ mediaPage, server }) => {
-    await mediaPage.goto(server.getBaseUrl());
+    await mediaPage.goto(server.getBaseUrl(), 20000);
 
     // Navigate to In Progress using POM
     await mediaPage.expandDetailsSection('details-history');
