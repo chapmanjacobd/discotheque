@@ -53,7 +53,7 @@ jobs:
           elif [ "${{ matrix.os }}" = "macos-latest" ]; then
             make macos-deps
           elif [ "${{ matrix.os }}" = "windows-latest" ]; then
-            choco install sqlite ffmpeg
+            choco install sqlite ffmpeg zip
           fi
 
       - name: Install Go and Web dependencies
@@ -111,7 +111,6 @@ jobs:
           elif [ "${{ matrix.os }}" = "windows-latest" ]; then
             make release-build GOOS=windows GOARCH=amd64
             cd dist
-            # Windows runner bash has zip available
             zip disco-windows-amd64.zip disco-windows-amd64.exe
           else
             make release-build GOOS=linux GOARCH=amd64
@@ -138,4 +137,3 @@ jobs:
           gh release upload ${{ github.ref_name }} \
             dist/disco-* \
             --repo ${{ github.repository }}
-
