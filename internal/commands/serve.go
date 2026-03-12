@@ -98,21 +98,27 @@ func (c *ServeCmd) authMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-// isPathBlacklisted checks if a path should be denied access
-func (c *ServeCmd) isPathBlacklisted(path string) bool {
-	p := strings.ToLower(path)
-	blacklisted := []string{
-		"/etc/passwd",
-		"/etc/shadow",
-		"/.ssh/",
-		"/.aws/",
-		"/.config/",
-		"/.gnupg/",
-		"/root/",
+// isPathBlocklisted checks if a path should be denied access
+func (c *ServeCmd) isPathBlocklisted(path string) bool {
+	// Normalize path separators to forward slashes for consistent matching
+	p := strings.ToLower(strings.ReplaceAll(path, "\\", "/"))
+	blocked := []string{
+		"etc/passwd",
+		"etc/shadow",
+		".ssh/",
+		".aws/",
+		".config/",
+		".gnupg/",
+		"root/",
 		"id_rsa",
 		"id_ed25519",
+		// Windows-specific sensitive paths
+		"windows/system32/config/sam",
+		"windows/system32/config/security",
+		"windows/system32/config/software",
+		"windows/system32/config/system",
 	}
-	for _, b := range blacklisted {
+	for _, b := range blocked {
 		if strings.Contains(p, b) {
 			return true
 		}

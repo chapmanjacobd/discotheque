@@ -9,6 +9,7 @@ import (
 
 	"github.com/chapmanjacobd/discoteca/internal/models"
 	"github.com/chapmanjacobd/discoteca/internal/utils"
+	"github.com/chapmanjacobd/discoteca/internal/utils/pathutil"
 )
 
 func AggregateMedia(media []models.MediaWithDB, flags models.GlobalFlags) []models.FolderStats {
@@ -163,12 +164,8 @@ func AggregateByDepth(media []models.MediaWithDB, flags models.GlobalFlags) []mo
 
 	for _, m := range media {
 		path := filepath.Clean(m.Path)
-		// Split on both separators for cross-platform support
-		parts := strings.FieldsFunc(path, func(r rune) bool {
-			return r == '/' || r == '\\'
-		})
-		// Track if path is absolute for proper reconstruction
-		isAbs := len(path) > 0 && (path[0] == '/' || path[0] == '\\')
+		// Use pathutil for proper cross-platform path handling
+		parts, isAbs := pathutil.Split(path)
 		sep := string(filepath.Separator)
 
 		// 1. Add the file itself if it matches depth

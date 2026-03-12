@@ -51,13 +51,12 @@ func TrimPathSegments(path string, desiredLength int) string {
 	pre := ""
 	if filepath.IsAbs(path) {
 		if strings.HasPrefix(path, "/") || strings.HasPrefix(path, "\\") {
-			pre = "/"
+			pre = string(filepath.Separator)
 			dir = strings.TrimLeft(dir, "/\\")
 		} else if len(path) >= 2 && path[1] == ':' {
-			pre = path[:2]
+			pre = path[:2] + string(filepath.Separator)
 			dir = path[2:]
 			if len(dir) > 0 && (dir[0] == '/' || dir[0] == '\\') {
-				pre += "/"
 				dir = strings.TrimLeft(dir, "/\\")
 			}
 		}

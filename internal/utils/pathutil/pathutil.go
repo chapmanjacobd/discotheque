@@ -51,17 +51,23 @@ func Join(parts []string, addLeadingSep bool) string {
 	}
 
 	result := filepath.Join(parts...)
-	if addLeadingSep {
-		// Check if first part is a Windows drive letter
-		if len(parts[0]) == 2 && parts[0][1] == ':' {
-			// Drive letter already has separator from Join if there are more parts
-			if len(parts) == 1 {
-				result += string(filepath.Separator)
+
+	// Check if first part is a Windows drive letter
+	if len(parts[0]) == 2 && parts[0][1] == ':' {
+		// Drive letter needs separator after it
+		if len(parts) > 1 {
+			// filepath.Join should have added separator, but ensure it's the OS separator
+			if !strings.HasPrefix(result, parts[0]+string(filepath.Separator)) {
+				result = parts[0] + string(filepath.Separator) + filepath.Join(parts[1:]...)
 			}
-		} else {
-			result = string(filepath.Separator) + result
+		} else if addLeadingSep || !strings.HasSuffix(result, string(filepath.Separator)) {
+			// Single drive letter, ensure trailing separator
+			result = parts[0] + string(filepath.Separator)
 		}
+	} else if addLeadingSep && !strings.HasPrefix(result, string(filepath.Separator)) {
+		result = string(filepath.Separator) + result
 	}
+
 	return result
 }
 

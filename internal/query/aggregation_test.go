@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/chapmanjacobd/discoteca/internal/models"
+	"github.com/chapmanjacobd/discoteca/internal/utils/pathutil"
 )
 
 func TestAggregateExtensions(t *testing.T) {
@@ -83,6 +84,45 @@ func TestAggregateByDepth(t *testing.T) {
 	// Should have: /home, /home/user, /home/user/vids, /home/user/vids/v1.mp4, /home/user/vids/v2.mp4, /home/user/music, /home/user/music/a1.mp3
 	if len(got) != 7 {
 		t.Errorf("Expected 7 groups in parents mode, got %d", len(got))
+	}
+}
+
+// TestAggregateByDepth_WindowsPaths tests pathutil.Split with Windows-style paths
+// This ensures Windows paths are parsed correctly regardless of the OS
+func TestAggregateByDepth_WindowsPaths(t *testing.T) {
+	// Test pathutil.Split directly with Windows paths (backslashes)
+	tests := []struct {
+		path      string
+		wantParts []string
+		wantAbs   bool
+	}{
+		// Windows paths with backslashes
+		{"C:\\Users\\user\\vids\\v1.mp4", []string{"C:", "Users", "user", "vids", "v1.mp4"}, true},
+		{"D:\\data\\file.txt", []string{"D:", "data", "file.txt"}, true},
+		{"C:\\", []string{"C:"}, true},
+
+		// Windows paths with forward slashes (also valid on Windows)
+		{"C:/Users/user/vids/v2.mp4", []string{"C:", "Users", "user", "vids", "v2.mp4"}, true},
+
+		// UNC paths
+		{"\\\\server\\share\\file", []string{"server", "share", "file"}, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.path, func(t *testing.T) {
+			parts, isAbs := pathutil.Split(tt.path)
+			if len(parts) != len(tt.wantParts) {
+				t.Errorf("Split(%q) returned %d parts, want %d: %v", tt.path, len(parts), len(tt.wantParts), parts)
+			}
+			if isAbs != tt.wantAbs {
+				t.Errorf("Split(%q) isAbs=%v, want %v", tt.path, isAbs, tt.wantAbs)
+			}
+			for i, p := range parts {
+				if i < len(tt.wantParts) && p != tt.wantParts[i] {
+					t.Errorf("Split(%q) part[%d]=%q, want %q", tt.path, i, p, tt.wantParts[i])
+				}
+			}
+		})
 	}
 }
 

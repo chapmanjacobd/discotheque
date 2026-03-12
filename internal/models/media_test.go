@@ -112,7 +112,7 @@ func TestMedia_ParentAtDepth(t *testing.T) {
 		{"/dir1/dir2/dir3/file.mp4", 3, "/dir1/dir2/dir3"},
 		{"/dir1/dir2/dir3/file.mp4", 4, "/dir1/dir2/dir3"},
 		{"/dir1/dir2/dir3/file.mp4", 10, "/dir1/dir2/dir3"},
-		
+
 		// Windows absolute paths (with drive letter)
 		{"C:\\dir1\\dir2\\dir3\\file.mp4", 0, "C:\\"},
 		{"C:\\dir1\\dir2\\dir3\\file.mp4", 1, "C:\\dir1"},

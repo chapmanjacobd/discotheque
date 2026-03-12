@@ -14,24 +14,24 @@ func TestIsAbs(t *testing.T) {
 		{"/home/user", true},
 		{"/", true},
 		{"/var/log", true},
-		
+
 		// Windows paths
 		{"C:\\Users\\user", true},
 		{"C:/Users/user", true},
 		{"D:\\data", true},
 		{"Z:\\", true},
-		
+
 		// UNC paths
 		{"\\\\server\\share\\path", true},
 		{"\\\\server\\share", true},
 		{"//server/share/path", true},
-		
+
 		// Relative paths
 		{"relative/path", false},
 		{"./relative", false},
 		{"../parent", false},
 		{"dir\\subdir", false},
-		
+
 		// Edge cases
 		{"", false},
 		{".", false},
@@ -57,21 +57,21 @@ func TestSplit(t *testing.T) {
 		{"/home/user", []string{"home", "user"}, true},
 		{"/", []string{}, true},
 		{"/var/log/syslog", []string{"var", "log", "syslog"}, true},
-		
+
 		// Windows paths (drive letter preserved)
 		{"C:\\Users\\user", []string{"C:", "Users", "user"}, true},
 		{"C:/Users/user", []string{"C:", "Users", "user"}, true},
 		{"D:\\data\\file.txt", []string{"D:", "data", "file.txt"}, true},
-		
+
 		// UNC paths
 		{"\\\\server\\share\\file", []string{"server", "share", "file"}, true},
 		{"//server/share/file", []string{"server", "share", "file"}, true},
-		
+
 		// Relative paths
 		{"relative/path", []string{"relative", "path"}, false},
 		{"dir\\subdir\\file", []string{"dir", "subdir", "file"}, false},
 		{"file.txt", []string{"file.txt"}, false},
-		
+
 		// Edge cases
 		{"", []string{}, false},
 	}
@@ -97,20 +97,20 @@ func TestSplit(t *testing.T) {
 func TestJoin(t *testing.T) {
 	sep := string(filepath.Separator)
 	tests := []struct {
-		parts       []string
+		parts         []string
 		addLeadingSep bool
-		want        string
+		want          string
 	}{
 		// With leading separator
 		{[]string{"home", "user"}, true, sep + "home" + sep + "user"},
 		{[]string{"home"}, true, sep + "home"},
 		{[]string{}, true, sep},
-		
+
 		// Without leading separator
 		{[]string{"home", "user"}, false, "home" + sep + "user"},
 		{[]string{"single"}, false, "single"},
 		{[]string{}, false, ""},
-		
+
 		// Windows drive letter
 		{[]string{"C:", "Users"}, true, "C:" + sep + "Users"},
 		{[]string{"C:"}, true, "C:" + sep},
@@ -135,20 +135,20 @@ func TestDepth(t *testing.T) {
 		{"/home/user", 2},
 		{"/", 0},
 		{"/var/log/syslog", 3},
-		
+
 		// Windows paths (drive counts as component)
 		{"C:\\Users\\user\\file.txt", 4},
 		{"C:\\", 1},
 		{"D:\\data", 2},
-		
+
 		// UNC paths
 		{"\\\\server\\share\\file", 3},
 		{"\\\\server\\share", 2},
-		
+
 		// Relative paths
 		{"relative", 1},
 		{"a/b/c", 3},
-		
+
 		// Edge cases
 		{"", 0},
 	}
@@ -171,16 +171,16 @@ func TestPrefix(t *testing.T) {
 		// Unix paths
 		{"/home/user", sep},
 		{"/", sep},
-		
+
 		// Windows paths
 		{"C:\\Users", "C:" + sep},
 		{"C:/Users", "C:" + sep},
 		{"D:\\", "D:" + sep},
-		
+
 		// UNC paths (backslash only - forward slash UNC is not standard)
 		{"\\\\server\\share\\file", "\\\\server\\share"},
 		{"\\\\server\\share", "\\\\server\\share"},
-		
+
 		// Relative paths
 		{"relative", ""},
 		{"", ""},

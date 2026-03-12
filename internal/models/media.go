@@ -98,21 +98,21 @@ func (m *Media) Extension() string {
 
 func (m *Media) ParentAtDepth(depth int) string {
 	parts, isAbs := pathutil.Split(m.Path)
-	
+
 	if len(parts) == 0 {
 		return "."
 	}
-	
+
 	// Check if first part is a drive letter
 	hasDrive := len(parts) > 0 && len(parts[0]) == 2 && parts[0][1] == ':'
-	
+
 	if depth <= 0 {
 		if isAbs {
 			return pathutil.Prefix(m.Path)
 		}
 		return "."
 	}
-	
+
 	// Calculate how many parts to include
 	// For paths with drive: depth 1 = drive + 1 dir = 2 parts
 	// For paths without drive: depth 1 = 1 part
@@ -120,27 +120,27 @@ func (m *Media) ParentAtDepth(depth int) string {
 	if hasDrive {
 		numParts = depth + 1 // Include drive letter
 	}
-	
+
 	// Cap at available parts (excluding file if depth doesn't reach it)
 	// If numParts would include the file, cap at the parent
 	maxParts := len(parts)
 	if numParts >= maxParts {
 		numParts = maxParts - 1 // Don't include the file itself
 	}
-	
+
 	if numParts <= 0 {
 		if isAbs {
 			return pathutil.Prefix(m.Path)
 		}
 		return "."
 	}
-	
+
 	// For paths with drive, use Join without leading separator (drive provides it)
 	if hasDrive {
 		result := pathutil.Join(parts[:numParts], false)
 		return result
 	}
-	
+
 	result := pathutil.Join(parts[:numParts], isAbs)
 	return result
 }

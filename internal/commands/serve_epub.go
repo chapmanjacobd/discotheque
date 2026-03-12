@@ -74,7 +74,7 @@ func (c *ServeCmd) handleEpubConvert(w http.ResponseWriter, r *http.Request) {
 	slog.Info("Final resolved paths", "docPath", docPath, "assetPath", assetPath)
 
 	// Verify file access
-	if c.isPathBlacklisted(docPath) {
+	if c.isPathBlocklisted(docPath) {
 		http.Error(w, "Access denied: sensitive path", http.StatusForbidden)
 		return
 	}

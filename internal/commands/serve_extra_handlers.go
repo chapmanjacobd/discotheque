@@ -582,8 +582,8 @@ func (c *ServeCmd) handleRaw(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if c.isPathBlacklisted(path) {
-		slog.Warn("Access denied: path is blacklisted", "path", path)
+	if c.isPathBlocklisted(path) {
+		slog.Warn("Access denied: path is blocklisted", "path", path)
 		http.Error(w, "Access denied: sensitive path", http.StatusForbidden)
 		return
 	}

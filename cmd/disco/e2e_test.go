@@ -18,10 +18,10 @@ func TestE2E_AddAndCheck(t *testing.T) {
 	fixture := testutils.Setup(t)
 	defer fixture.Cleanup()
 	sqlDB := fixture.GetDB()
+	defer sqlDB.Close()
 	if err := db.InitDB(sqlDB); err != nil {
 		t.Fatalf("database initialization failed: %v", err)
 	}
-	sqlDB.Close()
 
 	// 1. Add a dummy file
 	dummyPath := fixture.CreateDummyFile("video.mp4")
@@ -38,16 +38,16 @@ func TestE2E_AddAndCheck(t *testing.T) {
 	}
 
 	// 2. Verify file is in DB
-	sqlDB = fixture.GetDB()
+	sqlDB2 := fixture.GetDB()
+	defer sqlDB2.Close()
 	var count int
-	err := sqlDB.QueryRow("SELECT COUNT(*) FROM media WHERE path = ? AND time_deleted = 0", dummyPath).Scan(&count)
+	err := sqlDB2.QueryRow("SELECT COUNT(*) FROM media WHERE path = ? AND time_deleted = 0", dummyPath).Scan(&count)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if count != 1 {
 		t.Errorf("Expected 1 media record, got %d", count)
 	}
-	sqlDB.Close()
 
 	// 3. Delete the physical file
 	if err := os.Remove(dummyPath); err != nil {
@@ -65,26 +65,26 @@ func TestE2E_AddAndCheck(t *testing.T) {
 	}
 
 	// 5. Verify marked as deleted
-	sqlDB = fixture.GetDB()
+	sqlDB3 := fixture.GetDB()
+	defer sqlDB3.Close()
 	var timeDeleted int64
-	err = sqlDB.QueryRow("SELECT time_deleted FROM media WHERE path = ?", dummyPath).Scan(&timeDeleted)
+	err = sqlDB3.QueryRow("SELECT time_deleted FROM media WHERE path = ?", dummyPath).Scan(&timeDeleted)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if timeDeleted == 0 {
 		t.Error("Expected file to be marked as deleted in database")
 	}
-	sqlDB.Close()
 }
 
 func TestE2E_HistoryAdd(t *testing.T) {
 	fixture := testutils.Setup(t)
 	defer fixture.Cleanup()
 	sqlDB := fixture.GetDB()
+	defer sqlDB.Close()
 	if err := db.InitDB(sqlDB); err != nil {
 		t.Fatalf("database initialization failed: %v", err)
 	}
-	sqlDB.Close()
 
 	dummyPath := fixture.CreateDummyFile("played.mp4")
 
@@ -108,26 +108,26 @@ func TestE2E_HistoryAdd(t *testing.T) {
 	}
 
 	// 3. Verify history record
-	sqlDB = fixture.GetDB()
+	sqlDB2 := fixture.GetDB()
+	defer sqlDB2.Close()
 	var count int
-	err := sqlDB.QueryRow("SELECT COUNT(*) FROM history WHERE media_path = ? AND done = 1", dummyPath).Scan(&count)
+	err := sqlDB2.QueryRow("SELECT COUNT(*) FROM history WHERE media_path = ? AND done = 1", dummyPath).Scan(&count)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if count != 1 {
 		t.Errorf("Expected 1 history record, got %d", count)
 	}
-	sqlDB.Close()
 }
 
 func TestE2E_PathConsolidation(t *testing.T) {
 	fixture := testutils.Setup(t)
 	defer fixture.Cleanup()
 	sqlDB := fixture.GetDB()
+	defer sqlDB.Close()
 	if err := db.InitDB(sqlDB); err != nil {
 		t.Fatalf("database initialization failed: %v", err)
 	}
-	sqlDB.Close()
 
 	parentDir := filepath.Join(fixture.TempDir, "parent")
 	subDir := filepath.Join(parentDir, "sub")
@@ -143,13 +143,13 @@ func TestE2E_PathConsolidation(t *testing.T) {
 	}
 	addCmd.Run(nil)
 
-	sqlDB = fixture.GetDB()
+	sqlDB2 := fixture.GetDB()
+	defer sqlDB2.Close()
 	var count int
-	sqlDB.QueryRow("SELECT COUNT(*) FROM playlists").Scan(&count)
+	sqlDB2.QueryRow("SELECT COUNT(*) FROM playlists").Scan(&count)
 	if count != 1 {
 		t.Errorf("Expected 1 playlist, got %d", count)
 	}
-	sqlDB.Close()
 
 	// 2. Try adding subpath - should be skipped
 	addCmdSub := &commands.AddCmd{
@@ -159,12 +159,63 @@ func TestE2E_PathConsolidation(t *testing.T) {
 	}
 	addCmdSub.Run(nil)
 
-	sqlDB = fixture.GetDB()
-	sqlDB.QueryRow("SELECT COUNT(*) FROM playlists").Scan(&count)
+	sqlDB3 := fixture.GetDB()
+	defer sqlDB3.Close()
+	sqlDB3.QueryRow("SELECT COUNT(*) FROM playlists").Scan(&count)
 	if count != 1 {
 		t.Errorf("Expected still 1 playlist, got %d", count)
 	}
-	sqlDB.Close()
+}
+
+// TestE2E_PathConsolidation_WindowsPaths tests path consolidation with Windows-style paths
+// This ensures the logic works correctly on both Unix and Windows
+func TestE2E_PathConsolidation_WindowsPaths(t *testing.T) {
+	fixture := testutils.Setup(t)
+	defer fixture.Cleanup()
+	sqlDB := fixture.GetDB()
+	defer sqlDB.Close()
+	if err := db.InitDB(sqlDB); err != nil {
+		t.Fatalf("database initialization failed: %v", err)
+	}
+
+	// Create directory structure with Windows-style path separators in test data
+	parentDir := filepath.Join(fixture.TempDir, "parent")
+	subDir := filepath.Join(parentDir, "sub")
+	os.MkdirAll(subDir, 0o755)
+	fixture.CreateDummyFile("parent/video1.mp4")
+	fixture.CreateDummyFile("parent/sub/video2.mp4")
+
+	// Test with forward slashes (Unix-style but valid on Windows too)
+	addCmd := &commands.AddCmd{
+		Database:  fixture.DBPath,
+		ScanPaths: []string{parentDir},
+		Parallel:  1,
+	}
+	addCmd.Run(nil)
+
+	sqlDB2 := fixture.GetDB()
+	defer sqlDB2.Close()
+	var count int
+	sqlDB2.QueryRow("SELECT COUNT(*) FROM playlists").Scan(&count)
+	if count != 1 {
+		t.Errorf("Expected 1 playlist, got %d", count)
+	}
+
+	// Try adding with backslash path (Windows-style)
+	winStyleSubDir := parentDir + string(filepath.Separator) + "sub"
+	addCmdSub := &commands.AddCmd{
+		Database:  fixture.DBPath,
+		ScanPaths: []string{winStyleSubDir},
+		Parallel:  1,
+	}
+	addCmdSub.Run(nil)
+
+	sqlDB3 := fixture.GetDB()
+	defer sqlDB3.Close()
+	sqlDB3.QueryRow("SELECT COUNT(*) FROM playlists").Scan(&count)
+	if count != 1 {
+		t.Errorf("Expected still 1 playlist after adding Windows-style subpath, got %d", count)
+	}
 }
 
 func TestE2E_Stats(t *testing.T) {
@@ -210,14 +261,14 @@ func TestE2E_AddWithVTTCaptions(t *testing.T) {
 	fixture := testutils.Setup(t)
 	defer fixture.Cleanup()
 
-	sqlDB, err := sql.Open("sqlite3", fixture.DBPath)
+	sqlDB_init, err := sql.Open("sqlite3", fixture.DBPath)
 	if err != nil {
 		t.Fatalf("failed to open database: %v", err)
 	}
-	if err := db.InitDB(sqlDB); err != nil {
+	defer sqlDB_init.Close()
+	if err := db.InitDB(sqlDB_init); err != nil {
 		t.Fatalf("database initialization failed: %v", err)
 	}
-	sqlDB.Close()
 
 	// 1. Create a dummy video file and a sidecar VTT
 	videoPath := filepath.Join(fixture.TempDir, "movie.mp4")
@@ -258,7 +309,7 @@ Another caption here.
 	}
 
 	// 3. Verify captions are in DB
-	sqlDB, err = sql.Open("sqlite3", fixture.DBPath)
+	sqlDB, err := sql.Open("sqlite3", fixture.DBPath)
 	if err != nil {
 		t.Fatalf("failed to open database: %v", err)
 	}
