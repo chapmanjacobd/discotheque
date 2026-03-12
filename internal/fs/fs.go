@@ -30,7 +30,8 @@ func FindMedia(root string, filter map[string]bool) (map[string]os.FileInfo, err
 			if err != nil {
 				return nil // Skip files we can't access
 			}
-			files[path] = info
+			// Normalize path to forward slashes for cross-platform consistency
+			files[filepath.ToSlash(path)] = info
 		}
 		return nil
 	})

@@ -133,9 +133,10 @@ func (c *AddCmd) Run(ctx *kong.Context) error {
 			continue
 		}
 
-		// Record this new scan root
+		// Record this new scan root - normalize to forward slashes
+		normalizedRoot := filepath.ToSlash(absRoot)
 		queries.InsertPlaylist(context.Background(), db.InsertPlaylistParams{
-			Path:         sql.NullString{String: absRoot, Valid: true},
+			Path:         sql.NullString{String: normalizedRoot, Valid: true},
 			ExtractorKey: sql.NullString{String: "Local", Valid: true},
 		})
 

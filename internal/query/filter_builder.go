@@ -897,7 +897,7 @@ func ScanMedia(rows *sql.Rows, dbPath string) ([]models.MediaWithDB, error) {
 			val := values[i]
 			switch strings.ToLower(col) {
 			case "path":
-				m.Path = utils.GetString(val)
+				m.Path = filepath.ToSlash(utils.GetString(val))
 			case "title":
 				m.Title = sql.NullString{String: utils.GetString(val), Valid: true}
 			case "duration":

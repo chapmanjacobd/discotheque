@@ -60,6 +60,9 @@ type Format struct {
 }
 
 func Extract(ctx context.Context, path string, scanSubtitles bool) (*MediaMetadata, error) {
+	// Normalize path to forward slashes for cross-platform consistency
+	path = filepath.ToSlash(path)
+
 	stat, err := os.Stat(path)
 	if err != nil {
 		return nil, err

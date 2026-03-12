@@ -76,7 +76,9 @@ func (c *FilesInfoCmd) Run(ctx *kong.Context) error {
 				return nil
 			}
 
-			meta, err := metadata.Extract(context.Background(), path, c.ScanSubtitles)
+			// Normalize to forward slashes for cross-platform consistency
+			normalizedPath := filepath.ToSlash(path)
+			meta, err := metadata.Extract(context.Background(), normalizedPath, c.ScanSubtitles)
 			if err != nil {
 				return nil
 			}
