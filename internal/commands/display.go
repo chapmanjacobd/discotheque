@@ -40,7 +40,7 @@ func PrintMedia(flags models.DisplayFlags, columns []string, media []models.Medi
 		for _, col := range columns {
 			switch col {
 			case "path":
-				row = append(row, m.Path)
+				row = append(row, filepath.FromSlash(m.Path))
 			case "title":
 				row = append(row, utils.StringValue(m.Title))
 			case "duration":
@@ -80,7 +80,7 @@ func PrintFolders(flags models.DisplayFlags, columns []string, folders []models.
 		for _, col := range columns {
 			switch col {
 			case "path":
-				row = append(row, f.Path)
+				row = append(row, filepath.FromSlash(f.Path))
 			case "count":
 				row = append(row, fmt.Sprintf("%d", f.Count))
 			case "exists_count":
@@ -113,7 +113,7 @@ func PrintFolders(flags models.DisplayFlags, columns []string, folders []models.
 }
 
 func InteractiveDecision(flags models.GlobalFlags, m models.MediaWithDB) error {
-	fmt.Printf("\nAction for %s?\n", m.Path)
+	fmt.Printf("\nAction for %s?\n", filepath.FromSlash(m.Path))
 	fmt.Println("  [k]eep (default)")
 	fmt.Println("  [d]elete")
 	fmt.Println("  [t]rash")

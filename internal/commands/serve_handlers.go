@@ -873,8 +873,8 @@ func (c *ServeCmd) handleDU(w http.ResponseWriter, r *http.Request) {
 	flags := c.parseFlags(r)
 	path := r.URL.Query().Get("path")
 
-	// Clean and normalize the path
-	cleanPath := filepath.Clean(path)
+	// Clean and normalize the path to use forward slashes
+	cleanPath := filepath.ToSlash(filepath.Clean(path))
 	if cleanPath == "." || cleanPath == "/" {
 		cleanPath = ""
 	}
@@ -885,7 +885,7 @@ func (c *ServeCmd) handleDU(w http.ResponseWriter, r *http.Request) {
 	// "/media/videos" = depth 2
 	currentDepth := 0
 	if cleanPath != "" {
-		parts := strings.Split(cleanPath, string(filepath.Separator))
+		parts := strings.Split(cleanPath, "/")
 		if len(parts) > 0 && parts[0] == "" {
 			parts = parts[1:]
 		}
@@ -921,11 +921,14 @@ func (c *ServeCmd) handleDU(w http.ResponseWriter, r *http.Request) {
 	directFiles := make(map[string]*models.MediaWithDB)
 	folders := make(map[string]*models.FolderStats)
 
-	for _, media := range allMedia {
+	for i := range allMedia {
+		media := &allMedia[i]
+		// Normalize media path to use forward slashes for internal logic and API response
+		media.Path = filepath.ToSlash(media.Path)
 		filePath := media.Path
 
 		// Calculate the file's depth (number of path components)
-		parts := strings.Split(filePath, string(filepath.Separator))
+		parts := strings.Split(filePath, "/")
 		isAbsolute := len(parts) > 0 && parts[0] == ""
 
 		// Remove empty first element if path starts with /
@@ -936,7 +939,7 @@ func (c *ServeCmd) handleDU(w http.ResponseWriter, r *http.Request) {
 
 		if fileDepth == targetDepth {
 			// This is a direct child file - add to files list
-			directFiles[filePath] = &media
+			directFiles[filePath] = media
 		} else if fileDepth > targetDepth {
 			// This file is in a subfolder - group by subfolder
 			var parent string
@@ -945,15 +948,15 @@ func (c *ServeCmd) handleDU(w http.ResponseWriter, r *http.Request) {
 				if len(parts) > 0 {
 					parent = parts[0]
 					if isAbsolute {
-						parent = string(filepath.Separator) + parent
+						parent = "/" + parent
 					}
 				}
 			} else {
 				// Subdirectory: parent is path up to targetDepth components
 				if len(parts) >= targetDepth {
-					parent = strings.Join(parts[:targetDepth], string(filepath.Separator))
+					parent = strings.Join(parts[:targetDepth], "/")
 					if isAbsolute {
-						parent = string(filepath.Separator) + parent
+						parent = "/" + parent
 					}
 				} else {
 					parent = filePath

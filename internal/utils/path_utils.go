@@ -48,27 +48,26 @@ func TrimPathSegments(path string, desiredLength int) string {
 		return path
 	}
 
-	sep := string(filepath.Separator)
 	pre := ""
 	if filepath.IsAbs(path) {
 		if strings.HasPrefix(path, "/") || strings.HasPrefix(path, "\\") {
-			pre = sep
+			pre = "/"
 			dir = strings.TrimLeft(dir, "/\\")
 		} else if len(path) >= 2 && path[1] == ':' {
 			pre = path[:2]
 			dir = path[2:]
 			if len(dir) > 0 && (dir[0] == '/' || dir[0] == '\\') {
-				pre += sep
+				pre += "/"
 				dir = strings.TrimLeft(dir, "/\\")
 			}
 		}
 	}
 
-	segments := strings.Split(dir, sep)
+	segments := strings.Split(filepath.ToSlash(dir), "/")
 
 	// Try shortening segments from left to right (grandparents first)
 	for i := range segments {
-		if len(pre+filepath.Join(append(segments, base)...)) <= desiredLength {
+		if len(pre+strings.Join(append(segments, base), "/")) <= desiredLength {
 			break
 		}
 		if len(segments[i]) > 1 {
@@ -76,19 +75,19 @@ func TrimPathSegments(path string, desiredLength int) string {
 		}
 	}
 
-	res := pre + filepath.Join(append(segments, base)...)
+	res := pre + strings.Join(append(segments, base), "/")
 	if len(res) > desiredLength {
 		// If still too long, shorten the base name
-		available := desiredLength - len(pre+filepath.Join(segments...)+sep)
+		available := desiredLength - len(pre+strings.Join(segments, "/")) - 1
 		if available > 3 {
 			stem := strings.TrimSuffix(base, ext)
-			res = pre + filepath.Join(append(segments, ShortenMiddle(stem, available-len(ext))+ext)...)
+			res = pre + strings.Join(append(segments, ShortenMiddle(stem, available-len(ext))+ext), "/")
 		} else {
 			res = ShortenMiddle(res, desiredLength)
 		}
 	}
 
-	return res
+	return filepath.FromSlash(res)
 }
 
 // SafeJoin joins a base path with a user-provided path, preventing directory traversal
@@ -97,7 +96,7 @@ func SafeJoin(base string, userPath string) string {
 	userPath = filepath.Clean(userPath)
 
 	// Split and filter out traversal elements just in case Clean didn't handle everything as expected for "safe" join
-	parts := strings.Split(userPath, string(filepath.Separator))
+	parts := strings.Split(filepath.ToSlash(userPath), "/")
 	var safeParts []string
 	for _, p := range parts {
 		if p == "" || p == "." || p == ".." {
@@ -202,15 +201,14 @@ func CleanPath(path string, opts CleanPathOptions) string {
 	}
 
 	pre := ""
-	sep := string(filepath.Separator)
 	if strings.HasPrefix(path, "/") || strings.HasPrefix(path, "\\") {
-		pre = sep
+		pre = "/"
 		path = strings.TrimLeft(path, "/\\")
 	} else if len(path) >= 2 && path[1] == ':' {
 		pre = path[:2]
 		path = path[2:]
 		if len(path) > 0 && (path[0] == '/' || path[0] == '\\') {
-			pre += sep
+			pre += "/"
 			path = strings.TrimLeft(path, "/\\")
 		}
 	}
@@ -222,12 +220,12 @@ func CleanPath(path string, opts CleanPathOptions) string {
 	// Split directory into parts
 	var parts []string
 	if dir != "." && dir != "" {
-		parts = strings.Split(dir, sep)
+		parts = strings.Split(filepath.ToSlash(dir), "/")
 	}
 
 	var cleanParts []string
 	for _, p := range parts {
-		if p == "." || p == "" || p == sep {
+		if p == "." || p == "" {
 			continue
 		}
 		cp := CleanString(p)
@@ -264,12 +262,12 @@ func CleanPath(path string, opts CleanPathOptions) string {
 		cleanStem = ShortenMiddle(cleanStem, fsLimit)
 	}
 
-	res := filepath.Join(append(cleanParts, cleanStem)...) + ext
+	res := strings.Join(append(cleanParts, cleanStem), "/") + ext
 	if opts.DotSpace {
 		res = strings.ReplaceAll(res, " ", ".")
 	}
 
-	return pre + res
+	return filepath.FromSlash(pre + res)
 }
 
 // FilterPath checks if a path matches PathFilterFlags
