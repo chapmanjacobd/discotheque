@@ -1253,8 +1253,8 @@ func (qe *QueryExecutor) FetchSiblings(ctx context.Context, media []models.Media
 	parentToFiles := make(map[string][]models.MediaWithDB)
 	for _, m := range media {
 		dir := m.Parent()
-		if !strings.HasSuffix(dir, "/") {
-			dir += "/"
+		if !strings.HasSuffix(dir, "/") && !strings.HasSuffix(dir, "\\") {
+			dir += string(filepath.Separator)
 		}
 		parentToFiles[dir] = append(parentToFiles[dir], m)
 	}

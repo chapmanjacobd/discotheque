@@ -163,7 +163,13 @@ func AggregateByDepth(media []models.MediaWithDB, flags models.GlobalFlags) []mo
 
 	for _, m := range media {
 		path := filepath.Clean(m.Path)
-		parts := strings.Split(path, "/")
+		// Split on both separators for cross-platform support
+		parts := strings.FieldsFunc(path, func(r rune) bool {
+			return r == '/' || r == '\\'
+		})
+		// Track if path is absolute for proper reconstruction
+		isAbs := len(path) > 0 && (path[0] == '/' || path[0] == '\\')
+		sep := string(filepath.Separator)
 
 		// 1. Add the file itself if it matches depth
 		if flags.Depth > 0 && len(parts) == flags.Depth {
@@ -175,14 +181,15 @@ func AggregateByDepth(media []models.MediaWithDB, flags models.GlobalFlags) []mo
 
 		// 2. Add folders
 		if flags.Parents {
-			start := max(flags.MinDepth, 1)
+			// MinDepth refers to the number of path components, so MinDepth=1 means start from first component
+			start := max(flags.MinDepth-1, 0)
 			for d := start; d < len(parts); d++ {
-				if flags.MaxDepth > 0 && d > flags.MaxDepth {
+				if flags.MaxDepth > 0 && d+1 > flags.MaxDepth {
 					break
 				}
-				parent := strings.Join(parts[:d+1], "/")
-				if parent == "" {
-					parent = "/"
+				parent := filepath.Join(parts[:d+1]...)
+				if isAbs {
+					parent = sep + parent
 				}
 				if _, ok := groups[parent]; !ok {
 					groups[parent] = &models.FolderStats{Path: parent}
@@ -198,22 +205,20 @@ func AggregateByDepth(media []models.MediaWithDB, flags models.GlobalFlags) []mo
 			updateStats(groups[parent], m, true)
 		} else if flags.Depth > 0 && len(parts) > flags.Depth {
 			// Group at depth (e.g., depth=1 -> "/media" or "media", depth=2 -> "/media/video")
-			// For absolute paths, parts[0] is "", so we need depth+1 components
-			// For relative paths, we need exactly depth components
 			var parent string
-			if parts[0] == "" {
-				// Absolute path: include the leading "/"
+			if isAbs {
+				// Absolute path: include the leading separator
 				if flags.Depth < len(parts) {
-					parent = strings.Join(parts[:flags.Depth+1], "/")
+					parent = sep + filepath.Join(parts[:flags.Depth]...)
 				} else {
-					parent = strings.Join(parts, "/")
+					parent = sep + filepath.Join(parts...)
 				}
 			} else {
 				// Relative path: use exactly depth components
 				if flags.Depth <= len(parts) {
-					parent = strings.Join(parts[:flags.Depth], "/")
+					parent = filepath.Join(parts[:flags.Depth]...)
 				} else {
-					parent = strings.Join(parts, "/")
+					parent = filepath.Join(parts...)
 				}
 			}
 			if _, ok := groups[parent]; !ok {
@@ -260,7 +265,7 @@ func finalizeStats(groups map[string]*models.FolderStats) []models.FolderStats {
 	// Identify parents to count subdirectories
 	for path := range groups {
 		p := filepath.Dir(filepath.Clean(path))
-		for p != "." && p != "/" {
+		for p != "." && p != "/" && p != "\\" {
 			if _, ok := groups[p]; ok {
 				groups[p].FolderCount++
 			}
@@ -270,7 +275,7 @@ func finalizeStats(groups map[string]*models.FolderStats) []models.FolderStats {
 			}
 			p = nextP
 		}
-		if p == "/" {
+		if p == "/" || p == "\\" {
 			if _, ok := groups[p]; ok {
 				groups[p].FolderCount++
 			}

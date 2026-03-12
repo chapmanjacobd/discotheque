@@ -77,7 +77,8 @@ func (m *DUModel) updateList() {
 	// Determine next depth
 	depth := 1
 	if m.currentPath != "" {
-		depth = strings.Count(filepath.Clean(m.currentPath), "/") + 1
+		cleanPath := filepath.Clean(m.currentPath)
+		depth = strings.Count(cleanPath, "/") + strings.Count(cleanPath, "\\") + 1
 	}
 
 	tempFlags := m.flags

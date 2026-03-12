@@ -885,10 +885,9 @@ func (c *ServeCmd) handleDU(w http.ResponseWriter, r *http.Request) {
 	// "/media/videos" = depth 2
 	currentDepth := 0
 	if cleanPath != "" {
-		parts := strings.Split(cleanPath, "/")
-		if len(parts) > 0 && parts[0] == "" {
-			parts = parts[1:]
-		}
+		parts := strings.FieldsFunc(cleanPath, func(r rune) bool {
+			return r == '/' || r == '\\'
+		})
 		currentDepth = len(parts)
 	}
 	targetDepth := currentDepth + 1 // We want to show children at this depth
@@ -897,8 +896,9 @@ func (c *ServeCmd) handleDU(w http.ResponseWriter, r *http.Request) {
 	// We need to override the path filter to only get children of current path
 	originalWhere := flags.Where
 	if cleanPath != "" {
-		// Add path prefix filter
-		flags.Where = append(flags.Where, "path LIKE '"+cleanPath+"/%'")
+		// Add path prefix filter (handle both separators)
+		escapedPath := strings.ReplaceAll(cleanPath, "'", "''")
+		flags.Where = append(flags.Where, "(path LIKE '"+escapedPath+"/%' OR path LIKE '"+escapedPath+"\\%')")
 	} else {
 		// At root level - no path filter needed
 	}
@@ -927,13 +927,11 @@ func (c *ServeCmd) handleDU(w http.ResponseWriter, r *http.Request) {
 		filePath := media.Path
 
 		// Calculate the file's depth (number of path components)
-		parts := strings.Split(filePath, "/")
-		isAbsolute := len(parts) > 0 && parts[0] == ""
-
-		// Remove empty first element if path starts with /
-		if isAbsolute {
-			parts = parts[1:]
-		}
+		parts := strings.FieldsFunc(filePath, func(r rune) bool {
+			return r == '/' || r == '\\'
+		})
+		isAbsolute := len(filePath) > 0 && (filePath[0] == '/' || filePath[0] == '\\')
+		sep := string(filepath.Separator)
 		fileDepth := len(parts)
 
 		if fileDepth == targetDepth {
@@ -947,15 +945,15 @@ func (c *ServeCmd) handleDU(w http.ResponseWriter, r *http.Request) {
 				if len(parts) > 0 {
 					parent = parts[0]
 					if isAbsolute {
-						parent = "/" + parent
+						parent = sep + parent
 					}
 				}
 			} else {
 				// Subdirectory: parent is path up to targetDepth components
 				if len(parts) >= targetDepth {
-					parent = strings.Join(parts[:targetDepth], "/")
+					parent = filepath.Join(parts[:targetDepth]...)
 					if isAbsolute {
-						parent = "/" + parent
+						parent = sep + parent
 					}
 				} else {
 					parent = filePath
