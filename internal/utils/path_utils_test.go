@@ -13,13 +13,13 @@ func TestCleanPath(t *testing.T) {
 		expected string
 	}{
 		{"example.txt", CleanPathOptions{}, "example.txt"},
-		{"/folder/file.txt", CleanPathOptions{}, "/folder/file.txt"},
-		{"/ -folder- / -file-.txt", CleanPathOptions{}, "/folder/file.txt"},
-		{"/MyFolder/File.txt", CleanPathOptions{LowercaseFolders: true}, "/myfolder/File.txt"},
-		{"/my folder/File.txt", CleanPathOptions{CaseInsensitive: true}, "/My Folder/File.txt"},
-		{"/my folder/file.txt", CleanPathOptions{DotSpace: true}, "/my.folder/file.txt"},
-		{"3_seconds_ago.../Mike.webm", CleanPathOptions{}, "3_seconds_ago/Mike.webm"},
-		{"test/''/t", CleanPathOptions{}, "test/_/t"},
+		{"/folder/file.txt", CleanPathOptions{}, filepath.FromSlash("/folder/file.txt")},
+		{"/ -folder- / -file-.txt", CleanPathOptions{}, filepath.FromSlash("/folder/file.txt")},
+		{"/MyFolder/File.txt", CleanPathOptions{LowercaseFolders: true}, filepath.FromSlash("/myfolder/File.txt")},
+		{"/my folder/File.txt", CleanPathOptions{CaseInsensitive: true}, filepath.FromSlash("/My Folder/File.txt")},
+		{"/my folder/file.txt", CleanPathOptions{DotSpace: true}, filepath.FromSlash("/my.folder/file.txt")},
+		{"3_seconds_ago.../Mike.webm", CleanPathOptions{}, filepath.FromSlash("3_seconds_ago/Mike.webm")},
+		{"test/''/t", CleanPathOptions{}, filepath.FromSlash("test/_/t")},
 	}
 
 	for _, tt := range tests {
@@ -36,9 +36,9 @@ func TestTrimPathSegments(t *testing.T) {
 		desiredLength int
 		expected      string
 	}{
-		{"/aaaaaaaaaa/fans/001.jpg", 16, "/a/fans/001.jpg"},
-		{"/ao/bo/co/do/eo/fo/go/ho", 13, "/a/b/.../g/ho"},
-		{"/a/b/c", 10, "/a/b/c"},
+		{"/aaaaaaaaaa/fans/001.jpg", 16, filepath.FromSlash("/a/fans/001.jpg")},
+		{"/ao/bo/co/do/eo/fo/go/ho", 13, filepath.FromSlash("/a/b/.../g/ho")},
+		{"/a/b/c", 10, filepath.FromSlash("/a/b/c")},
 	}
 
 	for _, tt := range tests {
@@ -50,7 +50,7 @@ func TestTrimPathSegments(t *testing.T) {
 }
 
 func TestRelativize(t *testing.T) {
-	if got := Relativize("/home/user/file"); got != "home/user/file" {
+	if got := Relativize("/home/user/file"); got != filepath.FromSlash("home/user/file") {
 		t.Errorf("Relativize(/home/user/file) = %q, want home/user/file", got)
 	}
 }
@@ -61,9 +61,9 @@ func TestSafeJoin(t *testing.T) {
 		userPath string
 		expected string
 	}{
-		{"etc/passwd", "/path/to/fakeroot/etc/passwd"},
-		{"../../etc/passwd", "/path/to/fakeroot/etc/passwd"},
-		{"/absolute/path", "/path/to/fakeroot/absolute/path"},
+		{"etc/passwd", filepath.FromSlash("/path/to/fakeroot/etc/passwd")},
+		{"../../etc/passwd", filepath.FromSlash("/path/to/fakeroot/etc/passwd")},
+		{"/absolute/path", filepath.FromSlash("/path/to/fakeroot/absolute/path")},
 	}
 
 	for _, tt := range tests {
@@ -80,8 +80,8 @@ func TestPathTupleFromURL(t *testing.T) {
 		expectedParent   string
 		expectedFilename string
 	}{
-		{"http://example.com/path/to/file.txt", "example.com/path/to", "file.txt"},
-		{"https://www.example.org/another/file.jpg", "www.example.org/another", "file.jpg"},
+		{"http://example.com/path/to/file.txt", filepath.FromSlash("example.com/path/to"), "file.txt"},
+		{"https://www.example.org/another/file.jpg", filepath.FromSlash("www.example.org/another"), "file.jpg"},
 		{"http://example.com/", "example.com", ""},
 		{"invalid url", "", "invalid url"},
 	}

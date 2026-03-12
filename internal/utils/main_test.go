@@ -2,6 +2,7 @@ package utils
 
 import (
 	"io"
+	"log/slog"
 	"os"
 	"testing"
 )
@@ -16,6 +17,9 @@ func TestMain(m *testing.M) {
 		Stdout = origStdout
 		Stderr = origStderr
 	}()
+
+	// Silence slog during tests
+	slog.SetDefault(slog.New(slog.NewTextHandler(io.Discard, nil)))
 
 	os.Exit(m.Run())
 }

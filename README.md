@@ -4501,6 +4501,10 @@ Show version and build information
 
 ```bash
 $ disco version --help
+
+Flags:
+  -v, --verbose
+        Show verbose output including dependencies
 ```
 
 </details>

@@ -1,5 +1,3 @@
-//go:build bleve
-
 package query
 
 import (
@@ -8,6 +6,11 @@ import (
 
 // BleveSearch executes a Bleve search and returns matching paths
 func BleveSearch(searchTerms []string, limit int) ([]string, error) {
+	// Check if bleve index is available
+	if bleve.GetIndex() == nil {
+		return nil, nil
+	}
+
 	// Join search terms for Bleve query
 	query := ""
 	for i, term := range searchTerms {
