@@ -285,7 +285,27 @@ func (c *ServeCmd) handleQuery(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	query.SortMedia(media, flags)
+	// Check if sort config contains expansion markers (like _related_media)
+	sortConfig := flags.PlayInOrder
+	if sortConfig == "" {
+		sortConfig = flags.SortBy
+	}
+	
+	if strings.Contains(sortConfig, "_related_media") && len(dbs) > 0 {
+		// Use expansion-aware sorting with first database
+		err := c.execDB(ctx, dbs[0], func(sqlDB *sql.DB) error {
+			query.SortMediaWithExpansion(ctx, sqlDB, &media, flags)
+			return nil
+		})
+		if err != nil {
+			slog.Warn("SortMediaWithExpansion failed", "error", err)
+			// Fall back to regular sorting
+			query.SortMedia(media, flags)
+		}
+	} else {
+		// Use regular sorting
+		query.SortMedia(media, flags)
+	}
 
 	w.Header().Set("X-Total-Count", strconv.FormatInt(totalCount, 10))
 	w.Header().Set("Content-Type", "application/json")

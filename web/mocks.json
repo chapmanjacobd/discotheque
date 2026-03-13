@@ -24,6 +24,20 @@
       "type": "image/jpeg",
       "db": "test.db",
       "transcode": false
+    },
+    {
+      "path": "image2.jpg",
+      "size": 1024000,
+      "type": "image/jpeg",
+      "db": "test.db",
+      "transcode": false
+    },
+    {
+      "path": "image3.png",
+      "size": 2048000,
+      "type": "image/png",
+      "db": "test.db",
+      "transcode": false
     }
   ],
   "media_with_captions": [

@@ -466,6 +466,7 @@ func TestParseSortConfigWithGroups(t *testing.T) {
 		wantGroups   int
 		wantWeighted int // index of weighted group (-1 if none)
 		wantNatural  int // index of natural group (-1 if none)
+		wantRelated  int // index of related group (-1 if none)
 	}{
 		{
 			name:         "no markers",
@@ -473,6 +474,7 @@ func TestParseSortConfigWithGroups(t *testing.T) {
 			wantGroups:   1,
 			wantWeighted: -1,
 			wantNatural:  -1,
+			wantRelated:  -1,
 		},
 		{
 			name:         "weighted rerank marker",
@@ -480,6 +482,7 @@ func TestParseSortConfigWithGroups(t *testing.T) {
 			wantGroups:   2,
 			wantWeighted: 1, // second group is weighted
 			wantNatural:  -1,
+			wantRelated:  -1,
 		},
 		{
 			name:         "natural order marker",
@@ -487,13 +490,23 @@ func TestParseSortConfigWithGroups(t *testing.T) {
 			wantGroups:   2,
 			wantWeighted: -1,
 			wantNatural:  1, // second group is natural
+			wantRelated:  -1,
 		},
 		{
-			name:         "both markers",
-			config:       "play_count asc,size desc,_weighted_rerank,duration asc,_natural_order,path asc",
-			wantGroups:   3,
+			name:         "related media marker",
+			config:       "play_count asc,_related_media,title asc",
+			wantGroups:   2,
+			wantWeighted: -1,
+			wantNatural:  -1,
+			wantRelated:  1, // second group is related
+		},
+		{
+			name:         "all markers",
+			config:       "play_count asc,size desc,_weighted_rerank,duration asc,_natural_order,path asc,_related_media,title asc",
+			wantGroups:   4,
 			wantWeighted: 1, // second group is weighted
 			wantNatural:  2, // third group is natural
+			wantRelated:  3, // fourth group is related
 		},
 	}
 
@@ -511,6 +524,11 @@ func TestParseSortConfigWithGroups(t *testing.T) {
 			if tt.wantNatural >= 0 {
 				if groups[tt.wantNatural].Alg != "natural" {
 					t.Errorf("parseSortConfigWithGroups(%q) group[%d] alg = %q, want 'natural'", tt.config, tt.wantNatural, groups[tt.wantNatural].Alg)
+				}
+			}
+			if tt.wantRelated >= 0 {
+				if groups[tt.wantRelated].Alg != "related" {
+					t.Errorf("parseSortConfigWithGroups(%q) group[%d] alg = %q, want 'related'", tt.config, tt.wantRelated, groups[tt.wantRelated].Alg)
 				}
 			}
 		})

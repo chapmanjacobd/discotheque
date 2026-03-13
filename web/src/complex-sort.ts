@@ -20,6 +20,7 @@ export const SORT_FIELDS: { value: string; label: string }[] = [
     { value: 'size', label: 'Size' },
     { value: 'duration', label: 'Duration' },
     { value: 'path', label: 'Path' },
+    { value: 'parent', label: 'Parent (Directory)' },
     { value: 'title', label: 'Title' },
     { value: 'path_is_remote', label: 'Local vs Remote' },
     { value: 'title_is_null', label: 'Has Title' },
@@ -29,6 +30,7 @@ export const SORT_FIELDS: { value: string; label: string }[] = [
     { value: '---separator---', label: '────────────────' },
     { value: '_weighted_rerank', label: '⚖️ Weighted Re-rank (below fields)' },
     { value: '_natural_order', label: '📎 Natural Order (below fields)' },
+    { value: '_related_media', label: '🔗 Related Media (below fields)' },
 ];
 
 // Preset configurations mapped to sort-by values

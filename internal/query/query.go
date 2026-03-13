@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log/slog"
 	"math"
 	"sort"
 	"strconv"
@@ -35,6 +36,26 @@ func FilterMedia(media []models.MediaWithDB, flags models.GlobalFlags) []models.
 // SortMedia sorts media using the unified SortBuilder
 func SortMedia(media []models.MediaWithDB, flags models.GlobalFlags) {
 	NewSortBuilder(flags).Sort(media)
+}
+
+// SortMediaWithExpansion sorts media with optional result expansion (siblings, related)
+// This should be used when sort config includes expansion markers
+func SortMediaWithExpansion(ctx context.Context, sqlDB *sql.DB, media *[]models.MediaWithDB, flags models.GlobalFlags) {
+	// Check if sort config contains expansion markers
+	sortConfig := flags.PlayInOrder
+	if sortConfig == "" && flags.SortBy != "" {
+		sortConfig = flags.SortBy
+	}
+	
+	// Expand related media if requested
+	if strings.Contains(sortConfig, "_related_media") {
+		if err := ExpandRelatedMedia(ctx, sqlDB, media, flags); err != nil {
+			slog.Warn("Related media expansion failed", "error", err)
+		}
+	}
+	
+	// Sort with the full config (including expansion markers)
+	NewSortBuilder(flags).SortAdvanced(*media, sortConfig)
 }
 
 // FetchSiblings fetches sibling files for the given media (Re-exported for tests)

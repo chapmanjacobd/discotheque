@@ -837,7 +837,7 @@ type SortField struct {
 // SortGroup represents a group of fields with a specific sorting algorithm
 type SortGroup struct {
 	Fields []SortField
-	Alg    string // "weighted", "natural", or empty for standard
+	Alg    string // "weighted", "natural", "related", or empty for standard
 }
 
 // parseSortConfig parses a sort configuration string into SortField slices
@@ -966,6 +966,17 @@ func parseSortConfigWithGroups(config string) []SortGroup {
 			}
 			// Start new natural order group
 			currentGroup = SortGroup{Fields: []SortField{}, Alg: "natural"}
+			continue
+		}
+
+		if part == "_related_media" {
+			// Save current group if it has fields
+			if len(currentGroup.Fields) > 0 {
+				groups = append(groups, currentGroup)
+				currentGroup = SortGroup{}
+			}
+			// Start new related media group
+			currentGroup = SortGroup{Fields: []SortField{}, Alg: "related"}
 			continue
 		}
 
@@ -1262,7 +1273,7 @@ func (sb *SortBuilder) SortAdvanced(media []models.MediaWithDB, config string) {
 
 	// Check for meta-field markers and use grouped sorting
 	groups := parseSortConfigWithGroups(config)
-
+	
 	if len(groups) > 1 {
 		// Multiple groups - apply each group's sorting in sequence
 		for _, group := range groups {
@@ -1272,6 +1283,10 @@ func (sb *SortBuilder) SortAdvanced(media []models.MediaWithDB, config string) {
 			} else if group.Alg == "natural" {
 				// Apply natural sorting as tiebreaker for this group
 				applyNaturalSort(media, group.Fields)
+			} else if group.Alg == "related" {
+				// Related media - for now apply standard sort
+				// TODO: Expand results with related media from database based on shared search terms
+				applyStandardSort(media, group.Fields, "natural")
 			} else {
 				// Standard multi-field sorting
 				applyStandardSort(media, group.Fields, group.Alg)
@@ -1408,6 +1423,211 @@ func applyWeightedRerank(media []models.MediaWithDB, fields []SortField) {
 	sort.SliceStable(media, func(i, j int) bool {
 		return ranked[i].totalScore > ranked[j].totalScore
 	})
+}
+
+// ExpandRelatedMedia expands the result set with media related to the first item
+// based on shared search terms (title, path words) using FTS rank
+func ExpandRelatedMedia(ctx context.Context, sqlDB *sql.DB, media *[]models.MediaWithDB, flags models.GlobalFlags) error {
+	if len(*media) == 0 {
+		return nil
+	}
+
+	// Get the first media item to find related content
+	first := (*media)[0]
+	
+	// Extract words from search columns for finding related media
+	words := extractSearchWords(first)
+	if len(words) == 0 {
+		return nil
+	}
+
+	// Sort words by length (longer = more specific) and take top words
+	sort.Slice(words, func(i, j int) bool {
+		return len(words[i]) > len(words[j])
+	})
+	
+	maxWords := 50
+	if len(words) > maxWords {
+		words = words[:maxWords]
+	}
+
+	// Build FTS search query - use OR for broader matching
+	queryStr := strings.Join(words, " OR ")
+	
+	// Detect FTS table
+	ftsTable := detectFTSTable(ctx, sqlDB)
+	if ftsTable == "" {
+		// No FTS available, skip expansion
+		return nil
+	}
+
+	// Query for related media using FTS with rank
+	relatedRows, err := queryRelatedMediaWithRank(ctx, sqlDB, ftsTable, first.Path, queryStr, 20)
+	if err != nil {
+		return err
+	}
+
+	// Convert rows to media items and append
+	seenPaths := make(map[string]bool)
+	for _, m := range *media {
+		seenPaths[m.Path] = true
+	}
+
+	for _, row := range relatedRows {
+		if !seenPaths[row.Path] {
+			*media = append(*media, models.MediaWithDB{
+				Media: models.Media{
+					Path:           row.Path,
+					Title:          models.NullStringPtr(row.Title),
+					Size:           models.NullInt64Ptr(row.Size),
+					Duration:       models.NullInt64Ptr(row.Duration),
+					VideoCount:     models.NullInt64Ptr(row.VideoCount),
+					AudioCount:     models.NullInt64Ptr(row.AudioCount),
+					SubtitleCount:  models.NullInt64Ptr(row.SubtitleCount),
+					PlayCount:      models.NullInt64Ptr(row.PlayCount),
+					Playhead:       models.NullInt64Ptr(row.Playhead),
+					TimeCreated:    models.NullInt64Ptr(row.TimeCreated),
+					TimeModified:   models.NullInt64Ptr(row.TimeModified),
+					TimeDownloaded: models.NullInt64Ptr(row.TimeDownloaded),
+					TimeLastPlayed: models.NullInt64Ptr(row.TimeLastPlayed),
+					Score:          models.NullFloat64Ptr(row.Score),
+					Type:           models.NullStringPtr(row.Type),
+				},
+				DB: row.DB,
+			})
+			seenPaths[row.Path] = true
+		}
+	}
+
+	return nil
+}
+
+// extractSearchWords extracts searchable words from a media item
+func extractSearchWords(m models.MediaWithDB) []string {
+	words := make(map[string]bool)
+	
+	// Extract from path
+	pathWords := strings.FieldsFunc(m.Path, func(r rune) bool {
+		return r == '/' || r == '\\' || r == '.' || r == '-' || r == '_' || r == ' '
+	})
+	for _, w := range pathWords {
+		w = strings.TrimSpace(w)
+		if len(w) > 2 {
+			words[strings.ToLower(w)] = true
+		}
+	}
+	
+	// Extract from title if available
+	if m.Title != nil && *m.Title != "" {
+		titleWords := strings.FieldsFunc(*m.Title, func(r rune) bool {
+			return r == ' ' || r == '.' || r == '-' || r == '_' || r == ',' || r == ':' || r == '(' || r == ')'
+		})
+		for _, w := range titleWords {
+			w = strings.TrimSpace(w)
+			if len(w) > 2 {
+				words[strings.ToLower(w)] = true
+			}
+		}
+	}
+	
+	// Extract from stem (filename without extension)
+	stem := m.Stem()
+	stemWords := strings.FieldsFunc(stem, func(r rune) bool {
+		return r == '.' || r == '-' || r == '_' || r == ' '
+	})
+	for _, w := range stemWords {
+		w = strings.TrimSpace(w)
+		if len(w) > 2 {
+			words[strings.ToLower(w)] = true
+		}
+	}
+	
+	result := make([]string, 0, len(words))
+	for w := range words {
+		result = append(result, w)
+	}
+	return result
+}
+
+// detectFTSTable detects the available FTS table for media
+func detectFTSTable(ctx context.Context, sqlDB *sql.DB) string {
+	tables := []string{"media_fts", "media_fts5", "media_search"}
+	for _, table := range tables {
+		var exists int
+		err := sqlDB.QueryRowContext(ctx, 
+			"SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", 
+			table,
+		).Scan(&exists)
+		if err == nil && exists == 1 {
+			return table
+		}
+	}
+	return ""
+}
+
+// relatedMediaRow represents a row from related media query
+type relatedMediaRow struct {
+	Path           string
+	Title          sql.NullString
+	Size           sql.NullInt64
+	Duration       sql.NullInt64
+	VideoCount     sql.NullInt64
+	AudioCount     sql.NullInt64
+	SubtitleCount  sql.NullInt64
+	PlayCount      sql.NullInt64
+	Playhead       sql.NullInt64
+	TimeCreated    sql.NullInt64
+	TimeModified   sql.NullInt64
+	TimeDownloaded sql.NullInt64
+	TimeLastPlayed sql.NullInt64
+	Score          sql.NullFloat64
+	Type           sql.NullString
+	DB             string
+	Rank           float64
+}
+
+// queryRelatedMediaWithRank queries for related media using FTS, ordered by rank
+func queryRelatedMediaWithRank(ctx context.Context, sqlDB *sql.DB, ftsTable, excludePath, queryStr string, limit int64) ([]relatedMediaRow, error) {
+	// FTS query with rank ordering
+	query := fmt.Sprintf(`
+		SELECT 
+			m.path, m.title, m.size, m.duration,
+			m.video_count, m.audio_count, m.subtitle_count,
+			m.play_count, m.playhead,
+			m.time_created, m.time_modified, m.time_downloaded, m.time_last_played,
+			m.score, m.type,
+			%s.rank as rank
+		FROM %s fts
+		JOIN media m ON fts.rowid = m.rowid
+		WHERE %s MATCH ?
+			AND m.path != ?
+		ORDER BY %s.rank DESC, m.path
+		LIMIT ?
+	`, ftsTable, ftsTable, ftsTable, ftsTable)
+
+	rows, err := sqlDB.QueryContext(ctx, query, queryStr, excludePath, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var results []relatedMediaRow
+	for rows.Next() {
+		var r relatedMediaRow
+		err := rows.Scan(
+			&r.Path, &r.Title, &r.Size, &r.Duration,
+			&r.VideoCount, &r.AudioCount, &r.SubtitleCount,
+			&r.PlayCount, &r.Playhead,
+			&r.TimeCreated, &r.TimeModified, &r.TimeDownloaded, &r.TimeLastPlayed,
+			&r.Score, &r.Type, &r.Rank,
+		)
+		if err != nil {
+			return nil, err
+		}
+		results = append(results, r)
+	}
+
+	return results, rows.Err()
 }
 
 // QueryExecutor executes queries against databases
