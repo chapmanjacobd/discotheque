@@ -146,10 +146,10 @@ func TestQueries(t *testing.T) {
 
 		// GetMediaByType
 		res, _ := q.GetMediaByType(ctx, GetMediaByTypeParams{
-			Column1: true, // video
-			Column2: false,
-			Column3: false,
-			Limit:   10,
+			VideoOnly: true,
+			AudioOnly: false,
+			ImageOnly: false,
+			Limit:     10,
 		})
 		if len(res) != 1 || res[0].Path != "video.mp4" {
 			t.Errorf("GetMediaByType video failed, got %v", res)
@@ -157,9 +157,9 @@ func TestQueries(t *testing.T) {
 
 		// GetMediaBySize
 		res, _ = q.GetMediaBySize(ctx, GetMediaBySizeParams{
-			Size:   sql.NullInt64{Int64: 3000, Valid: true},
-			Size_2: sql.NullInt64{Int64: 6000, Valid: true},
-			Limit:  10,
+			MinSize: 3000,
+			MaxSize: 6000,
+			Limit:   10,
 		})
 		if len(res) != 1 || res[0].Path != "video.mp4" {
 			t.Errorf("GetMediaBySize failed, got %v", res)
@@ -167,9 +167,9 @@ func TestQueries(t *testing.T) {
 
 		// GetMediaByDuration
 		res, _ = q.GetMediaByDuration(ctx, GetMediaByDurationParams{
-			Duration:   sql.NullInt64{Int64: 150, Valid: true},
-			Duration_2: sql.NullInt64{Int64: 250, Valid: true},
-			Limit:      10,
+			MinDuration: 150,
+			MaxDuration: 250,
+			Limit:       10,
 		})
 		if len(res) != 1 || res[0].Path != "audio.mp3" {
 			t.Errorf("GetMediaByDuration failed, got %v", res)
@@ -231,7 +231,7 @@ func TestQueries(t *testing.T) {
 
 	t.Run("UpdateOperations", func(t *testing.T) {
 		q.UpsertMedia(ctx, UpsertMediaParams{Path: "old.mp4"})
-		q.UpdatePath(ctx, UpdatePathParams{Path: "new.mp4", Path_2: "old.mp4"})
+		q.UpdatePath(ctx, UpdatePathParams{NewPath: "new.mp4", OldPath: "old.mp4"})
 		_, err := q.GetMediaByPathExact(ctx, "old.mp4")
 		if err == nil {
 			t.Error("old.mp4 should not exist")
@@ -345,19 +345,19 @@ func TestQueries(t *testing.T) {
 		}
 
 		// GetMediaByPath
-		res, _ = q.GetMediaByPath(ctx, GetMediaByPathParams{Path: "%random%", Limit: 10})
+		res, _ = q.GetMediaByPath(ctx, GetMediaByPathParams{PathPattern: "%random%", Limit: 10})
 		if len(res) == 0 {
 			t.Error("GetMediaByPath failed")
 		}
 
 		// GetMediaByPlayCount
-		res, _ = q.GetMediaByPlayCount(ctx, GetMediaByPlayCountParams{PlayCount: sql.NullInt64{Int64: 0, Valid: true}, PlayCount_2: sql.NullInt64{Int64: 10, Valid: true}, Limit: 10})
+		res, _ = q.GetMediaByPlayCount(ctx, GetMediaByPlayCountParams{MinPlayCount: 0, MaxPlayCount: 10, Limit: 10})
 		if len(res) == 0 {
 			t.Error("GetMediaByPlayCount failed")
 		}
 
 		// GetSiblingMedia
-		res, _ = q.GetSiblingMedia(ctx, GetSiblingMediaParams{Path: "%", Path_2: "non-existent", Limit: 10})
+		res, _ = q.GetSiblingMedia(ctx, GetSiblingMediaParams{PathPattern: "%", PathExclude: "non-existent", Limit: 10})
 		if len(res) == 0 {
 			t.Error("GetSiblingMedia failed")
 		}

@@ -12,6 +12,65 @@ Discoteca supports three different build modes, each with different full-text se
 
 ---
 
+## Should I use FTS5 or Bleve?
+
+
+Search Performance by Dataset Size
+
+
+┌───────────┬──────────────────────┬───────────────────────┬───────────────┐
+│ Rows      │ FTS5                 │ Bleve                 │ Bleve Speedup │
+├───────────┼──────────────────────┼───────────────────────┼───────────────┤
+│ 200       │ 2.48 ms/op           │ 48 μs/op              │ 52× faster    │
+│ 20,000    │ 2,272 ms/op          │ 1,395 μs/op           │ 1,629× faster │
+│ 200,000   │ 3,877 ms/op          │ 11,803 μs/op          │ 328× faster   │
+│ 2,000,000 │ 89,761 ms/op (89.8s) │ 126,723 μs/op (127ms) │ 708× faster   │
+└───────────┴──────────────────────┴───────────────────────┴───────────────┘
+
+
+Performance Scaling Analysis
+
+
+┌──────┬───────────┬────────────┬─────────────┬──────────────┐
+│ Rows │ FTS5 (ms) │ Bleve (ms) │ FTS5 Growth │ Bleve Growth │
+├──────┼───────────┼────────────┼─────────────┼──────────────┤
+│ 200  │ 2.5       │ 0.05       │ -           │ -            │
+│ 20K  │ 2,272     │ 1.4        │ 909×        │ 28×          │
+│ 200K │ 3,877     │ 11.8       │ 1.7×        │ 8.4×         │
+│ 2M   │ 89,761    │ 126.7      │ 23.2×       │ 10.7×        │
+└──────┴───────────┴────────────┴─────────────┴──────────────┘
+
+
+Key Observations
+
+    1. Bleve is consistently faster across all dataset sizes (52× to 1,629×)
+    2. FTS5 scaling is non-linear - big jump from 200→20K rows (909× slower), then more gradual
+    3. Bleve scales more predictably - roughly linear with data size
+    4. At 2M rows: Bleve (127ms) vs FTS5 (89.8 seconds) - 708× difference
+
+Memory Allocations
+
+
+┌──────┬─────────────┬──────────────┐
+│ Rows │ FTS5 Allocs │ Bleve Allocs │
+├──────┼─────────────┼──────────────┤
+│ 200  │ 1,915       │ 521          │
+│ 20K  │ 180,129     │ 696          │
+│ 200K │ 1,800,139   │ 1,117        │
+│ 2M   │ 18,000,149  │ 1,370        │
+└──────┴─────────────┴──────────────┘
+
+
+FTS5 allocates ~13,000× more at 2M rows!
+
+Summary
+    - ✅ Bleve: Dramatically faster search, better scaling, fewer allocations
+    - ✅ FTS5: Smaller index size (from earlier 200K test: 82MB vs 346MB)
+    - ⚠️ Bleve: Requires separate indexing step (~543 docs/sec)
+    - ⚠️ FTS5 with detail=none: Query limitations (no phrases, 3-char terms)
+
+---
+
 ## 1. FTS5 Build (Default)
 
 **Build command:**

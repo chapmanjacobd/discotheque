@@ -149,6 +149,13 @@ type SearchCaptionsRow struct {
 
 // SearchCaptions searches captions using FTS5 with trigram-compatible queries
 func (q *Queries) SearchCaptions(ctx context.Context, arg SearchCaptionsParams) ([]SearchCaptionsRow, error) {
+	// Tokenize query for trigram-compatible FTS5 search
+	// Convert "hello world" to "hel OR wor" for detail=none trigram index
+	ftsQuery := tokenizeForFTS5(arg.Query)
+	if ftsQuery == "" {
+		return nil, nil
+	}
+
 	query := `
 SELECT c.media_path, c.time, c.text, m.title, m.type, m.size, m.duration
 FROM captions c, captions_fts, media m
@@ -179,7 +186,7 @@ AND (? = 0 OR m.type = 'text')
 		textOnly = 1
 	}
 
-	rows, err := q.db.QueryContext(ctx, query, arg.Query, videoOnly, audioOnly, imageOnly, textOnly)
+	rows, err := q.db.QueryContext(ctx, query, ftsQuery, videoOnly, audioOnly, imageOnly, textOnly)
 	if err != nil {
 		return nil, err
 	}
@@ -196,6 +203,58 @@ AND (? = 0 OR m.type = 'text')
 	}
 
 	return results, rows.Err()
+}
+
+// tokenizeForFTS5 converts a search query to trigram-compatible format
+// "hello world" -> "hel OR wor"
+// This works with FTS5 trigram indexes using detail=none
+func tokenizeForFTS5(query string) string {
+	if query == "" {
+		return ""
+	}
+
+	// Remove phrase quotes - we'll search for individual trigrams
+	query = strings.ReplaceAll(query, `"`, " ")
+	query = strings.ReplaceAll(query, `'`, " ")
+
+	// Remove FTS5 operators that don't work with detail=none
+	query = strings.ReplaceAll(query, "(", " ")
+	query = strings.ReplaceAll(query, ")", " ")
+	query = strings.ReplaceAll(query, ":", " ")
+	query = strings.ReplaceAll(query, "NEAR", " ")
+
+	// Split into terms
+	terms := strings.Fields(query)
+	if len(terms) == 0 {
+		return ""
+	}
+
+	// Convert each term to its first 3 chars (trigram)
+	var trigrams []string
+	for _, term := range terms {
+		term = strings.TrimSpace(term)
+		upper := strings.ToUpper(term)
+
+		// Pass through boolean operators
+		if upper == "OR" || upper == "AND" || upper == "NOT" {
+			trigrams = append(trigrams, upper)
+			continue
+		}
+
+		// Skip very short terms
+		if len(term) < 3 {
+			continue
+		}
+
+		trigrams = append(trigrams, term[:3])
+	}
+
+	if len(trigrams) == 0 {
+		return ""
+	}
+
+	// Use OR between trigrams for broader matching
+	return strings.Join(trigrams, " OR ")
 }
 
 // RankCaptionsResults applies in-memory ranking to caption search results

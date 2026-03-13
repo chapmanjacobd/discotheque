@@ -403,10 +403,3 @@ func TestExpandRelatedMedia_NoSearchTerms(t *testing.T) {
 		t.Error("Expected at least 1 media item")
 	}
 }
-
-// Helper function
-//
-//go:fix inline
-func ptr(s string) *string {
-	return new(s)
-}
