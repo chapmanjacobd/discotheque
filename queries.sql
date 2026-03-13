@@ -98,13 +98,13 @@ WHERE time_deleted = 0
 ORDER BY path
 LIMIT ?;
 
--- name: SearchMediaFTS :many
-SELECT * FROM media
-WHERE rowid IN (
-    SELECT rowid FROM media_fts f WHERE f.fts_path MATCH sqlc.arg('query') OR f.title MATCH sqlc.arg('query') OR f.description MATCH sqlc.arg('query')
-)
-AND time_deleted = 0
-LIMIT sqlc.arg('limit');
+-- FTS5 MATCH query for media search - implemented manually in Go
+-- due to sqlc's limited FTS5 MATCH support with detail=none
+-- Original query:
+--   SELECT * FROM media
+--   WHERE time_deleted = 0
+--   AND rowid IN (SELECT rowid FROM media_fts WHERE media_fts MATCH ?)
+--   LIMIT ?;
 
 -- name: UpdatePlayHistory :exec
 UPDATE media
@@ -298,22 +298,19 @@ WHERE m.time_deleted = 0
 ORDER BY c.media_path, c.time
 LIMIT sqlc.arg('limit');
 
--- name: SearchCaptions :many
-SELECT c.media_path, c.time, c.text, m.title, m.type, m.size, m.duration
-FROM captions c
-JOIN captions_fts f ON c.rowid = f.rowid
-JOIN media m ON c.media_path = m.path
-WHERE f.text MATCH @query
-  AND m.time_deleted = 0
-  AND c.text IS NOT NULL AND c.text != ''
-  AND (
-    (@video_only = 0 OR m.type = 'video')
-    AND (@audio_only = 0 OR m.type IN ('audio', 'audiobook'))
-    AND (@image_only = 0 OR m.type = 'image')
-    AND (@text_only = 0 OR m.type = 'text')
-  )
-ORDER BY c.media_path, c.time
-LIMIT sqlc.arg('limit');
+-- FTS5 MATCH query for captions search - implemented manually in Go
+-- due to sqlc's limited FTS5 MATCH support with detail=none
+-- Original query:
+--   SELECT c.media_path, c.time, c.text, m.title, m.type, m.size, m.duration
+--   FROM captions c
+--   JOIN captions_fts f ON c.rowid = f.rowid
+--   JOIN media m ON c.media_path = m.path
+--   WHERE f.text MATCH ?
+--   AND m.time_deleted = 0
+--   AND c.text IS NOT NULL AND c.text != ''
+--   AND ((@video_only = 0 OR m.type = 'video') ...)
+--   ORDER BY c.media_path, c.time
+--   LIMIT ?;
 
 -- name: GetStats :one
 SELECT

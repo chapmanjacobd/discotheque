@@ -95,13 +95,13 @@ func TestHybridSearchQuery_BuildFTSQuery(t *testing.T) {
 			name:      "simple OR join",
 			terms:     []string{"video", "tutorial"},
 			joinOp:    " OR ",
-			wantQuery: `"video" OR "tutorial"`,
+			wantQuery: "vid OR tut",
 		},
 		{
 			name:      "with boolean operators",
 			terms:     []string{"video", "OR", "tutorial"},
 			joinOp:    "OR",
-			wantQuery: `"video" OR "tutorial"`,
+			wantQuery: "vid OR tut",
 		},
 		{
 			name:      "empty terms",

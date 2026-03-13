@@ -1286,8 +1286,8 @@ func (sb *SortBuilder) SortAdvanced(media []models.MediaWithDB, config string) {
 				// Apply natural sorting as tiebreaker for this group
 				applyNaturalSort(media, group.Fields)
 			} else if group.Alg == "related" {
-				// Related media - for now apply standard sort
-				// TODO: Expand results with related media from database based on shared search terms
+				// Related media - apply standard natural sort
+				// Note: Media expansion happens earlier in SortMediaWithExpansion
 				applyStandardSort(media, group.Fields, "natural")
 			} else {
 				// Standard multi-field sorting
@@ -1436,9 +1436,33 @@ func ExpandRelatedMedia(ctx context.Context, sqlDB *sql.DB, media *[]models.Medi
 
 	// Get the first media item to find related content
 	first := (*media)[0]
+
+	// Extract search terms from flags first (if available)
+	var words []string
+	if len(flags.Search) > 0 {
+		// Use the original search query terms
+		queryStr := strings.Join(flags.Search, " ")
+		hybrid := utils.ParseHybridSearchQuery(queryStr)
+		
+		// Use FTS terms from the search
+		words = append(words, hybrid.FTSTerms...)
+		
+		// Also include phrases as individual words
+		for _, phrase := range hybrid.Phrases {
+			phraseWords := strings.Fields(phrase)
+			for _, w := range phraseWords {
+				if len(w) > 2 {
+					words = append(words, w)
+				}
+			}
+		}
+	}
 	
-	// Extract words from search columns for finding related media
-	words := extractSearchWords(first)
+	// If no search terms from flags, extract from media item
+	if len(words) == 0 {
+		words = extractSearchWords(first)
+	}
+	
 	if len(words) == 0 {
 		return nil
 	}
@@ -1447,15 +1471,16 @@ func ExpandRelatedMedia(ctx context.Context, sqlDB *sql.DB, media *[]models.Medi
 	sort.Slice(words, func(i, j int) bool {
 		return len(words[i]) > len(words[j])
 	})
-	
+
 	maxWords := 50
 	if len(words) > maxWords {
 		words = words[:maxWords]
 	}
 
-	// Build FTS search query - use OR for broader matching
-	queryStr := strings.Join(words, " OR ")
-	
+	// Build FTS search query using trigram-compatible format for detail=none
+	hybrid := &utils.HybridSearchQuery{FTSTerms: words}
+	queryStr := hybrid.BuildFTSQuery("OR")
+
 	// Detect FTS table
 	ftsTable := detectFTSTable(ctx, sqlDB)
 	if ftsTable == "" {
@@ -1588,24 +1613,25 @@ type relatedMediaRow struct {
 	Rank           float64
 }
 
-// queryRelatedMediaWithRank queries for related media using FTS, ordered by rank
+// queryRelatedMediaWithRank queries for related media using FTS, ordered by bm25 rank
 func queryRelatedMediaWithRank(ctx context.Context, sqlDB *sql.DB, ftsTable, excludePath, queryStr string, limit int64) ([]relatedMediaRow, error) {
-	// FTS query with rank ordering
+	// FTS query with bm25() ranking - works with detail=none + trigram
+	// Note: bm25() requires the table name, not an alias
 	query := fmt.Sprintf(`
-		SELECT 
+		SELECT
 			m.path, m.title, m.size, m.duration,
 			m.video_count, m.audio_count, m.subtitle_count,
 			m.play_count, m.playhead,
 			m.time_created, m.time_modified, m.time_downloaded, m.time_last_played,
 			m.score, m.type,
-			%s.rank as rank
-		FROM %s fts
-		JOIN media m ON fts.rowid = m.rowid
-		WHERE %s MATCH ?
+			bm25(%s) as rank
+		FROM %s, media m
+		WHERE m.rowid = %s.rowid
+		AND %s MATCH ?
 			AND m.path != ?
-		ORDER BY %s.rank DESC, m.path
+		ORDER BY bm25(%s) DESC, m.path
 		LIMIT ?
-	`, ftsTable, ftsTable, ftsTable, ftsTable)
+	`, ftsTable, ftsTable, ftsTable, ftsTable, ftsTable)
 
 	rows, err := sqlDB.QueryContext(ctx, query, queryStr, excludePath, limit)
 	if err != nil {

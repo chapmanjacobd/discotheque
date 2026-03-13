@@ -34,6 +34,19 @@ type Querier interface {
 	GetRandomMedia(ctx context.Context, limit int64) ([]Media, error)
 	GetRatingStats(ctx context.Context) ([]GetRatingStatsRow, error)
 	GetSiblingMedia(ctx context.Context, arg GetSiblingMediaParams) ([]Media, error)
+	// FTS5 MATCH query for captions search - implemented manually in Go
+	// due to sqlc's limited FTS5 MATCH support with detail=none
+	// Original query:
+	//   SELECT c.media_path, c.time, c.text, m.title, m.type, m.size, m.duration
+	//   FROM captions c
+	//   JOIN captions_fts f ON c.rowid = f.rowid
+	//   JOIN media m ON c.media_path = m.path
+	//   WHERE f.text MATCH ?
+	//   AND m.time_deleted = 0
+	//   AND c.text IS NOT NULL AND c.text != ''
+	//   AND ((@video_only = 0 OR m.type = 'video') ...)
+	//   ORDER BY c.media_path, c.time
+	//   LIMIT ?;
 	GetStats(ctx context.Context) (GetStatsRow, error)
 	GetStatsByType(ctx context.Context) ([]GetStatsByTypeRow, error)
 	GetUnfinishedMedia(ctx context.Context, limit int64) ([]Media, error)
@@ -45,10 +58,15 @@ type Querier interface {
 	InsertPlaylist(ctx context.Context, arg InsertPlaylistParams) (int64, error)
 	MarkDeleted(ctx context.Context, arg MarkDeletedParams) error
 	RemovePlaylistItem(ctx context.Context, arg RemovePlaylistItemParams) error
-	SearchCaptions(ctx context.Context, arg SearchCaptionsParams) ([]SearchCaptionsRow, error)
-	SearchMediaFTS(ctx context.Context, arg SearchMediaFTSParams) ([]Media, error)
 	UpdateMediaCategories(ctx context.Context, arg UpdateMediaCategoriesParams) error
 	UpdatePath(ctx context.Context, arg UpdatePathParams) error
+	// FTS5 MATCH query for media search - implemented manually in Go
+	// due to sqlc's limited FTS5 MATCH support with detail=none
+	// Original query:
+	//   SELECT * FROM media
+	//   WHERE time_deleted = 0
+	//   AND rowid IN (SELECT rowid FROM media_fts WHERE media_fts MATCH ?)
+	//   LIMIT ?;
 	UpdatePlayHistory(ctx context.Context, arg UpdatePlayHistoryParams) error
 	UpsertMedia(ctx context.Context, arg UpsertMediaParams) error
 }

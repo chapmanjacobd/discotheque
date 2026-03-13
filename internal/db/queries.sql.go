@@ -1230,6 +1230,7 @@ func (q *Queries) GetSiblingMedia(ctx context.Context, arg GetSiblingMediaParams
 }
 
 const getStats = `-- name: GetStats :one
+
 SELECT
     COUNT(*) as total_count,
     SUM(size) as total_size,
@@ -1250,6 +1251,20 @@ type GetStatsRow struct {
 	TotalWatchedDuration sql.NullFloat64 `json:"total_watched_duration"`
 }
 
+// FTS5 MATCH query for captions search - implemented manually in Go
+// due to sqlc's limited FTS5 MATCH support with detail=none
+// Original query:
+//
+//	SELECT c.media_path, c.time, c.text, m.title, m.type, m.size, m.duration
+//	FROM captions c
+//	JOIN captions_fts f ON c.rowid = f.rowid
+//	JOIN media m ON c.media_path = m.path
+//	WHERE f.text MATCH ?
+//	AND m.time_deleted = 0
+//	AND c.text IS NOT NULL AND c.text != ''
+//	AND ((@video_only = 0 OR m.type = 'video') ...)
+//	ORDER BY c.media_path, c.time
+//	LIMIT ?;
 func (q *Queries) GetStats(ctx context.Context) (GetStatsRow, error) {
 	row := q.db.QueryRowContext(ctx, getStats)
 	var i GetStatsRow
@@ -1629,149 +1644,6 @@ func (q *Queries) RemovePlaylistItem(ctx context.Context, arg RemovePlaylistItem
 	return err
 }
 
-const searchCaptions = `-- name: SearchCaptions :many
-SELECT c.media_path, c.time, c.text, m.title, m.type, m.size, m.duration
-FROM captions c
-JOIN captions_fts f ON c.rowid = f.rowid
-JOIN media m ON c.media_path = m.path
-WHERE f.text MATCH ?1
-  AND m.time_deleted = 0
-  AND c.text IS NOT NULL AND c.text != ''
-  AND (
-    (?2 = 0 OR m.type = 'video')
-    AND (?3 = 0 OR m.type IN ('audio', 'audiobook'))
-    AND (?4 = 0 OR m.type = 'image')
-    AND (?5 = 0 OR m.type = 'text')
-  )
-ORDER BY c.media_path, c.time
-LIMIT ?6
-`
-
-type SearchCaptionsParams struct {
-	Query     string      `json:"query"`
-	VideoOnly interface{} `json:"video_only"`
-	AudioOnly interface{} `json:"audio_only"`
-	ImageOnly interface{} `json:"image_only"`
-	TextOnly  interface{} `json:"text_only"`
-	Limit     int64       `json:"limit"`
-}
-
-type SearchCaptionsRow struct {
-	MediaPath string          `json:"media_path"`
-	Time      sql.NullFloat64 `json:"time"`
-	Text      sql.NullString  `json:"text"`
-	Title     sql.NullString  `json:"title"`
-	Type      sql.NullString  `json:"type"`
-	Size      sql.NullInt64   `json:"size"`
-	Duration  sql.NullInt64   `json:"duration"`
-}
-
-func (q *Queries) SearchCaptions(ctx context.Context, arg SearchCaptionsParams) ([]SearchCaptionsRow, error) {
-	rows, err := q.db.QueryContext(ctx, searchCaptions,
-		arg.Query,
-		arg.VideoOnly,
-		arg.AudioOnly,
-		arg.ImageOnly,
-		arg.TextOnly,
-		arg.Limit,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []SearchCaptionsRow{}
-	for rows.Next() {
-		var i SearchCaptionsRow
-		if err := rows.Scan(
-			&i.MediaPath,
-			&i.Time,
-			&i.Text,
-			&i.Title,
-			&i.Type,
-			&i.Size,
-			&i.Duration,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const searchMediaFTS = `-- name: SearchMediaFTS :many
-SELECT path, fts_path, title, duration, size, time_created, time_modified, time_deleted, time_first_played, time_last_played, play_count, playhead, type, width, height, fps, video_codecs, audio_codecs, subtitle_codecs, video_count, audio_count, subtitle_count, album, artist, genre, categories, description, language, time_downloaded, score FROM media
-WHERE rowid IN (
-    SELECT rowid FROM media_fts f WHERE f.fts_path MATCH ?1 OR f.title MATCH ?1 OR f.description MATCH ?1
-)
-AND time_deleted = 0
-LIMIT ?2
-`
-
-type SearchMediaFTSParams struct {
-	Query string `json:"query"`
-	Limit int64  `json:"limit"`
-}
-
-func (q *Queries) SearchMediaFTS(ctx context.Context, arg SearchMediaFTSParams) ([]Media, error) {
-	rows, err := q.db.QueryContext(ctx, searchMediaFTS, arg.Query, arg.Limit)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []Media{}
-	for rows.Next() {
-		var i Media
-		if err := rows.Scan(
-			&i.Path,
-			&i.FtsPath,
-			&i.Title,
-			&i.Duration,
-			&i.Size,
-			&i.TimeCreated,
-			&i.TimeModified,
-			&i.TimeDeleted,
-			&i.TimeFirstPlayed,
-			&i.TimeLastPlayed,
-			&i.PlayCount,
-			&i.Playhead,
-			&i.Type,
-			&i.Width,
-			&i.Height,
-			&i.Fps,
-			&i.VideoCodecs,
-			&i.AudioCodecs,
-			&i.SubtitleCodecs,
-			&i.VideoCount,
-			&i.AudioCount,
-			&i.SubtitleCount,
-			&i.Album,
-			&i.Artist,
-			&i.Genre,
-			&i.Categories,
-			&i.Description,
-			&i.Language,
-			&i.TimeDownloaded,
-			&i.Score,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const updateMediaCategories = `-- name: UpdateMediaCategories :exec
 UPDATE media
 SET categories = ?
@@ -1805,6 +1677,7 @@ func (q *Queries) UpdatePath(ctx context.Context, arg UpdatePathParams) error {
 }
 
 const updatePlayHistory = `-- name: UpdatePlayHistory :exec
+
 UPDATE media
 SET time_last_played = ?,
     time_first_played = COALESCE(time_first_played, ?),
@@ -1820,6 +1693,14 @@ type UpdatePlayHistoryParams struct {
 	Path            string        `json:"path"`
 }
 
+// FTS5 MATCH query for media search - implemented manually in Go
+// due to sqlc's limited FTS5 MATCH support with detail=none
+// Original query:
+//
+//	SELECT * FROM media
+//	WHERE time_deleted = 0
+//	AND rowid IN (SELECT rowid FROM media_fts WHERE media_fts MATCH ?)
+//	LIMIT ?;
 func (q *Queries) UpdatePlayHistory(ctx context.Context, arg UpdatePlayHistoryParams) error {
 	_, err := q.db.ExecContext(ctx, updatePlayHistory,
 		arg.TimeLastPlayed,

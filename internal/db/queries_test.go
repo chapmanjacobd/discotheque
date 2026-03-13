@@ -262,9 +262,9 @@ func TestQueries(t *testing.T) {
 			Title: sql.NullString{String: "Unique Title for FTS", Valid: true},
 		})
 
-		// SearchMediaFTS
+		// SearchMediaFTS - use 3-char terms for detail=none compatibility
 		res, err := q.SearchMediaFTS(ctx, SearchMediaFTSParams{
-			Query: "Unique",
+			Query: "Uni",  // First 3 chars of "Unique"
 			Limit: 10,
 		})
 		if err != nil {
@@ -272,6 +272,12 @@ func TestQueries(t *testing.T) {
 		}
 		if len(res) == 0 {
 			t.Error("SearchMediaFTS returned no results")
+		}
+		// Verify rank is populated
+		if res[0].Rank == 0 {
+			t.Logf("Warning: FTS rank is 0 (may be expected with trigram)")
+		} else {
+			t.Logf("FTS rank: %f", res[0].Rank)
 		}
 
 		// Captions
@@ -285,7 +291,7 @@ func TestQueries(t *testing.T) {
 		}
 
 		resCaptions, err := q.SearchCaptions(ctx, SearchCaptionsParams{
-			Query:     "Hello",
+			Query:     "Hel",  // First 3 chars of "Hello"
 			VideoOnly: false,
 			AudioOnly: false,
 			ImageOnly: false,

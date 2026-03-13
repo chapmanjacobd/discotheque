@@ -87,8 +87,18 @@ func (c *ServeCmd) handleQuery(w http.ResponseWriter, r *http.Request) {
 						return err2
 					}
 					slog.Info("Fetched captions", "count", len(rawRows), "video_only", params.VideoOnly, "audio_only", params.AudioOnly)
+					// Convert GetAllCaptionsOrderedRow to SearchCaptionsRow (rank=0 for non-search)
 					for _, r := range rawRows {
-						rows = append(rows, database.SearchCaptionsRow(r))
+						rows = append(rows, database.SearchCaptionsRow{
+							MediaPath: r.MediaPath,
+							Time:      r.Time,
+							Text:      r.Text,
+							Title:     r.Title,
+							Type:      r.Type,
+							Size:      r.Size,
+							Duration:  r.Duration,
+							Rank:      0, // No ranking for non-search queries
+						})
 					}
 				}
 

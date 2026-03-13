@@ -72,40 +72,34 @@ func ParseHybridSearchQuery(query string) *HybridSearchQuery {
 }
 
 // BuildFTSQuery constructs the FTS MATCH query from terms
+// For trigram + detail=none, we use first 3 chars of each word for filtering
+// This is a loose filter - actual matching is done by LIKE for phrases
 func (h *HybridSearchQuery) BuildFTSQuery(joinOp string) string {
 	if len(h.FTSTerms) == 0 {
 		return ""
 	}
 
-	var parts []string
+	var trigrams []string
 	for _, term := range h.FTSTerms {
 		// Pass through boolean operators
 		if term == "OR" || term == "AND" || term == "NOT" {
-			parts = append(parts, term)
 			continue
 		}
-		// Quote terms for exact token matching
-		quoted := FtsQuote([]string{term})[0]
-		parts = append(parts, quoted)
+		
+		// Use first 3 chars as trigram filter
+		if len(term) >= 3 {
+			trigrams = append(trigrams, term[:3])
+		} else if len(term) > 0 {
+			trigrams = append(trigrams, term)
+		}
 	}
 
-	if len(parts) == 0 {
+	if len(trigrams) == 0 {
 		return ""
 	}
 
-	// Join with OR by default for broader matching, unless explicit operators present
-	hasOperators := false
-	for _, term := range parts {
-		if term == "OR" || term == "AND" || term == "NOT" {
-			hasOperators = true
-			break
-		}
-	}
-
-	if hasOperators {
-		return strings.Join(parts, " ")
-	}
-	return strings.Join(parts, joinOp)
+	// OR between trigrams for broader filtering
+	return strings.Join(trigrams, " OR ")
 }
 
 // HasPhrases returns true if the query contains phrase searches
