@@ -1,4 +1,4 @@
-//go:build !fts5 && !bleve
+//go:build !fts5
 
 package db
 

@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/chapmanjacobd/discoteca/internal/bleve"
+	database "github.com/chapmanjacobd/discoteca/internal/db"
 )
 
 // SearchMode represents the search backend being used
@@ -47,7 +48,7 @@ func DetectSearchMode(db *sql.DB) SearchMode {
 		}
 
 		// Check for FTS5
-		if db != nil && hasFTS5Table(db) {
+		if database.FtsEnabled && db != nil && hasFTS5Table(db) {
 			detectedSearchMode = SearchModeFTS5
 			return
 		}

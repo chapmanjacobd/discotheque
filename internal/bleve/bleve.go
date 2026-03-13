@@ -221,8 +221,8 @@ func Search(queryStr string, limit int) ([]string, uint64, error) {
 	}
 
 	// Create a match query that searches all fields
+	// Don't set FieldVal to search across all indexed fields
 	bleveQuery := bleve.NewMatchQuery(queryStr)
-	bleveQuery.FieldVal = "fts_path"
 
 	// Create search request
 	searchRequest := bleve.NewSearchRequest(bleveQuery)

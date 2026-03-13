@@ -242,6 +242,10 @@ func migrateColumns(db *sql.DB) error {
 	}
 
 	for _, c := range cols {
+		if !FtsEnabled && (c.column == "fts_path" || strings.Contains(c.column, "_fts")) {
+			continue
+		}
+
 		rows, err := db.Query(fmt.Sprintf("PRAGMA table_info(%s)", c.table))
 		if err != nil {
 			if strings.Contains(err.Error(), "no such table") {
@@ -347,10 +351,16 @@ func cleanupMediaTable(db *sql.DB, hasStrict bool) error {
 		strictSql = "STRICT"
 	}
 
+	colsDef := "path TEXT PRIMARY KEY, fts_path TEXT,"
+	colsNames := "path, fts_path,"
+	if !FtsEnabled {
+		colsDef = "path TEXT PRIMARY KEY,"
+		colsNames = "path,"
+	}
+
 	sqls := []string{
 		fmt.Sprintf(`CREATE TABLE media_dg_tmp (
-            path TEXT PRIMARY KEY,
-            fts_path TEXT,
+            %s
             title TEXT,
             duration INTEGER,
             size INTEGER,
@@ -379,20 +389,20 @@ func cleanupMediaTable(db *sql.DB, hasStrict bool) error {
             language TEXT,
             time_downloaded INTEGER,
             score REAL
-        ) %s`, strictSql),
-		`INSERT INTO media_dg_tmp (
-            path, fts_path, title, duration, size, time_created, time_modified,
+        ) %s`, colsDef, strictSql),
+		fmt.Sprintf(`INSERT INTO media_dg_tmp (
+            %s title, duration, size, time_created, time_modified,
             time_deleted, time_first_played, time_last_played, play_count, playhead,
             type, width, height, fps, video_codecs, audio_codecs, subtitle_codecs,
             video_count, audio_count, subtitle_count, album, artist, genre,
             categories, description, language, time_downloaded, score
         ) SELECT 
-            path, fts_path, title, duration, size, time_created, time_modified,
+            %s title, duration, size, time_created, time_modified,
             time_deleted, time_first_played, time_last_played, play_count, playhead,
             type, width, height, fps, video_codecs, audio_codecs, subtitle_codecs,
             video_count, audio_count, subtitle_count, album, artist, genre,
             categories, description, language, time_downloaded, score
-        FROM media`,
+        FROM media`, colsNames, colsNames),
 		`DROP TABLE media`,
 		`ALTER TABLE media_dg_tmp RENAME TO media`,
 	}
@@ -608,11 +618,13 @@ func migrateTables(db *sql.DB, hasStrict bool) error {
 		return nil
 	}
 
-	if err := upgradeFTS("media_fts", "description"); err != nil {
-		return err
-	}
-	if err := upgradeFTS("captions_fts", ""); err != nil {
-		return err
+	if FtsEnabled {
+		if err := upgradeFTS("media_fts", "description"); err != nil {
+			return err
+		}
+		if err := upgradeFTS("captions_fts", ""); err != nil {
+			return err
+		}
 	}
 
 	return nil

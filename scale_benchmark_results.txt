@@ -1,0 +1,10 @@
+goos: linux
+goarch: amd64
+pkg: github.com/chapmanjacobd/discoteca/internal/bleve
+cpu: 13th Gen Intel(R) Core(TM) i5-13600KF
+BenchmarkFTS5vsBleve_Scale/Rows_200/FTS5-20    	     430	   2484155 ns/op	  490177 B/op	    1915 allocs/op
+BenchmarkFTS5vsBleve_Scale/Rows_200/Bleve-20   	   23864	     47963 ns/op	   36271 B/op	     521 allocs/op
+BenchmarkFTS5vsBleve_Scale/Rows_20000/FTS5-20  	       1	2272548867 ns/op	78300816 B/op	  180129 allocs/op
+BenchmarkFTS5vsBleve_Scale/Rows_20000/Bleve-20 	     760	   1395128 ns/op	   55359 B/op	     696 allocs/op
+BenchmarkFTS5vsBleve_Scale/Rows_200000/FTS5-20 	       1	3877974464 ns/op	815067408 B/op	 1800139 allocs/op
+BenchmarkFTS5vsBleve_Scale/Rows_200000/Bleve-20         	      97	  11803935 ns/op	  105134 B/op	    1117 allocs/op
