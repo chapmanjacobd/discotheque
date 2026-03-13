@@ -834,6 +834,12 @@ type SortField struct {
 	Reverse bool
 }
 
+// SortGroup represents a group of fields with a specific sorting algorithm
+type SortGroup struct {
+	Fields []SortField
+	Alg    string // "weighted", "natural", or empty for standard
+}
+
 // parseSortConfig parses a sort configuration string into SortField slices
 // Supports:
 //   - Simple: "path", "title"
@@ -842,6 +848,7 @@ type SortField struct {
 //   - Multi-field: "video_count desc,audio_count desc,path asc"
 //   - Complex: "natural_path,title desc"
 //   - Array notation: "field1,field2,field3" (comma-separated)
+//   - Meta-field markers: "_weighted_rerank", "_natural_order" (apply to fields below)
 func parseSortConfig(config string) ([]SortField, string) {
 	if config == "" {
 		return []SortField{{Field: "ps", Reverse: false}}, "natural"
@@ -911,6 +918,109 @@ func parseSortConfig(config string) ([]SortField, string) {
 	}
 
 	return sortFields, alg
+}
+
+// parseSortConfigWithGroups parses a sort configuration string into SortGroup slices
+// Meta-field markers (_weighted_rerank, _natural_order) create new groups that apply to fields below them
+func parseSortConfigWithGroups(config string) []SortGroup {
+	if config == "" {
+		return []SortGroup{{Fields: []SortField{{Field: "ps", Reverse: false}}, Alg: "natural"}}
+	}
+
+	var groups []SortGroup
+	var currentGroup SortGroup
+	currentAlg := "natural"
+
+	// Known algorithms for prefix detection
+	knownAlgs := map[string]bool{
+		"natural": true, "ignorecase": true,
+		"lowercase": true, "human": true, "locale": true,
+		"signed": true, "os": true, "python": true,
+	}
+
+	parts := strings.SplitSeq(config, ",")
+
+	for part := range parts {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+
+		// Check for meta-field markers
+		if part == "_weighted_rerank" {
+			// Save current group if it has fields
+			if len(currentGroup.Fields) > 0 {
+				groups = append(groups, currentGroup)
+				currentGroup = SortGroup{}
+			}
+			// Start new weighted group
+			currentGroup = SortGroup{Fields: []SortField{}, Alg: "weighted"}
+			continue
+		}
+
+		if part == "_natural_order" {
+			// Save current group if it has fields
+			if len(currentGroup.Fields) > 0 {
+				groups = append(groups, currentGroup)
+				currentGroup = SortGroup{}
+			}
+			// Start new natural order group
+			currentGroup = SortGroup{Fields: []SortField{}, Alg: "natural"}
+			continue
+		}
+
+		reverse := false
+		field := part
+
+		// Check for "desc" / "asc" suffix
+		if strings.HasSuffix(part, " desc") {
+			reverse = true
+			field = strings.TrimSpace(strings.TrimSuffix(part, " desc"))
+		} else if before, ok := strings.CutSuffix(part, " asc"); ok {
+			field = strings.TrimSpace(before)
+		}
+
+		// Check for "reverse_" prefix
+		if after, ok := strings.CutPrefix(field, "reverse_"); ok {
+			reverse = !reverse
+			field = after
+		}
+
+		// Check for "-" prefix
+		if strings.HasPrefix(field, "-") {
+			reverse = !reverse
+			field = field[1:]
+		}
+
+		// Check for algorithm prefix (alg_field)
+		if strings.Contains(field, "_") {
+			potentialParts := strings.SplitN(field, "_", 2)
+			if knownAlgs[potentialParts[0]] {
+				currentAlg = potentialParts[0]
+				field = potentialParts[1]
+			}
+		}
+
+		// Add field to current group
+		if currentGroup.Alg == "" {
+			currentGroup.Alg = currentAlg
+		}
+		currentGroup.Fields = append(currentGroup.Fields, SortField{Field: field, Reverse: reverse})
+	}
+
+	// Add final group if it has fields
+	if len(currentGroup.Fields) > 0 {
+		if currentGroup.Alg == "" {
+			currentGroup.Alg = currentAlg
+		}
+		groups = append(groups, currentGroup)
+	}
+
+	if len(groups) == 0 {
+		return []SortGroup{{Fields: []SortField{{Field: "ps", Reverse: false}}, Alg: "natural"}}
+	}
+
+	return groups
 }
 
 // getSortValueFloat64 returns a numeric sort value for a field
@@ -1150,6 +1260,27 @@ func (sb *SortBuilder) SortAdvanced(media []models.MediaWithDB, config string) {
 		config = "size_per_count asc,size asc,count asc,folders asc,path asc"
 	}
 
+	// Check for meta-field markers and use grouped sorting
+	groups := parseSortConfigWithGroups(config)
+
+	if len(groups) > 1 {
+		// Multiple groups - apply each group's sorting in sequence
+		for _, group := range groups {
+			if group.Alg == "weighted" {
+				// Apply weighted re-ranking for this group
+				applyWeightedRerank(media, group.Fields)
+			} else if group.Alg == "natural" {
+				// Apply natural sorting as tiebreaker for this group
+				applyNaturalSort(media, group.Fields)
+			} else {
+				// Standard multi-field sorting
+				applyStandardSort(media, group.Fields, group.Alg)
+			}
+		}
+		return
+	}
+
+	// Single group - use original logic
 	sortFields, alg := parseSortConfig(config)
 
 	if len(sortFields) == 1 && sortFields[0].Field == "ps" {
@@ -1179,6 +1310,103 @@ func (sb *SortBuilder) SortAdvanced(media []models.MediaWithDB, config string) {
 	sort.SliceStable(media, func(i, j int) bool {
 		cmp := compareSortFields(media, i, j, sortFields, alg)
 		return cmp < 0
+	})
+}
+
+// applyStandardSort applies standard multi-field sorting to media
+func applyStandardSort(media []models.MediaWithDB, fields []SortField, alg string) {
+	if len(fields) == 0 {
+		return
+	}
+	sort.SliceStable(media, func(i, j int) bool {
+		cmp := compareSortFields(media, i, j, fields, alg)
+		return cmp < 0
+	})
+}
+
+// applyNaturalSort applies natural sorting to media using the specified fields as tiebreakers
+func applyNaturalSort(media []models.MediaWithDB, fields []SortField) {
+	if len(fields) == 0 {
+		return
+	}
+	// Use natural algorithm for string comparisons
+	applyStandardSort(media, fields, "natural")
+}
+
+// applyWeightedRerank applies MCDA-style weighted re-ranking based on field positions
+// Fields earlier in the list have higher weights (position-based weighting)
+func applyWeightedRerank(media []models.MediaWithDB, fields []SortField) {
+	if len(fields) == 0 || len(media) == 0 {
+		return
+	}
+
+	// Calculate ranks for each field and combine with weights
+	// Weight decreases with position: first field gets highest weight
+	type rankedMedia struct {
+		index      int
+		totalScore float64
+	}
+
+	ranked := make([]rankedMedia, len(media))
+	for i := range media {
+		ranked[i] = rankedMedia{index: i, totalScore: 0}
+	}
+
+	// For each field, calculate ranks and apply weights
+	for fieldIdx, field := range fields {
+		// Weight based on position (higher weight for earlier fields)
+		// Using inverse position weighting: weight = 1 / (position + 1)
+		weight := 1.0 / float64(fieldIdx+1)
+
+		// Create sortable slice with field values
+		type fieldValue struct {
+			originalIndex int
+			value         float64
+			strValue      string
+			isNumeric     bool
+		}
+
+		values := make([]fieldValue, len(media))
+		for i, m := range media {
+			values[i] = fieldValue{originalIndex: i}
+			if isNumericField(field.Field) {
+				values[i].value = getSortValueFloat64(m, field.Field)
+				values[i].isNumeric = true
+			} else {
+				values[i].strValue = getSortValueString(m, field.Field)
+				values[i].isNumeric = false
+			}
+		}
+
+		// Sort values to determine ranks
+		sort.Slice(values, func(i, j int) bool {
+			if values[i].isNumeric {
+				if field.Reverse {
+					return values[i].value > values[j].value
+				}
+				return values[i].value < values[j].value
+			}
+			// Use natural comparison for strings
+			if field.Reverse {
+				return utils.NaturalLess(values[j].strValue, values[i].strValue)
+			}
+			return utils.NaturalLess(values[i].strValue, values[j].strValue)
+		})
+
+		// Assign ranks (normalized to 0-1 range)
+		for rank, fv := range values {
+			// Normalize rank to 0-1 (best = 1, worst = 0)
+			normalizedRank := 1.0 - (float64(rank) / float64(len(values)-1))
+			if len(values) == 1 {
+				normalizedRank = 1.0
+			}
+			ranked[fv.originalIndex].totalScore += normalizedRank * weight
+		}
+	}
+
+	// Sort media by total weighted score
+	sort.SliceStable(media, func(i, j int) bool {
+		return ranked[i].totalScore > ranked[j].totalScore
 	})
 }
 

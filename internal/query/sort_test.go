@@ -458,3 +458,126 @@ func TestReverseXklbSort(t *testing.T) {
 		t.Errorf("SortAdvanced(reverse_xklb) position 0 = %q, want /path/a.mp4 (audio-first)", media[0].Path)
 	}
 }
+
+func TestParseSortConfigWithGroups(t *testing.T) {
+	tests := []struct {
+		name         string
+		config       string
+		wantGroups   int
+		wantWeighted int // index of weighted group (-1 if none)
+		wantNatural  int // index of natural group (-1 if none)
+	}{
+		{
+			name:         "no markers",
+			config:       "play_count asc,size desc",
+			wantGroups:   1,
+			wantWeighted: -1,
+			wantNatural:  -1,
+		},
+		{
+			name:         "weighted rerank marker",
+			config:       "play_count asc,size desc,_weighted_rerank,duration asc",
+			wantGroups:   2,
+			wantWeighted: 1, // second group is weighted
+			wantNatural:  -1,
+		},
+		{
+			name:         "natural order marker",
+			config:       "play_count asc,_natural_order,path asc",
+			wantGroups:   2,
+			wantWeighted: -1,
+			wantNatural:  1, // second group is natural
+		},
+		{
+			name:         "both markers",
+			config:       "play_count asc,size desc,_weighted_rerank,duration asc,_natural_order,path asc",
+			wantGroups:   3,
+			wantWeighted: 1, // second group is weighted
+			wantNatural:  2, // third group is natural
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			groups := parseSortConfigWithGroups(tt.config)
+			if len(groups) != tt.wantGroups {
+				t.Errorf("parseSortConfigWithGroups(%q) returned %d groups, want %d", tt.config, len(groups), tt.wantGroups)
+			}
+			if tt.wantWeighted >= 0 {
+				if groups[tt.wantWeighted].Alg != "weighted" {
+					t.Errorf("parseSortConfigWithGroups(%q) group[%d] alg = %q, want 'weighted'", tt.config, tt.wantWeighted, groups[tt.wantWeighted].Alg)
+				}
+			}
+			if tt.wantNatural >= 0 {
+				if groups[tt.wantNatural].Alg != "natural" {
+					t.Errorf("parseSortConfigWithGroups(%q) group[%d] alg = %q, want 'natural'", tt.config, tt.wantNatural, groups[tt.wantNatural].Alg)
+				}
+			}
+		})
+	}
+}
+
+func TestWeightedRerank(t *testing.T) {
+	playCount1 := int64(10)
+	playCount2 := int64(5)
+	playCount3 := int64(1)
+	oneMB := int64(1024 * 1024)
+	twoMB := int64(2 * 1024 * 1024)
+	threeMB := int64(3 * 1024 * 1024)
+
+	media := []models.MediaWithDB{
+		{
+			Media: models.Media{
+				Path:      "/path/low.mp4",
+				PlayCount: &playCount3,
+				Size:      &oneMB,
+			},
+		},
+		{
+			Media: models.Media{
+				Path:      "/path/high.mp4",
+				PlayCount: &playCount1,
+				Size:      &threeMB,
+			},
+		},
+		{
+			Media: models.Media{
+				Path:      "/path/medium.mp4",
+				PlayCount: &playCount2,
+				Size:      &twoMB,
+			},
+		},
+	}
+
+	// Apply weighted rerank with play_count as primary (higher weight) and size as secondary
+	applyWeightedRerank(media, []SortField{
+		{Field: "play_count", Reverse: true}, // Most played first
+		{Field: "size", Reverse: true},       // Largest first
+	})
+
+	// Highest play count should come first
+	if media[0].Path != "/path/high.mp4" {
+		t.Errorf("applyWeightedRerank() position 0 = %q, want /path/high.mp4 (most played)", media[0].Path)
+	}
+}
+
+func TestNaturalOrderGroup(t *testing.T) {
+	media := []models.MediaWithDB{
+		{Media: models.Media{Path: "/path/episode10.mp4"}},
+		{Media: models.Media{Path: "/path/episode2.mp4"}},
+		{Media: models.Media{Path: "/path/episode1.mp4"}},
+	}
+
+	// Apply natural sort - should order numerically (1, 2, 10) not lexicographically (1, 10, 2)
+	applyNaturalSort(media, []SortField{{Field: "path", Reverse: false}})
+
+	if media[0].Path != "/path/episode1.mp4" {
+		t.Errorf("applyNaturalSort() position 0 = %q, want /path/episode1.mp4", media[0].Path)
+	}
+	if media[1].Path != "/path/episode2.mp4" {
+		t.Errorf("applyNaturalSort() position 1 = %q, want /path/episode2.mp4", media[1].Path)
+	}
+	if media[2].Path != "/path/episode10.mp4" {
+		t.Errorf("applyNaturalSort() position 2 = %q, want /path/episode10.mp4", media[2].Path)
+	}
+}

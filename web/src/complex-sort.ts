@@ -26,6 +26,9 @@ export const SORT_FIELDS: { value: string; label: string }[] = [
     { value: 'score', label: 'Rating' },
     { value: 'extension', label: 'Extension' },
     { value: 'random', label: 'Random' },
+    { value: '---separator---', label: '────────────────' },
+    { value: '_weighted_rerank', label: '⚖️ Weighted Re-rank (below fields)' },
+    { value: '_natural_order', label: '📎 Natural Order (below fields)' },
 ];
 
 // Preset configurations mapped to sort-by values
@@ -195,15 +198,21 @@ function saveConfig() {
 
     // Update state filters
     state.filters.reverse = false; // Reverse is now handled per-field
-    
+
     // Convert fields to comma-separated string for API
+    // Meta-fields (_weighted_rerank, _natural_order) don't have direction
     const sortFieldsStr = currentFields
-        .map(f => `${f.field} ${f.reverse ? 'desc' : 'asc'}`)
+        .map(f => {
+            if (f.field.startsWith('_')) {
+                return f.field; // Meta-fields don't need direction
+            }
+            return `${f.field} ${f.reverse ? 'desc' : 'asc'}`;
+        })
         .join(',');
-    
+
     // Check if this matches a preset
     const matchedPreset = matchesPreset(currentFields);
-    
+
     if (matchedPreset) {
         // Set sort-by to match the preset
         state.filters.sort = matchedPreset;
@@ -234,6 +243,10 @@ function renderFieldsList() {
 function createFieldItem(field: SortField, index: number): HTMLElement {
     const item = document.createElement('div');
     item.className = 'sort-field-item';
+    // Add special styling for meta-fields
+    if (field.field.startsWith('_')) {
+        item.classList.add('is-meta-field');
+    }
     item.draggable = true;
     item.dataset.index = index.toString();
 
@@ -257,15 +270,23 @@ function createFieldItem(field: SortField, index: number): HTMLElement {
     };
     item.appendChild(select);
 
-    // Direction toggle
-    const direction = document.createElement('div');
-    direction.className = 'direction-toggle';
-    direction.textContent = field.reverse ? '↓ DESC' : '↑ ASC';
-    direction.onclick = () => {
-        currentFields[index].reverse = !currentFields[index].reverse;
-        direction.textContent = currentFields[index].reverse ? '↓ DESC' : '↑ ASC';
-    };
-    item.appendChild(direction);
+    // Direction toggle (only for regular sort fields, not meta-fields)
+    const isMetaField = field.field.startsWith('_');
+    if (!isMetaField) {
+        const direction = document.createElement('div');
+        direction.className = 'direction-toggle';
+        direction.textContent = field.reverse ? '↓ DESC' : '↑ ASC';
+        direction.onclick = () => {
+            currentFields[index].reverse = !currentFields[index].reverse;
+            direction.textContent = currentFields[index].reverse ? '↓ DESC' : '↑ ASC';
+        };
+        item.appendChild(direction);
+    } else {
+        // Add spacer for meta-fields to maintain alignment
+        const spacer = document.createElement('div');
+        spacer.className = 'direction-spacer';
+        item.appendChild(spacer);
+    }
 
     // Remove button
     const removeBtn = document.createElement('button');

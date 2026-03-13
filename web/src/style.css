@@ -2405,6 +2405,26 @@ body.has-pip #content {
     color: var(--text-muted);
 }
 
+.sort-field-item .direction-spacer {
+    min-width: 80px;
+    text-align: center;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    font-style: italic;
+}
+
+.sort-field-item.is-meta-field {
+    background: var(--bg-color);
+    border-style: dashed;
+    border-color: var(--border-color);
+}
+
+.sort-field-item.is-meta-field select {
+    font-weight: 600;
+    color: var(--accent-color);
+    background: var(--bg-secondary);
+}
+
 .sort-field-item .remove-field {
     padding: 0.25rem 0.5rem;
     background: transparent;
