@@ -75,12 +75,12 @@ func setupBenchmarkData(b *testing.B, rowCount int) (*sql.DB, string) {
 		mediaType := "video"
 
 		doc := &MediaDocument{
-			ID:          path,
-			Path:        path,
-			FtsPath:     "/home/user/videos",
-			Title:       title,
-			Description: description,
-			Type:        mediaType,
+			ID:            path,
+			Path:          path,
+			PathTokenized: "/home/user/videos",
+			Title:         title,
+			Description:   description,
+			Type:          mediaType,
 		}
 		if i == 0 {
 			if err := InitIndex(dbPath); err != nil {

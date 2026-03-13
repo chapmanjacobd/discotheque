@@ -27,7 +27,7 @@ var (
 type MediaDocument struct {
 	ID          string `json:"id"`
 	Path        string `json:"path"`
-	FtsPath     string `json:"fts_path"`
+	PathTokenized string `json:"path_tokenized"`
 	Title       string `json:"title"`
 	Description string `json:"description"`
 	Type        string `json:"type"`
@@ -42,8 +42,8 @@ func ToBleveDoc(m models.Media) *MediaDocument {
 		Path: m.Path,
 	}
 
-	if m.FtsPath != nil {
-		doc.FtsPath = *m.FtsPath
+	if m.PathTokenized != nil {
+		doc.PathTokenized = *m.PathTokenized
 	}
 	if m.Title != nil {
 		doc.Title = *m.Title
@@ -107,8 +107,8 @@ func createIndex(path string) (bleve.Index, error) {
 	pathField := bleve.NewTextFieldMapping()
 	pathField.Analyzer = keyword.Name // For exact path matching
 
-	ftsPathField := bleve.NewTextFieldMapping()
-	ftsPathField.Analyzer = standard.Name // For full-text search
+	pathTokenizedField := bleve.NewTextFieldMapping()
+	pathTokenizedField.Analyzer = standard.Name // For full-text search
 
 	// Title field with edge_ngram for prefix/autocomplete search
 	titleField := bleve.NewTextFieldMapping()
@@ -126,7 +126,7 @@ func createIndex(path string) (bleve.Index, error) {
 	// Create document mapping
 	docMapping := bleve.NewDocumentMapping()
 	docMapping.AddFieldMappingsAt("path", pathField)
-	docMapping.AddFieldMappingsAt("fts_path", ftsPathField)
+	docMapping.AddFieldMappingsAt("path_tokenized", pathTokenizedField)
 	docMapping.AddFieldMappingsAt("title", titleField)
 	docMapping.AddFieldMappingsAt("description", descriptionField)
 	docMapping.AddFieldMappingsAt("type", typeField)

@@ -409,7 +409,7 @@ func (c *ServeCmd) handleCategorizeSuggest(w http.ResponseWriter, r *http.Reques
 
 			sentence := ""
 			if fullPath {
-				sentence = utils.PathToSentenceFull(m.Path)
+				sentence = utils.PathToTokenized(m.Path)
 			} else {
 				sentence = utils.PathToSentence(m.Path)
 			}

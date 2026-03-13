@@ -135,8 +135,8 @@ func migrateToStrict(db *sql.DB, tableName string, createSql string) error {
 	return tx.Commit()
 }
 
-// pathToFtsPath converts a file path to FTS-friendly format
-func pathToFtsPath(path string) string {
+// pathToTokenized converts a file path to FTS-friendly format
+func pathToTokenized(path string) string {
 	re := regexp.MustCompile(`[/\\.\[\]\-\+(){}_&]`)
 	s := re.ReplaceAllString(path, " ")
 	return cleanString(s)
@@ -280,7 +280,7 @@ func migrateColumns(db *sql.DB) error {
 
 			if c.table == "media" && c.column == "fts_path" {
 				// New column added, populate it for existing rows
-				if err := populateFtsPath(db); err != nil {
+				if err := populatePathTokenized(db); err != nil {
 					return fmt.Errorf("failed to populate fts_path: %w", err)
 				}
 			}
@@ -416,7 +416,7 @@ func cleanupMediaTable(db *sql.DB, hasStrict bool) error {
 	return tx.Commit()
 }
 
-func populateFtsPath(db *sql.DB) error {
+func populatePathTokenized(db *sql.DB) error {
 	rows, err := db.Query("SELECT path FROM media WHERE fts_path IS NULL")
 	if err != nil {
 		return err
@@ -425,7 +425,7 @@ func populateFtsPath(db *sql.DB) error {
 
 	var updates []struct {
 		path    string
-		ftsPath string
+		tokenized string
 	}
 	for rows.Next() {
 		var path string
@@ -434,8 +434,8 @@ func populateFtsPath(db *sql.DB) error {
 		}
 		updates = append(updates, struct {
 			path    string
-			ftsPath string
-		}{path, pathToFtsPath(path)})
+			tokenized string
+		}{path, pathToTokenized(path)})
 	}
 	rows.Close()
 
@@ -456,7 +456,7 @@ func populateFtsPath(db *sql.DB) error {
 	defer stmt.Close()
 
 	for _, u := range updates {
-		if _, err := stmt.Exec(u.ftsPath, u.path); err != nil {
+		if _, err := stmt.Exec(u.tokenized, u.path); err != nil {
 			return err
 		}
 	}

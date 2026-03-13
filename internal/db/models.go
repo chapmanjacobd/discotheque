@@ -67,7 +67,7 @@ type Media struct {
 
 type MediaFts struct {
 	Path        string `json:"path"`
-	FtsPath     string `json:"fts_path"`
+	PathTokenized     string `json:"path_tokenized"`
 	Title       string `json:"title"`
 	Description string `json:"description"`
 }

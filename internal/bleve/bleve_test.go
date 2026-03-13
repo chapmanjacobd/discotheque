@@ -19,16 +19,16 @@ func TestMediaDocument(t *testing.T) {
 	title := "Test Title"
 	description := "Test Description"
 	mediaType := "video"
-	ftsPath := filepath.FromSlash("/test/path")
+	pathTokenized := filepath.FromSlash("/test/path")
 
 	media := models.Media{
-		Path:        filepath.FromSlash("/test/path/video.mp4"),
-		Size:        &size,
-		Duration:    &duration,
-		Title:       &title,
-		Description: &description,
-		Type:        &mediaType,
-		FtsPath:     &ftsPath,
+		Path:          filepath.FromSlash("/test/path/video.mp4"),
+		Size:          &size,
+		Duration:      &duration,
+		Title:         &title,
+		Description:   &description,
+		Type:          &mediaType,
+		PathTokenized: &pathTokenized,
 	}
 
 	doc := ToBleveDoc(media)
@@ -39,8 +39,8 @@ func TestMediaDocument(t *testing.T) {
 	if doc.Path != filepath.FromSlash("/test/path/video.mp4") {
 		t.Errorf("Expected Path %s, got %s", filepath.FromSlash("/test/path/video.mp4"), doc.Path)
 	}
-	if doc.FtsPath != filepath.FromSlash("/test/path") {
-		t.Errorf("Expected FtsPath %s, got %s", filepath.FromSlash("/test/path"), doc.FtsPath)
+	if doc.PathTokenized != filepath.FromSlash("/test/path") {
+		t.Errorf("Expected PathTokenized %s, got %s", filepath.FromSlash("/test/path"), doc.PathTokenized)
 	}
 	if doc.Title != "Test Title" {
 		t.Errorf("Expected Title Test Title, got %s", doc.Title)
@@ -72,8 +72,8 @@ func TestMediaDocumentNilFields(t *testing.T) {
 	if doc.Path != filepath.FromSlash("/test/path/video.mp4") {
 		t.Errorf("Expected Path %s, got %s", filepath.FromSlash("/test/path/video.mp4"), doc.Path)
 	}
-	if doc.FtsPath != "" {
-		t.Errorf("Expected empty FtsPath, got %s", doc.FtsPath)
+	if doc.PathTokenized != "" {
+		t.Errorf("Expected empty PathTokenized, got %s", doc.PathTokenized)
 	}
 	if doc.Title != "" {
 		t.Errorf("Expected empty Title, got %s", doc.Title)
@@ -209,14 +209,14 @@ func TestIndexDocument(t *testing.T) {
 	defer CloseIndex()
 
 	doc := &MediaDocument{
-		ID:          "test-id-1",
-		Path:        filepath.FromSlash("/test/path/video.mp4"),
-		FtsPath:     filepath.FromSlash("/test/path"),
-		Title:       "Test Video",
-		Description: "A test video file",
-		Type:        "video",
-		Size:        1024,
-		Duration:    3600,
+		ID:            "test-id-1",
+		Path:          filepath.FromSlash("/test/path/video.mp4"),
+		PathTokenized: filepath.FromSlash("/test/path"),
+		Title:         "Test Video",
+		Description:   "A test video file",
+		Type:          "video",
+		Size:          1024,
+		Duration:      3600,
 	}
 
 	err = IndexDocument(doc)
@@ -266,10 +266,10 @@ func TestDeleteDocument(t *testing.T) {
 
 	// Index a document
 	doc := &MediaDocument{
-		ID:      "test-id-1",
-		Path:    filepath.FromSlash("/test/path/video.mp4"),
-		FtsPath: filepath.FromSlash("/test/path"),
-		Title:   "Test Video",
+		ID:            "test-id-1",
+		Path:          filepath.FromSlash("/test/path/video.mp4"),
+		PathTokenized: filepath.FromSlash("/test/path"),
+		Title:         "Test Video",
 	}
 
 	err = IndexDocument(doc)
@@ -326,28 +326,28 @@ func TestSearch(t *testing.T) {
 	// Index multiple documents
 	docs := []*MediaDocument{
 		{
-			ID:          "doc-1",
-			Path:        filepath.FromSlash("/media/videos/sample-video1.mp4"),
-			FtsPath:     filepath.FromSlash("/media/videos/sample-video1"),
-			Title:       "Sample Video One",
-			Description: "A sample video file",
-			Type:        "video",
+			ID:            "doc-1",
+			Path:          filepath.FromSlash("/media/videos/sample-video1.mp4"),
+			PathTokenized: filepath.FromSlash("/media/videos/sample-video1"),
+			Title:         "Sample Video One",
+			Description:   "A sample video file",
+			Type:          "video",
 		},
 		{
-			ID:          "doc-2",
-			Path:        filepath.FromSlash("/media/videos/sample-video2.mp4"),
-			FtsPath:     filepath.FromSlash("/media/videos/sample-video2"),
-			Title:       "Sample Video Two",
-			Description: "Another sample video clip",
-			Type:        "video",
+			ID:            "doc-2",
+			Path:          filepath.FromSlash("/media/videos/sample-video2.mp4"),
+			PathTokenized: filepath.FromSlash("/media/videos/sample-video2"),
+			Title:         "Sample Video Two",
+			Description:   "Another sample video clip",
+			Type:          "video",
 		},
 		{
-			ID:          "doc-3",
-			Path:        filepath.FromSlash("/media/music/sample-audio.mp3"),
-			FtsPath:     filepath.FromSlash("/media/music/sample-audio"),
-			Title:       "Sample Audio",
-			Description: "A sample audio track",
-			Type:        "audio",
+			ID:            "doc-3",
+			Path:          filepath.FromSlash("/media/music/sample-audio.mp3"),
+			PathTokenized: filepath.FromSlash("/media/music/sample-audio"),
+			Title:         "Sample Audio",
+			Description:   "A sample audio track",
+			Type:          "audio",
 		},
 	}
 
@@ -418,22 +418,22 @@ func TestSearchPath(t *testing.T) {
 	// Index documents with different paths
 	docs := []*MediaDocument{
 		{
-			ID:      "doc-1",
-			Path:    filepath.FromSlash("/home/user/videos/movie.mp4"),
-			FtsPath: filepath.FromSlash("/home/user/videos/movie"),
-			Title:   "Movie",
+			ID:            "doc-1",
+			Path:          filepath.FromSlash("/home/user/videos/movie.mp4"),
+			PathTokenized: filepath.FromSlash("/home/user/videos/movie"),
+			Title:         "Movie",
 		},
 		{
-			ID:      "doc-2",
-			Path:    filepath.FromSlash("/home/user/videos/clip.mp4"),
-			FtsPath: filepath.FromSlash("/home/user/videos/clip"),
-			Title:   "Clip",
+			ID:            "doc-2",
+			Path:          filepath.FromSlash("/home/user/videos/clip.mp4"),
+			PathTokenized: filepath.FromSlash("/home/user/videos/clip"),
+			Title:         "Clip",
 		},
 		{
-			ID:      "doc-3",
-			Path:    filepath.FromSlash("/home/user/music/song.mp3"),
-			FtsPath: filepath.FromSlash("/home/user/music/song"),
-			Title:   "Song",
+			ID:            "doc-3",
+			Path:          filepath.FromSlash("/home/user/music/song.mp3"),
+			PathTokenized: filepath.FromSlash("/home/user/music/song"),
+			Title:         "Song",
 		},
 	}
 
@@ -498,10 +498,10 @@ func TestCount(t *testing.T) {
 	// Add documents
 	for i := 0; i < 5; i++ {
 		doc := &MediaDocument{
-			ID:      fmt.Sprintf("doc-%d", i),
-			Path:    filepath.FromSlash(fmt.Sprintf("/test/path%d.mp4", i)),
-			FtsPath: filepath.FromSlash("/test/path"),
-			Title:   "Test",
+			ID:            fmt.Sprintf("doc-%d", i),
+			Path:          filepath.FromSlash(fmt.Sprintf("/test/path%d.mp4", i)),
+			PathTokenized: filepath.FromSlash("/test/path"),
+			Title:         "Test",
 		}
 		if err := IndexDocument(doc); err != nil {
 			t.Fatalf("IndexDocument failed: %v", err)
@@ -544,10 +544,10 @@ func TestReindexAll(t *testing.T) {
 	// Add some documents
 	for i := 0; i < 3; i++ {
 		doc := &MediaDocument{
-			ID:      fmt.Sprintf("doc-%d", i),
-			Path:    filepath.FromSlash(fmt.Sprintf("/test/path%d.mp4", i)),
-			FtsPath: filepath.FromSlash("/test/path"),
-			Title:   "Test",
+			ID:            fmt.Sprintf("doc-%d", i),
+			Path:          filepath.FromSlash(fmt.Sprintf("/test/path%d.mp4", i)),
+			PathTokenized: filepath.FromSlash("/test/path"),
+			Title:         "Test",
 		}
 		if err := IndexDocument(doc); err != nil {
 			t.Fatalf("IndexDocument failed: %v", err)
@@ -602,10 +602,10 @@ func TestIndexUpdateDocument(t *testing.T) {
 
 	// Index a document
 	doc1 := &MediaDocument{
-		ID:      "doc-1",
-		Path:    filepath.FromSlash("/test/old.mp4"),
-		FtsPath: filepath.FromSlash("/test/old"),
-		Title:   "Old Title",
+		ID:            "doc-1",
+		Path:          filepath.FromSlash("/test/old.mp4"),
+		PathTokenized: filepath.FromSlash("/test/old"),
+		Title:         "Old Title",
 	}
 	if err := IndexDocument(doc1); err != nil {
 		t.Fatalf("IndexDocument failed: %v", err)
@@ -613,10 +613,10 @@ func TestIndexUpdateDocument(t *testing.T) {
 
 	// Update the same document with new data
 	doc2 := &MediaDocument{
-		ID:      "doc-1",
-		Path:    filepath.FromSlash("/test/new.mp4"),
-		FtsPath: filepath.FromSlash("/test/new"),
-		Title:   "New Title",
+		ID:            "doc-1",
+		Path:          filepath.FromSlash("/test/new.mp4"),
+		PathTokenized: filepath.FromSlash("/test/new"),
+		Title:         "New Title",
 	}
 	if err := IndexDocument(doc2); err != nil {
 		t.Fatalf("IndexDocument update failed: %v", err)

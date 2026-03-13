@@ -83,14 +83,14 @@ func generateRandomMedia(i int) (db.UpsertMediaParams, *MediaDocument) {
 	}
 
 	bleveDoc := &MediaDocument{
-		ID:          path,
-		Path:        path,
-		FtsPath:     pathDir,
-		Title:       title,
-		Description: description,
-		Type:        mediaType,
-		Size:        size,
-		Duration:    duration,
+		ID:            path,
+		Path:          path,
+		PathTokenized: pathDir,
+		Title:         title,
+		Description:   description,
+		Type:          mediaType,
+		Size:          size,
+		Duration:      duration,
 	}
 
 	return dbParam, bleveDoc

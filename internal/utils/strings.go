@@ -126,7 +126,7 @@ func PathToSentence(path string) string {
 	return CleanString(s)
 }
 
-func PathToSentenceFull(path string) string {
+func PathToTokenized(path string) string {
 	re := regexp.MustCompile(`[/\\.\[\]\-\+(){}_&]`)
 	s := re.ReplaceAllString(path, " ")
 	return CleanString(s)

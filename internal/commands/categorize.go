@@ -194,7 +194,7 @@ func (c *CategorizeCmd) mineCategories(media []models.MediaWithDB, compiled map[
 			unmatchedCount++
 			sentence := ""
 			if c.FullPath {
-				sentence = utils.PathToSentenceFull(m.Path)
+				sentence = utils.PathToTokenized(m.Path)
 			} else {
 				sentence = utils.PathToSentence(m.Path)
 			}

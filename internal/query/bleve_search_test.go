@@ -25,28 +25,28 @@ func TestBleveSearch(t *testing.T) {
 	// Index test documents
 	docs := []*bleve.MediaDocument{
 		{
-			ID:          "doc-1",
-			Path:        "/media/videos/action-video1.mp4",
-			FtsPath:     "/media/videos/action-video1",
-			Title:       "Sample Action Video",
-			Description: "An exciting action video with great scenes",
-			Type:        "video",
+			ID:            "doc-1",
+			Path:          "/media/videos/action-video1.mp4",
+			PathTokenized: "/media/videos/action-video1",
+			Title:         "Sample Action Video",
+			Description:   "An exciting action video with great scenes",
+			Type:          "video",
 		},
 		{
-			ID:          "doc-2",
-			Path:        "/media/videos/comedy-video2.mp4",
-			FtsPath:     "/media/videos/comedy-video2",
-			Title:       "Sample Comedy Video",
-			Description: "A hilarious comedy video clip",
-			Type:        "video",
+			ID:            "doc-2",
+			Path:          "/media/videos/comedy-video2.mp4",
+			PathTokenized: "/media/videos/comedy-video2",
+			Title:         "Sample Comedy Video",
+			Description:   "A hilarious comedy video clip",
+			Type:          "video",
 		},
 		{
-			ID:          "doc-3",
-			Path:        "/media/music/rock-audio.mp3",
-			FtsPath:     "/media/music/rock-audio",
-			Title:       "Sample Rock Audio",
-			Description: "A great rock music track",
-			Type:        "audio",
+			ID:            "doc-3",
+			Path:          "/media/music/rock-audio.mp3",
+			PathTokenized: "/media/music/rock-audio",
+			Title:         "Sample Rock Audio",
+			Description:   "A great rock music track",
+			Type:          "audio",
 		},
 	}
 
@@ -149,12 +149,12 @@ func TestBleveSearchTermJoining(t *testing.T) {
 
 	// Index a document
 	doc := &bleve.MediaDocument{
-		ID:          "doc-1",
-		Path:        "/test/path.mp4",
-		FtsPath:     "/test/path",
-		Title:       "Test Document",
-		Description: "This is a test document with multiple words",
-		Type:        "video",
+		ID:            "doc-1",
+		Path:          "/test/path.mp4",
+		PathTokenized: "/test/path",
+		Title:         "Test Document",
+		Description:   "This is a test document with multiple words",
+		Type:          "video",
 	}
 	if err := bleve.IndexDocument(doc); err != nil {
 		t.Fatalf("IndexDocument failed: %v", err)
@@ -208,44 +208,44 @@ func TestBleveSearchIntegration(t *testing.T) {
 	// Create a realistic set of test documents
 	docs := []*bleve.MediaDocument{
 		{
-			ID:          "video-1",
-			Path:        "/home/media/videos/sample-video-1999.mp4",
-			FtsPath:     "/home/media/videos/sample-video-1999",
-			Title:       "Sample Video Title",
-			Description: "A sample video file with test content",
-			Type:        "video",
-			Size:        1073741824, // 1GB
-			Duration:    8160,       // 136 minutes
+			ID:            "video-1",
+			Path:          "/home/media/videos/sample-video-1999.mp4",
+			PathTokenized: "/home/media/videos/sample-video-1999",
+			Title:         "Sample Video Title",
+			Description:   "A sample video file with test content",
+			Type:          "video",
+			Size:          1073741824, // 1GB
+			Duration:      8160,       // 136 minutes
 		},
 		{
-			ID:          "video-2",
-			Path:        "/home/media/videos/another-video-2010.mp4",
-			FtsPath:     "/home/media/videos/another-video-2010",
-			Title:       "Another Video",
-			Description: "Another sample video file",
-			Type:        "video",
-			Size:        2147483648, // 2GB
-			Duration:    8880,       // 148 minutes
+			ID:            "video-2",
+			Path:          "/home/media/videos/another-video-2010.mp4",
+			PathTokenized: "/home/media/videos/another-video-2010",
+			Title:         "Another Video",
+			Description:   "Another sample video file",
+			Type:          "video",
+			Size:          2147483648, // 2GB
+			Duration:      8880,       // 148 minutes
 		},
 		{
-			ID:          "show-1",
-			Path:        "/home/media/shows/sample-show/S01E01.mp4",
-			FtsPath:     "/home/media/shows/sample-show/S01E01",
-			Title:       "Sample Show S01E01",
-			Description: "A sample show episode",
-			Type:        "video",
-			Size:        536870912, // 512MB
-			Duration:    3480,      // 58 minutes
+			ID:            "show-1",
+			Path:          "/home/media/shows/sample-show/S01E01.mp4",
+			PathTokenized: "/home/media/shows/sample-show/S01E01",
+			Title:         "Sample Show S01E01",
+			Description:   "A sample show episode",
+			Type:          "video",
+			Size:          536870912, // 512MB
+			Duration:      3480,      // 58 minutes
 		},
 		{
-			ID:          "music-1",
-			Path:        "/home/media/music/sample-artist/sample-album.mp3",
-			FtsPath:     "/home/media/music/sample-artist/sample-album",
-			Title:       "Sample Track",
-			Description: "Classic sample album by sample artist",
-			Type:        "audio",
-			Size:        10485760, // 10MB
-			Duration:    382,      // 6:22 minutes
+			ID:            "music-1",
+			Path:          "/home/media/music/sample-artist/sample-album.mp3",
+			PathTokenized: "/home/media/music/sample-artist/sample-album",
+			Title:         "Sample Track",
+			Description:   "Classic sample album by sample artist",
+			Type:          "audio",
+			Size:          10485760, // 10MB
+			Duration:      382,      // 6:22 minutes
 		},
 	}
 
@@ -323,28 +323,28 @@ func TestBleveSearchPathIntegration(t *testing.T) {
 	// Index documents with hierarchical paths
 	docs := []*bleve.MediaDocument{
 		{
-			ID:      "doc-1",
-			Path:    "/data/videos/movies/action/movie1.mp4",
-			FtsPath: "/data/videos/movies/action/movie1",
-			Title:   "Action Movie 1",
+			ID:            "doc-1",
+			Path:          "/data/videos/movies/action/movie1.mp4",
+			PathTokenized: "/data/videos/movies/action/movie1",
+			Title:         "Action Movie 1",
 		},
 		{
-			ID:      "doc-2",
-			Path:    "/data/videos/movies/action/movie2.mp4",
-			FtsPath: "/data/videos/movies/action/movie2",
-			Title:   "Action Movie 2",
+			ID:            "doc-2",
+			Path:          "/data/videos/movies/action/movie2.mp4",
+			PathTokenized: "/data/videos/movies/action/movie2",
+			Title:         "Action Movie 2",
 		},
 		{
-			ID:      "doc-3",
-			Path:    "/data/videos/movies/comedy/movie3.mp4",
-			FtsPath: "/data/videos/movies/comedy/movie3",
-			Title:   "Comedy Movie",
+			ID:            "doc-3",
+			Path:          "/data/videos/movies/comedy/movie3.mp4",
+			PathTokenized: "/data/videos/movies/comedy/movie3",
+			Title:         "Comedy Movie",
 		},
 		{
-			ID:      "doc-4",
-			Path:    "/data/music/rock/song1.mp3",
-			FtsPath: "/data/music/rock/song1",
-			Title:   "Rock Song",
+			ID:            "doc-4",
+			Path:          "/data/music/rock/song1.mp3",
+			PathTokenized: "/data/music/rock/song1",
+			Title:         "Rock Song",
 		},
 	}
 
@@ -385,11 +385,11 @@ func TestBleveSearchCaseSensitivity(t *testing.T) {
 
 	// Index a document
 	doc := &bleve.MediaDocument{
-		ID:          "doc-1",
-		Path:        "/test/sample-video.mp4",
-		FtsPath:     "/test/sample-video",
-		Title:       "Sample Video Title",
-		Description: "Sample description text",
+		ID:            "doc-1",
+		Path:          "/test/sample-video.mp4",
+		PathTokenized: "/test/sample-video",
+		Title:         "Sample Video Title",
+		Description:   "Sample description text",
 	}
 	if err := bleve.IndexDocument(doc); err != nil {
 		t.Fatalf("IndexDocument failed: %v", err)
@@ -432,20 +432,20 @@ func TestBleveSearchSpecialCharacters(t *testing.T) {
 	// Index documents with special characters in paths and titles
 	docs := []*bleve.MediaDocument{
 		{
-			ID:          "doc-1",
-			Path:        "/media/videos/sample-video-1999-1080p.mp4",
-			FtsPath:     "/media/videos/sample-video-1999-1080p",
-			Title:       "Sample Video (1999)",
-			Description: "Video with special chars: @#$%",
-			Type:        "video",
+			ID:            "doc-1",
+			Path:          "/media/videos/sample-video-1999-1080p.mp4",
+			PathTokenized: "/media/videos/sample-video-1999-1080p",
+			Title:         "Sample Video (1999)",
+			Description:   "Video with special chars: @#$%",
+			Type:          "video",
 		},
 		{
-			ID:          "doc-2",
-			Path:        "/media/videos/another-sample-video.mp4",
-			FtsPath:     "/media/videos/another-sample-video",
-			Title:       "Another Sample Video",
-			Description: "Classic sample video",
-			Type:        "video",
+			ID:            "doc-2",
+			Path:          "/media/videos/another-sample-video.mp4",
+			PathTokenized: "/media/videos/another-sample-video",
+			Title:         "Another Sample Video",
+			Description:   "Classic sample video",
+			Type:          "video",
 		},
 	}
 
