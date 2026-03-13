@@ -470,7 +470,7 @@ func (c *ServeCmd) handleProgress(w http.ResponseWriter, r *http.Request) {
 
 	for _, dbPath := range c.Databases {
 		err := c.execDB(r.Context(), dbPath, func(sqlDB *sql.DB) error {
-			// Use raw SQL to update progress to avoid complex sqlc param mapping if not existing
+			// Use raw SQL to update progress
 			// We want to increment play_count only once per session ideally, but for now we follow simple logic
 			if _, err := sqlDB.ExecContext(r.Context(), `
 			UPDATE media

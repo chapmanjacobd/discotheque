@@ -69,8 +69,7 @@ func UpdateHistoryWithTime(dbPath string, paths []string, playhead int, timePlay
 
 	for _, path := range paths {
 		// Update media aggregate
-		// Note: UpdatePlayHistory in queries.sql only updates time_last_played if it's newer,
-		// but sqlc generated code might differ. Let's assume it's a simple update for now.
+		// Note: UpdatePlayHistory in queries.sql only updates time_last_played if it's newer
 		if err := queries.UpdatePlayHistory(context.Background(), db.UpdatePlayHistoryParams{
 			TimeLastPlayed:  sql.NullInt64{Int64: timePlayed, Valid: true},
 			TimeFirstPlayed: sql.NullInt64{Int64: timePlayed, Valid: true},

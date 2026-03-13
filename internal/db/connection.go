@@ -3,12 +3,14 @@ package db
 import (
 	"database/sql"
 	"fmt"
+	"log/slog"
 
 	_ "github.com/mattn/go-sqlite3"
 )
 
 // Connect opens a SQLite database and applies performance tuning PRAGMAs
-func Connect(dbPath string) (*sql.DB, error) {
+// If debugMode is true, queries slower than 50ms will be logged
+func Connect(dbPath string, debugMode bool) (*sql.DB, error) {
 	// Add busy timeout and immediate locking to handle concurrent writes better
 	dsn := fmt.Sprintf("%s?_busy_timeout=30000&_txlock=immediate", dbPath)
 	db, err := sql.Open("sqlite3", dsn)
@@ -33,5 +35,15 @@ func Connect(dbPath string) (*sql.DB, error) {
 		}
 	}
 
+	// Wrap with slow query logger if debug mode is enabled
+	if debugMode {
+		db = wrapSlowQuery(db)
+	}
+
 	return db, nil
+}
+
+// wrapSlowQuery wraps a sql.DB with slow query logging
+func wrapSlowQuery(sqlDB *sql.DB) *sql.DB {
+	return &SlowQueryDB{DB: sqlDB}.DB
 }

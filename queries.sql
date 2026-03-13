@@ -99,7 +99,6 @@ ORDER BY path
 LIMIT ?;
 
 -- FTS5 MATCH query for media search - implemented manually in Go
--- due to sqlc's limited FTS5 MATCH support with detail=none
 -- Original query:
 --   SELECT * FROM media
 --   WHERE time_deleted = 0
@@ -289,17 +288,16 @@ JOIN media m ON c.media_path = m.path
 WHERE m.time_deleted = 0
   AND c.text IS NOT NULL AND c.text != ''
   AND (
-    (CAST(sqlc.arg('video_only') AS INT) = 0 AND CAST(sqlc.arg('audio_only') AS INT) = 0 AND CAST(sqlc.arg('image_only') AS INT) = 0 AND CAST(sqlc.arg('text_only') AS INT) = 0)
-    OR (CAST(sqlc.arg('video_only') AS INT) = 1 AND m.type = 'video')
-    OR (CAST(sqlc.arg('audio_only') AS INT) = 1 AND m.type IN ('audio', 'audiobook'))
-    OR (CAST(sqlc.arg('image_only') AS INT) = 1 AND m.type = 'image')
-    OR (CAST(sqlc.arg('text_only') AS INT) = 1 AND m.type = 'text')
+    (? = 0 AND ? = 0 AND ? = 0 AND ? = 0)
+    OR (? = 1 AND m.type = 'video')
+    OR (? = 1 AND m.type IN ('audio', 'audiobook'))
+    OR (? = 1 AND m.type = 'image')
+    OR (? = 1 AND m.type = 'text')
   )
 ORDER BY c.media_path, c.time
-LIMIT sqlc.arg('limit');
+LIMIT ?;
 
 -- FTS5 MATCH query for captions search - implemented manually in Go
--- due to sqlc's limited FTS5 MATCH support with detail=none
 -- Original query:
 --   SELECT c.media_path, c.time, c.text, m.title, m.type, m.size, m.duration
 --   FROM captions c
