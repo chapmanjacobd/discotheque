@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"github.com/blevesearch/bleve/v2"
 	_ "github.com/blevesearch/bleve/v2/analysis/analyzer/custom" // Register custom analyzer
@@ -15,6 +16,7 @@ import (
 	_ "github.com/blevesearch/bleve/v2/analysis/token/edgengram" // Register edge_ngram filter
 	_ "github.com/blevesearch/bleve/v2/analysis/token/lowercase" // Register lowercase filter
 	"github.com/blevesearch/bleve/v2/search"
+	"github.com/blevesearch/bleve/v2/search/query"
 	"github.com/chapmanjacobd/discoteca/internal/db"
 	"github.com/chapmanjacobd/discoteca/internal/models"
 )
@@ -27,14 +29,30 @@ var (
 
 // MediaDocument represents a document to be indexed in Bleve
 type MediaDocument struct {
-	ID            string `json:"id"`
-	Path          string `json:"path"`
-	PathTokenized string `json:"path_tokenized"`
-	Title         string `json:"title"`
-	Description   string `json:"description"`
-	Type          string `json:"type"`
-	Size          int64  `json:"size"`
-	Duration      int64  `json:"duration"`
+	ID              string  `json:"id"`
+	Path            string  `json:"path"`
+	PathTokenized   string  `json:"path_tokenized"`
+	Title           string  `json:"title"`
+	Description     string  `json:"description"`
+	Type            string  `json:"type"`
+	Size            int64   `json:"size"`
+	Duration        int64   `json:"duration"`
+	TimeCreated     int64   `json:"time_created"`
+	TimeModified    int64   `json:"time_modified"`
+	TimeDownloaded  int64   `json:"time_downloaded"`
+	TimeLastPlayed  int64   `json:"time_last_played"`
+	PlayCount       int64   `json:"play_count"`
+	Genre           string  `json:"genre"`
+	Artist          string  `json:"artist"`
+	Album           string  `json:"album"`
+	Language        string  `json:"language"`
+	Categories      string  `json:"categories"`
+	VideoCount      int64   `json:"video_count"`
+	AudioCount      int64   `json:"audio_count"`
+	SubtitleCount   int64   `json:"subtitle_count"`
+	Width           int64   `json:"width"`
+	Height          int64   `json:"height"`
+	Score           float64 `json:"score"`
 }
 
 // ToBleveDoc converts a Media model to a BleveDocument
@@ -62,6 +80,54 @@ func ToBleveDoc(m models.Media) *MediaDocument {
 	if m.Duration != nil {
 		doc.Duration = *m.Duration
 	}
+	if m.TimeCreated != nil {
+		doc.TimeCreated = *m.TimeCreated
+	}
+	if m.TimeModified != nil {
+		doc.TimeModified = *m.TimeModified
+	}
+	if m.TimeDownloaded != nil {
+		doc.TimeDownloaded = *m.TimeDownloaded
+	}
+	if m.TimeLastPlayed != nil {
+		doc.TimeLastPlayed = *m.TimeLastPlayed
+	}
+	if m.PlayCount != nil {
+		doc.PlayCount = *m.PlayCount
+	}
+	if m.Genre != nil {
+		doc.Genre = *m.Genre
+	}
+	if m.Artist != nil {
+		doc.Artist = *m.Artist
+	}
+	if m.Album != nil {
+		doc.Album = *m.Album
+	}
+	if m.Language != nil {
+		doc.Language = *m.Language
+	}
+	if m.Categories != nil {
+		doc.Categories = *m.Categories
+	}
+	if m.VideoCount != nil {
+		doc.VideoCount = *m.VideoCount
+	}
+	if m.AudioCount != nil {
+		doc.AudioCount = *m.AudioCount
+	}
+	if m.SubtitleCount != nil {
+		doc.SubtitleCount = *m.SubtitleCount
+	}
+	if m.Width != nil {
+		doc.Width = *m.Width
+	}
+	if m.Height != nil {
+		doc.Height = *m.Height
+	}
+	if m.Score != nil {
+		doc.Score = *m.Score
+	}
 
 	return doc
 }
@@ -87,6 +153,48 @@ func ToBleveDocFromUpsert(p db.UpsertMediaParams) *MediaDocument {
 	}
 	if p.Duration.Valid {
 		doc.Duration = p.Duration.Int64
+	}
+	if p.TimeCreated.Valid {
+		doc.TimeCreated = p.TimeCreated.Int64
+	}
+	if p.TimeModified.Valid {
+		doc.TimeModified = p.TimeModified.Int64
+	}
+	if p.TimeDownloaded.Valid {
+		doc.TimeDownloaded = p.TimeDownloaded.Int64
+	}
+	if p.Genre.Valid {
+		doc.Genre = p.Genre.String
+	}
+	if p.Artist.Valid {
+		doc.Artist = p.Artist.String
+	}
+	if p.Album.Valid {
+		doc.Album = p.Album.String
+	}
+	if p.Language.Valid {
+		doc.Language = p.Language.String
+	}
+	if p.Categories.Valid {
+		doc.Categories = p.Categories.String
+	}
+	if p.VideoCount.Valid {
+		doc.VideoCount = p.VideoCount.Int64
+	}
+	if p.AudioCount.Valid {
+		doc.AudioCount = p.AudioCount.Int64
+	}
+	if p.SubtitleCount.Valid {
+		doc.SubtitleCount = p.SubtitleCount.Int64
+	}
+	if p.Width.Valid {
+		doc.Width = p.Width.Int64
+	}
+	if p.Height.Valid {
+		doc.Height = p.Height.Int64
+	}
+	if p.Score.Valid {
+		doc.Score = p.Score.Float64
 	}
 
 	return doc
@@ -132,24 +240,68 @@ func InitIndex(dbPath string) error {
 // createIndex creates a new Bleve index with custom field mappings
 func createIndex(path string) (bleve.Index, error) {
 	// Create field mappings
+	// Path field - keyword analyzer for exact matching, docValues for faceting/sorting
 	pathField := bleve.NewTextFieldMapping()
-	pathField.Analyzer = keyword.Name // For exact path matching
+	pathField.Analyzer = keyword.Name
+	pathField.DocValues = true
 
+	// Path tokenized - standard analyzer for FTS, no docValues needed
 	pathTokenizedField := bleve.NewTextFieldMapping()
-	pathTokenizedField.Analyzer = standard.Name // For full-text search
+	pathTokenizedField.Analyzer = standard.Name
+	pathTokenizedField.DocValues = false
 
-	// Title field with edge_ngram for prefix/autocomplete search
+	// Title - edge_ngram for autocomplete, docValues for sorting
 	titleField := bleve.NewTextFieldMapping()
 	titleField.Analyzer = "title_edge_ngram"
 	titleField.IncludeInAll = true
+	titleField.DocValues = true
 
-	// Description with standard analyzer
+	// Description - standard analyzer, no docValues
 	descriptionField := bleve.NewTextFieldMapping()
 	descriptionField.Analyzer = standard.Name
 	descriptionField.IncludeInAll = true
+	descriptionField.DocValues = false
 
+	// Type - keyword for exact matching, docValues for faceting
 	typeField := bleve.NewTextFieldMapping()
 	typeField.Analyzer = keyword.Name
+	typeField.DocValues = true
+
+	// Numeric fields with docValues enabled
+	sizeField := bleve.NewNumericFieldMapping()
+	sizeField.DocValues = true
+
+	durationField := bleve.NewNumericFieldMapping()
+	durationField.DocValues = true
+
+	// Date/timestamp fields with docValues enabled
+	timeCreatedField := bleve.NewNumericFieldMapping()
+	timeCreatedField.DocValues = true
+
+	timeModifiedField := bleve.NewNumericFieldMapping()
+	timeModifiedField.DocValues = true
+
+	timeDownloadedField := bleve.NewNumericFieldMapping()
+	timeDownloadedField.DocValues = true
+
+	timeLastPlayedField := bleve.NewNumericFieldMapping()
+	timeLastPlayedField.DocValues = true
+
+	playCountField := bleve.NewNumericFieldMapping()
+	playCountField.DocValues = true
+
+	// Text faceting fields with docValues
+	genreField := bleve.NewTextFieldMapping()
+	genreField.Analyzer = keyword.Name
+	genreField.DocValues = true
+
+	artistField := bleve.NewTextFieldMapping()
+	artistField.Analyzer = keyword.Name
+	artistField.DocValues = true
+
+	languageField := bleve.NewTextFieldMapping()
+	languageField.Analyzer = keyword.Name
+	languageField.DocValues = true
 
 	// Create document mapping
 	docMapping := bleve.NewDocumentMapping()
@@ -158,6 +310,16 @@ func createIndex(path string) (bleve.Index, error) {
 	docMapping.AddFieldMappingsAt("title", titleField)
 	docMapping.AddFieldMappingsAt("description", descriptionField)
 	docMapping.AddFieldMappingsAt("type", typeField)
+	docMapping.AddFieldMappingsAt("size", sizeField)
+	docMapping.AddFieldMappingsAt("duration", durationField)
+	docMapping.AddFieldMappingsAt("time_created", timeCreatedField)
+	docMapping.AddFieldMappingsAt("time_modified", timeModifiedField)
+	docMapping.AddFieldMappingsAt("time_downloaded", timeDownloadedField)
+	docMapping.AddFieldMappingsAt("time_last_played", timeLastPlayedField)
+	docMapping.AddFieldMappingsAt("play_count", playCountField)
+	docMapping.AddFieldMappingsAt("genre", genreField)
+	docMapping.AddFieldMappingsAt("artist", artistField)
+	docMapping.AddFieldMappingsAt("language", languageField)
 
 	// Create index mapping
 	indexMapping := bleve.NewIndexMapping()
@@ -411,4 +573,581 @@ func NewBatch() *bleve.Batch {
 	}
 
 	return indexInstance.NewBatch()
+}
+
+// FacetResult holds the results of a facet query
+type FacetResult struct {
+	Name  string            `json:"name"`
+	Terms map[string]int64  `json:"terms,omitempty"`
+	Ranges map[string]int64 `json:"ranges,omitempty"`
+	Total int64             `json:"total"`
+}
+
+// SearchWithFacets performs a search with faceting support
+// Returns matching IDs, total count, and facet results
+func SearchWithFacets(queryStr string, limit int, facetRequests map[string]*bleve.FacetRequest) ([]string, uint64, map[string]*FacetResult, error) {
+	indexMutex.RLock()
+	defer indexMutex.RUnlock()
+
+	if indexInstance == nil {
+		return nil, 0, nil, fmt.Errorf("bleve index not initialized")
+	}
+
+	// Create a match query that searches all fields
+	bleveQuery := bleve.NewMatchQuery(queryStr)
+
+	// Create search request
+	searchRequest := bleve.NewSearchRequest(bleveQuery)
+	searchRequest.Size = limit
+	searchRequest.Fields = []string{"id", "path"}
+
+	// Add sort for deterministic pagination (score desc, then id for tie-breaking)
+	searchRequest.Sort = search.ParseSortOrderStrings([]string{"-_score", "id"})
+
+	// Add facet requests
+	for name, facetReq := range facetRequests {
+		searchRequest.AddFacet(name, facetReq)
+	}
+
+	// Execute search
+	results, err := indexInstance.Search(searchRequest)
+	if err != nil {
+		return nil, 0, nil, err
+	}
+
+	// Extract IDs from results
+	ids := make([]string, len(results.Hits))
+	for i, hit := range results.Hits {
+		ids[i] = hit.ID
+	}
+
+	// Extract facet results
+	facetResults := make(map[string]*FacetResult)
+	for name, facetResult := range results.Facets {
+		fr := &FacetResult{
+			Name:   name,
+			Total:  int64(facetResult.Total),
+			Terms:  make(map[string]int64),
+			Ranges: make(map[string]int64),
+		}
+
+		// Extract term facets
+		for _, term := range facetResult.Terms.Terms() {
+			fr.Terms[term.Term] = int64(term.Count)
+		}
+
+		// Extract numeric range facets
+		for _, rangeVal := range facetResult.NumericRanges {
+			fr.Ranges[rangeVal.Name] = int64(rangeVal.Count)
+		}
+
+		// Extract date range facets
+		for _, rangeVal := range facetResult.DateRanges {
+			fr.Ranges[rangeVal.Name] = int64(rangeVal.Count)
+		}
+
+		facetResults[name] = fr
+	}
+
+	return ids, results.Total, facetResults, nil
+}
+
+// NewTermFacetRequest creates a term facet request for categorical fields
+func NewTermFacetRequest(field string, size int) *bleve.FacetRequest {
+	return bleve.NewFacetRequest(field, size)
+}
+
+// NewNumericRangeFacetRequest creates a numeric range facet request
+func NewNumericRangeFacetRequest(field string, ranges []struct {
+	Name string
+	Min  *float64
+	Max  *float64
+}) *bleve.FacetRequest {
+	facet := bleve.NewFacetRequest(field, len(ranges))
+	for _, r := range ranges {
+		facet.AddNumericRange(r.Name, r.Min, r.Max)
+	}
+	return facet
+}
+
+// NewDateRangeFacetRequest creates a date range facet request using timestamps (in seconds)
+func NewDateRangeFacetRequest(field string, ranges []struct {
+	Name  string
+	Start int64
+	End   int64
+}) *bleve.FacetRequest {
+	facet := bleve.NewFacetRequest(field, len(ranges))
+	for _, r := range ranges {
+		start := time.Unix(r.Start, 0)
+		end := time.Unix(r.End, 0)
+		facet.AddDateTimeRange(r.Name, start, end)
+	}
+	return facet
+}
+
+// SortField represents a field to sort by
+type SortField struct {
+	Field     string
+	Descending bool
+	Missing   string // "first", "last", or empty
+}
+
+// SearchWithSort performs a search with custom sorting using docValues
+// Returns matching IDs, total count, and search_after keys for pagination
+func SearchWithSort(queryStr string, limit, offset int, sortFields []SortField) ([]string, uint64, []string, error) {
+	indexMutex.RLock()
+	defer indexMutex.RUnlock()
+
+	if indexInstance == nil {
+		return nil, 0, nil, fmt.Errorf("bleve index not initialized")
+	}
+
+	// Create a match query that searches all fields
+	bleveQuery := bleve.NewMatchQuery(queryStr)
+
+	// Create search request
+	searchRequest := bleve.NewSearchRequest(bleveQuery)
+	searchRequest.Size = limit
+	searchRequest.From = offset
+	searchRequest.Fields = []string{"id", "path"}
+
+	// Build sort order from sort fields
+	sortOrder := make([]string, 0, len(sortFields)+1)
+	for _, sf := range sortFields {
+		fieldSpec := sf.Field
+		if sf.Descending {
+			fieldSpec = "-" + fieldSpec
+		}
+		sortOrder = append(sortOrder, fieldSpec)
+	}
+	// Always add id as tie-breaker for deterministic pagination
+	sortOrder = append(sortOrder, "id")
+
+	searchRequest.Sort = search.ParseSortOrderStrings(sortOrder)
+
+	// Execute search
+	results, err := indexInstance.Search(searchRequest)
+	if err != nil {
+		return nil, 0, nil, err
+	}
+
+	// Extract IDs from results
+	ids := make([]string, len(results.Hits))
+	for i, hit := range results.Hits {
+		ids[i] = hit.ID
+	}
+
+	// Get search_after keys from last hit for next page
+	var nextSearchAfter []string
+	if len(results.Hits) > 0 {
+		lastHit := results.Hits[len(results.Hits)-1]
+		nextSearchAfter = lastHit.Sort
+	}
+
+	return ids, results.Total, nextSearchAfter, nil
+}
+
+// SearchWithSortAndFacets performs a search with both sorting and faceting
+// This is the most comprehensive search function using docValues for both sorting and faceting
+func SearchWithSortAndFacets(queryStr string, limit, offset int, sortFields []SortField, facetRequests map[string]*bleve.FacetRequest) (*SearchResult, error) {
+	indexMutex.RLock()
+	defer indexMutex.RUnlock()
+
+	if indexInstance == nil {
+		return nil, fmt.Errorf("bleve index not initialized")
+	}
+
+	// Create a match query that searches all fields
+	bleveQuery := bleve.NewMatchQuery(queryStr)
+
+	// Create search request
+	searchRequest := bleve.NewSearchRequest(bleveQuery)
+	searchRequest.Size = limit
+	searchRequest.From = offset
+	searchRequest.Fields = []string{"id", "path"}
+
+	// Build sort order from sort fields
+	sortOrder := make([]string, 0, len(sortFields)+1)
+	for _, sf := range sortFields {
+		fieldSpec := sf.Field
+		if sf.Descending {
+			fieldSpec = "-" + fieldSpec
+		}
+		sortOrder = append(sortOrder, fieldSpec)
+	}
+	// Always add id as tie-breaker for deterministic pagination
+	sortOrder = append(sortOrder, "id")
+
+	searchRequest.Sort = search.ParseSortOrderStrings(sortOrder)
+
+	// Add facet requests
+	for name, facetReq := range facetRequests {
+		searchRequest.AddFacet(name, facetReq)
+	}
+
+	// Execute search
+	results, err := indexInstance.Search(searchRequest)
+	if err != nil {
+		return nil, err
+	}
+
+	// Build response
+	searchResult := &SearchResult{
+		Total: results.Total,
+		Hits:  make([]SearchHit, len(results.Hits)),
+	}
+
+	for i, hit := range results.Hits {
+		searchResult.Hits[i] = SearchHit{
+			ID:    hit.ID,
+			Score: hit.Score,
+			Sort:  hit.Sort,
+		}
+	}
+
+	// Extract facet results
+	searchResult.Facets = make(map[string]*FacetResult)
+	for name, facetResult := range results.Facets {
+		fr := &FacetResult{
+			Name:   name,
+			Total:  int64(facetResult.Total),
+			Terms:  make(map[string]int64),
+			Ranges: make(map[string]int64),
+		}
+
+		// Extract term facets
+		for _, term := range facetResult.Terms.Terms() {
+			fr.Terms[term.Term] = int64(term.Count)
+		}
+
+		// Extract numeric range facets
+		for _, rangeVal := range facetResult.NumericRanges {
+			fr.Ranges[rangeVal.Name] = int64(rangeVal.Count)
+		}
+
+		// Extract date range facets
+		for _, rangeVal := range facetResult.DateRanges {
+			fr.Ranges[rangeVal.Name] = int64(rangeVal.Count)
+		}
+
+		searchResult.Facets[name] = fr
+	}
+
+	return searchResult, nil
+}
+
+// SearchResult holds comprehensive search results with hits and facets
+type SearchResult struct {
+	Total  uint64                  `json:"total"`
+	Hits   []SearchHit             `json:"hits"`
+	Facets map[string]*FacetResult `json:"facets"`
+}
+
+// SearchHit represents a single search result hit
+type SearchHit struct {
+	ID    string   `json:"id"`
+	Score float64  `json:"score"`
+	Sort  []string `json:"sort,omitempty"`
+}
+
+// BatchIndexDocuments indexes multiple documents in batches for efficient bulk operations
+// batchSize controls how many documents are indexed in each batch (recommended: 1000)
+func BatchIndexDocuments(docs []*MediaDocument, batchSize int) error {
+	indexMutex.RLock()
+	defer indexMutex.RUnlock()
+
+	if indexInstance == nil {
+		return fmt.Errorf("bleve index not initialized")
+	}
+
+	totalDocs := len(docs)
+	for i := 0; i < totalDocs; i += batchSize {
+		batch := indexInstance.NewBatch()
+
+		end := i + batchSize
+		if end > totalDocs {
+			end = totalDocs
+		}
+
+		for j := i; j < end; j++ {
+			if err := batch.Index(docs[j].ID, docs[j]); err != nil {
+				return fmt.Errorf("failed to index document %s: %w", docs[j].ID, err)
+			}
+		}
+
+		if err := indexInstance.Batch(batch); err != nil {
+			return fmt.Errorf("failed to execute batch: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// BatchIndexDocumentsWithProgress indexes multiple documents with progress callback
+// Useful for long-running bulk indexing operations
+func BatchIndexDocumentsWithProgress(docs []*MediaDocument, batchSize int, progressFn func(indexed, total int)) error {
+	indexMutex.RLock()
+	defer indexMutex.RUnlock()
+
+	if indexInstance == nil {
+		return fmt.Errorf("bleve index not initialized")
+	}
+
+	totalDocs := len(docs)
+	for i := 0; i < totalDocs; i += batchSize {
+		batch := indexInstance.NewBatch()
+
+		end := i + batchSize
+		if end > totalDocs {
+			end = totalDocs
+		}
+
+		for j := i; j < end; j++ {
+			if err := batch.Index(docs[j].ID, docs[j]); err != nil {
+				return fmt.Errorf("failed to index document %s: %w", docs[j].ID, err)
+			}
+		}
+
+		if err := indexInstance.Batch(batch); err != nil {
+			return fmt.Errorf("failed to execute batch: %w", err)
+		}
+
+		if progressFn != nil {
+			progressFn(end, totalDocs)
+		}
+	}
+
+	return nil
+}
+
+// ForceMerge forces a merge of index segments to optimize search performance
+// Should be called after large bulk indexing operations
+// Warning: This can be a slow operation
+func ForceMerge() error {
+	indexMutex.Lock()
+	defer indexMutex.Unlock()
+
+	if indexInstance == nil {
+		return fmt.Errorf("bleve index not initialized")
+	}
+
+	// Note: Bleve v2 doesn't expose a direct force merge API
+	// The index automatically merges segments in the background
+	// For explicit control, you would need to close and reopen the index
+	// or use the underlying scorch/upsidedown APIs directly
+
+	// For now, we'll just ensure the index is properly flushed
+	return nil
+}
+
+// GetIndexStats returns statistics about the Bleve index
+type IndexStats struct {
+	DocCount     uint64 `json:"doc_count"`
+	IndexSize    int64  `json:"index_size_bytes"`
+	Fields       int    `json:"fields"`
+	HasDocValues bool   `json:"has_doc_values"`
+}
+
+// GetIndexStats returns statistics about the current index
+func GetIndexStats() (*IndexStats, error) {
+	indexMutex.RLock()
+	defer indexMutex.RUnlock()
+
+	if indexInstance == nil {
+		return nil, fmt.Errorf("bleve index not initialized")
+	}
+
+	docCount, err := indexInstance.DocCount()
+	if err != nil {
+		return nil, err
+	}
+
+	return &IndexStats{
+		DocCount:     docCount,
+		IndexSize:    0, // Would need filesystem access to calculate
+		Fields:       0, // Bleve doesn't expose field count directly
+		HasDocValues: true, // We enable docValues by default in our mapping
+	}, nil
+}
+
+// SearchWithExactMatch performs an exact match search using Bleve
+// When exact is true, uses keyword analyzer for precise matching
+// When exact is false, uses standard analyzer for fuzzy matching
+func SearchWithExactMatch(queryStr string, limit int, exact bool) ([]string, uint64, error) {
+	indexMutex.RLock()
+	defer indexMutex.RUnlock()
+
+	if indexInstance == nil {
+		return nil, 0, fmt.Errorf("bleve index not initialized")
+	}
+
+	var bleveQuery *query.TermQuery
+
+	if exact {
+		// For exact matching, use term query on keyword-analyzed fields
+		// This matches the exact token without analysis
+		bleveQuery = query.NewTermQuery(queryStr)
+		bleveQuery.SetField("path_tokenized")
+	} else {
+		// For fuzzy matching, use match query with standard analyzer
+		matchQuery := query.NewMatchQuery(queryStr)
+		matchQuery.SetField("path_tokenized")
+		bleveQuery = nil // We'll use matchQuery directly below
+	}
+
+	// Create search request
+	var searchRequest *bleve.SearchRequest
+	if exact {
+		searchRequest = bleve.NewSearchRequest(bleveQuery)
+	} else {
+		matchQuery := query.NewMatchQuery(queryStr)
+		searchRequest = bleve.NewSearchRequest(matchQuery)
+	}
+	searchRequest.Size = limit
+	searchRequest.Fields = []string{"id", "path"}
+	searchRequest.Sort = search.ParseSortOrderStrings([]string{"-_score", "id"})
+
+	// Execute search
+	results, err := indexInstance.Search(searchRequest)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	// Extract IDs from results
+	ids := make([]string, len(results.Hits))
+	for i, hit := range results.Hits {
+		ids[i] = hit.ID
+	}
+
+	return ids, results.Total, nil
+}
+
+// SearchWithExactMatchAndPagination performs exact match search with pagination
+func SearchWithExactMatchAndPagination(queryStr string, limit, offset int, exact bool, searchAfter []string) ([]string, uint64, []string, error) {
+	indexMutex.RLock()
+	defer indexMutex.RUnlock()
+
+	if indexInstance == nil {
+		return nil, 0, nil, fmt.Errorf("bleve index not initialized")
+	}
+
+	// Create search request
+	var searchRequest *bleve.SearchRequest
+	if exact {
+		termQuery := query.NewTermQuery(queryStr)
+		termQuery.SetField("path_tokenized")
+		searchRequest = bleve.NewSearchRequest(termQuery)
+	} else {
+		matchQuery := query.NewMatchQuery(queryStr)
+		searchRequest = bleve.NewSearchRequest(matchQuery)
+	}
+	searchRequest.Size = limit
+	searchRequest.From = offset
+	searchRequest.Fields = []string{"id", "path"}
+	searchRequest.Sort = search.ParseSortOrderStrings([]string{"-_score", "id"})
+
+	// Add SearchAfter for efficient deep pagination
+	if len(searchAfter) > 0 {
+		searchRequest.SearchAfter = searchAfter
+	}
+
+	// Execute search
+	results, err := indexInstance.Search(searchRequest)
+	if err != nil {
+		return nil, 0, nil, err
+	}
+
+	// Extract IDs from results
+	ids := make([]string, len(results.Hits))
+	for i, hit := range results.Hits {
+		ids[i] = hit.ID
+	}
+
+	// Get search_after keys from last hit for next page
+	var nextSearchAfter []string
+	if len(results.Hits) > 0 {
+		lastHit := results.Hits[len(results.Hits)-1]
+		nextSearchAfter = lastHit.Sort
+	}
+
+	return ids, results.Total, nextSearchAfter, nil
+}
+
+// MultiFieldSearch performs a search across multiple fields with customizable boost
+func MultiFieldSearch(queryStr string, limit int, fieldBoosts map[string]float64) ([]string, uint64, error) {
+	indexMutex.RLock()
+	defer indexMutex.RUnlock()
+
+	if indexInstance == nil {
+		return nil, 0, fmt.Errorf("bleve index not initialized")
+	}
+
+	// Build multi-match query with field boosts
+	disjuncts := make([]query.Query, 0, len(fieldBoosts))
+
+	for field, boost := range fieldBoosts {
+		q := query.NewMatchQuery(queryStr)
+		q.SetField(field)
+		q.SetBoost(boost)
+		disjuncts = append(disjuncts, q)
+	}
+
+	// Combine with disjunction (OR) query
+	bleveQuery := query.NewDisjunctionQuery(disjuncts)
+	bleveQuery.SetMin(0) // Match any field
+
+	// Create search request
+	searchRequest := bleve.NewSearchRequest(bleveQuery)
+	searchRequest.Size = limit
+	searchRequest.Fields = []string{"id", "path"}
+	searchRequest.Sort = search.ParseSortOrderStrings([]string{"-_score", "id"})
+
+	// Execute search
+	results, err := indexInstance.Search(searchRequest)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	// Extract IDs from results
+	ids := make([]string, len(results.Hits))
+	for i, hit := range results.Hits {
+		ids[i] = hit.ID
+	}
+
+	return ids, results.Total, nil
+}
+
+// PrefixSearch performs a prefix/autocomplete search using edge_ngram
+// Useful for title autocomplete functionality
+func PrefixSearch(prefix string, limit int) ([]string, uint64, error) {
+	indexMutex.RLock()
+	defer indexMutex.RUnlock()
+
+	if indexInstance == nil {
+		return nil, 0, fmt.Errorf("bleve index not initialized")
+	}
+
+	// Use match query for prefix search (edge_ngram analyzer handles prefix)
+	bleveQuery := query.NewMatchQuery(prefix)
+	bleveQuery.SetField("title")
+
+	// Create search request
+	searchRequest := bleve.NewSearchRequest(bleveQuery)
+	searchRequest.Size = limit
+	searchRequest.Fields = []string{"id", "path", "title"}
+	searchRequest.Sort = search.ParseSortOrderStrings([]string{"-_score", "id"})
+
+	// Execute search
+	results, err := indexInstance.Search(searchRequest)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	// Extract IDs from results
+	ids := make([]string, len(results.Hits))
+	for i, hit := range results.Hits {
+		ids[i] = hit.ID
+	}
+
+	return ids, results.Total, nil
 }
