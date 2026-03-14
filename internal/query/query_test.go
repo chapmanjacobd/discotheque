@@ -49,7 +49,7 @@ func TestFilterBuilder_Build(t *testing.T) {
 				QueryFlags:   models.QueryFlags{Limit: 100},
 				DeletedFlags: models.DeletedFlags{HideDeleted: true},
 			},
-			"SELECT * FROM media WHERE COALESCE(time_deleted, 0) = 0 AND ((path LIKE ? OR title LIKE ?)) ORDER BY path ASC LIMIT 100",
+			"SELECT * FROM media WHERE COALESCE(time_deleted, 0) = 0 AND ((path LIKE ? OR title LIKE ? OR path_tokenized LIKE ?)) ORDER BY path ASC LIMIT 100",
 		},
 		{
 			"Video Only",
@@ -106,7 +106,7 @@ func TestFilterBuilder_Build(t *testing.T) {
 				QueryFlags:   models.QueryFlags{Limit: 10},
 				DeletedFlags: models.DeletedFlags{HideDeleted: true},
 			},
-			"SELECT * FROM media WHERE COALESCE(time_deleted, 0) = 0 AND ((path LIKE ? OR title LIKE ?) OR (path LIKE ? OR title LIKE ?)) LIMIT 10",
+			"SELECT * FROM media WHERE COALESCE(time_deleted, 0) = 0 AND ((path LIKE ? OR title LIKE ? OR path_tokenized LIKE ?) OR (path LIKE ? OR title LIKE ? OR path_tokenized LIKE ?)) LIMIT 10",
 		},
 		{
 			"Mixed FTS and other filters",
