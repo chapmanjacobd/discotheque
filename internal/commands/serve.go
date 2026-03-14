@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/alecthomas/kong"
+	"github.com/chapmanjacobd/discoteca/internal/bleve"
 	"github.com/chapmanjacobd/discoteca/internal/db"
 	"github.com/chapmanjacobd/discoteca/internal/models"
 	"github.com/chapmanjacobd/discoteca/internal/utils"
@@ -66,6 +67,7 @@ type ServeCmd struct {
 	models.AggregateFlags   `embed:""`
 	models.PlaybackFlags    `embed:""`
 	models.PostActionFlags  `embed:""`
+	models.FTSFlags         `embed:""`
 
 	Databases            []string `arg:"" required:"" help:"SQLite database files" type:"existingfile"`
 	Port                 int      `short:"p" default:"5555" help:"Port to listen on"`
@@ -295,7 +297,7 @@ func (c *ServeCmd) execDB(ctx context.Context, dbPath string, fn func(*sql.DB) e
 	return lastErr
 }
 
-// Close closes all cached database connections
+// Close closes all cached database connections and Bleve index
 func (c *ServeCmd) Close() error {
 	var errs []error
 	c.dbCache.Range(func(key, value any) bool {
@@ -307,8 +309,16 @@ func (c *ServeCmd) Close() error {
 		c.dbCache.Delete(key)
 		return true
 	})
+	
+	// Close Bleve index if it was initialized
+	if c.Bleve {
+		if err := bleve.CloseIndex(); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	
 	if len(errs) > 0 {
-		return fmt.Errorf("failed to close some databases: %v", errs)
+		return fmt.Errorf("failed to close some resources: %v", errs)
 	}
 	return nil
 }
@@ -335,6 +345,15 @@ func (c *ServeCmd) Run(ctx *kong.Context) error {
 			slog.Error("Failed to initialize database", "db", dbPath, "error", err)
 		}
 		c.dbCache.Store(dbPath, sqlDB)
+		
+		// Initialize Bleve index if --bleve flag is set
+		if c.Bleve {
+			if err := bleve.InitIndex(dbPath); err != nil {
+				slog.Warn("Failed to initialize Bleve index", "db", dbPath, "error", err)
+			} else {
+				slog.Info("Bleve index initialized", "db", dbPath)
+			}
+		}
 	}
 
 	if _, err := exec.LookPath("ffmpeg"); err != nil {
@@ -403,6 +422,7 @@ func (c *ServeCmd) GetGlobalFlags() models.GlobalFlags {
 		AggregateFlags:   c.AggregateFlags,
 		PlaybackFlags:    c.PlaybackFlags,
 		PostActionFlags:  c.PostActionFlags,
+		FTSFlags:         c.FTSFlags,
 	}
 }
 

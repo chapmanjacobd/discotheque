@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/chapmanjacobd/discoteca/internal/bleve"
 	database "github.com/chapmanjacobd/discoteca/internal/db"
 	"github.com/chapmanjacobd/discoteca/internal/models"
 )
@@ -75,47 +76,56 @@ func (c *ServeCmd) handleCategories(w http.ResponseWriter, r *http.Request) {
 	counts := make(map[string]int64)
 	isCustom := make(map[string]bool)
 
-	for _, dbPath := range c.Databases {
-		err := c.execDB(r.Context(), dbPath, func(sqlDB *sql.DB) error {
-			queries := database.New(sqlDB)
+	// Try Bleve first if --bleve flag is set
+	if c.Bleve {
+		bleveCounts, err := bleve.GetTermFacetCounts("categories", 1000)
+		if err == nil && len(bleveCounts) > 0 {
+			counts = bleveCounts
+		}
+	}
 
-			// 1. Get categories already assigned to media
-			rows, err := queries.GetUsedCategories(r.Context())
-			if err != nil {
-				return err
-			}
-			for _, row := range rows {
-				if row.Categories.Valid {
-					trimmed := strings.Trim(row.Categories.String, ";")
-					if trimmed == "" {
-						continue
-					}
-					cats := strings.SplitSeq(trimmed, ";")
-					for cat := range cats {
-						if cat != "" {
-							counts[cat] += row.Count
+	// Fall back to SQL if Bleve failed or not enabled
+	if len(counts) == 0 {
+		for _, dbPath := range c.Databases {
+			err := c.execDB(r.Context(), dbPath, func(sqlDB *sql.DB) error {
+				queries := database.New(sqlDB)
+
+				// 1. Get categories already assigned to media
+				rows, err := queries.GetUsedCategories(r.Context())
+				if err != nil {
+					return err
+				}
+				for _, row := range rows {
+					if row.Categories.Valid {
+						trimmed := strings.Trim(row.Categories.String, ";")
+						if trimmed == "" {
+							continue
+						}
+						cats := strings.SplitSeq(trimmed, ";")
+						for cat := range cats {
+							if cat != "" {
+								counts[cat] += row.Count
+							}
 						}
 					}
 				}
-			}
 
-			// 2. Get categories from custom keywords
-			customCats, err := queries.GetCustomCategories(r.Context())
-			if err == nil {
-				for _, cat := range customCats {
-					isCustom[cat] = true
-					if _, ok := counts[cat]; !ok {
-						counts[cat] = 0
+				// 2. Get categories from custom keywords
+				customCats, err := queries.GetCustomCategories(r.Context())
+				if err == nil {
+					for _, cat := range customCats {
+						isCustom[cat] = true
+						if _, ok := counts[cat]; !ok {
+							counts[cat] = 0
+						}
 					}
 				}
-			}
 
-			return nil
-		})
-		if err != nil {
-			slog.Error("Failed to fetch categories", "db", dbPath, "error", err)
-			writeError(w, http.StatusInternalServerError, "Failed to fetch categories")
-			return
+				return nil
+			})
+			if err != nil {
+				slog.Error("Failed to fetch categories", "db", dbPath, "error", err)
+			}
 		}
 	}
 
@@ -158,23 +168,34 @@ func (c *ServeCmd) handleCategories(w http.ResponseWriter, r *http.Request) {
 func (c *ServeCmd) handleGenres(w http.ResponseWriter, r *http.Request) {
 	counts := make(map[string]int64)
 
-	for _, dbPath := range c.Databases {
-		err := c.execDB(r.Context(), dbPath, func(sqlDB *sql.DB) error {
-			queries := database.New(sqlDB)
-			rows, err := queries.GetGenreStats(r.Context())
-			if err != nil {
-				return err
-			}
-			for _, row := range rows {
-				if row.Genre.Valid {
-					counts[row.Genre.String] = row.Count
+	// Try Bleve first if --bleve flag is set
+	if c.Bleve {
+		bleveCounts, err := bleve.GetTermFacetCounts("genre", 1000)
+		if err == nil && len(bleveCounts) > 0 {
+			counts = bleveCounts
+		}
+	}
+
+	// Fall back to SQL if Bleve failed or not enabled
+	if len(counts) == 0 {
+		for _, dbPath := range c.Databases {
+			err := c.execDB(r.Context(), dbPath, func(sqlDB *sql.DB) error {
+				queries := database.New(sqlDB)
+				rows, err := queries.GetGenreStats(r.Context())
+				if err != nil {
+					return err
 				}
+				for _, row := range rows {
+					if row.Genre.Valid {
+						counts[row.Genre.String] = row.Count
+					}
+				}
+				return nil
+			})
+			if err != nil {
+				slog.Error("Failed to fetch genres", "db", dbPath, "error", err)
+				continue
 			}
-			return nil
-		})
-		if err != nil {
-			slog.Error("Failed to fetch genres", "db", dbPath, "error", err)
-			continue
 		}
 	}
 
@@ -239,23 +260,34 @@ func (c *ServeCmd) handleRatings(w http.ResponseWriter, r *http.Request) {
 func (c *ServeCmd) handleLanguages(w http.ResponseWriter, r *http.Request) {
 	counts := make(map[string]int64)
 
-	for _, dbPath := range c.Databases {
-		err := c.execDB(r.Context(), dbPath, func(sqlDB *sql.DB) error {
-			queries := database.New(sqlDB)
-			rows, err := queries.GetLanguageStats(r.Context())
-			if err != nil {
-				return err
-			}
-			for _, row := range rows {
-				if row.Language.Valid {
-					counts[row.Language.String] = row.Count
+	// Try Bleve first if --bleve flag is set
+	if c.Bleve {
+		bleveCounts, err := bleve.GetTermFacetCounts("language", 1000)
+		if err == nil && len(bleveCounts) > 0 {
+			counts = bleveCounts
+		}
+	}
+
+	// Fall back to SQL if Bleve failed or not enabled
+	if len(counts) == 0 {
+		for _, dbPath := range c.Databases {
+			err := c.execDB(r.Context(), dbPath, func(sqlDB *sql.DB) error {
+				queries := database.New(sqlDB)
+				rows, err := queries.GetLanguageStats(r.Context())
+				if err != nil {
+					return err
 				}
+				for _, row := range rows {
+					if row.Language.Valid {
+						counts[row.Language.String] = row.Count
+					}
+				}
+				return nil
+			})
+			if err != nil {
+				slog.Error("Failed to fetch languages", "db", dbPath, "error", err)
+				continue
 			}
-			return nil
-		})
-		if err != nil {
-			slog.Error("Failed to fetch languages", "db", dbPath, "error", err)
-			continue
 		}
 	}
 

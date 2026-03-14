@@ -231,3 +231,8 @@ type DirectoryStats struct {
 func DiskUsageByDirectory(prefix string, limit int) (map[string]*DirectoryStats, error) {
 	return nil, fmt.Errorf("bleve support not enabled in this build")
 }
+
+// GetTermFacetCounts returns term facet counts for a categorical field
+func GetTermFacetCounts(field string, limit int) (map[string]int64, error) {
+	return nil, fmt.Errorf("bleve support not enabled in this build")
+}

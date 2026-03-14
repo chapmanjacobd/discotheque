@@ -1226,3 +1226,35 @@ type DirectoryStats struct {
 	AvgSize       int64   `json:"avg_size"`
 	TotalDuration int64   `json:"total_duration"`
 }
+
+// GetTermFacetCounts returns term facet counts for a categorical field
+func GetTermFacetCounts(field string, limit int) (map[string]int64, error) {
+	indexMutex.RLock()
+	defer indexMutex.RUnlock()
+
+	if indexInstance == nil {
+		return nil, fmt.Errorf("bleve index not initialized")
+	}
+
+	// Match all query with term facet
+	bleveQuery := query.NewMatchAllQuery()
+	searchRequest := bleve.NewSearchRequest(bleveQuery)
+	searchRequest.Size = 0 // No hits needed, just facets
+
+	facetReq := NewTermFacetRequest(field, limit)
+	searchRequest.AddFacet(field, facetReq)
+
+	results, err := indexInstance.Search(searchRequest)
+	if err != nil {
+		return nil, err
+	}
+
+	counts := make(map[string]int64)
+	if facetResult, ok := results.Facets[field]; ok {
+		for _, term := range facetResult.Terms.Terms() {
+			counts[term.Term] = int64(term.Count)
+		}
+	}
+
+	return counts, nil
+}
