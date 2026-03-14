@@ -1,8 +1,11 @@
 package commands
 
 import (
+	"archive/zip"
+	"bytes"
 	"database/sql"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"os"
@@ -259,6 +262,207 @@ func (c *ServeCmd) handleSubtitles(w http.ResponseWriter, r *http.Request) {
 	w.Write(output)
 }
 
+// generateTextSnippetSVG creates a styled SVG thumbnail with text content preview
+func (c *ServeCmd) generateTextSnippetSVG(label, firstLine, filename string) []byte {
+	// Truncate and escape text for SVG
+	if len(firstLine) > 60 {
+		firstLine = firstLine[:57] + "..."
+	}
+	firstLine = strings.ReplaceAll(firstLine, "&", "&amp;")
+	firstLine = strings.ReplaceAll(firstLine, "<", "&lt;")
+	firstLine = strings.ReplaceAll(firstLine, ">", "&gt;")
+	
+	if firstLine == "" {
+		firstLine = label
+	}
+	
+	svg := fmt.Sprintf(`<svg xmlns="http://www.w3.org/2000/svg" width="320" height="240" viewBox="0 0 320 240">
+  <defs>
+    <linearGradient id="grad-%s" x1="0%%" y1="0%%" x2="100%%" y2="100%%">
+      <stop offset="0%%" stop-color="#1e40af"/>
+      <stop offset="100%%" stop-color="#3b82f6"/>
+    </linearGradient>
+  </defs>
+  <rect fill="url(#grad-%s)" width="320" height="240"/>
+  <text fill="white" font-family="system-ui,sans-serif" font-size="12" opacity="0.7" x="20" y="30">%s</text>
+  <text fill="white" font-family="system-ui,sans-serif" font-size="18" font-weight="600" x="20" y="80" text-overflow="ellipsis">%s</text>
+  <text fill="white" font-family="system-ui,sans-serif" font-size="11" opacity="0.5" x="20" y="220">%s</text>
+</svg>`, label, label, label, firstLine, filepath.Base(filename))
+	
+	return []byte(svg)
+}
+
+// generatePDFThumbnail generates a thumbnail for PDF files using pdftoppm or fallback
+func (c *ServeCmd) generatePDFThumbnail(path string) ([]byte, string, error) {
+	// Try pdftoppm first (fastest, best quality)
+	if data, err := exec.Command("pdftoppm", "-png", "-f", "1", "-singlefile", "-scale-to", "320", path, "-").Output(); err == nil {
+		return data, "image/png", nil
+	}
+	
+	// Fallback: read first page text and render as SVG
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, "", err
+	}
+	defer f.Close()
+	
+	// Read first 1KB to find text
+	buf := make([]byte, 1024)
+	n, _ := f.Read(buf)
+	text := string(buf[:n])
+	
+	// Try to extract readable text (skip PDF headers)
+	lines := strings.Split(text, "\n")
+	firstLine := ""
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if len(line) > 3 && !strings.HasPrefix(line, "%") && !strings.HasPrefix(line, "/") {
+			firstLine = line
+			break
+		}
+	}
+	
+	return c.generateTextSnippetSVG("PDF", firstLine, path), "image/svg+xml", nil
+}
+
+// extractEpubCover extracts the cover image from an EPUB file
+func (c *ServeCmd) extractEpubCover(path string) ([]byte, error) {
+	r, err := zip.OpenReader(path)
+	if err != nil {
+		return nil, err
+	}
+	defer r.Close()
+	
+	// Look for cover image in common locations
+	coverPatterns := []string{"cover.jpg", "cover.png", "Cover.jpg", "Cover.png", "cover.jpeg"}
+	imageExts := []string{".jpg", ".jpeg", ".png"}
+	
+	var coverFile *zip.File
+	var imageFile *zip.File
+	
+	for _, f := range r.File {
+		name := f.Name
+		base := filepath.Base(name)
+		
+		// Check for explicit cover files
+		for _, pattern := range coverPatterns {
+			if strings.HasSuffix(name, pattern) || strings.HasSuffix(base, pattern) {
+				coverFile = f
+				break
+			}
+		}
+		
+		// Also look for images in images/ or cover/ directories
+		if coverFile == nil {
+			dir := filepath.Dir(name)
+			if strings.Contains(strings.ToLower(dir), "cover") || strings.Contains(strings.ToLower(dir), "image") {
+				for _, ext := range imageExts {
+					if strings.HasSuffix(strings.ToLower(base), ext) {
+						imageFile = f
+						break
+					}
+				}
+			}
+		}
+	}
+	
+	// Prefer explicit cover, fallback to any image
+	target := coverFile
+	if target == nil {
+		target = imageFile
+	}
+	
+	if target != nil {
+		rc, err := target.Open()
+		if err != nil {
+			return nil, err
+		}
+		defer rc.Close()
+		return io.ReadAll(rc)
+	}
+	
+	return nil, fmt.Errorf("no cover image found")
+}
+
+// generateEpubThumbnail generates a thumbnail for EPUB files
+func (c *ServeCmd) generateEpubThumbnail(path string) ([]byte, string, error) {
+	// Try to extract cover image first
+	if coverData, err := c.extractEpubCover(path); err == nil && coverData != nil {
+		// Detect cover image type
+		if bytes.HasPrefix(coverData, []byte{0xFF, 0xD8, 0xFF}) {
+			return coverData, "image/jpeg", nil
+		}
+		if bytes.HasPrefix(coverData, []byte{0x89, 0x50, 0x4E, 0x47}) {
+			return coverData, "image/png", nil
+		}
+		return coverData, "image/jpeg", nil
+	}
+	
+	// Fallback: extract title/author from metadata and render as SVG
+	r, err := zip.OpenReader(path)
+	if err != nil {
+		return c.generateTextSnippetSVG("EPUB", "", path), "image/svg+xml", nil
+	}
+	defer r.Close()
+	
+	// Look for content.opf or .opf files for metadata
+	var opfFile *zip.File
+	for _, f := range r.File {
+		if strings.HasSuffix(strings.ToLower(f.Name), ".opf") {
+			opfFile = f
+			break
+		}
+	}
+	
+	title := ""
+	if opfFile != nil {
+		rc, err := opfFile.Open()
+		if err == nil {
+			content, _ := io.ReadAll(rc)
+			rc.Close()
+			// Simple XML parsing for dc:title
+			contentStr := string(content)
+			if idx := strings.Index(contentStr, "<dc:title"); idx != -1 {
+				start := strings.Index(contentStr[idx:], ">")
+				end := strings.Index(contentStr[idx:], "</dc:title>")
+				if start != -1 && end != -1 && end > start {
+					title = strings.TrimSpace(contentStr[idx+start+1 : idx+end])
+				}
+			}
+		}
+	}
+	
+	return c.generateTextSnippetSVG("EPUB", title, path), "image/svg+xml", nil
+}
+
+// generateTextFileThumbnail generates a thumbnail for text-based files
+func (c *ServeCmd) generateTextFileThumbnail(path string, ext string) ([]byte, string) {
+	f, err := os.Open(path)
+	if err != nil {
+		return c.generateTextSnippetSVG(strings.ToUpper(ext), "", path), "image/svg+xml"
+	}
+	defer f.Close()
+	
+	// Read first 500 bytes
+	buf := make([]byte, 500)
+	n, _ := f.Read(buf)
+	text := strings.TrimSpace(string(buf[:n]))
+	
+	// Extract first meaningful line
+	lines := strings.Split(text, "\n")
+	firstLine := ""
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		// Skip markdown headers, empty lines, and RTF control chars
+		if len(line) > 0 && !strings.HasPrefix(line, "#") && line[0] != '\\' {
+			firstLine = line
+			break
+		}
+	}
+	
+	return c.generateTextSnippetSVG(strings.ToUpper(ext), firstLine, path), "image/svg+xml"
+}
+
 func (c *ServeCmd) handleThumbnail(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Query().Get("path")
 	if path == "" {
@@ -313,6 +517,44 @@ func (c *ServeCmd) handleThumbnail(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Handle text-based documents with smart thumbnails
+	ext := strings.ToLower(filepath.Ext(path))
+	switch ext {
+	case ".pdf":
+		thumb, contentType, err := c.generatePDFThumbnail(path)
+		if err != nil {
+			slog.Warn("PDF thumbnail generation failed", "path", path, "error", err)
+			thumb, contentType = c.generateTextSnippetSVG("PDF", "", path), "image/svg+xml"
+		}
+		w.Header().Set("Content-Type", contentType)
+		w.Header().Set("Cache-Control", "public, max-age=31536000")
+		w.Write(thumb)
+		return
+		
+	case ".epub":
+		thumb, contentType, err := c.generateEpubThumbnail(path)
+		if err != nil {
+			slog.Warn("EPUB thumbnail generation failed", "path", path, "error", err)
+			thumb, contentType = c.generateTextSnippetSVG("EPUB", "", path), "image/svg+xml"
+		}
+		w.Header().Set("Content-Type", contentType)
+		w.Header().Set("Cache-Control", "public, max-age=31536000")
+		w.Write(thumb)
+		return
+		
+	case ".txt", ".md", ".markdown", ".rtf":
+		label := strings.TrimPrefix(ext, ".")
+		if label == "markdown" {
+			label = "md"
+		}
+		thumb, contentType := c.generateTextFileThumbnail(path, label)
+		w.Header().Set("Content-Type", contentType)
+		w.Header().Set("Cache-Control", "public, max-age=31536000")
+		w.Write(thumb)
+		return
+	}
+
+	// Default: handle video/audio with ffmpeg
 	var args []string
 	if strings.HasPrefix(mimeType, "video/") {
 		args = []string{"-ss", "25", "-i", path, "-frames:v", "1", "-q:v", "4", "-vf", "scale=320:-1", "-f", "image2", "pipe:1"}
