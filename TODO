@@ -1,4 +1,4 @@
-
+lets fix the document modal header title to be more like the PiP Player header title where clicking will select the full file name and the ellipses is visual but not selected
 
 - Pagination should work on all pages except for Categorization
 - Captions mode: Media Type should filter the caption media
@@ -45,6 +45,8 @@ lambda x: (
 
 
 test large database Web UI performance, fts5 vs bleve
+
+support text in captions page, when disco add --extract-text (store in both sqlite and bleve, if enabled)
 
 e2e web safari
 e2e web mobile
