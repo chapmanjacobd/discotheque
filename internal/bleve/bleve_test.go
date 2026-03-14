@@ -377,6 +377,9 @@ func TestSearch(t *testing.T) {
 	if total < 1 {
 		t.Errorf("Expected at least 1 result for 'videos', got %d", total)
 	}
+	if len(ids) < 1 {
+		t.Errorf("Expected at least 1 result for 'videos', got %v", ids)
+	}
 
 	// Test search with limit
 	ids, total, err = Search("media", 1)
@@ -385,6 +388,9 @@ func TestSearch(t *testing.T) {
 	}
 	if len(ids) > 1 {
 		t.Errorf("Expected max 1 result with limit 1, got %d", len(ids))
+	}
+	if total < 1 {
+		t.Errorf("Expected at least 1 total result for 'media', got %d", total)
 	}
 }
 
@@ -496,7 +502,7 @@ func TestCount(t *testing.T) {
 	}
 
 	// Add documents
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		doc := &MediaDocument{
 			ID:            fmt.Sprintf("doc-%d", i),
 			Path:          filepath.FromSlash(fmt.Sprintf("/test/path%d.mp4", i)),
@@ -542,7 +548,7 @@ func TestReindexAll(t *testing.T) {
 	defer CloseIndex()
 
 	// Add some documents
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		doc := &MediaDocument{
 			ID:            fmt.Sprintf("doc-%d", i),
 			Path:          filepath.FromSlash(fmt.Sprintf("/test/path%d.mp4", i)),

@@ -101,8 +101,6 @@ PlayInOrder(lambda x: (
   )
 )
 
-Or rather accept an array for complex sorting with drag-and-drop reordering. The functionality should expose a level of completeness which allows for the above
-
 DU mode Default sort should be similar to xklb:
 lambda x: (
         (x.get("size") or 0) / (x.get("count") or 1),
@@ -112,11 +110,9 @@ lambda x: (
         objects.Reverser(x.get("path")),
     )
 
-non-fts build should have support for substring searches somehow... do an estimated performance benchmark comparison of the options
+Add Time Modified, Time Created, and Time Downloaded range slider filters
 
 test large database Web UI performance, fts5 vs bleve
-
-Add Time Modified, Time Created, and Time Downloaded range slider filters
 
 e2e web safari
 e2e web mobile

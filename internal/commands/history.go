@@ -29,7 +29,6 @@ type HistoryCmd struct {
 }
 
 func (c *HistoryCmd) Run(ctx *kong.Context) error {
-	models.SetupLogging(c.Verbose)
 	flags := models.GlobalFlags{
 		CoreFlags:        c.CoreFlags,
 		PathFilterFlags:  c.PathFilterFlags,
@@ -47,58 +46,54 @@ func (c *HistoryCmd) Run(ctx *kong.Context) error {
 		flags.Reverse = true
 	}
 
-	media, err := query.MediaQuery(context.Background(), c.Databases, flags)
-	if err != nil {
-		return err
-	}
-
 	// Filter for only watched items if not otherwise specified
 	if flags.Watched == nil && !flags.InProgress && !flags.Completed {
 		watched := true
 		flags.Watched = &watched
 	}
 
-	media = query.FilterMedia(media, flags)
-	HideRedundantFirstPlayed(media)
+	return RunQuery(context.Background(), c.Databases, flags, func(media []models.MediaWithDB) error {
+		HideRedundantFirstPlayed(media)
 
-	if flags.JSON {
-		encoder := json.NewEncoder(os.Stdout)
-		encoder.SetIndent("", "  ")
-		return encoder.Encode(media)
-	}
-
-	if flags.Completed {
-		fmt.Println("Completed:")
-	} else if flags.InProgress {
-		fmt.Println("In progress:")
-	} else {
-		fmt.Println("History:")
-	}
-
-	if flags.DeleteRows {
-		for _, dbPath := range c.Databases {
-			var paths []string
-			for _, m := range media {
-				if m.DB == dbPath {
-					paths = append(paths, m.Path)
-				}
-			}
-			if len(paths) > 0 {
-				if err := history.DeleteHistoryByPaths(dbPath, paths); err != nil {
-					return err
-				}
-			}
+		if flags.JSON {
+			encoder := json.NewEncoder(os.Stdout)
+			encoder.SetIndent("", "  ")
+			return encoder.Encode(media)
 		}
-		fmt.Printf("Deleted history for %d items\n", len(media))
-		return nil
-	}
 
-	if flags.Partial != "" {
-		query.SortHistory(media, flags.Partial, flags.Reverse)
-	} else {
-		query.SortMedia(media, flags)
-	}
-	return PrintMedia(flags.DisplayFlags, flags.Columns, media)
+		if flags.Completed {
+			fmt.Println("Completed:")
+		} else if flags.InProgress {
+			fmt.Println("In progress:")
+		} else {
+			fmt.Println("History:")
+		}
+
+		if flags.DeleteRows {
+			for _, dbPath := range c.Databases {
+				var paths []string
+				for _, m := range media {
+					if m.DB == dbPath {
+						paths = append(paths, m.Path)
+					}
+				}
+				if len(paths) > 0 {
+					if err := history.DeleteHistoryByPaths(dbPath, paths); err != nil {
+						return err
+					}
+				}
+			}
+			fmt.Printf("Deleted history for %d items\n", len(media))
+			return nil
+		}
+
+		if flags.Partial != "" {
+			query.SortHistory(media, flags.Partial, flags.Reverse)
+		} else {
+			query.SortMedia(media, flags)
+		}
+		return PrintMedia(flags.DisplayFlags, flags.Columns, media)
+	})
 }
 
 type HistoryAddCmd struct {

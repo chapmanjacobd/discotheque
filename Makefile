@@ -1,7 +1,7 @@
 .PHONY: build build-fts5 build-bleve build-nofts test cover webtest webcover e2e clean fmt lint install all readme dev ubuntu-deps go-deps web-install webbuild e2e-install e2e-init e2e-cli e2e-web release-build benchmark benchstat profiles screenshots
 
 BINARY_NAME=disco
-BUILD_TAGS=fts5
+BUILD_TAGS=fts5 bleve
 
 ifeq ($(OS),Windows_NT)
 	EXE=.exe

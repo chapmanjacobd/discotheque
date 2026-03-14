@@ -71,11 +71,11 @@ func TestBleveSearch(t *testing.T) {
 			expectIDs:   []string{"doc-1"},
 		},
 		{
-			name:        "Multiple search terms",
+			name:        "Multiple search terms (OR logic)",
 			searchTerms: []string{"video", "action"},
 			limit:       10,
-			expectCount: 1,
-			expectIDs:   []string{"doc-1"},
+			expectCount: 2, // Both doc-1 and doc-2 contain "video"
+			expectIDs:   []string{"doc-1", "doc-2"},
 		},
 		{
 			name:        "Search with limit",
@@ -108,7 +108,7 @@ func TestBleveSearch(t *testing.T) {
 				t.Errorf("Expected %d results, got %d: %v", tt.expectCount, len(ids), ids)
 			}
 
-			if tt.expectIDs != nil && len(tt.expectIDs) > 0 {
+			if len(tt.expectIDs) > 0 {
 				if len(ids) != len(tt.expectIDs) {
 					t.Errorf("Expected IDs %v, got %v", tt.expectIDs, ids)
 				} else {

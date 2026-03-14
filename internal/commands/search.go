@@ -27,7 +27,6 @@ type SearchCmd struct {
 }
 
 func (c *SearchCmd) Run(ctx *kong.Context) error {
-	models.SetupLogging(c.Verbose)
 	flags := models.GlobalFlags{
 		CoreFlags:        c.CoreFlags,
 		QueryFlags:       c.QueryFlags,
@@ -41,33 +40,29 @@ func (c *SearchCmd) Run(ctx *kong.Context) error {
 		FTSFlags:         c.FTSFlags,
 	}
 	// We prefer FTS if not specified
-	if !c.FTS {
+	if !flags.FTS {
 		// Check if FTS table exists in first database
 		if len(c.Databases) > 0 {
 			if sqlDB, err := db.Connect(c.Databases[0]); err == nil {
 				var name string
 				err := sqlDB.QueryRow("SELECT name FROM sqlite_master WHERE type='table' AND name='media_fts'").Scan(&name)
 				if err == nil {
-					c.FTS = true
+					flags.FTS = true
 				}
 				sqlDB.Close()
 			}
 		}
 	}
 
-	media, err := query.MediaQuery(context.Background(), c.Databases, flags)
-	if err != nil {
-		return err
-	}
+	return RunQuery(context.Background(), c.Databases, flags, func(media []models.MediaWithDB) error {
+		query.SortMedia(media, flags)
 
-	media = query.FilterMedia(media, flags)
-	query.SortMedia(media, flags)
+		if flags.JSON {
+			encoder := json.NewEncoder(os.Stdout)
+			encoder.SetIndent("", "  ")
+			return encoder.Encode(media)
+		}
 
-	if c.JSON {
-		encoder := json.NewEncoder(os.Stdout)
-		encoder.SetIndent("", "  ")
-		return encoder.Encode(media)
-	}
-
-	return PrintMedia(c.DisplayFlags, c.Columns, media)
+		return PrintMedia(flags.DisplayFlags, flags.Columns, media)
+	})
 }

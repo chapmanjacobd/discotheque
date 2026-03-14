@@ -68,7 +68,7 @@ func setupBenchmarkData(b *testing.B, rowCount int) (*sql.DB, string) {
 	b.Logf("Indexing %d documents into Bleve...", rowCount)
 	indexStart := time.Now()
 
-	for i := 0; i < rowCount; i++ {
+	for i := range rowCount {
 		path := filepath.Join("/home/user/videos", fmt.Sprintf("media_%d.mp4", i))
 		title := fmt.Sprintf("Sample Video Title %d", i)
 		description := "A sample video file with test content"

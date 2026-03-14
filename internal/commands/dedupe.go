@@ -3,6 +3,7 @@ package commands
 import (
 	"fmt"
 	"log/slog"
+	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -152,24 +153,26 @@ func (c *DedupeCmd) Run(ctx *kong.Context) error {
 	return nil
 }
 
-func (c *DedupeCmd) getMusicDuplicates(dbPath string) ([]DedupeDuplicate, error) {
+func (c *DedupeCmd) getDuplicatesBy(dbPath string, groupByCols, selectCols, whereClause string) ([]DedupeDuplicate, error) {
 	sqlDB, err := db.Connect(dbPath)
 	if err != nil {
 		return nil, err
 	}
 	defer sqlDB.Close()
 
-	// Find candidates using GROUP BY to avoid N^2 self-join
-	query := `
-		SELECT title, artist, album, COUNT(*) as count
-		FROM media
-		WHERE COALESCE(time_deleted, 0) = 0
-		  AND title != '' AND artist != ''
-		GROUP BY title, artist, album
-		HAVING count > 1
-	`
+	if whereClause != "" {
+		whereClause = " AND " + whereClause
+	}
 
-	rows, err := sqlDB.Query(query)
+	queryStr := fmt.Sprintf(`
+		SELECT %s, COUNT(*) as count
+		FROM media
+		WHERE COALESCE(time_deleted, 0) = 0 %s
+		GROUP BY %s
+		HAVING count > 1
+	`, groupByCols, whereClause, groupByCols)
+
+	rows, err := sqlDB.Query(queryStr)
 	if err != nil {
 		return nil, err
 	}
@@ -177,21 +180,32 @@ func (c *DedupeCmd) getMusicDuplicates(dbPath string) ([]DedupeDuplicate, error)
 
 	var dups []DedupeDuplicate
 	for rows.Next() {
-		var title, artist, album string
-		var count int
-		if err := rows.Scan(&title, &artist, &album, &count); err != nil {
+		// We need to scan the groupByCols. Since it's dynamic, we use a slice of interface{}
+		cols := strings.Split(groupByCols, ",")
+		values := make([]any, len(cols)+1)
+		for i := range values {
+			values[i] = new(any)
+		}
+		if err := rows.Scan(values...); err != nil {
 			return nil, err
 		}
 
-		// Fetch all files for this candidate group
-		groupQuery := `
+		// Build the group query
+		whereParts := make([]string, len(cols))
+		args := make([]any, len(cols))
+		for i, col := range cols {
+			whereParts[i] = strings.TrimSpace(col) + " = ?"
+			args[i] = *(values[i].(*any))
+		}
+
+		groupQuery := fmt.Sprintf(`
 			SELECT path, size, duration
 			FROM media
-			WHERE title = ? AND artist = ? AND album = ?
-			  AND COALESCE(time_deleted, 0) = 0
+			WHERE %s AND COALESCE(time_deleted, 0) = 0
 			ORDER BY size DESC, time_modified DESC
-		`
-		gRows, err := sqlDB.Query(groupQuery, title, artist, album)
+		`, strings.Join(whereParts, " AND "))
+
+		gRows, err := sqlDB.Query(groupQuery, args...)
 		if err != nil {
 			continue
 		}
@@ -216,8 +230,8 @@ func (c *DedupeCmd) getMusicDuplicates(dbPath string) ([]DedupeDuplicate, error)
 
 		keep := items[0]
 		for _, dup := range items[1:] {
-			// Basic duration check (already within the group mostly, but let's be sure)
-			if keep.duration > 0 && dup.duration > 0 && MathAbs(keep.duration-dup.duration) > 8 {
+			// Basic duration check
+			if keep.duration > 0 && dup.duration > 0 && math.Abs(keep.duration-dup.duration) > 8 {
 				continue
 			}
 			dups = append(dups, DedupeDuplicate{
@@ -230,207 +244,20 @@ func (c *DedupeCmd) getMusicDuplicates(dbPath string) ([]DedupeDuplicate, error)
 	return dups, nil
 }
 
-func MathAbs(v float64) float64 {
-	if v < 0 {
-		return -v
-	}
-	return v
+func (c *DedupeCmd) getMusicDuplicates(dbPath string) ([]DedupeDuplicate, error) {
+	return c.getDuplicatesBy(dbPath, "title, artist, album", "path, size, duration", "title != '' AND artist != ''")
 }
 
 func (c *DedupeCmd) getIDDuplicates(dbPath string) ([]DedupeDuplicate, error) {
-	sqlDB, err := db.Connect(dbPath)
-	if err != nil {
-		return nil, err
-	}
-	defer sqlDB.Close()
-
-	query := `
-		SELECT webpath, COUNT(*) as count
-		FROM media
-		WHERE COALESCE(time_deleted, 0) = 0 AND webpath != ''
-		GROUP BY webpath
-		HAVING count > 1
-	`
-
-	rows, err := sqlDB.Query(query)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var dups []DedupeDuplicate
-	for rows.Next() {
-		var webpath string
-		var count int
-		if err := rows.Scan(&webpath, &count); err != nil {
-			return nil, err
-		}
-
-		gRows, err := sqlDB.Query("SELECT path, size, duration FROM media WHERE webpath = ? AND COALESCE(time_deleted, 0) = 0 ORDER BY size DESC", webpath)
-		if err != nil {
-			continue
-		}
-
-		type item struct {
-			path     string
-			size     int64
-			duration float64
-		}
-		var items []item
-		for gRows.Next() {
-			var i item
-			if err := gRows.Scan(&i.path, &i.size, &i.duration); err == nil {
-				items = append(items, i)
-			}
-		}
-		gRows.Close()
-
-		if len(items) < 2 {
-			continue
-		}
-
-		keep := items[0]
-		for _, dup := range items[1:] {
-			if keep.duration > 0 && dup.duration > 0 && MathAbs(keep.duration-dup.duration) > 8 {
-				continue
-			}
-			dups = append(dups, DedupeDuplicate{
-				KeepPath:      keep.path,
-				DuplicatePath: dup.path,
-				DuplicateSize: dup.size,
-			})
-		}
-	}
-	return dups, nil
+	return c.getDuplicatesBy(dbPath, "webpath", "path, size, duration", "webpath != ''")
 }
 
 func (c *DedupeCmd) getTitleDuplicates(dbPath string) ([]DedupeDuplicate, error) {
-	sqlDB, err := db.Connect(dbPath)
-	if err != nil {
-		return nil, err
-	}
-	defer sqlDB.Close()
-
-	query := `
-		SELECT title, COUNT(*) as count
-		FROM media
-		WHERE COALESCE(time_deleted, 0) = 0 AND title != ''
-		GROUP BY title
-		HAVING count > 1
-	`
-
-	rows, err := sqlDB.Query(query)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var dups []DedupeDuplicate
-	for rows.Next() {
-		var title string
-		var count int
-		if err := rows.Scan(&title, &count); err != nil {
-			return nil, err
-		}
-
-		gRows, err := sqlDB.Query("SELECT path, size, duration FROM media WHERE title = ? AND COALESCE(time_deleted, 0) = 0 ORDER BY size DESC", title)
-		if err != nil {
-			continue
-		}
-
-		type item struct {
-			path     string
-			size     int64
-			duration float64
-		}
-		var items []item
-		for gRows.Next() {
-			var i item
-			if err := gRows.Scan(&i.path, &i.size, &i.duration); err == nil {
-				items = append(items, i)
-			}
-		}
-		gRows.Close()
-
-		if len(items) < 2 {
-			continue
-		}
-
-		keep := items[0]
-		for _, dup := range items[1:] {
-			if keep.duration > 0 && dup.duration > 0 && MathAbs(keep.duration-dup.duration) > 8 {
-				continue
-			}
-			dups = append(dups, DedupeDuplicate{
-				KeepPath:      keep.path,
-				DuplicatePath: dup.path,
-				DuplicateSize: dup.size,
-			})
-		}
-	}
-	return dups, nil
+	return c.getDuplicatesBy(dbPath, "title", "path, size, duration", "title != ''")
 }
 
 func (c *DedupeCmd) getDurationDuplicates(dbPath string) ([]DedupeDuplicate, error) {
-	sqlDB, err := db.Connect(dbPath)
-	if err != nil {
-		return nil, err
-	}
-	defer sqlDB.Close()
-
-	query := `
-		SELECT duration, COUNT(*) as count
-		FROM media
-		WHERE COALESCE(time_deleted, 0) = 0 AND duration > 0
-		GROUP BY duration
-		HAVING count > 1
-	`
-
-	rows, err := sqlDB.Query(query)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var dups []DedupeDuplicate
-	for rows.Next() {
-		var duration float64
-		var count int
-		if err := rows.Scan(&duration, &count); err != nil {
-			return nil, err
-		}
-
-		gRows, err := sqlDB.Query("SELECT path, size FROM media WHERE duration = ? AND COALESCE(time_deleted, 0) = 0 ORDER BY size DESC", duration)
-		if err != nil {
-			continue
-		}
-
-		var paths []string
-		var sizes []int64
-		for gRows.Next() {
-			var p string
-			var s int64
-			if err := gRows.Scan(&p, &s); err == nil {
-				paths = append(paths, p)
-				sizes = append(sizes, s)
-			}
-		}
-		gRows.Close()
-
-		if len(paths) < 2 {
-			continue
-		}
-
-		keep := paths[0]
-		for i, dup := range paths[1:] {
-			dups = append(dups, DedupeDuplicate{
-				KeepPath:      keep,
-				DuplicatePath: dup,
-				DuplicateSize: sizes[i+1],
-			})
-		}
-	}
-	return dups, nil
+	return c.getDuplicatesBy(dbPath, "duration", "path, size", "duration > 0")
 }
 
 func (c *DedupeCmd) getFSDuplicates(dbPath string, flags models.GlobalFlags) ([]DedupeDuplicate, error) {

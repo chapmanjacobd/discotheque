@@ -14,6 +14,8 @@ import (
 	"github.com/blevesearch/bleve/v2/analysis/analyzer/standard"
 	_ "github.com/blevesearch/bleve/v2/analysis/token/edgengram" // Register edge_ngram filter
 	_ "github.com/blevesearch/bleve/v2/analysis/token/lowercase" // Register lowercase filter
+	"github.com/blevesearch/bleve/v2/search"
+	"github.com/chapmanjacobd/discoteca/internal/db"
 	"github.com/chapmanjacobd/discoteca/internal/models"
 )
 
@@ -59,6 +61,32 @@ func ToBleveDoc(m models.Media) *MediaDocument {
 	}
 	if m.Duration != nil {
 		doc.Duration = *m.Duration
+	}
+
+	return doc
+}
+
+// ToBleveDocFromUpsert converts UpsertMediaParams to a BleveDocument
+func ToBleveDocFromUpsert(p db.UpsertMediaParams) *MediaDocument {
+	doc := &MediaDocument{
+		ID:   p.Path,
+		Path: p.Path,
+	}
+
+	if p.Title.Valid {
+		doc.Title = p.Title.String
+	}
+	if p.Description.Valid {
+		doc.Description = p.Description.String
+	}
+	if p.Type.Valid {
+		doc.Type = p.Type.String
+	}
+	if p.Size.Valid {
+		doc.Size = p.Size.Int64
+	}
+	if p.Duration.Valid {
+		doc.Duration = p.Duration.Int64
 	}
 
 	return doc
@@ -140,7 +168,7 @@ func createIndex(path string) (bleve.Index, error) {
 	// Register custom edge_ngram analyzer for title autocomplete
 	// This creates tokens from the start of words: "matrix" → "m", "ma", "mat", "matr", "matri", "matrix"
 	// First register the edge_ngram token filter
-	err := indexMapping.AddCustomTokenFilter("title_edge_ngram", map[string]interface{}{
+	err := indexMapping.AddCustomTokenFilter("title_edge_ngram", map[string]any{
 		"type": "edge_ngram",
 		"min":  float64(1),
 		"max":  float64(20),
@@ -151,7 +179,7 @@ func createIndex(path string) (bleve.Index, error) {
 	}
 
 	// Now create the analyzer using the custom filter
-	err = indexMapping.AddCustomAnalyzer("title_edge_ngram", map[string]interface{}{
+	err = indexMapping.AddCustomAnalyzer("title_edge_ngram", map[string]any{
 		"type":      "custom",
 		"tokenizer": "unicode",
 		"token_filters": []string{
@@ -222,7 +250,6 @@ func Search(queryStr string, limit int) ([]string, uint64, error) {
 	}
 
 	// Create a match query that searches all fields
-	// Don't set FieldVal to search across all indexed fields
 	bleveQuery := bleve.NewMatchQuery(queryStr)
 
 	// Create search request
@@ -243,6 +270,56 @@ func Search(queryStr string, limit int) ([]string, uint64, error) {
 	}
 
 	return ids, results.Total, nil
+}
+
+// SearchWithPagination performs a search with pagination support
+// Supports both offset-based (From/Size) and cursor-based (SearchAfter) pagination
+func SearchWithPagination(queryStr string, limit, offset int, searchAfter []string) ([]string, uint64, []string, error) {
+	indexMutex.RLock()
+	defer indexMutex.RUnlock()
+
+	if indexInstance == nil {
+		return nil, 0, nil, fmt.Errorf("bleve index not initialized")
+	}
+
+	// Create a match query that searches all fields
+	bleveQuery := bleve.NewMatchQuery(queryStr)
+
+	// Create search request
+	searchRequest := bleve.NewSearchRequest(bleveQuery)
+	searchRequest.Size = limit
+	searchRequest.From = offset
+	searchRequest.Fields = []string{"id", "path"}
+
+	// Add sort for deterministic pagination (score desc, then id for tie-breaking)
+	// This ensures consistent results across pages
+	searchRequest.Sort = search.ParseSortOrderStrings([]string{"-_score", "id"})
+
+	// Add SearchAfter for efficient deep pagination (avoids From offset cost)
+	if len(searchAfter) > 0 {
+		searchRequest.SearchAfter = searchAfter
+	}
+
+	// Execute search
+	results, err := indexInstance.Search(searchRequest)
+	if err != nil {
+		return nil, 0, nil, err
+	}
+
+	// Extract IDs from results
+	ids := make([]string, len(results.Hits))
+	for i, hit := range results.Hits {
+		ids[i] = hit.ID
+	}
+
+	// Get search_after keys from last hit for next page
+	var nextSearchAfter []string
+	if len(results.Hits) > 0 {
+		lastHit := results.Hits[len(results.Hits)-1]
+		nextSearchAfter = lastHit.Sort
+	}
+
+	return ids, results.Total, nextSearchAfter, nil
 }
 
 // SearchPath performs a path-specific search
@@ -310,4 +387,28 @@ func ReindexAll() error {
 	// Recreate index
 	indexInstance, err = createIndex(indexPath)
 	return err
+}
+
+// Batch indexes a batch of documents
+func Batch(batch *bleve.Batch) error {
+	indexMutex.RLock()
+	defer indexMutex.RUnlock()
+
+	if indexInstance == nil {
+		return fmt.Errorf("bleve index not initialized")
+	}
+
+	return indexInstance.Batch(batch)
+}
+
+// NewBatch creates a new batch for bulk indexing
+func NewBatch() *bleve.Batch {
+	indexMutex.RLock()
+	defer indexMutex.RUnlock()
+
+	if indexInstance == nil {
+		return nil
+	}
+
+	return indexInstance.NewBatch()
 }

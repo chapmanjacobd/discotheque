@@ -51,7 +51,7 @@ func Connect(dbPath string) (*sql.DB, error) {
 // wrapWithTracing wraps the database connection with query tracing
 func wrapWithTracing(baseDB *sql.DB, dsn string) (*sql.DB, error) {
 	// Get the underlying driver
- drv := baseDB.Driver()
+	drv := baseDB.Driver()
 
 	// Create a connector from the existing connection
 	// We need to close the baseDB and reopen with tracing
@@ -139,9 +139,10 @@ func (c *traceConn) ExecContext(ctx context.Context, query string, args []driver
 		logSlowQuery(query, args, start)
 		return result, err
 	}
-	// Fallback
+	// Fallback for drivers that don't implement ExecerContext
 	values := namedValuesToValues(args)
 	start := time.Now()
+	//lint:ignore SA1019 Fallback for backward compatibility with older drivers
 	result, err := c.Conn.(driver.Execer).Exec(query, values)
 	logSlowQuery(query, valuesToNamedValues(values), start)
 	return result, err
@@ -154,9 +155,10 @@ func (c *traceConn) QueryContext(ctx context.Context, query string, args []drive
 		logSlowQuery(query, args, start)
 		return rows, err
 	}
-	// Fallback
+	// Fallback for drivers that don't implement QueryerContext
 	values := namedValuesToValues(args)
 	start := time.Now()
+	//lint:ignore SA1019 Fallback for backward compatibility with older drivers
 	rows, err := c.Conn.(driver.Queryer).Query(query, values)
 	logSlowQuery(query, valuesToNamedValues(values), start)
 	return rows, err
@@ -170,6 +172,7 @@ type traceStmt struct {
 
 func (s *traceStmt) Exec(args []driver.Value) (driver.Result, error) {
 	start := time.Now()
+	//lint:ignore SA1019 Fallback for backward compatibility with older drivers
 	result, err := s.Stmt.Exec(args)
 	logSlowQuery(s.query, valuesToNamedValues(args), start)
 	return result, err
@@ -182,13 +185,14 @@ func (s *traceStmt) ExecContext(ctx context.Context, args []driver.NamedValue) (
 		logSlowQuery(s.query, args, start)
 		return result, err
 	}
-	// Fallback
+	// Fallback for drivers that don't implement StmtExecContext
 	values := namedValuesToValues(args)
 	return s.Exec(values)
 }
 
 func (s *traceStmt) Query(args []driver.Value) (driver.Rows, error) {
 	start := time.Now()
+	//lint:ignore SA1019 Fallback for backward compatibility with older drivers
 	rows, err := s.Stmt.Query(args)
 	if err != nil {
 		return nil, err
@@ -204,7 +208,7 @@ func (s *traceStmt) QueryContext(ctx context.Context, args []driver.NamedValue) 
 		logSlowQuery(s.query, args, start)
 		return rows, err
 	}
-	// Fallback
+	// Fallback for drivers that don't implement StmtQueryContext
 	values := namedValuesToValues(args)
 	return s.Query(values)
 }

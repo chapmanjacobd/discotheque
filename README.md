@@ -19,7 +19,7 @@ go install github.com/chapmanjacobd/discoteca/cmd/disco@latest
 - `espeak-ng` - Text-to-speech generation
 - `mpv` - Playback control
 
-See [INSTALL.md](INSTALL.md) for installation instructions on your platform.
+See [INSTALL.md](docs/INSTALL.md) for installation instructions on your platform.
 
 ## Screenshots
 
@@ -443,6 +443,8 @@ Flags:
         Use FTS5 full-text search
   --fts-table
         FTS table name
+  --bleve
+        Use Bleve full-text search index
   --no-fts
         Disable full-text search, use substring search only
   -R, --related
@@ -604,6 +606,8 @@ Flags:
         Use FTS5 full-text search
   --fts-table
         FTS table name
+  --bleve
+        Use Bleve full-text search index
   --no-fts
         Disable full-text search, use substring search only
   -R, --related
@@ -642,6 +646,8 @@ Flags:
         Use FTS5 full-text search
   --fts-table
         FTS table name
+  --bleve
+        Use Bleve full-text search index
   --no-fts
         Disable full-text search, use substring search only
   -R, --related
@@ -2285,6 +2291,8 @@ Flags:
         Use FTS5 full-text search
   --fts-table
         FTS table name
+  --bleve
+        Use Bleve full-text search index
   --no-fts
         Disable full-text search, use substring search only
   -R, --related
@@ -2546,6 +2554,8 @@ Flags:
         Use FTS5 full-text search
   --fts-table
         FTS table name
+  --bleve
+        Use Bleve full-text search index
   --no-fts
         Disable full-text search, use substring search only
   -R, --related
@@ -3546,6 +3556,8 @@ Flags:
         Use FTS5 full-text search
   --fts-table
         FTS table name
+  --bleve
+        Use Bleve full-text search index
   --no-fts
         Disable full-text search, use substring search only
   -R, --related
@@ -3800,6 +3812,8 @@ Flags:
         Use FTS5 full-text search
   --fts-table
         FTS table name
+  --bleve
+        Use Bleve full-text search index
   --no-fts
         Disable full-text search, use substring search only
   -R, --related

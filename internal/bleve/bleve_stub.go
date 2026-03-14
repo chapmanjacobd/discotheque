@@ -5,6 +5,8 @@ package bleve
 import (
 	"fmt"
 
+	"github.com/blevesearch/bleve/v2"
+	"github.com/chapmanjacobd/discoteca/internal/db"
 	"github.com/chapmanjacobd/discoteca/internal/models"
 )
 
@@ -22,6 +24,11 @@ type MediaDocument struct {
 
 // ToBleveDoc converts a Media model to a BleveDocument
 func ToBleveDoc(m models.Media) *MediaDocument {
+	return nil
+}
+
+// ToBleveDocFromUpsert converts UpsertMediaParams to a BleveDocument
+func ToBleveDocFromUpsert(p db.UpsertMediaParams) *MediaDocument {
 	return nil
 }
 
@@ -68,4 +75,14 @@ func Count() (uint64, error) {
 // ReindexAll rebuilds the entire index
 func ReindexAll() error {
 	return fmt.Errorf("bleve support not enabled in this build")
+}
+
+// Batch indexes a batch of documents
+func Batch(batch *bleve.Batch) error {
+	return fmt.Errorf("bleve support not enabled in this build")
+}
+
+// NewBatch creates a new batch for bulk indexing
+func NewBatch() *bleve.Batch {
+	return nil
 }

@@ -11,7 +11,6 @@ import (
 	"github.com/chapmanjacobd/discoteca/internal/db"
 	"github.com/chapmanjacobd/discoteca/internal/metadata"
 	"github.com/chapmanjacobd/discoteca/internal/models"
-	"github.com/chapmanjacobd/discoteca/internal/query"
 	"github.com/chapmanjacobd/discoteca/internal/utils"
 )
 
@@ -33,7 +32,6 @@ type MediaCheckCmd struct {
 }
 
 func (c *MediaCheckCmd) Run(ctx *kong.Context) error {
-	models.SetupLogging(c.Verbose)
 	flags := models.GlobalFlags{
 		CoreFlags:        c.CoreFlags,
 		PathFilterFlags:  c.PathFilterFlags,
@@ -42,72 +40,69 @@ func (c *MediaCheckCmd) Run(ctx *kong.Context) error {
 		DeletedFlags:     c.DeletedFlags,
 	}
 
-	media, err := query.MediaQuery(context.Background(), c.Databases, flags)
-	if err != nil {
-		return err
-	}
-	media = query.FilterMedia(media, flags)
-
-	if len(media) == 0 {
-		return fmt.Errorf("no media found")
-	}
-
 	gap, _ := utils.FloatFromPercent(c.Gap)
 	deleteThreshold, _ := utils.FloatFromPercent(c.DeleteCorrupt)
 	fullScanThreshold, _ := utils.FloatFromPercent(c.FullScanIfCorrupt)
 
-	for _, m := range media {
-		corruption := 0.0
-		duration := 0.0
-		if m.Duration != nil {
-			duration = float64(*m.Duration)
+	return RunQuery(context.Background(), c.Databases, flags, func(media []models.MediaWithDB) error {
+		if len(media) == 0 {
+			return fmt.Errorf("no media found")
 		}
 
-		if c.FullScan {
-			corruption, err = metadata.DecodeFullScan(context.Background(), m.Path)
-			if err != nil {
-				slog.Error("Full scan failed", "path", m.Path, "error", err)
-				corruption = 0.5
+		for _, m := range media {
+			var corruption float64
+			duration := 0.0
+			if m.Duration != nil {
+				duration = float64(*m.Duration)
 			}
-		} else {
-			if duration == 0 {
-				corruption = 0.5
+
+			if c.FullScan {
+				var err error
+				corruption, err = metadata.DecodeFullScan(context.Background(), m.Path)
+				if err != nil {
+					slog.Error("Full scan failed", "path", m.Path, "error", err)
+					corruption = 0.5
+				}
 			} else {
-				scans := utils.CalculateSegments(duration, c.ChunkSize, gap)
-				corruption = metadata.DecodeQuickScan(context.Background(), m.Path, scans, c.ChunkSize)
-
-				if fullScanThreshold > 0 && corruption >= fullScanThreshold {
-					slog.Info("Corruption threshold reached, performing full scan", "path", m.Path, "corruption", corruption)
-					corruption, err = metadata.DecodeFullScan(context.Background(), m.Path)
-					if err != nil {
-						slog.Error("Full scan failed", "path", m.Path, "error", err)
-					}
-				}
-			}
-		}
-
-		fmt.Printf("%.2f%%\t%s\n", corruption*100, m.Path)
-
-		if deleteThreshold > 0 && corruption >= deleteThreshold {
-			slog.Warn("Deleting corrupt file", "path", m.Path, "corruption", corruption)
-			if !c.Simulate {
-				if err := os.Remove(m.Path); err != nil {
-					slog.Error("Failed to delete corrupt file", "path", m.Path, "error", err)
+				if duration == 0 {
+					corruption = 0.5
 				} else {
-					// Mark as deleted in DB
-					sqlDB, err := db.Connect(m.DB)
-					if err == nil {
-						defer sqlDB.Close()
-						queries := db.New(sqlDB)
-						queries.MarkDeleted(context.Background(), db.MarkDeletedParams{
-							Path:        m.Path,
-							TimeDeleted: utils.ToNullInt64(time.Now().Unix()),
-						})
+					scans := utils.CalculateSegments(duration, c.ChunkSize, gap)
+					corruption = metadata.DecodeQuickScan(context.Background(), m.Path, scans, c.ChunkSize)
+
+					if fullScanThreshold > 0 && corruption >= fullScanThreshold {
+						slog.Info("Corruption threshold reached, performing full scan", "path", m.Path, "corruption", corruption)
+						var err error
+						corruption, err = metadata.DecodeFullScan(context.Background(), m.Path)
+						if err != nil {
+							slog.Error("Full scan failed", "path", m.Path, "error", err)
+						}
+					}
+				}
+			}
+
+			fmt.Printf("%.2f%%\t%s\n", corruption*100, m.Path)
+
+			if deleteThreshold > 0 && corruption >= deleteThreshold {
+				slog.Warn("Deleting corrupt file", "path", m.Path, "corruption", corruption)
+				if !flags.Simulate {
+					if err := os.Remove(m.Path); err != nil {
+						slog.Error("Failed to delete corrupt file", "path", m.Path, "error", err)
+					} else {
+						// Mark as deleted in DB
+						sqlDB, err := db.Connect(m.DB)
+						if err == nil {
+							defer sqlDB.Close()
+							queries := db.New(sqlDB)
+							queries.MarkDeleted(context.Background(), db.MarkDeletedParams{
+								Path:        m.Path,
+								TimeDeleted: utils.ToNullInt64(time.Now().Unix()),
+							})
+						}
 					}
 				}
 			}
 		}
-	}
-
-	return nil
+		return nil
+	})
 }
