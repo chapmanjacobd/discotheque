@@ -1,71 +1,5 @@
 
 
-     1. Add batch indexing for bulk operations:
-
-      1 // In internal/commands/add.go
-      2 batch := bleve.GetIndex().NewBatch()
-      3 for i, doc := range docs {
-      4     batch.Index(doc.Path, bleve.ToBleveDoc(doc))
-      5     if i % 1000 == 0 {
-      6         bleve.GetIndex().Batch(batch)
-      7         batch = bleve.GetIndex().NewBatch()
-      8     }
-      9 }
-     10 bleve.GetIndex().Batch(batch) // Final batch
-
-     2. Consider auto-merging to prevent segment explosion:
-
-     // After bulk imports
-     bleve.GetIndex().ForceMerge()
-
-     No Feature Loss:
-        - disco print --big-dirs (directory aggregation)
-        - disco du (disk usage mode)
-        - Playback history tracking
-        - Watched/unwatched filtering
-        - Sibling fetching
-
-
-Search queries can match many documents. Pagination lets you fetch and display results in chunks, keeping responses small and fast.
-
-By default, Bleve returns the first 10 hits sorted by relevance (score), highest first.
-Two pagination modes
-
-    From/Size: simple and stateless; cost grows with page depth.
-    SearchAfter/SearchBefore: efficient for deep paging; requires passing sort keys from the previous page.
-
-Both modes can be used with any valid sort.
-Size/From
-
-Offset-based pagination uses Size (page length) and From (number of hits to skip). Bleve collects at least Size + From ordered results, then returns the Size slice starting at From.
-
-JSON example:
-
-{
-  "query": { "match": "California" },
-  "sort": ["-_score"],
-  "size": 5,
-  "from": 10
-}
-
-The result would be 5 hits starting from the 5th hit.
-
-Total Sort Order
-
-Pagination is deterministic. Ensure your Sort defines a total order, so that documents with the same sort keys are not left out:
-
-    Sort strings can be field names (prefix with - for descending), "_score", or "_id".
-    Always include a stable tie-breaker as the last key, typically "_id".
-    Examples:
-        ["country", "-age", "_id"]
-        ["-_score", "_id"] (default score desc with a tie-breaker)
-
-Performance guidance
-
-    Offset pagination cost grows with From (collects at least Size + From results before slicing).
-
-
-
 
 - Pagination should work on all pages except for Categorization
 - Captions mode: Media Type should filter the caption media
@@ -110,7 +44,6 @@ lambda x: (
         objects.Reverser(x.get("path")),
     )
 
-Add Time Modified, Time Created, and Time Downloaded range slider filters
 
 test large database Web UI performance, fts5 vs bleve
 
