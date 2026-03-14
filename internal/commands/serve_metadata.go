@@ -309,6 +309,25 @@ func (c *ServeCmd) handleLanguages(w http.ResponseWriter, r *http.Request) {
 
 // getCaptionsWithContext fetches captions matching a query along with 2 captions before and after each match
 func (c *ServeCmd) getCaptionsWithContext(ctx context.Context, queries *database.Queries, queryStr string, limit int64, videoOnly, audioOnly, imageOnly, textOnly bool) ([]database.SearchCaptionsRow, error) {
+	// Try Bleve first if --bleve flag is set
+	if c.Bleve {
+		bleveCaptions, total, err := bleve.SearchCaptions(queryStr, int(limit))
+		if err == nil && total > 0 {
+			// Convert Bleve captions to database rows
+			result := make([]database.SearchCaptionsRow, 0, len(bleveCaptions))
+			for _, cap := range bleveCaptions {
+				result = append(result, database.SearchCaptionsRow{
+					MediaPath: cap.MediaPath,
+					Time:      sql.NullFloat64{Float64: cap.Time, Valid: true},
+					Text:      sql.NullString{String: cap.Text, Valid: true},
+					Rank:      0, // Bleve already ranked
+				})
+			}
+			return result, nil
+		}
+		// Fall through to SQL if Bleve failed
+	}
+
 	// First, get the matching captions with media type filters
 	matches, err := queries.SearchCaptions(ctx, database.SearchCaptionsParams{
 		Query:     queryStr,

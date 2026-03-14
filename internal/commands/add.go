@@ -330,6 +330,21 @@ func (c *AddCmd) Run(ctx *kong.Context) error {
 					if err := qtx.InsertCaption(context.Background(), cap); err != nil {
 						slog.Error("Caption insertion failed", "path", res.Media.Path, "error", err)
 					}
+					// Index caption to Bleve
+					if bleveIndexAvailable {
+						capDoc := &bleve.CaptionDocument{
+							MediaPath: cap.MediaPath,
+						}
+						if cap.Time.Valid {
+							capDoc.Time = cap.Time.Float64
+						}
+						if cap.Text.Valid {
+							capDoc.Text = cap.Text.String
+						}
+						if err := bleve.IndexCaption(capDoc); err != nil {
+							slog.Error("Bleve caption indexing failed", "path", cap.MediaPath, "error", err)
+						}
+					}
 				}
 			}
 			if err := tx.Commit(); err != nil {

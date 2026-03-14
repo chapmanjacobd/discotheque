@@ -1254,3 +1254,120 @@ func GetTermFacetCounts(field string, limit int) (map[string]int64, error) {
 
 	return counts, nil
 }
+
+// CaptionDocument represents a caption segment for Bleve indexing
+type CaptionDocument struct {
+	ID        string  `json:"id"`
+	MediaPath string  `json:"media_path"`
+	Time      float64 `json:"time"`
+	Text      string  `json:"text"`
+}
+
+// IndexCaption adds or updates a caption in the Bleve index
+func IndexCaption(doc *CaptionDocument) error {
+	indexMutex.RLock()
+	defer indexMutex.RUnlock()
+
+	if indexInstance == nil {
+		return fmt.Errorf("bleve index not initialized")
+	}
+
+	// Use composite ID: media_path:timestamp
+	docID := fmt.Sprintf("%s:%.3f", doc.MediaPath, doc.Time)
+	return indexInstance.Index(docID, doc)
+}
+
+// DeleteCaption removes a caption from the Bleve index
+func DeleteCaption(mediaPath string, time float64) error {
+	indexMutex.RLock()
+	defer indexMutex.RUnlock()
+
+	if indexInstance == nil {
+		return fmt.Errorf("bleve index not initialized")
+	}
+
+	docID := fmt.Sprintf("%s:%.3f", mediaPath, time)
+	return indexInstance.Delete(docID)
+}
+
+// DeleteCaptionsForMedia removes all captions for a specific media file
+func DeleteCaptionsForMedia(mediaPath string) error {
+	indexMutex.RLock()
+	defer indexMutex.RUnlock()
+
+	if indexInstance == nil {
+		return fmt.Errorf("bleve index not initialized")
+	}
+
+	// Search for all captions for this media
+	bleveQuery := query.NewTermQuery(mediaPath)
+	bleveQuery.SetField("media_path")
+	searchRequest := bleve.NewSearchRequest(bleveQuery)
+	searchRequest.Size = 100000
+	searchRequest.Fields = []string{"id"}
+
+	results, err := indexInstance.Search(searchRequest)
+	if err != nil {
+		return err
+	}
+
+	// Delete each caption
+	batch := indexInstance.NewBatch()
+	for _, hit := range results.Hits {
+		batch.Delete(hit.ID)
+	}
+
+	return indexInstance.Batch(batch)
+}
+
+// SearchCaptions searches captions using Bleve
+func SearchCaptions(queryStr string, limit int) ([]*CaptionDocument, uint64, error) {
+	indexMutex.RLock()
+	defer indexMutex.RUnlock()
+
+	if indexInstance == nil {
+		return nil, 0, fmt.Errorf("bleve index not initialized")
+	}
+
+	// Use match query for full-text search on caption text
+	bleveQuery := query.NewMatchQuery(queryStr)
+	bleveQuery.SetField("text")
+
+	searchRequest := bleve.NewSearchRequest(bleveQuery)
+	searchRequest.Size = limit
+	searchRequest.Fields = []string{"id", "media_path", "time", "text"}
+	searchRequest.Sort = search.ParseSortOrderStrings([]string{"-_score", "id"})
+
+	results, err := indexInstance.Search(searchRequest)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	// Extract caption documents from results
+	captions := make([]*CaptionDocument, 0, len(results.Hits))
+	for _, hit := range results.Hits {
+		doc := &CaptionDocument{}
+		if fields, ok := hit.Fields["media_path"]; ok {
+			if path, ok := fields.(string); ok {
+				doc.MediaPath = path
+			}
+		}
+		if fields, ok := hit.Fields["time"]; ok {
+			switch v := fields.(type) {
+			case float64:
+				doc.Time = v
+			case string:
+				fmt.Sscanf(v, "%f", &doc.Time)
+			}
+		}
+		if fields, ok := hit.Fields["text"]; ok {
+			if text, ok := fields.(string); ok {
+				doc.Text = text
+			}
+		}
+		doc.ID = hit.ID
+		captions = append(captions, doc)
+	}
+
+	return captions, results.Total, nil
+}

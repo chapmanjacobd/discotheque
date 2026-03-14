@@ -238,3 +238,31 @@ func DiskUsageByDirectory(prefix string, limit int) (map[string]*DirectoryStats,
 func GetTermFacetCounts(field string, limit int) (map[string]int64, error) {
 	return nil, fmt.Errorf("bleve support not enabled in this build")
 }
+
+// CaptionDocument represents a caption segment for Bleve indexing
+type CaptionDocument struct {
+	ID        string  `json:"id"`
+	MediaPath string  `json:"media_path"`
+	Time      float64 `json:"time"`
+	Text      string  `json:"text"`
+}
+
+// IndexCaption adds or updates a caption in the Bleve index
+func IndexCaption(doc *CaptionDocument) error {
+	return fmt.Errorf("bleve support not enabled in this build")
+}
+
+// DeleteCaption removes a caption from the Bleve index
+func DeleteCaption(mediaPath string, time float64) error {
+	return fmt.Errorf("bleve support not enabled in this build")
+}
+
+// DeleteCaptionsForMedia removes all captions for a specific media file
+func DeleteCaptionsForMedia(mediaPath string) error {
+	return fmt.Errorf("bleve support not enabled in this build")
+}
+
+// SearchCaptions searches captions using Bleve
+func SearchCaptions(queryStr string, limit int) ([]*CaptionDocument, uint64, error) {
+	return nil, 0, fmt.Errorf("bleve support not enabled in this build")
+}
