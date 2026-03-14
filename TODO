@@ -1,6 +1,29 @@
-should/could we use bleve instead of SQLite completely? pros/cons ?
 
-lets read docs/SORTING_EXAMPLES.md and docs/COMPLEX_SORTING.md and delete docs
+
+     1. Add batch indexing for bulk operations:
+
+      1 // In internal/commands/add.go
+      2 batch := bleve.GetIndex().NewBatch()
+      3 for i, doc := range docs {
+      4     batch.Index(doc.Path, bleve.ToBleveDoc(doc))
+      5     if i % 1000 == 0 {
+      6         bleve.GetIndex().Batch(batch)
+      7         batch = bleve.GetIndex().NewBatch()
+      8     }
+      9 }
+     10 bleve.GetIndex().Batch(batch) // Final batch
+
+     2. Consider auto-merging to prevent segment explosion:
+
+     // After bulk imports
+     bleve.GetIndex().ForceMerge()
+
+     No Feature Loss:
+        - disco print --big-dirs (directory aggregation)
+        - disco du (disk usage mode)
+        - Playback history tracking
+        - Watched/unwatched filtering
+        - Sibling fetching
 
 
 Search queries can match many documents. Pagination lets you fetch and display results in chunks, keeping responses small and fast.

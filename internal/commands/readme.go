@@ -49,7 +49,7 @@ func (c *ReadmeCmd) Run(ctx *kong.Context) error {
 	sb.WriteString("- `kiwix-serve` - ZIM files proxy\n")
 	sb.WriteString("- `espeak-ng` - Text-to-speech generation\n")
 	sb.WriteString("- `mpv` - Playback control\n\n")
-	sb.WriteString("See [INSTALL.md](INSTALL.md) for installation instructions on your platform.\n\n")
+	sb.WriteString("See [INSTALL.md](docs/INSTALL.md) for installation instructions on your platform.\n\n")
 
 	sb.WriteString("## Screenshots\n\n")
 	sb.WriteString("### Grid View\n\n")
