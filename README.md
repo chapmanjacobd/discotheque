@@ -113,6 +113,12 @@ Flags:
         Size range (e.g., >100MB, 1GB%10)
   -d, --duration
         Duration range (e.g., >1hour, 30min%10)
+  --modified
+        Filter by modification time
+  --created
+        Filter by creation time
+  --downloaded
+        Filter by download time
   --duration-from-size
         Constrain media to duration of videos which match any size constraints
   --watched
@@ -293,6 +299,12 @@ Flags:
         Size range (e.g., >100MB, 1GB%10)
   -d, --duration
         Duration range (e.g., >1hour, 30min%10)
+  --modified
+        Filter by modification time
+  --created
+        Filter by creation time
+  --downloaded
+        Filter by download time
   --duration-from-size
         Constrain media to duration of videos which match any size constraints
   --watched
@@ -506,6 +518,12 @@ Flags:
         Size range (e.g., >100MB, 1GB%10)
   -d, --duration
         Duration range (e.g., >1hour, 30min%10)
+  --modified
+        Filter by modification time
+  --created
+        Filter by creation time
+  --downloaded
+        Filter by download time
   --duration-from-size
         Constrain media to duration of videos which match any size constraints
   --watched
@@ -814,6 +832,12 @@ Flags:
         Size range (e.g., >100MB, 1GB%10)
   -d, --duration
         Duration range (e.g., >1hour, 30min%10)
+  --modified
+        Filter by modification time
+  --created
+        Filter by creation time
+  --downloaded
+        Filter by download time
   --duration-from-size
         Constrain media to duration of videos which match any size constraints
   --watched
@@ -966,6 +990,12 @@ Flags:
         Size range (e.g., >100MB, 1GB%10)
   -d, --duration
         Duration range (e.g., >1hour, 30min%10)
+  --modified
+        Filter by modification time
+  --created
+        Filter by creation time
+  --downloaded
+        Filter by download time
   --duration-from-size
         Constrain media to duration of videos which match any size constraints
   --watched
@@ -1070,6 +1100,12 @@ Flags:
         Size range (e.g., >100MB, 1GB%10)
   -d, --duration
         Duration range (e.g., >1hour, 30min%10)
+  --modified
+        Filter by modification time
+  --created
+        Filter by creation time
+  --downloaded
+        Filter by download time
   --duration-from-size
         Constrain media to duration of videos which match any size constraints
   --watched
@@ -1205,6 +1241,12 @@ Flags:
         Size range (e.g., >100MB, 1GB%10)
   -d, --duration
         Duration range (e.g., >1hour, 30min%10)
+  --modified
+        Filter by modification time
+  --created
+        Filter by creation time
+  --downloaded
+        Filter by download time
   --duration-from-size
         Constrain media to duration of videos which match any size constraints
   --watched
@@ -1375,6 +1417,12 @@ Flags:
         Size range (e.g., >100MB, 1GB%10)
   -d, --duration
         Duration range (e.g., >1hour, 30min%10)
+  --modified
+        Filter by modification time
+  --created
+        Filter by creation time
+  --downloaded
+        Filter by download time
   --duration-from-size
         Constrain media to duration of videos which match any size constraints
   --watched
@@ -1543,6 +1591,12 @@ Flags:
         Size range (e.g., >100MB, 1GB%10)
   -d, --duration
         Duration range (e.g., >1hour, 30min%10)
+  --modified
+        Filter by modification time
+  --created
+        Filter by creation time
+  --downloaded
+        Filter by download time
   --duration-from-size
         Constrain media to duration of videos which match any size constraints
   --watched
@@ -1721,6 +1775,12 @@ Flags:
         Size range (e.g., >100MB, 1GB%10)
   -d, --duration
         Duration range (e.g., >1hour, 30min%10)
+  --modified
+        Filter by modification time
+  --created
+        Filter by creation time
+  --downloaded
+        Filter by download time
   --duration-from-size
         Constrain media to duration of videos which match any size constraints
   --watched
@@ -1867,6 +1927,12 @@ Flags:
         Size range (e.g., >100MB, 1GB%10)
   -d, --duration
         Duration range (e.g., >1hour, 30min%10)
+  --modified
+        Filter by modification time
+  --created
+        Filter by creation time
+  --downloaded
+        Filter by download time
   --duration-from-size
         Constrain media to duration of videos which match any size constraints
   --watched
@@ -2039,6 +2105,12 @@ Flags:
         Size range (e.g., >100MB, 1GB%10)
   -d, --duration
         Duration range (e.g., >1hour, 30min%10)
+  --modified
+        Filter by modification time
+  --created
+        Filter by creation time
+  --downloaded
+        Filter by download time
   --duration-from-size
         Constrain media to duration of videos which match any size constraints
   --watched
@@ -2227,6 +2299,12 @@ Flags:
         Size range (e.g., >100MB, 1GB%10)
   -d, --duration
         Duration range (e.g., >1hour, 30min%10)
+  --modified
+        Filter by modification time
+  --created
+        Filter by creation time
+  --downloaded
+        Filter by download time
   --duration-from-size
         Constrain media to duration of videos which match any size constraints
   --watched
@@ -2494,6 +2572,12 @@ Flags:
         Size range (e.g., >100MB, 1GB%10)
   -d, --duration
         Duration range (e.g., >1hour, 30min%10)
+  --modified
+        Filter by modification time
+  --created
+        Filter by creation time
+  --downloaded
+        Filter by download time
   --duration-from-size
         Constrain media to duration of videos which match any size constraints
   --watched
@@ -2746,6 +2830,12 @@ Flags:
         Size range (e.g., >100MB, 1GB%10)
   -d, --duration
         Duration range (e.g., >1hour, 30min%10)
+  --modified
+        Filter by modification time
+  --created
+        Filter by creation time
+  --downloaded
+        Filter by download time
   --duration-from-size
         Constrain media to duration of videos which match any size constraints
   --watched
@@ -2885,6 +2975,12 @@ Flags:
         Size range (e.g., >100MB, 1GB%10)
   -d, --duration
         Duration range (e.g., >1hour, 30min%10)
+  --modified
+        Filter by modification time
+  --created
+        Filter by creation time
+  --downloaded
+        Filter by download time
   --duration-from-size
         Constrain media to duration of videos which match any size constraints
   --watched
@@ -3214,6 +3310,12 @@ Flags:
         Size range (e.g., >100MB, 1GB%10)
   -d, --duration
         Duration range (e.g., >1hour, 30min%10)
+  --modified
+        Filter by modification time
+  --created
+        Filter by creation time
+  --downloaded
+        Filter by download time
   --duration-from-size
         Constrain media to duration of videos which match any size constraints
   --watched
@@ -3516,6 +3618,12 @@ Flags:
         Size range (e.g., >100MB, 1GB%10)
   -d, --duration
         Duration range (e.g., >1hour, 30min%10)
+  --modified
+        Filter by modification time
+  --created
+        Filter by creation time
+  --downloaded
+        Filter by download time
   --duration-from-size
         Constrain media to duration of videos which match any size constraints
   --watched
@@ -3676,6 +3784,12 @@ Flags:
         Size range (e.g., >100MB, 1GB%10)
   -d, --duration
         Duration range (e.g., >1hour, 30min%10)
+  --modified
+        Filter by modification time
+  --created
+        Filter by creation time
+  --downloaded
+        Filter by download time
   --duration-from-size
         Constrain media to duration of videos which match any size constraints
   --watched
@@ -4216,6 +4330,12 @@ Flags:
         Size range (e.g., >100MB, 1GB%10)
   -d, --duration
         Duration range (e.g., >1hour, 30min%10)
+  --modified
+        Filter by modification time
+  --created
+        Filter by creation time
+  --downloaded
+        Filter by download time
   --duration-from-size
         Constrain media to duration of videos which match any size constraints
   --watched
@@ -4344,6 +4464,12 @@ Flags:
         Size range (e.g., >100MB, 1GB%10)
   -d, --duration
         Duration range (e.g., >1hour, 30min%10)
+  --modified
+        Filter by modification time
+  --created
+        Filter by creation time
+  --downloaded
+        Filter by download time
   --duration-from-size
         Constrain media to duration of videos which match any size constraints
   --watched
@@ -4544,6 +4670,12 @@ Flags:
         Size range (e.g., >100MB, 1GB%10)
   -d, --duration
         Duration range (e.g., >1hour, 30min%10)
+  --modified
+        Filter by modification time
+  --created
+        Filter by creation time
+  --downloaded
+        Filter by download time
   --duration-from-size
         Constrain media to duration of videos which match any size constraints
   --watched

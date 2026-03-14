@@ -11,6 +11,7 @@
 /*.db-shm
 /*.db-wal
 /*.db
+*.bleve/
 !/e2e/fixtures/schema.sql
 /disco
 /discotheque

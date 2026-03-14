@@ -319,14 +319,16 @@ func (fb *FilterBuilder) BuildWhereClauses() ([]string, []any) {
 		if useBleve {
 			// Bleve search - handled separately, just mark for in-memory filtering
 			// Bleve search is executed before SQL query to get matching IDs
-		} else if useFTS {
+		} else if useFTS && !fb.flags.Exact {
 			// Hybrid FTS + LIKE search for phrase support with detail=none
+			// Note: FTS with detail=none doesn't support exact matching, so we use LIKE for --exact
 			// Combine all terms into a single query string for parsing
 			queryStr := strings.Join(allInclude, " ")
 			hybrid := utils.ParseHybridSearchQuery(queryStr)
 
 			// FTS terms (works with detail=none)
 			if hybrid.HasFTSTerms() {
+				// Use trigram matching for fuzzy search
 				ftsQuery := hybrid.BuildFTSQuery(joinOp)
 				if ftsQuery != "" {
 					whereClauses = append(whereClauses, fmt.Sprintf("%s MATCH ?", fb.getFTSTable()))
@@ -341,15 +343,20 @@ func (fb *FilterBuilder) BuildWhereClauses() ([]string, []any) {
 				args = append(args, pattern, pattern, pattern)
 			}
 		} else {
-			// Regular LIKE search
+			// Regular LIKE search (also used for --exact mode since FTS detail=none doesn't support exact)
 			var searchParts []string
 			for _, term := range allInclude {
-				searchParts = append(searchParts, "(path LIKE ? OR title LIKE ?)")
+				// When FTS join is used, qualify column names to avoid ambiguity
+				if fb.flags.FTS && fb.hasSearchTerms() {
+					searchParts = append(searchParts, "(media.path LIKE ? OR media.title LIKE ? OR media.path_tokenized LIKE ?)")
+				} else {
+					searchParts = append(searchParts, "(path LIKE ? OR title LIKE ? OR path_tokenized LIKE ?)")
+				}
 				pattern := term
 				if !fb.flags.Exact {
 					pattern = "%" + strings.ReplaceAll(term, " ", "%") + "%"
 				}
-				args = append(args, pattern, pattern)
+				args = append(args, pattern, pattern, pattern)
 			}
 			whereClauses = append(whereClauses, "("+strings.Join(searchParts, joinOp)+")")
 		}
