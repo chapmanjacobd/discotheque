@@ -41,9 +41,7 @@ func (c *ReadmeCmd) Run(ctx *kong.Context) error {
 	sb.WriteString("go install github.com/chapmanjacobd/discoteca/cmd/disco@latest\n")
 	sb.WriteString("```\n\n")
 
-	sb.WriteString("## Dependencies\n\n")
-	sb.WriteString("**Required:** None\n\n")
-	sb.WriteString("**Optional (sorted by importance):**\n\n")
+	sb.WriteString("## Optional dependencies\n\n")
 	sb.WriteString("### Core Media Features\n\n")
 	sb.WriteString("- `ffmpeg` - Media transcoding, streaming, duration detection, subtitle extraction, image conversion\n")
 	sb.WriteString("- `mpv` - Playback control, keyboard shortcuts, playlist management\n\n")

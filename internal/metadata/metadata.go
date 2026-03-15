@@ -1,15 +1,18 @@
 package metadata
 
 import (
+	"archive/zip"
 	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -71,7 +74,12 @@ func Extract(ctx context.Context, path string, scanSubtitles bool, extractText b
 
 	// Advanced Type Detection
 	mediaType := ""
-	if strings.HasPrefix(mimeStr, "image/") {
+	ext := strings.ToLower(filepath.Ext(path))
+
+	// Check extension first for formats that are archive-based but treated as documents
+	if ext == ".cbz" || ext == ".cbr" || ext == ".epub" || ext == ".pdf" || ext == ".zim" {
+		mediaType = "text"
+	} else if strings.HasPrefix(mimeStr, "image/") {
 		mediaType = "image"
 	} else if strings.HasPrefix(mimeStr, "text/") || mimeStr == "application/pdf" || mimeStr == "application/epub+zip" || mimeStr == "application/x-zim" {
 		mediaType = "text"
@@ -113,8 +121,16 @@ func Extract(ctx context.Context, path string, scanSubtitles bool, extractText b
 		}
 		result.Media = params
 
-		// Extract full text from document if requested
-		if extractText {
+		// Extract text from comic archives (CBZ/CBR) using OCR if requested
+		if (ext == ".cbz" || ext == ".cbr") && ocr {
+			captions, err := extractImageTextFromComicArchive(path, ocrEngine)
+			if err != nil {
+				slog.Warn("Comic archive OCR extraction failed", "path", path, "error", err)
+			} else {
+				result.Captions = captions
+			}
+		} else if extractText {
+			// Extract full text from document if requested (non-comic documents)
 			captions, err := extractDocumentText(path)
 			if err != nil {
 				slog.Warn("Document text extraction failed", "path", path, "error", err)
@@ -828,4 +844,166 @@ func extractSpeechToTextWhisper(path string) ([]db.InsertCaptionParams, error) {
 	}
 
 	return captions, nil
+}
+
+// extractImageTextFromComicArchive extracts text from images in CBZ/CBR archives using OCR.
+// Returns captions with page numbers as timestamps (page 1 = 0s, page 2 = 1s, etc.)
+func extractImageTextFromComicArchive(path string, ocrEngine string) ([]db.InsertCaptionParams, error) {
+	ext := strings.ToLower(filepath.Ext(path))
+
+	if ext == ".cbz" || ext == ".zip" {
+		return extractImageTextFromCBZ(path, ocrEngine)
+	}
+	if ext == ".cbr" || ext == ".rar" {
+		return extractImageTextFromCBR(path, ocrEngine)
+	}
+
+	return nil, fmt.Errorf("unsupported archive format: %s", ext)
+}
+
+// extractImageTextFromCBZ extracts text from images in CBZ (ZIP-based) archives
+func extractImageTextFromCBZ(path string, ocrEngine string) ([]db.InsertCaptionParams, error) {
+	r, err := zip.OpenReader(path)
+	if err != nil {
+		return nil, err
+	}
+	defer r.Close()
+
+	// Collect image files and sort them for consistent page ordering
+	type imageFile struct {
+		name string
+		idx  int
+	}
+	var imageFiles []imageFile
+
+	imageExts := map[string]bool{
+		".jpg": true, ".jpeg": true, ".png": true, ".gif": true,
+		".webp": true, ".bmp": true, ".tiff": true, ".tif": true,
+	}
+
+	for i, f := range r.File {
+		if f.FileInfo().IsDir() {
+			continue
+		}
+		ext := strings.ToLower(filepath.Ext(f.Name))
+		if imageExts[ext] {
+			imageFiles = append(imageFiles, imageFile{name: f.Name, idx: i})
+		}
+	}
+
+	// Sort by filename for consistent page ordering (01.jpg, 02.jpg, etc.)
+	sort.Slice(imageFiles, func(i, j int) bool {
+		return imageFiles[i].name < imageFiles[j].name
+	})
+
+	var allCaptions []db.InsertCaptionParams
+
+	for pageNum, imgFile := range imageFiles {
+		rc, err := r.File[imgFile.idx].Open()
+		if err != nil {
+			slog.Warn("Failed to open image in archive", "archive", path, "image", imgFile.name, "error", err)
+			continue
+		}
+
+		// Extract image to temp file for OCR processing
+		tmpFile, err := os.CreateTemp("", "comic-ocr-*.img")
+		if err != nil {
+			rc.Close()
+			slog.Warn("Failed to create temp file for OCR", "error", err)
+			continue
+		}
+		tmpPath := tmpFile.Name()
+
+		_, err = io.Copy(tmpFile, rc)
+		rc.Close()
+		tmpFile.Close()
+
+		if err != nil {
+			os.Remove(tmpPath)
+			slog.Warn("Failed to extract image for OCR", "error", err)
+			continue
+		}
+
+		// Run OCR on the extracted image
+		captions, err := extractImageText(tmpPath, ocrEngine)
+		os.Remove(tmpPath)
+
+		if err != nil {
+			slog.Warn("OCR failed on comic page", "archive", path, "page", imgFile.name, "error", err)
+			continue
+		}
+
+		// Add page number as timestamp (page 1 = 0s, page 2 = 1s, etc.)
+		for _, cap := range captions {
+			cap.Time = sql.NullFloat64{Float64: float64(pageNum), Valid: true}
+			allCaptions = append(allCaptions, cap)
+		}
+	}
+
+	return allCaptions, nil
+}
+
+// extractImageTextFromCBR extracts text from images in CBR (RAR-based) archives
+func extractImageTextFromCBR(path string, ocrEngine string) ([]db.InsertCaptionParams, error) {
+	// Check for unrar
+	unrarBin := "unrar"
+	if _, err := exec.LookPath(unrarBin); err != nil {
+		return nil, fmt.Errorf("unrar not found")
+	}
+
+	// Extract to temp directory
+	tmpDir, err := os.MkdirTemp("", "cbr-extract-*")
+	if err != nil {
+		return nil, err
+	}
+	defer os.RemoveAll(tmpDir)
+
+	// Extract all files
+	cmd := exec.Command(unrarBin, "e", "-y", path, tmpDir)
+	if err := cmd.Run(); err != nil {
+		return nil, err
+	}
+
+	// Find all image files
+	imageExts := map[string]bool{
+		".jpg": true, ".jpeg": true, ".png": true, ".gif": true,
+		".webp": true, ".bmp": true, ".tiff": true, ".tif": true,
+	}
+
+	var imageFiles []string
+	err = filepath.Walk(tmpDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil || info.IsDir() {
+			return nil
+		}
+		ext := strings.ToLower(filepath.Ext(path))
+		if imageExts[ext] {
+			imageFiles = append(imageFiles, path)
+		}
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	// Sort for consistent page ordering
+	sort.Strings(imageFiles)
+
+	var allCaptions []db.InsertCaptionParams
+
+	for pageNum, imgPath := range imageFiles {
+		captions, err := extractImageText(imgPath, ocrEngine)
+		if err != nil {
+			slog.Warn("OCR failed on comic page", "archive", path, "page", imgPath, "error", err)
+			continue
+		}
+
+		// Add page number as timestamp
+		for _, cap := range captions {
+			cap.Time = sql.NullFloat64{Float64: float64(pageNum), Valid: true}
+			allCaptions = append(allCaptions, cap)
+		}
+	}
+
+	return allCaptions, nil
 }
