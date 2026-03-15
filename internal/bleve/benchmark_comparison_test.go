@@ -144,6 +144,32 @@ func setupSQLiteComparison(b *testing.B, media []*MediaDocument, captions []*Cap
 		b.Fatalf("Failed to commit transaction: %v", err)
 	}
 
+	// For the benchmark, ensure FTS tables are fully populated
+	// Especially since captions_ai trigger now joins with media
+	var mCount, cCount int
+	sqlDB.QueryRow("SELECT COUNT(*) FROM media").Scan(&mCount)
+	sqlDB.QueryRow("SELECT COUNT(*) FROM captions").Scan(&cCount)
+	
+	var mPath, cPath string
+	sqlDB.QueryRow("SELECT path FROM media LIMIT 1").Scan(&mPath)
+	sqlDB.QueryRow("SELECT media_path FROM captions LIMIT 1").Scan(&cPath)
+	fmt.Printf("DEBUG SETUP: media count=%d (%s), captions count=%d (%s)\n", mCount, mPath, cCount, cPath)
+
+	_, err = sqlDB.Exec("INSERT INTO media_fts(rowid, path, path_tokenized, title, description, time_deleted) SELECT rowid, path, path_tokenized, title, description, time_deleted FROM media")
+	if err != nil {
+		fmt.Printf("DEBUG SETUP: Failed to populate media_fts: %v\n", err)
+		b.Fatalf("Failed to populate media_fts: %v. Media count in DB: %d", err, mCount)
+	}
+	_, err = sqlDB.Exec("INSERT INTO captions_fts(rowid, media_path, text) SELECT rowid, media_path, text FROM captions")
+	if err != nil {
+		fmt.Printf("DEBUG SETUP: Failed to populate captions_fts: %v\n", err)
+		b.Fatalf("Failed to populate captions_fts: %v. Media count: %d (%s), Captions count: %d (%s)", err, mCount, mPath, cCount, cPath)
+	}
+	
+	var ftsCCount int
+	sqlDB.QueryRow("SELECT COUNT(*) FROM captions_fts").Scan(&ftsCCount)
+	fmt.Printf("DEBUG SETUP: captions_fts count after populate=%d\n", ftsCCount)
+
 	return sqlDB, queries
 }
 

@@ -27,10 +27,10 @@ func Connect(dbPath string) (*sql.DB, error) {
 	tuning := []string{
 		"PRAGMA journal_mode=WAL",
 		"PRAGMA synchronous=NORMAL",
-		"PRAGMA cache_size=-64000",
+		"PRAGMA cache_size=-256000",
 		"PRAGMA temp_store=MEMORY",
 		"PRAGMA foreign_keys=ON",
-		"PRAGMA mmap_size=268435456",
+		"PRAGMA mmap_size=2147483648",
 	}
 
 	for _, pragma := range tuning {

@@ -554,7 +554,7 @@ func migrateTables(db *sql.DB, hasStrict bool) error {
 			return err
 		}
 
-		if strings.Contains(existingSql, "unicode61") || !strings.Contains(existingSql, "trigram") || !strings.Contains(existingSql, "detail='full'") || (expectedSqlPart != "" && !strings.Contains(existingSql, expectedSqlPart)) {
+		if !strings.Contains(existingSql, "time_deleted") || !strings.Contains(existingSql, "detail='full'") || (expectedSqlPart != "" && !strings.Contains(existingSql, expectedSqlPart)) {
 			// Needs upgrade - drop it
 			if _, err := db.Exec(fmt.Sprintf("DROP TABLE %s", tableName)); err != nil {
 				return fmt.Errorf("failed to drop %s for upgrade: %w", tableName, err)
@@ -568,6 +568,7 @@ func migrateTables(db *sql.DB, hasStrict bool) error {
 					path_tokenized,
 					title,
                     description,
+					time_deleted UNINDEXED,
 					content='media',
 					content_rowid='rowid',
 					tokenize = 'trigram',
@@ -591,15 +592,15 @@ func migrateTables(db *sql.DB, hasStrict bool) error {
 			if tableName == "media_fts" {
 				triggerSqls := []string{
 					`CREATE TRIGGER IF NOT EXISTS media_ai AFTER INSERT ON media BEGIN
-						INSERT INTO media_fts(rowid, path, path_tokenized, title, description)
-						VALUES (new.rowid, new.path, new.path_tokenized, new.title, new.description);
+						INSERT INTO media_fts(rowid, path, path_tokenized, title, description, time_deleted)
+						VALUES (new.rowid, new.path, new.path_tokenized, new.title, new.description, new.time_deleted);
 					END;`,
 					`CREATE TRIGGER IF NOT EXISTS media_ad AFTER DELETE ON media BEGIN
 						DELETE FROM media_fts WHERE rowid = old.rowid;
 					END;`,
 					`CREATE TRIGGER IF NOT EXISTS media_au AFTER UPDATE ON media BEGIN
-						INSERT INTO media_fts(media_fts, rowid, path, path_tokenized, title, description) VALUES('delete', old.rowid, old.path, old.path_tokenized, old.title, old.description);
-						INSERT INTO media_fts(rowid, path, path_tokenized, title, description) VALUES (new.rowid, new.path, new.path_tokenized, new.title, new.description);
+						INSERT INTO media_fts(media_fts, rowid, path, path_tokenized, title, description, time_deleted) VALUES('delete', old.rowid, old.path, old.path_tokenized, old.title, old.description, old.time_deleted);
+						INSERT INTO media_fts(rowid, path, path_tokenized, title, description, time_deleted) VALUES (new.rowid, new.path, new.path_tokenized, new.title, new.description, new.time_deleted);
 					END;`,
 				}
 				for _, tsql := range triggerSqls {
@@ -610,9 +611,14 @@ func migrateTables(db *sql.DB, hasStrict bool) error {
 			}
 
 			// Rebuild data
-			if _, err := db.Exec(fmt.Sprintf("INSERT INTO %s(%s) VALUES('rebuild')", tableName, tableName)); err != nil {
-				// Non-fatal, might be empty
-				return nil
+			if tableName == "media_fts" {
+				if _, err := db.Exec("INSERT INTO media_fts(rowid, path, path_tokenized, title, description, time_deleted) SELECT rowid, path, path_tokenized, title, description, time_deleted FROM media"); err != nil {
+					return nil
+				}
+			} else if tableName == "captions_fts" {
+				if _, err := db.Exec("INSERT INTO captions_fts(rowid, media_path, text) SELECT rowid, media_path, text FROM captions"); err != nil {
+					return nil
+				}
 			}
 		}
 		return nil

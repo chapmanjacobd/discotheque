@@ -28,12 +28,14 @@ func (q *Queries) SearchMediaFTS(ctx context.Context, arg SearchMediaFTSParams) 
 	}
 
 	query := `
-SELECT m.* FROM media m, media_fts
-WHERE m.rowid = media_fts.rowid
-AND media_fts MATCH ?
-AND m.time_deleted = 0
-ORDER BY rank
-LIMIT ?
+SELECT m.* FROM media m
+JOIN (
+    SELECT rowid, rank FROM media_fts
+    WHERE media_fts MATCH ? AND time_deleted = 0
+    ORDER BY rank
+    LIMIT ?
+) fts ON m.rowid = fts.rowid
+ORDER BY fts.rank
 `
 	rows, err := q.db.QueryContext(ctx, query, arg.Query, arg.Limit)
 	if err != nil {
@@ -159,18 +161,20 @@ func (q *Queries) SearchCaptions(ctx context.Context, arg SearchCaptionsParams) 
 
 	query := `
 SELECT c.media_path, c.time, c.text, m.title, m.type, m.size, m.duration
-FROM captions c, captions_fts, media m
-WHERE c.rowid = captions_fts.rowid
-AND c.media_path = m.path
-AND captions_fts MATCH ?
-AND m.time_deleted = 0
-AND c.text IS NOT NULL AND c.text != ''
+FROM captions c
+JOIN (
+    SELECT rowid, rank FROM captions_fts
+    WHERE captions_fts MATCH ?
+    ORDER BY rank
+    LIMIT ?
+) fts ON c.rowid = fts.rowid
+JOIN media m ON c.media_path = m.path
+WHERE m.time_deleted = 0
 AND (? = 0 OR m.type = 'video')
 AND (? = 0 OR m.type IN ('audio', 'audiobook'))
 AND (? = 0 OR m.type = 'image')
 AND (? = 0 OR m.type = 'text')
-ORDER BY rank
-LIMIT ?
+ORDER BY fts.rank
 `
 	videoOnly := 0
 	audioOnly := 0
@@ -189,7 +193,7 @@ LIMIT ?
 		textOnly = 1
 	}
 
-	rows, err := q.db.QueryContext(ctx, query, arg.Query, videoOnly, audioOnly, imageOnly, textOnly, arg.Limit)
+	rows, err := q.db.QueryContext(ctx, query, arg.Query, arg.Limit, videoOnly, audioOnly, imageOnly, textOnly)
 	if err != nil {
 		return nil, err
 	}
