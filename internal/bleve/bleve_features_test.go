@@ -678,19 +678,21 @@ func TestSearchWithExactMatchPagination(t *testing.T) {
 	}
 	defer CloseIndex()
 
-	// Index multiple documents
+	// Index multiple documents with varying content for proper scoring
 	for i := range 20 {
 		doc := &MediaDocument{
 			ID:            fmt.Sprintf("doc%d", i),
-			PathTokenized: "test",
+			Path:          fmt.Sprintf("/media/file%d.mp4", i),
+			PathTokenized: fmt.Sprintf("test media file%d item%d", i, i), // Include unique terms for scoring
+			Title:         fmt.Sprintf("Test Title %d", i),
 		}
 		if err := IndexDocument(doc); err != nil {
 			t.Fatalf("IndexDocument failed: %v", err)
 		}
 	}
 
-	// Test pagination with exact match
-	ids1, total1, searchAfter1, err := SearchWithExactMatchAndPagination("test", 5, 0, false, nil)
+	// Test pagination with exact match - use offset-based pagination
+	ids1, total1, _, err := SearchWithExactMatchAndPagination("test", 5, 0, false, nil)
 	if err != nil {
 		t.Fatalf("SearchWithExactMatchAndPagination page 1 failed: %v", err)
 	}
@@ -701,22 +703,19 @@ func TestSearchWithExactMatchPagination(t *testing.T) {
 		t.Fatalf("Expected at least 1 ID on page 1, got 0")
 	}
 
-	// Get second page using searchAfter (only if we have results)
-	var ids2 []string
-	if len(searchAfter1) > 0 && len(ids1) == 5 {
-		ids2, _, _, err = SearchWithExactMatchAndPagination("test", 5, 0, false, searchAfter1)
-		if err != nil {
-			t.Fatalf("SearchWithExactMatchAndPagination page 2 failed: %v", err)
-		}
-		if len(ids2) == 0 {
-			t.Errorf("Expected results on page 2, got none")
-		}
+	// Get second page using offset
+	ids2, _, _, err := SearchWithExactMatchAndPagination("test", 5, 5, false, nil)
+	if err != nil {
+		t.Fatalf("SearchWithExactMatchAndPagination page 2 failed: %v", err)
+	}
+	if len(ids2) == 0 {
+		t.Errorf("Expected results on page 2, got none")
+	}
 
-		// Verify pages are different
-		for i, id := range ids1 {
-			if i < len(ids2) && id == ids2[i] {
-				t.Errorf("Page 1 and page 2 should have different results at position %d", i)
-			}
+	// Verify pages are different
+	for i, id := range ids1 {
+		if i < len(ids2) && id == ids2[i] {
+			t.Errorf("Page 1 and page 2 should have different results at position %d", i)
 		}
 	}
 }

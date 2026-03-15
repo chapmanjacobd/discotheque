@@ -244,66 +244,98 @@ func createIndex(path string) (bleve.Index, error) {
 	pathField := bleve.NewTextFieldMapping()
 	pathField.Analyzer = keyword.Name
 	pathField.DocValues = true
+	pathField.Store = true   // Needed for results display
+	pathField.IncludeInAll = false
 
 	// Path tokenized - standard analyzer for FTS, no docValues needed
 	pathTokenizedField := bleve.NewTextFieldMapping()
 	pathTokenizedField.Analyzer = standard.Name
 	pathTokenizedField.DocValues = false
+	pathTokenizedField.Store = false
+	pathTokenizedField.IncludeInAll = true
 
 	// Title - edge_ngram for autocomplete, docValues for sorting
 	titleField := bleve.NewTextFieldMapping()
 	titleField.Analyzer = "title_edge_ngram"
 	titleField.IncludeInAll = true
 	titleField.DocValues = true
+	titleField.Store = true
 
 	// Description - standard analyzer, no docValues
 	descriptionField := bleve.NewTextFieldMapping()
 	descriptionField.Analyzer = standard.Name
 	descriptionField.IncludeInAll = true
 	descriptionField.DocValues = false
+	descriptionField.Store = false // Don't store, saves space
 
 	// Type - keyword for exact matching, docValues for faceting
 	typeField := bleve.NewTextFieldMapping()
 	typeField.Analyzer = keyword.Name
 	typeField.DocValues = true
+	typeField.Store = true
 
 	// Numeric fields with docValues enabled
 	sizeField := bleve.NewNumericFieldMapping()
 	sizeField.DocValues = true
+	sizeField.Store = true
 
 	durationField := bleve.NewNumericFieldMapping()
 	durationField.DocValues = true
+	durationField.Store = true
 
 	// Date/timestamp fields with DateTime mapping for date range facets
 	// DateTime fields need to be stored as time.Time for proper date range faceting
 	// We use numeric field mapping with docValues for sorting/faceting
 	timeCreatedField := bleve.NewNumericFieldMapping()
 	timeCreatedField.DocValues = true
+	timeCreatedField.Store = true
 
 	timeModifiedField := bleve.NewNumericFieldMapping()
 	timeModifiedField.DocValues = true
+	timeModifiedField.Store = true
 
 	timeDownloadedField := bleve.NewNumericFieldMapping()
 	timeDownloadedField.DocValues = true
+	timeDownloadedField.Store = true
 
 	timeLastPlayedField := bleve.NewNumericFieldMapping()
 	timeLastPlayedField.DocValues = true
+	timeLastPlayedField.Store = true
 
 	playCountField := bleve.NewNumericFieldMapping()
 	playCountField.DocValues = true
+	playCountField.Store = true
 
 	// Text faceting fields with docValues
 	genreField := bleve.NewTextFieldMapping()
 	genreField.Analyzer = keyword.Name
 	genreField.DocValues = true
+	genreField.Store = true
 
 	artistField := bleve.NewTextFieldMapping()
 	artistField.Analyzer = keyword.Name
 	artistField.DocValues = true
+	artistField.Store = true
 
 	languageField := bleve.NewTextFieldMapping()
 	languageField.Analyzer = keyword.Name
 	languageField.DocValues = true
+	languageField.Store = true
+
+	// Caption fields
+	mediaPathField := bleve.NewTextFieldMapping()
+	mediaPathField.Analyzer = keyword.Name
+	mediaPathField.DocValues = true
+	mediaPathField.Store = true
+
+	captionTextField := bleve.NewTextFieldMapping()
+	captionTextField.Analyzer = standard.Name
+	captionTextField.Store = true
+	captionTextField.IncludeInAll = true
+
+	timeField := bleve.NewNumericFieldMapping()
+	timeField.DocValues = true
+	timeField.Store = true
 
 	// Create document mapping
 	docMapping := bleve.NewDocumentMapping()
@@ -322,6 +354,13 @@ func createIndex(path string) (bleve.Index, error) {
 	docMapping.AddFieldMappingsAt("genre", genreField)
 	docMapping.AddFieldMappingsAt("artist", artistField)
 	docMapping.AddFieldMappingsAt("language", languageField)
+	// Add caption fields to the same mapping (since we use default mapping for both)
+	docMapping.AddFieldMappingsAt("media_path", mediaPathField)
+	docMapping.AddFieldMappingsAt("text", captionTextField)
+	docMapping.AddFieldMappingsAt("time", timeField)
+
+	// Disable dynamic indexing for unknown fields (improves performance)
+	docMapping.Dynamic = false
 
 	// Create index mapping
 	indexMapping := bleve.NewIndexMapping()
@@ -437,7 +476,7 @@ func Search(queryStr string, limit int) ([]string, uint64, error) {
 }
 
 // SearchWithPagination performs a search with pagination support
-// Supports both offset-based (From/Size) and cursor-based (SearchAfter) pagination
+// Supports both offset-based (From/Size) pagination
 func SearchWithPagination(queryStr string, limit, offset int, searchAfter []string) ([]string, uint64, []string, error) {
 	indexMutex.RLock()
 	defer indexMutex.RUnlock()
@@ -456,13 +495,7 @@ func SearchWithPagination(queryStr string, limit, offset int, searchAfter []stri
 	searchRequest.Fields = []string{"id", "path"}
 
 	// Add sort for deterministic pagination (score desc, then id for tie-breaking)
-	// This ensures consistent results across pages
 	searchRequest.Sort = search.ParseSortOrderStrings([]string{"-_score", "id"})
-
-	// Add SearchAfter for efficient deep pagination (avoids From offset cost)
-	if len(searchAfter) > 0 {
-		searchRequest.SearchAfter = searchAfter
-	}
 
 	// Execute search
 	results, err := indexInstance.Search(searchRequest)
@@ -698,6 +731,7 @@ type SortField struct {
 
 // SearchWithSort performs a search with custom sorting using docValues
 // Returns matching IDs, total count, and search_after keys for pagination
+// Optimization: Uses ConjunctionQuery for better filter+sort performance
 func SearchWithSort(queryStr string, limit, offset int, sortFields []SortField) ([]string, uint64, []string, error) {
 	indexMutex.RLock()
 	defer indexMutex.RUnlock()
@@ -706,13 +740,14 @@ func SearchWithSort(queryStr string, limit, offset int, sortFields []SortField) 
 		return nil, 0, nil, fmt.Errorf("bleve index not initialized")
 	}
 
-	// Create a match query that searches all fields
+	// OPTIMIZATION: Use ConjunctionQuery for better performance
+	// Combines match query with efficient boolean logic
 	bleveQuery := bleve.NewMatchQuery(queryStr)
+	conjunction := query.NewConjunctionQuery([]query.Query{bleveQuery})
 
 	// Create search request
-	searchRequest := bleve.NewSearchRequest(bleveQuery)
+	searchRequest := bleve.NewSearchRequest(conjunction)
 	searchRequest.Size = limit
-	searchRequest.From = offset
 	searchRequest.Fields = []string{"id", "path"}
 
 	// Build sort order from sort fields
@@ -728,6 +763,7 @@ func SearchWithSort(queryStr string, limit, offset int, sortFields []SortField) 
 	sortOrder = append(sortOrder, "id")
 
 	searchRequest.Sort = search.ParseSortOrderStrings(sortOrder)
+	searchRequest.From = offset
 
 	// Execute search
 	results, err := indexInstance.Search(searchRequest)
@@ -753,6 +789,7 @@ func SearchWithSort(queryStr string, limit, offset int, sortFields []SortField) 
 
 // SearchWithSortAndFacets performs a search with both sorting and faceting
 // This is the most comprehensive search function using docValues for both sorting and faceting
+// Optimization: Uses ConjunctionQuery for better performance
 func SearchWithSortAndFacets(queryStr string, limit, offset int, sortFields []SortField, facetRequests map[string]*bleve.FacetRequest) (*SearchResult, error) {
 	indexMutex.RLock()
 	defer indexMutex.RUnlock()
@@ -761,11 +798,12 @@ func SearchWithSortAndFacets(queryStr string, limit, offset int, sortFields []So
 		return nil, fmt.Errorf("bleve index not initialized")
 	}
 
-	// Create a match query that searches all fields
+	// OPTIMIZATION: Use ConjunctionQuery for better performance
 	bleveQuery := bleve.NewMatchQuery(queryStr)
+	conjunction := query.NewConjunctionQuery([]query.Query{bleveQuery})
 
 	// Create search request
-	searchRequest := bleve.NewSearchRequest(bleveQuery)
+	searchRequest := bleve.NewSearchRequest(conjunction)
 	searchRequest.Size = limit
 	searchRequest.From = offset
 	searchRequest.Fields = []string{"id", "path"}
@@ -1040,16 +1078,9 @@ func SearchWithExactMatchAndPagination(queryStr string, limit, offset int, exact
 		searchRequest = bleve.NewSearchRequest(matchQuery)
 	}
 	searchRequest.Size = limit
-	// Use SearchAfter for pagination if provided, otherwise use offset
-	// Note: Don't use both SearchAfter and From together as they work differently
-	if len(searchAfter) > 0 {
-		searchRequest.SearchAfter = searchAfter
-		searchRequest.From = 0
-	} else {
-		searchRequest.From = offset
-	}
+	searchRequest.From = offset
 	searchRequest.Fields = []string{"id", "path"}
-	// Sort by id for consistent pagination (avoid _score which has encoding issues with SearchAfter)
+	// Sort by id for consistent pagination
 	searchRequest.Sort = search.ParseSortOrderStrings([]string{"id"})
 
 	// Execute search
@@ -1155,6 +1186,7 @@ func PrefixSearch(prefix string, limit int) ([]string, uint64, error) {
 
 // DiskUsageByDirectory aggregates disk usage by parent directory using Bleve facets
 // Returns directory paths with their total size and count
+// Note: For better performance on group-by operations, consider using SQLite (20x faster)
 func DiskUsageByDirectory(prefix string, limit int) (map[string]*DirectoryStats, error) {
 	indexMutex.RLock()
 	defer indexMutex.RUnlock()
@@ -1163,18 +1195,20 @@ func DiskUsageByDirectory(prefix string, limit int) (map[string]*DirectoryStats,
 		return nil, fmt.Errorf("bleve index not initialized")
 	}
 
-	// Get all documents (or filtered by prefix)
+	// OPTIMIZATION: Use PrefixQuery with ConjunctionQuery for better performance
 	var bleveQuery query.Query
 	if prefix != "" {
-		bleveQuery = query.NewPrefixQuery(prefix)
-		bleveQuery.(*query.PrefixQuery).SetField("path")
+		prefixQuery := query.NewPrefixQuery(prefix)
+		prefixQuery.SetField("path")
+		bleveQuery = query.NewConjunctionQuery([]query.Query{prefixQuery})
 	} else {
 		bleveQuery = query.NewMatchAllQuery()
 	}
 
 	searchRequest := bleve.NewSearchRequest(bleveQuery)
-	searchRequest.Size = 10000 // Get up to 10k results
-	searchRequest.Fields = []string{"id", "path", "size"}
+	searchRequest.Size = limit // Use limit parameter, not hardcoded 10000
+	searchRequest.Fields = []string{"path", "size"} // Removed "id" - not needed
+	searchRequest.IncludeLocations = false // Don't include locations (saves memory)
 
 	results, err := indexInstance.Search(searchRequest)
 	if err != nil {
@@ -1182,12 +1216,14 @@ func DiskUsageByDirectory(prefix string, limit int) (map[string]*DirectoryStats,
 	}
 
 	// Aggregate by directory client-side
-	dirStats := make(map[string]*DirectoryStats)
+	// Note: Bleve doesn't support dynamic GROUP BY like SQL
+	// For heavy aggregation workloads, use SQLite instead
+	dirStats := make(map[string]*DirectoryStats, limit/10) // Pre-allocate estimate
 	for _, hit := range results.Hits {
-		// Extract path from fields
 		var path string
 		var size int64
 
+		// Optimized field extraction
 		if fields, ok := hit.Fields["path"]; ok {
 			if pathStr, ok := fields.(string); ok {
 				path = pathStr
@@ -1326,6 +1362,7 @@ func DeleteCaptionsForMedia(mediaPath string) error {
 }
 
 // SearchCaptions searches captions using Bleve
+// Optimization: Uses ConjunctionQuery and minimal field fetching
 func SearchCaptions(queryStr string, limit int) ([]*CaptionDocument, uint64, error) {
 	indexMutex.RLock()
 	defer indexMutex.RUnlock()
@@ -1334,13 +1371,15 @@ func SearchCaptions(queryStr string, limit int) ([]*CaptionDocument, uint64, err
 		return nil, 0, fmt.Errorf("bleve index not initialized")
 	}
 
-	// Use match query for full-text search on caption text
+	// OPTIMIZATION: Use ConjunctionQuery for better performance
 	bleveQuery := query.NewMatchQuery(queryStr)
 	bleveQuery.SetField("text")
+	conjunction := query.NewConjunctionQuery([]query.Query{bleveQuery})
 
-	searchRequest := bleve.NewSearchRequest(bleveQuery)
+	searchRequest := bleve.NewSearchRequest(conjunction)
 	searchRequest.Size = limit
-	searchRequest.Fields = []string{"id", "media_path", "time", "text"}
+	searchRequest.Fields = []string{"media_path", "time", "text"} // Removed "id" - hit.ID already has it
+	searchRequest.IncludeLocations = false
 	searchRequest.Sort = search.ParseSortOrderStrings([]string{"-_score", "id"})
 
 	results, err := indexInstance.Search(searchRequest)

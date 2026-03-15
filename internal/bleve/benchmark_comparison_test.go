@@ -222,7 +222,7 @@ func setupBleveComparison(b *testing.B, media []*MediaDocument, captions []*Capt
 func BenchmarkComparison(b *testing.B) {
 	configs := []ComparisonBenchmarkConfig{
 		// {MediaCount: 10000, CaptionCount: 20000},
-		{MediaCount: 20000, CaptionCount: 40000},
+		{MediaCount: 240000, CaptionCount: 480000},
 	}
 
 	for _, config := range configs {
