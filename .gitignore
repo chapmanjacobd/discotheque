@@ -25,3 +25,5 @@
 *.svg
 /disco-both
 /disco-fts
+/.tmp
+/internal/bleve/.tmp

@@ -82,13 +82,15 @@ func getExt(t string) string {
 
 // Setup SQLite for comparison
 func setupSQLiteComparison(b *testing.B, media []*MediaDocument, captions []*CaptionDocument) (*sql.DB, *db.Queries) {
-	t := &testing.T{}
-	fixture := testutils.Setup(t) // This creates the DB file and runs schema
+	// Create local temp dir in repo root
+	os.MkdirAll(".tmp", 0755)
+	tmpDir, err := os.MkdirTemp(".tmp", "sqlite_bench_*")
+	if err != nil {
+		b.Fatalf("Failed to create temp dir: %v", err)
+	}
+	dbPath := filepath.Join(tmpDir, "test.db")
 	
-	// We need to reopen it to return it, or just use what testutils gives if it exposes it.
-	// testutils.Setup returns a struct with DBPath.
-	
-	sqlDB, err := db.Connect(fixture.DBPath)
+	sqlDB, err := db.Connect(dbPath)
 	if err != nil {
 		b.Fatalf("Failed to connect to SQLite: %v", err)
 	}
@@ -101,7 +103,6 @@ func setupSQLiteComparison(b *testing.B, media []*MediaDocument, captions []*Cap
 	ctx := context.Background()
 
 	// Batch insert media
-	// Note: In real app we might batch differently, but here we do simple loop or transaction
 	tx, err := sqlDB.Begin()
 	if err != nil {
 		b.Fatalf("Failed to begin transaction: %v", err)
@@ -175,17 +176,22 @@ func setupSQLiteComparison(b *testing.B, media []*MediaDocument, captions []*Cap
 
 // Setup Bleve for comparison
 func setupBleveComparison(b *testing.B, media []*MediaDocument, captions []*CaptionDocument) (string, func()) {
-	tmpDir := b.TempDir()
+	// Create local temp dir in repo root
+	os.MkdirAll(".tmp", 0755)
+	tmpDir, err := os.MkdirTemp(".tmp", "bleve_bench_*")
+	if err != nil {
+		b.Fatalf("Failed to create temp dir: %v", err)
+	}
 	dbPath := filepath.Join(tmpDir, "test.db")
 	
 	// InitIndex expects a DB path and creates a sibling .bleve directory
-	err := InitIndex(dbPath)
+	err = InitIndex(dbPath)
 	if err != nil {
 		b.Fatalf("Failed to init Bleve index: %v", err)
 	}
 
 	// Batch index media
-	if err := BatchIndexDocuments(media, 1000); err != nil {
+	if err = BatchIndexDocuments(media, 1000); err != nil {
 		b.Fatalf("Failed to batch index media: %v", err)
 	}
 
@@ -208,7 +214,7 @@ func setupBleveComparison(b *testing.B, media []*MediaDocument, captions []*Capt
 			batch.Index(docID, c)
 		}
 		
-		if err := idx.Batch(batch); err != nil {
+		if err = idx.Batch(batch); err != nil {
 			b.Fatalf("Failed to batch index captions: %v", err)
 		}
 	}
@@ -222,7 +228,7 @@ func setupBleveComparison(b *testing.B, media []*MediaDocument, captions []*Capt
 func BenchmarkComparison(b *testing.B) {
 	configs := []ComparisonBenchmarkConfig{
 		// {MediaCount: 10000, CaptionCount: 20000},
-		{MediaCount: 240000, CaptionCount: 480000},
+		{MediaCount: 800000, CaptionCount: 1600000},
 	}
 
 	for _, config := range configs {
@@ -408,8 +414,11 @@ func BenchmarkComparison(b *testing.B) {
 			})
 
 			// 4. Pagination (Deep Paging)
-			// Page 100 (Offset 2000)
+			// Page 100 (Offset 2000) or 50% of dataset if smaller
 			offset := 2000
+			if config.MediaCount <= offset {
+				offset = config.MediaCount / 2
+			}
 			b.Run("Pagination_SQLite", func(b *testing.B) {
 				for i := 0; i < b.N; i++ {
 					rows, err := sqliteDB.Query(`SELECT path FROM media ORDER BY size DESC LIMIT 20 OFFSET ?`, offset)
