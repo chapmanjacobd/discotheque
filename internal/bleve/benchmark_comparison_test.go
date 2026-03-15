@@ -196,7 +196,7 @@ func setupBleveComparison(b *testing.B, media []*MediaDocument, captions []*Capt
 func BenchmarkComparison(b *testing.B) {
 	configs := []ComparisonBenchmarkConfig{
 		// {MediaCount: 10000, CaptionCount: 20000},
-		{MediaCount: 100000, CaptionCount: 200000},
+		{MediaCount: 200000, CaptionCount: 400000},
 	}
 
 	for _, config := range configs {
@@ -213,6 +213,25 @@ func BenchmarkComparison(b *testing.B) {
 			sqliteDB, sqliteQueries := setupSQLiteComparison(b, media, captions)
 			defer sqliteDB.Close()
 			
+			// Verify SQLite Data
+			var mediaCount int
+			sqliteDB.QueryRow("SELECT COUNT(*) FROM media").Scan(&mediaCount)
+			if mediaCount != config.MediaCount {
+				b.Fatalf("SQLite media count mismatch: expected %d, got %d", config.MediaCount, mediaCount)
+			}
+			
+			var captionCount int
+			sqliteDB.QueryRow("SELECT COUNT(*) FROM captions").Scan(&captionCount)
+			if captionCount != config.CaptionCount {
+				b.Fatalf("SQLite captions count mismatch: expected %d, got %d", config.CaptionCount, captionCount)
+			}
+
+			var ftsCount int
+			sqliteDB.QueryRow("SELECT COUNT(*) FROM captions_fts").Scan(&ftsCount)
+			if ftsCount != config.CaptionCount {
+				b.Fatalf("SQLite captions_fts count mismatch: expected %d, got %d", config.CaptionCount, ftsCount)
+			}
+			
 			// Bleve Setup
 			_, bleveCleanup := setupBleveComparison(b, media, captions)
 			defer bleveCleanup()
@@ -225,12 +244,15 @@ func BenchmarkComparison(b *testing.B) {
 			b.Run("Search_Media_FTS_SQLite", func(b *testing.B) {
 				for i := 0; i < b.N; i++ {
 					// SQLite FTS on Media
-					_, err := sqliteQueries.SearchMediaFTS(context.Background(), db.SearchMediaFTSParams{
+					res, err := sqliteQueries.SearchMediaFTS(context.Background(), db.SearchMediaFTSParams{
 						Query: "Description", // Term in description
-						Limit: 20,
+						Limit: 1000,
 					})
 					if err != nil {
 						b.Fatal(err)
+					}
+					if len(res) == 0 && i == 0 {
+						b.Fatal("Search_Media_FTS_SQLite returned 0 results")
 					}
 				}
 			})
@@ -238,9 +260,12 @@ func BenchmarkComparison(b *testing.B) {
 			b.Run("Search_Media_FTS_Bleve", func(b *testing.B) {
 				for i := 0; i < b.N; i++ {
 					// Bleve Search
-					_, _, err := Search("Description", 20)
+					ids, _, err := Search("Description", 1000)
 					if err != nil {
 						b.Fatal(err)
+					}
+					if len(ids) == 0 && i == 0 {
+						b.Fatal("Search_Media_FTS_Bleve returned 0 results")
 					}
 				}
 			})
@@ -248,20 +273,28 @@ func BenchmarkComparison(b *testing.B) {
 			// 2. Caption Search
 			b.Run("Search_Captions_SQLite", func(b *testing.B) {
 				for i := 0; i < b.N; i++ {
-					// SQLite FTS on Captions
-					rows, err := sqliteDB.Query(`SELECT media_path FROM captions_fts WHERE text MATCH ? LIMIT 20`, term)
+					// SQLite FTS on Captions using helper that handles tokenization
+					res, err := sqliteQueries.SearchCaptions(context.Background(), db.SearchCaptionsParams{
+						Query: term,
+						Limit: 20,
+					})
 					if err != nil {
 						b.Fatal(err)
 					}
-					rows.Close()
+					if len(res) == 0 && i == 0 {
+						b.Fatal("Search_Captions_SQLite returned 0 results")
+					}
 				}
 			})
 
 			b.Run("Search_Captions_Bleve", func(b *testing.B) {
 				for i := 0; i < b.N; i++ {
-					_, _, err := SearchCaptions(term, 20)
+					captions, _, err := SearchCaptions(term, 20)
 					if err != nil {
 						b.Fatal(err)
+					}
+					if len(captions) == 0 && i == 0 {
+						b.Fatal("Search_Captions_Bleve returned 0 results")
 					}
 				}
 			})
@@ -270,9 +303,17 @@ func BenchmarkComparison(b *testing.B) {
 			// Filter by Type='video', Sort by Size DESC, Limit 20
 			b.Run("Complex_FilterSort_SQLite", func(b *testing.B) {
 				for i := 0; i < b.N; i++ {
-					_, err := sqliteDB.Query(`SELECT path FROM media WHERE type = 'video' AND time_deleted = 0 ORDER BY size DESC LIMIT 20`)
+					rows, err := sqliteDB.Query(`SELECT path FROM media WHERE type = 'video' AND time_deleted = 0 ORDER BY size DESC LIMIT 20`)
 					if err != nil {
 						b.Fatal(err)
+					}
+					count := 0
+					for rows.Next() {
+						count++
+					}
+					rows.Close()
+					if count == 0 && i == 0 {
+						b.Fatal("Complex_FilterSort_SQLite returned 0 results")
 					}
 				}
 			})
@@ -289,9 +330,12 @@ func BenchmarkComparison(b *testing.B) {
 					req.Sort = search.ParseSortOrderStrings([]string{"-size"})
 					
 					idx := GetIndex()
-					_, err := idx.Search(req)
+					res, err := idx.Search(req)
 					if err != nil {
 						b.Fatal(err)
+					}
+					if res.Total == 0 && i == 0 {
+						b.Fatal("Complex_FilterSort_Bleve returned 0 results")
 					}
 				}
 			})
@@ -301,9 +345,17 @@ func BenchmarkComparison(b *testing.B) {
 			offset := 2000
 			b.Run("Pagination_SQLite", func(b *testing.B) {
 				for i := 0; i < b.N; i++ {
-					_, err := sqliteDB.Query(`SELECT path FROM media ORDER BY size DESC LIMIT 20 OFFSET ?`, offset)
+					rows, err := sqliteDB.Query(`SELECT path FROM media ORDER BY size DESC LIMIT 20 OFFSET ?`, offset)
 					if err != nil {
 						b.Fatal(err)
+					}
+					count := 0
+					for rows.Next() {
+						count++
+					}
+					rows.Close()
+					if count == 0 && i == 0 {
+						b.Fatal("Pagination_SQLite returned 0 results")
 					}
 				}
 			})
@@ -316,9 +368,12 @@ func BenchmarkComparison(b *testing.B) {
 					req.Sort = search.ParseSortOrderStrings([]string{"-size"})
 					
 					idx := GetIndex()
-					_, err := idx.Search(req)
+					res, err := idx.Search(req)
 					if err != nil {
 						b.Fatal(err)
+					}
+					if res.Total == 0 && i == 0 {
+						b.Fatal("Pagination_Bleve returned 0 results")
 					}
 				}
 			})
@@ -368,7 +423,14 @@ func BenchmarkComparison(b *testing.B) {
 					if err != nil {
 						b.Fatal(err)
 					}
+					count := 0
+					for rows.Next() {
+						count++
+					}
 					rows.Close()
+					if count == 0 && i == 0 {
+						b.Fatal("Stats_Agg_SQLite returned 0 results")
+					}
 				}
 			})
 

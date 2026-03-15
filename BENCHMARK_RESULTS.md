@@ -3,75 +3,66 @@
 ## Configuration
 - **Hardware**: 13th Gen Intel(R) Core(TM) i5-13600KF
 - **OS**: Linux
-- **Scale**: 10,000 and 100,000 Media items (20k/200k Captions)
+- **Scale**: 200,000 Media items / 400,000 Captions
 - **Bleve**: v2 (standard mapping)
 - **SQLite**: FTS5 (trigram, detail=none)
 
-## Summary of Results (100k Media)
+## Summary of Results (200k Media)
 
 | Operation | SQLite FTS5 | Bleve | Difference |
 |-----------|-------------|-------|------------|
-| **Search (Common Term)** | 12,900 ms (*) | 13.5 ms | Bleve is ~1000x faster |
-| **Search (Captions)** | 0.004 ms | 93.8 ms | SQLite is ~20,000x faster |
-| **Filter & Sort** | 0.30 ms | 41.2 ms | SQLite is ~130x faster |
-| **Pagination (Deep)** | 0.28 ms | 208.4 ms | SQLite is ~700x faster |
-| **Update (Playhead)** | 0.36 ms | 7.2 ms | SQLite is ~20x faster |
-| **Aggregation (Stats)**| 0.007 ms | 258.5 ms | SQLite is ~36,000x faster |
+| **Search (Common Term)** | 7,440 ms (*) | 22.2 ms | Bleve is ~335x faster |
+| **Search (Captions)** | 13,076 ms (*) | 110.6 ms | Bleve is ~118x faster |
+| **Filter & Sort** | 30.4 ms | 61.9 ms | SQLite is ~2x faster |
+| **Pagination (Deep)** | 0.045 ms | 238.6 ms | SQLite is ~5300x faster |
+| **Update (Playhead)** | 0.35 ms | 2.6 ms | SQLite is ~7.4x faster |
+| **Aggregation (Stats)**| 6.3 ms | 196.1 ms | SQLite is ~31x faster |
 
-(*) *SQLite FTS5 search time is high because the current implementation fetches ALL matching rows (100k) to perform in-memory ranking. It does not use `LIMIT` at the database level for full-text search.*
+(*) **Critical Context**: The high latency for SQLite Search operations is because the current implementation **fetches ALL matching rows** (e.g., 200,000 rows for "common term") to perform in-memory ranking in Go. It explicitly **ignores the `LIMIT` parameter** in the SQL query. If `LIMIT` were applied at the database level (as in the raw SQL benchmark in previous tests), SQLite returns results in microseconds (0.004ms).
 
 ## Detailed Findings
 
-### 1. Full Text Search
-- **Bleve** excels at full-text search relevance and performance for common terms due to its inverted index and efficient BM25 scoring.
-- **SQLite FTS5** (as implemented) is slow for common terms because it lacks native BM25 ranking with `detail=none` (trigram) indexes, forcing the application to fetch all results and rank them in Go.
-- **Fix**: SQLite FTS5 performance could be improved by using `LIMIT` in the SQL query, but this would sacrifice relevance ranking (random results).
+### 1. Full Text Search & Captions
+- **Bleve** is significantly faster for broad queries because it natively handles ranking and limiting (BM25) efficiently.
+- **SQLite** (as implemented) is slow for broad queries because it retrieves the entire result set to rank them manually (since `detail=none` trigram indexes don't support BM25).
+- **Optimization Opportunity**: If we accept "random" or "boolean-only" ranking for common terms, applying `LIMIT` to the SQLite query would make it orders of magnitude faster than Bleve.
 
-### 2. Captions
-- **SQLite** is incredibly fast (microseconds) because it uses `LIMIT` effectively and the index covers the query.
-- **Bleve** is significantly slower (93ms), likely due to the overhead of searching a separate index or document set and joining results.
+### 2. Updates (Progress Tracking)
+- **SQLite** handles high-frequency updates (e.g., `playhead` tracking) with minimal overhead (0.35ms).
+- **Bleve** is slower (2.6ms) because it requires re-indexing the document. While 2.6ms is fast, it accumulates load at high concurrency.
 
-### 3. Updates (Progress Tracking)
-- **SQLite** handles updates (playhead, time_last_played) with negligible cost (0.36ms).
-- **Bleve** requires re-indexing the entire document for any field update, taking ~7ms per update. At high concurrency (e.g., 5 users/sec), this would add significant CPU load (35ms/sec) but is manageable. However, at 100 updates/sec, it would consume a full core.
-
-### 4. Aggregation & Metadata
-- **SQLite** is instant for aggregations (`GROUP BY`, `COUNT`) using standard indices.
-- **Bleve** faceting is slow (250ms) for large datasets as it requires processing docValues for the entire result set (or all docs).
+### 3. Metadata & Pagination
+- **SQLite** is vastly superior for structured data operations. Deep pagination is instant (45µs), whereas Bleve takes 238ms.
+- **Filter & Sort**: SQLite is 2x faster (30ms vs 62ms). Note that SQLite performance degraded from 0.3ms in the 100k test, possibly due to the specific query plan or data distribution in the 200k dataset.
 
 ## Recommendation
 
 **Do NOT remove SQLite.**
 
-SQLite outperforms Bleve by orders of magnitude in:
-- Metadata filtering and sorting
-- Aggregations (Stats)
-- Updates (Progress tracking)
-- Caption search
+The benchmarks confirm that SQLite is the optimal engine for:
+- Metadata management
+- Filtering and sorting
+- Aggregations
+- Progress tracking
+- Deep pagination
 
-Bleve is only superior for:
-- Full-text search relevance (BM25)
-- Fuzzy/Prefix search (if configured)
-- "Common term" queries where `LIMIT` cannot be applied blindly.
+**Bleve Integration Strategy**:
+- Use **Bleve** *only* for the specific `Search` endpoints where full-text relevance (ranking) is critical.
+- Keep **SQLite** for everything else.
+- **Action Item**: Consider optimizing the SQLite FTS implementation to use `LIMIT` for queries where strict ranking is less important, or pre-filter results to avoid fetching 200k rows.
 
-**Hybrid Approach**:
-- Keep **SQLite** as the primary source of truth, metadata storage, and aggregation engine.
-- Keep **SQLite** for progress tracking (it is much more efficient).
-- Use **Bleve** (optionally) for the specific `Search` API route to provide better relevance ranking, but consider the complexity/maintenance cost.
-- **Fix**: The SQLite FTS5 search implementation needs to handle query tokenization correctly (as fixed in `internal/db/fts_queries.go`) to avoid "phrase query" errors with `detail=none`.
-
-## Raw Data (100k Benchmarks)
+## Raw Data (200k Benchmarks)
 ```
-BenchmarkComparison/M100000_C200000/Search_Media_FTS_SQLite-20                 1        12914595450 ns/op
-BenchmarkComparison/M100000_C200000/Search_Media_FTS_Bleve-20                103          13463369 ns/op
-BenchmarkComparison/M100000_C200000/Search_Captions_SQLite-20             323138              4387 ns/op
-BenchmarkComparison/M100000_C200000/Search_Captions_Bleve-20                  12          93828875 ns/op
-BenchmarkComparison/M100000_C200000/Complex_FilterSort_SQLite-20            3484            299129 ns/op
-BenchmarkComparison/M100000_C200000/Complex_FilterSort_Bleve-20               28          41182543 ns/op
-BenchmarkComparison/M100000_C200000/Pagination_SQLite-20                    3706            281797 ns/op
-BenchmarkComparison/M100000_C200000/Pagination_Bleve-20                        7         208372186 ns/op
-BenchmarkComparison/M100000_C200000/Update_Playhead_SQLite-20               3187            360108 ns/op
-BenchmarkComparison/M100000_C200000/Update_Playhead_Bleve-20                 158           7223079 ns/op
-BenchmarkComparison/M100000_C200000/Stats_Agg_SQLite-20                   215115              7070 ns/op
-BenchmarkComparison/M100000_C200000/Stats_Agg_Bleve-20                         5         258515510 ns/op
+BenchmarkComparison/M200000_C400000/Search_Media_FTS_SQLite-20                 1        7440625801 ns/op
+BenchmarkComparison/M200000_C400000/Search_Media_FTS_Bleve-20                 50          22243266 ns/op
+BenchmarkComparison/M200000_C400000/Search_Captions_SQLite-20                  1        13076712860 ns/op
+BenchmarkComparison/M200000_C400000/Search_Captions_Bleve-20                  13         110643089 ns/op
+BenchmarkComparison/M200000_C400000/Complex_FilterSort_SQLite-20              37          30408210 ns/op
+BenchmarkComparison/M200000_C400000/Complex_FilterSort_Bleve-20               24          61962070 ns/op
+BenchmarkComparison/M200000_C400000/Pagination_SQLite-20                   21864             45943 ns/op
+BenchmarkComparison/M200000_C400000/Pagination_Bleve-20                        5         238645342 ns/op
+BenchmarkComparison/M200000_C400000/Update_Playhead_SQLite-20               3086            357680 ns/op
+BenchmarkComparison/M200000_C400000/Update_Playhead_Bleve-20                 470           2663633 ns/op
+BenchmarkComparison/M200000_C400000/Stats_Agg_SQLite-20                      180           6351052 ns/op
+BenchmarkComparison/M200000_C400000/Stats_Agg_Bleve-20                         6         196130809 ns/op
 ```
