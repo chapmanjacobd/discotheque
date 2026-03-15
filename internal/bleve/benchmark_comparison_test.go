@@ -413,44 +413,6 @@ func BenchmarkComparison(b *testing.B) {
 				}
 			})
 
-			// 5. High Frequency Updates (Simulate "Playhead" updates)
-			// Note: Bleve requires re-indexing the whole document.
-			b.Run("Update_Playhead_SQLite", func(b *testing.B) {
-				ctx := context.Background()
-				for i := 0; i < b.N; i++ {
-					// Pick a random media to update
-					idx := i % len(media)
-					m := media[idx]
-					err := sqliteQueries.UpdatePlayHistory(ctx, db.UpdatePlayHistoryParams{
-						Playhead:       sql.NullInt64{Int64: int64(i), Valid: true},
-						Path:           m.Path,
-						TimeLastPlayed: sql.NullInt64{Int64: time.Now().Unix(), Valid: true},
-					})
-					if err != nil {
-						b.Fatal(err)
-					}
-				}
-			})
-
-			b.Run("Update_Playhead_Bleve", func(b *testing.B) {
-				for i := 0; i < b.N; i++ {
-					// Pick a random media to update
-					idx := i % len(media)
-					m := media[idx]
-
-					// In Bleve, we must re-index the document.
-					// We assume we have the document in memory (m).
-					// We update the field:
-					m.TimeLastPlayed = int64(i) // Update field
-
-					// Re-index
-					err := IndexDocument(m)
-					if err != nil {
-						b.Fatal(err)
-					}
-				}
-			})
-
 			// 6. Stats Aggregation (e.g. Count by Type)
 			b.Run("Stats_Agg_SQLite", func(b *testing.B) {
 				for i := 0; i < b.N; i++ {
