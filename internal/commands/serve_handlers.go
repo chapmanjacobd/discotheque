@@ -37,7 +37,7 @@ func (c *ServeCmd) handleQuery(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	// Validate and filter databases
-	dbs, err := c.getDatabasesForQuery(flags)
+	dbs, err := c.getDBs(flags)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Invalid database filter: %v", err), http.StatusBadRequest)
 		return

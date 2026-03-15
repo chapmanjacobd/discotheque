@@ -67,7 +67,7 @@ func (c *ServeCmd) handleCategorizeKeywords(w http.ResponseWriter, r *http.Reque
 		return results[i].Category < results[j].Category
 	})
 
-	writeJSON(w, http.StatusOK, results)
+	sendJSON(w, http.StatusOK, results)
 }
 
 func (c *ServeCmd) handleCategorizeDefaults(w http.ResponseWriter, r *http.Request) {
@@ -109,7 +109,7 @@ func (c *ServeCmd) handleCategorizeDefaults(w http.ResponseWriter, r *http.Reque
 		}
 	}
 
-	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	sendJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
 func (c *ServeCmd) handleCategorizeDeleteCategory(w http.ResponseWriter, r *http.Request) {
@@ -138,7 +138,7 @@ func (c *ServeCmd) handleCategorizeDeleteCategory(w http.ResponseWriter, r *http
 		}
 	}
 
-	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	sendJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
 func (c *ServeCmd) handleCategorizeKeyword(w http.ResponseWriter, r *http.Request) {
@@ -166,7 +166,7 @@ func (c *ServeCmd) handleCategorizeKeyword(w http.ResponseWriter, r *http.Reques
 				slog.Error("Failed to delete keyword", "db", dbPath, "error", err)
 			}
 		}
-		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+		sendJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 		return
 	}
 
@@ -194,7 +194,7 @@ func (c *ServeCmd) handleCategorizeKeyword(w http.ResponseWriter, r *http.Reques
 		}
 	}
 
-	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	sendJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
 func (c *ServeCmd) handleRandomClip(w http.ResponseWriter, r *http.Request) {
@@ -309,7 +309,7 @@ func (c *ServeCmd) handleRandomClip(w http.ResponseWriter, r *http.Request) {
 		response.MediaWithDB = cleared
 	}
 
-	writeJSON(w, http.StatusOK, response)
+	sendJSON(w, http.StatusOK, response)
 }
 
 func (c *ServeCmd) handleCategorizeSuggest(w http.ResponseWriter, r *http.Request) {
@@ -445,7 +445,7 @@ func (c *ServeCmd) handleCategorizeSuggest(w http.ResponseWriter, r *http.Reques
 	})
 
 	limit := min(len(freqs), 100)
-	writeJSON(w, http.StatusOK, freqs[:limit])
+	sendJSON(w, http.StatusOK, freqs[:limit])
 }
 
 func (c *ServeCmd) handleCategorizeApply(w http.ResponseWriter, r *http.Request) {
@@ -646,7 +646,7 @@ func (c *ServeCmd) handleTrash(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("X-Total-Count", strconv.Itoa(len(media)))
-	writeJSON(w, http.StatusOK, media)
+	sendJSON(w, http.StatusOK, media)
 }
 
 func (c *ServeCmd) handleEmptyBin(w http.ResponseWriter, r *http.Request) {
@@ -814,7 +814,7 @@ func (c *ServeCmd) handlePlaylists(w http.ResponseWriter, r *http.Request) {
 		}
 		sort.Strings(uniqueTitles)
 
-		writeJSON(w, http.StatusOK, uniqueTitles)
+		sendJSON(w, http.StatusOK, uniqueTitles)
 		return
 	}
 
@@ -994,7 +994,7 @@ func (c *ServeCmd) handlePlaylistItems(w http.ResponseWriter, r *http.Request) {
 			return allMedia[i].Media.Path < allMedia[j].Media.Path
 		})
 
-		writeJSON(w, http.StatusOK, allMedia)
+		sendJSON(w, http.StatusOK, allMedia)
 		return
 	}
 

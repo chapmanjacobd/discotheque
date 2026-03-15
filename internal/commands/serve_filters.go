@@ -417,7 +417,7 @@ func (c *ServeCmd) handleFilterBins(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 
 	// Validate and filter databases
-	dbs, err := c.getDatabasesForQuery(flags)
+	dbs, err := c.getDBs(flags)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Invalid database filter: %v", err), http.StatusBadRequest)
 		return
@@ -503,7 +503,7 @@ func (c *ServeCmd) handleFilterBins(w http.ResponseWriter, r *http.Request) {
 		"durationCount", len(durData.durations),
 		"parentCount", len(epData.parentCounts))
 
-	writeJSON(w, http.StatusOK, resp)
+	sendJSON(w, http.StatusOK, resp)
 }
 
 // calculateFilterCounts computes filter bin counts for the current query

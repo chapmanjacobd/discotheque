@@ -23,8 +23,8 @@ import (
 	"github.com/chapmanjacobd/discoteca/web"
 )
 
-// writeJSON writes a JSON response with proper headers and error handling
-func writeJSON(w http.ResponseWriter, status int, data any) {
+// sendJSON writes a JSON response with proper headers and error handling
+func sendJSON(w http.ResponseWriter, status int, data any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	if err := json.NewEncoder(w).Encode(data); err != nil {
@@ -34,7 +34,7 @@ func writeJSON(w http.ResponseWriter, status int, data any) {
 
 // sendError writes a JSON error response with the given message
 func sendError(w http.ResponseWriter, status int, message string) {
-	writeJSON(w, status, models.ErrorResponse{Error: message})
+	sendJSON(w, status, models.ErrorResponse{Error: message})
 }
 
 func init() {
@@ -692,8 +692,8 @@ func (c *ServeCmd) filterDatabases(requested []string) ([]string, error) {
 	return filtered, nil
 }
 
-// getDatabasesForQuery returns the list of databases to query based on request flags
+// getDBs returns the list of databases to query based on request flags
 // It validates that all requested databases are in the server's allowed list
-func (c *ServeCmd) getDatabasesForQuery(flags models.GlobalFlags) ([]string, error) {
+func (c *ServeCmd) getDBs(flags models.GlobalFlags) ([]string, error) {
 	return c.filterDatabases(flags.Databases)
 }

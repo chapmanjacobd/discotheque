@@ -52,7 +52,7 @@ func (c *ServeCmd) handleMetadata(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, metadata)
+	sendJSON(w, http.StatusOK, metadata)
 }
 
 // handleDatabases returns server configuration.
@@ -63,7 +63,7 @@ func (c *ServeCmd) handleDatabases(w http.ResponseWriter, r *http.Request) {
 		ReadOnly:  c.ReadOnly,
 		Dev:       c.Dev,
 	}
-	writeJSON(w, http.StatusOK, resp)
+	sendJSON(w, http.StatusOK, resp)
 }
 
 // handleCategories returns a list of categories and their media counts.
@@ -144,7 +144,7 @@ func (c *ServeCmd) handleCategories(w http.ResponseWriter, r *http.Request) {
 		return res[i].Category < res[j].Category
 	})
 
-	writeJSON(w, http.StatusOK, res)
+	sendJSON(w, http.StatusOK, res)
 }
 
 // handleGenres returns genre statistics.
@@ -184,7 +184,7 @@ func (c *ServeCmd) handleGenres(w http.ResponseWriter, r *http.Request) {
 		return res[i].Category < res[j].Category
 	})
 
-	writeJSON(w, http.StatusOK, res)
+	sendJSON(w, http.StatusOK, res)
 }
 
 // handleRatings returns rating statistics.
@@ -221,7 +221,7 @@ func (c *ServeCmd) handleRatings(w http.ResponseWriter, r *http.Request) {
 		return res[i].Rating > res[j].Rating
 	})
 
-	writeJSON(w, http.StatusOK, res)
+	sendJSON(w, http.StatusOK, res)
 }
 
 // handleLanguages returns language statistics.
@@ -261,7 +261,7 @@ func (c *ServeCmd) handleLanguages(w http.ResponseWriter, r *http.Request) {
 		return res[i].Category < res[j].Category
 	})
 
-	writeJSON(w, http.StatusOK, res)
+	sendJSON(w, http.StatusOK, res)
 }
 
 // getCaptionsWithContext fetches captions matching a query along with 2 captions before and after each match
