@@ -31,18 +31,18 @@ type TuiCmd struct {
 
 func (c *TuiCmd) Run(ctx *kong.Context) error {
 	models.SetupLogging(c.Verbose)
-	flags := models.GlobalFlags{
-		CoreFlags:        c.CoreFlags,
-		QueryFlags:       c.QueryFlags,
-		PathFilterFlags:  c.PathFilterFlags,
-		FilterFlags:      c.FilterFlags,
-		MediaFilterFlags: c.MediaFilterFlags,
-		TimeFilterFlags:  c.TimeFilterFlags,
-		DeletedFlags:     c.DeletedFlags,
-		SortFlags:        c.SortFlags,
-		DisplayFlags:     c.DisplayFlags,
-		FTSFlags:         c.FTSFlags,
-	}
+	flags := models.BuildQueryGlobalFlags(
+		c.CoreFlags,
+		c.QueryFlags,
+		c.PathFilterFlags,
+		c.FilterFlags,
+		c.MediaFilterFlags,
+		c.TimeFilterFlags,
+		c.DeletedFlags,
+		c.SortFlags,
+		c.DisplayFlags,
+		c.FTSFlags,
+	)
 
 	media, err := query.MediaQuery(context.Background(), c.Databases, flags)
 	if err != nil {

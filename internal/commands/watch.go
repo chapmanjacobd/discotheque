@@ -36,21 +36,21 @@ type WatchCmd struct {
 
 func (c *WatchCmd) Run(ctx *kong.Context) error {
 	models.SetupLogging(c.Verbose)
-	flags := models.GlobalFlags{
-		CoreFlags:        c.CoreFlags,
-		QueryFlags:       c.QueryFlags,
-		PathFilterFlags:  c.PathFilterFlags,
-		FilterFlags:      c.FilterFlags,
-		MediaFilterFlags: c.MediaFilterFlags,
-		TimeFilterFlags:  c.TimeFilterFlags,
-		DeletedFlags:     c.DeletedFlags,
-		SortFlags:        c.SortFlags,
-		DisplayFlags:     c.DisplayFlags,
-		FTSFlags:         c.FTSFlags,
-		PlaybackFlags:    c.PlaybackFlags,
-		MpvActionFlags:   c.MpvActionFlags,
-		PostActionFlags:  c.PostActionFlags,
-	}
+	flags := models.BuildQueryGlobalFlags(
+		c.CoreFlags,
+		c.QueryFlags,
+		c.PathFilterFlags,
+		c.FilterFlags,
+		c.MediaFilterFlags,
+		c.TimeFilterFlags,
+		c.DeletedFlags,
+		c.SortFlags,
+		c.DisplayFlags,
+		c.FTSFlags,
+	)
+	flags.PlaybackFlags = c.PlaybackFlags
+	flags.MpvActionFlags = c.MpvActionFlags
+	flags.PostActionFlags = c.PostActionFlags
 	media, err := query.MediaQuery(context.Background(), c.Databases, flags)
 	if err != nil {
 		return err
@@ -241,21 +241,21 @@ type ListenCmd struct {
 
 func (c *ListenCmd) Run(ctx *kong.Context) error {
 	models.SetupLogging(c.Verbose)
-	flags := models.GlobalFlags{
-		CoreFlags:        c.CoreFlags,
-		QueryFlags:       c.QueryFlags,
-		PathFilterFlags:  c.PathFilterFlags,
-		FilterFlags:      c.FilterFlags,
-		MediaFilterFlags: c.MediaFilterFlags,
-		TimeFilterFlags:  c.TimeFilterFlags,
-		DeletedFlags:     c.DeletedFlags,
-		SortFlags:        c.SortFlags,
-		DisplayFlags:     c.DisplayFlags,
-		FTSFlags:         c.FTSFlags,
-		PlaybackFlags:    c.PlaybackFlags,
-		MpvActionFlags:   c.MpvActionFlags,
-		PostActionFlags:  c.PostActionFlags,
-	}
+	flags := models.BuildQueryGlobalFlags(
+		c.CoreFlags,
+		c.QueryFlags,
+		c.PathFilterFlags,
+		c.FilterFlags,
+		c.MediaFilterFlags,
+		c.TimeFilterFlags,
+		c.DeletedFlags,
+		c.SortFlags,
+		c.DisplayFlags,
+		c.FTSFlags,
+	)
+	flags.PlaybackFlags = c.PlaybackFlags
+	flags.MpvActionFlags = c.MpvActionFlags
+	flags.PostActionFlags = c.PostActionFlags
 	media, err := query.MediaQuery(context.Background(), c.Databases, flags)
 	if err != nil {
 		return err

@@ -34,16 +34,19 @@ type CategorizeCmd struct {
 
 func (c *CategorizeCmd) Run(ctx *kong.Context) error {
 	models.SetupLogging(c.Verbose)
-	flags := models.GlobalFlags{
-		CoreFlags:        c.CoreFlags,
-		QueryFlags:       c.QueryFlags,
-		PathFilterFlags:  c.PathFilterFlags,
-		FilterFlags:      c.FilterFlags,
-		MediaFilterFlags: c.MediaFilterFlags,
-		TimeFilterFlags:  c.TimeFilterFlags,
-		DeletedFlags:     c.DeletedFlags,
-		PostActionFlags:  c.PostActionFlags,
-	}
+	flags := models.BuildQueryGlobalFlags(
+		c.CoreFlags,
+		c.QueryFlags,
+		c.PathFilterFlags,
+		c.FilterFlags,
+		c.MediaFilterFlags,
+		c.TimeFilterFlags,
+		c.DeletedFlags,
+		models.SortFlags{},
+		models.DisplayFlags{},
+		models.FTSFlags{},
+	)
+	flags.PostActionFlags = c.PostActionFlags
 
 	media, err := query.MediaQuery(context.Background(), c.Databases, flags)
 	if err != nil {

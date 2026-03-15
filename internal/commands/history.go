@@ -28,17 +28,19 @@ type HistoryCmd struct {
 }
 
 func (c *HistoryCmd) Run(ctx *kong.Context) error {
-	flags := models.GlobalFlags{
-		CoreFlags:        c.CoreFlags,
-		PathFilterFlags:  c.PathFilterFlags,
-		FilterFlags:      c.FilterFlags,
-		MediaFilterFlags: c.MediaFilterFlags,
-		TimeFilterFlags:  c.TimeFilterFlags,
-		DeletedFlags:     c.DeletedFlags,
-		SortFlags:        c.SortFlags,
-		DisplayFlags:     c.DisplayFlags,
-		PostActionFlags:  c.PostActionFlags,
-	}
+	flags := models.BuildQueryGlobalFlags(
+		c.CoreFlags,
+		models.QueryFlags{},
+		c.PathFilterFlags,
+		c.FilterFlags,
+		c.MediaFilterFlags,
+		c.TimeFilterFlags,
+		c.DeletedFlags,
+		c.SortFlags,
+		c.DisplayFlags,
+		models.FTSFlags{},
+	)
+	flags.PostActionFlags = c.PostActionFlags
 	// Set default sort for history
 	if flags.SortBy == "path" || flags.SortBy == "" {
 		flags.SortBy = "time_last_played"

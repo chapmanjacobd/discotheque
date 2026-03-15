@@ -37,20 +37,20 @@ func (c *PrintCmd) AfterApply() error {
 }
 
 func (c *PrintCmd) Run(ctx *kong.Context) error {
-	flags := models.GlobalFlags{
-		CoreFlags:        c.CoreFlags,
-		QueryFlags:       c.QueryFlags,
-		PathFilterFlags:  c.PathFilterFlags,
-		FilterFlags:      c.FilterFlags,
-		MediaFilterFlags: c.MediaFilterFlags,
-		TimeFilterFlags:  c.TimeFilterFlags,
-		DeletedFlags:     c.DeletedFlags,
-		SortFlags:        c.SortFlags,
-		DisplayFlags:     c.DisplayFlags,
-		AggregateFlags:   c.AggregateFlags,
-		TextFlags:        c.TextFlags,
-		FTSFlags:         c.FTSFlags,
-	}
+	flags := models.BuildQueryGlobalFlags(
+		c.CoreFlags,
+		c.QueryFlags,
+		c.PathFilterFlags,
+		c.FilterFlags,
+		c.MediaFilterFlags,
+		c.TimeFilterFlags,
+		c.DeletedFlags,
+		c.SortFlags,
+		c.DisplayFlags,
+		c.FTSFlags,
+	)
+	flags.AggregateFlags = c.AggregateFlags
+	flags.TextFlags = c.TextFlags
 
 	return RunQuery(context.Background(), c.Databases, flags, func(media []models.MediaWithDB) error {
 		// Handle scan paths (omitted for brevity, assume they would be handled if implemented)

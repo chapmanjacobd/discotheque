@@ -26,18 +26,18 @@ type SearchCmd struct {
 }
 
 func (c *SearchCmd) Run(ctx *kong.Context) error {
-	flags := models.GlobalFlags{
-		CoreFlags:        c.CoreFlags,
-		QueryFlags:       c.QueryFlags,
-		PathFilterFlags:  c.PathFilterFlags,
-		FilterFlags:      c.FilterFlags,
-		MediaFilterFlags: c.MediaFilterFlags,
-		TimeFilterFlags:  c.TimeFilterFlags,
-		DeletedFlags:     c.DeletedFlags,
-		SortFlags:        c.SortFlags,
-		DisplayFlags:     c.DisplayFlags,
-		FTSFlags:         c.FTSFlags,
-	}
+	flags := models.BuildQueryGlobalFlags(
+		c.CoreFlags,
+		c.QueryFlags,
+		c.PathFilterFlags,
+		c.FilterFlags,
+		c.MediaFilterFlags,
+		c.TimeFilterFlags,
+		c.DeletedFlags,
+		c.SortFlags,
+		c.DisplayFlags,
+		c.FTSFlags,
+	)
 	// We prefer FTS if not specified
 	if !flags.FTS && !flags.NoFTS {
 		// Check if FTS table exists in first database
