@@ -302,7 +302,7 @@ Schedule: ${o.map(e=>Ec(e))} pos: ${this.timelinePos}`),c.length&&this.log(`Remo
                 `:`
                     ${Q.readOnly?``:`<button class="media-action-btn add-playlist" title="Add to Playlist">+</button>`}
                     ${l>0?`<button class="media-action-btn mark-unplayed" title="Mark as Unplayed">⭕</button>`:`<button class="media-action-btn mark-played" title="Mark as Played">✅</button>`}
-                    ${Q.readOnly?``:`<button class="media-action-btn delete" title="Move to Trash">🗑️</button>`}
+                    ${!Q.readOnly&&Q.trashcan?`<button class="media-action-btn delete" title="Move to Trash">🗑️</button>`:``}
                 `;let y=`
                 <img src="${u}" loading="lazy" onload="this.classList.add('loaded')" onerror="this.style.display='none'; this.nextElementSibling.style.display='block'">
                 <i style="display: none">${Fu(t.type)}</i>
@@ -410,7 +410,7 @@ Schedule: ${o.map(e=>Ec(e))} pos: ${this.timelinePos}`),c.length&&this.log(`Remo
                     <div class="playlist-item-actions">
                         ${Q.readOnly?``:`<button class="table-action-btn add-btn" title="Add to Playlist">+</button>`}
                         ${t>0?`<button class="table-action-btn mark-unplayed-btn" title="Unmark as Played">⭕</button>`:`<button class="table-action-btn mark-played-btn" title="Mark as Played">✅</button>`}
-                        ${Q.readOnly?``:`<button class="table-action-btn delete-btn" title="Move to Trash">🗑️</button>`}
+                        ${!Q.readOnly&&Q.trashcan?`<button class="table-action-btn delete-btn" title="Move to Trash">🗑️</button>`:``}
                     </div>
                 `}let s=Tt(e),l=s>0?s:e.playhead||0,u=e.duration&&l?Math.round(l/e.duration*100):0,d=`
                 <div style="display: flex; align-items: center; gap: 8px;">
