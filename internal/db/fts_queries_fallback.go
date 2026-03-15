@@ -20,7 +20,7 @@ type SearchMediaFTSResult struct {
 }
 
 // SearchMediaFTS returns empty results when FTS is not enabled
-// This allows bleve-only builds to fall back gracefully
+// This allows non-FTS builds to fall back gracefully
 func (q *Queries) SearchMediaFTS(ctx context.Context, arg SearchMediaFTSParams) ([]SearchMediaFTSResult, error) {
 	// Return empty slice instead of error to allow graceful fallback
 	return []SearchMediaFTSResult{}, nil
@@ -53,7 +53,7 @@ type SearchCaptionsRow struct {
 }
 
 // SearchCaptions returns empty results when FTS is not enabled
-// This allows bleve-only builds to fall back gracefully
+// This allows non-FTS builds to fall back gracefully
 func (q *Queries) SearchCaptions(ctx context.Context, arg SearchCaptionsParams) ([]SearchCaptionsRow, error) {
 	// Return empty slice instead of error to allow graceful fallback
 	return []SearchCaptionsRow{}, nil

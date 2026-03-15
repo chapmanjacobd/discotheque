@@ -495,8 +495,6 @@ Flags:
         Use FTS5 full-text search
   --fts-table
         FTS table name
-  --bleve
-        Use Bleve full-text search index
   --no-fts
         Disable full-text search, use substring search only
   -R, --related
@@ -668,8 +666,6 @@ Flags:
         Use FTS5 full-text search
   --fts-table
         FTS table name
-  --bleve
-        Use Bleve full-text search index
   --no-fts
         Disable full-text search, use substring search only
   -R, --related
@@ -708,8 +704,6 @@ Flags:
         Use FTS5 full-text search
   --fts-table
         FTS table name
-  --bleve
-        Use Bleve full-text search index
   --no-fts
         Disable full-text search, use substring search only
   -R, --related
@@ -1419,8 +1413,6 @@ Flags:
         Use FTS5 full-text search
   --fts-table
         FTS table name
-  --bleve
-        Use Bleve full-text search index
   --no-fts
         Disable full-text search, use substring search only
   -R, --related
@@ -2459,8 +2451,6 @@ Flags:
         Use FTS5 full-text search
   --fts-table
         FTS table name
-  --bleve
-        Use Bleve full-text search index
   --no-fts
         Disable full-text search, use substring search only
   -R, --related
@@ -2732,8 +2722,6 @@ Flags:
         Use FTS5 full-text search
   --fts-table
         FTS table name
-  --bleve
-        Use Bleve full-text search index
   --no-fts
         Disable full-text search, use substring search only
   -R, --related
@@ -3560,8 +3548,6 @@ Flags:
         Use FTS5 full-text search
   --fts-table
         FTS table name
-  --bleve
-        Use Bleve full-text search index
   --no-fts
         Disable full-text search, use substring search only
   -R, --related
@@ -3788,8 +3774,6 @@ Flags:
         Use FTS5 full-text search
   --fts-table
         FTS table name
-  --bleve
-        Use Bleve full-text search index
   --no-fts
         Disable full-text search, use substring search only
   -R, --related
@@ -4054,8 +4038,6 @@ Flags:
         Use FTS5 full-text search
   --fts-table
         FTS table name
-  --bleve
-        Use Bleve full-text search index
   --no-fts
         Disable full-text search, use substring search only
   -R, --related

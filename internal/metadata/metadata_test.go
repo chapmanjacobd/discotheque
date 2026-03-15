@@ -322,7 +322,6 @@ func TestExtractImageTextFromCBZ_TIFFConversion(t *testing.T) {
 	// Test extraction with OCR enabled
 	// This tests that TIFF files are converted to PNG before OCR
 	captions, err := extractImageTextFromComicArchive(cbzPath, "tesseract")
-
 	// The function should handle TIFF files without error
 	// Even if tesseract is not installed or can't read the mock image,
 	// the conversion pipeline should work

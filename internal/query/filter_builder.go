@@ -298,28 +298,22 @@ func (fb *FilterBuilder) BuildWhereClauses() ([]string, []any) {
 			joinOp = " OR "
 		}
 
-		// Determine search mode: --no-fts > --bleve > --fts > auto-detect
-		useBleve := fb.flags.Bleve
+		// Determine search mode: --no-fts > --fts > auto-detect
 		useFTS := fb.flags.FTS
 		noFTS := fb.flags.NoFTS
 
 		// Auto-detect if not explicitly set
-		if !useBleve && !useFTS && !noFTS {
-			mode := DetectSearchMode(nil) // Will check bleve global state
-			useBleve = (mode == SearchModeBleve)
+		if !useFTS && !noFTS {
+			mode := DetectSearchMode(nil)
 			useFTS = (mode == SearchModeFTS5)
 		}
 
 		if noFTS {
 			// Force substring search
-			useBleve = false
 			useFTS = false
 		}
 
-		if useBleve {
-			// Bleve search - handled separately, just mark for in-memory filtering
-			// Bleve search is executed before SQL query to get matching IDs
-		} else if useFTS && !fb.flags.Exact {
+		if useFTS && !fb.flags.Exact {
 			// Hybrid FTS + LIKE search for phrase support with detail=none
 			// Note: FTS with detail=none doesn't support exact matching, so we use LIKE for --exact
 			// Combine all terms into a single query string for parsing

@@ -624,7 +624,7 @@ func extractImageText(path string, engine string) ([]db.InsertCaptionParams, err
 // Returns the path to the converted image, or the original path if no conversion needed.
 func convertImageForOCR(path string) (string, error) {
 	ext := strings.ToLower(filepath.Ext(path))
-	
+
 	// Formats that OCR engines handle well natively
 	goodFormats := map[string]bool{
 		".png":  true,
@@ -633,11 +633,11 @@ func convertImageForOCR(path string) (string, error) {
 		".tif":  true,
 		".tiff": true,
 	}
-	
+
 	if goodFormats[ext] {
 		return path, nil
 	}
-	
+
 	// Try ffmpeg first (faster, handles most formats)
 	ffmpegBin := "ffmpeg"
 	if _, err := exec.LookPath(ffmpegBin); err == nil {
@@ -647,7 +647,7 @@ func convertImageForOCR(path string) (string, error) {
 		}
 		tmpPath := tmpFile.Name()
 		tmpFile.Close()
-		
+
 		args := []string{
 			"-hide_banner",
 			"-loglevel", "error",
@@ -655,14 +655,14 @@ func convertImageForOCR(path string) (string, error) {
 			"-c:v", "png",
 			tmpPath,
 		}
-		
+
 		cmd := exec.Command(ffmpegBin, args...)
 		if err := cmd.Run(); err == nil {
 			return tmpPath, nil
 		}
 		os.Remove(tmpPath)
 	}
-	
+
 	// Try ImageMagick (convert)
 	convertBin := "convert"
 	if _, err := exec.LookPath(convertBin); err == nil {
@@ -672,7 +672,7 @@ func convertImageForOCR(path string) (string, error) {
 		}
 		tmpPath := tmpFile.Name()
 		tmpFile.Close()
-		
+
 		args := []string{path, tmpPath}
 		cmd := exec.Command(convertBin, args...)
 		if err := cmd.Run(); err == nil {
@@ -680,7 +680,7 @@ func convertImageForOCR(path string) (string, error) {
 		}
 		os.Remove(tmpPath)
 	}
-	
+
 	// No converter available, return original path
 	// OCR engine may still be able to handle it
 	return path, nil

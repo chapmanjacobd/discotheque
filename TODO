@@ -45,7 +45,7 @@ lambda x: (
     )
 
 
-test large database Web UI performance, fts5 vs bleve
+test large database Web UI performance with FTS5
 
 e2e web safari
 e2e web mobile

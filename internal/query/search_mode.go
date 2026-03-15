@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"sync"
 
-	"github.com/chapmanjacobd/discoteca/internal/bleve"
 	database "github.com/chapmanjacobd/discoteca/internal/db"
 )
 
@@ -15,7 +14,6 @@ const (
 	SearchModeUnknown   SearchMode = iota
 	SearchModeSubstring            // LIKE-based search
 	SearchModeFTS5                 // SQLite FTS5
-	SearchModeBleve                // Bleve full-text search
 )
 
 func (s SearchMode) String() string {
@@ -24,8 +22,6 @@ func (s SearchMode) String() string {
 		return "Substring"
 	case SearchModeFTS5:
 		return "FTS5"
-	case SearchModeBleve:
-		return "Bleve"
 	default:
 		return "Unknown"
 	}
@@ -38,15 +34,9 @@ var (
 )
 
 // DetectSearchMode detects the best available search backend
-// Priority: Bleve > FTS5 > Substring
+// Priority: FTS5 > Substring
 func DetectSearchMode(db *sql.DB) SearchMode {
 	detectionOnce.Do(func() {
-		// Check for Bleve first (highest priority)
-		if bleve.GetIndex() != nil {
-			detectedSearchMode = SearchModeBleve
-			return
-		}
-
 		// Check for FTS5
 		if database.FtsEnabled && db != nil && hasFTS5Table(db) {
 			detectedSearchMode = SearchModeFTS5
@@ -93,8 +83,6 @@ func ResetSearchModeDetection() {
 // IsSearchAvailable checks if a specific search mode is available
 func IsSearchAvailable(mode SearchMode, db *sql.DB) bool {
 	switch mode {
-	case SearchModeBleve:
-		return bleve.GetIndex() != nil
 	case SearchModeFTS5:
 		return db != nil && hasFTS5Table(db)
 	case SearchModeSubstring:
