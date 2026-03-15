@@ -3,7 +3,6 @@ package commands
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -504,8 +503,7 @@ func (c *ServeCmd) handleFilterBins(w http.ResponseWriter, r *http.Request) {
 		"durationCount", len(durData.durations),
 		"parentCount", len(epData.parentCounts))
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	writeJSON(w, http.StatusOK, resp)
 }
 
 // calculateFilterCounts computes filter bin counts for the current query

@@ -231,9 +231,7 @@ func (c *ServeCmd) handleQuery(w http.ResponseWriter, r *http.Request) {
 	media, err := query.MediaQuery(ctx, dbs, flags)
 	if err != nil {
 		slog.Error("Query failed", "dbs", dbs, "error", err)
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Query failed: " + err.Error()})
+		sendError(w, http.StatusInternalServerError, "Query failed: "+err.Error())
 		return
 	}
 	if media == nil {
@@ -347,26 +345,20 @@ func (c *ServeCmd) handleQuery(w http.ResponseWriter, r *http.Request) {
 // Body: {"path": "..."}
 func (c *ServeCmd) handlePlay(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Method not allowed"})
+		sendError(w, http.StatusMethodNotAllowed, "Method not allowed")
 		return
 	}
 
 	var req models.PlayResponse
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Invalid request body"})
+		sendError(w, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 
 	if !strings.HasPrefix(req.Path, "http") && !utils.FileExists(req.Path) {
 		slog.Warn("File not found, marking as deleted in databases", "path", req.Path)
 		c.markDeletedInAllDBs(r.Context(), req.Path, true)
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusNotFound)
-		json.NewEncoder(w).Encode(models.ErrorResponse{Error: "File not found"})
+		sendError(w, http.StatusNotFound, "File not found")
 		return
 	}
 
@@ -376,9 +368,7 @@ func (c *ServeCmd) handlePlay(w http.ResponseWriter, r *http.Request) {
 	// We run it in background and don't wait for it
 	if err := cmd.Start(); err != nil {
 		slog.Error("Failed to start mpv", "error", err)
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Failed to start playback: " + err.Error()})
+		sendError(w, http.StatusInternalServerError, "Failed to start playback: "+err.Error())
 		return
 	}
 
@@ -413,23 +403,17 @@ func (c *ServeCmd) markDeletedInAllDBs(ctx context.Context, path string, deleted
 // Body: {"path": "...", "restore": bool}
 func (c *ServeCmd) handleDelete(w http.ResponseWriter, r *http.Request) {
 	if c.ReadOnly {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusForbidden)
-		json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Read-only mode"})
+		sendError(w, http.StatusForbidden, "Read-only mode")
 		return
 	}
 	if r.Method != http.MethodPost {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Method not allowed"})
+		sendError(w, http.StatusMethodNotAllowed, "Method not allowed")
 		return
 	}
 
 	var req models.DeleteRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Invalid request body"})
+		sendError(w, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 
@@ -442,23 +426,17 @@ func (c *ServeCmd) handleDelete(w http.ResponseWriter, r *http.Request) {
 // Body: {"path": "...", "playhead": int64, "completed": bool}
 func (c *ServeCmd) handleProgress(w http.ResponseWriter, r *http.Request) {
 	if c.ReadOnly {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusForbidden)
-		json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Read-only mode"})
+		sendError(w, http.StatusForbidden, "Read-only mode")
 		return
 	}
 	if r.Method != http.MethodPost {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Method not allowed"})
+		sendError(w, http.StatusMethodNotAllowed, "Method not allowed")
 		return
 	}
 
 	var req models.ProgressRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Invalid request body"})
+		sendError(w, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 
@@ -497,15 +475,11 @@ func (c *ServeCmd) handleProgress(w http.ResponseWriter, r *http.Request) {
 // Body: {"path": "..."}
 func (c *ServeCmd) handleMarkUnplayed(w http.ResponseWriter, r *http.Request) {
 	if c.ReadOnly {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusForbidden)
-		json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Read-only mode"})
+		sendError(w, http.StatusForbidden, "Read-only mode")
 		return
 	}
 	if r.Method != http.MethodPost {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Method not allowed"})
+		sendError(w, http.StatusMethodNotAllowed, "Method not allowed")
 		return
 	}
 
@@ -513,9 +487,7 @@ func (c *ServeCmd) handleMarkUnplayed(w http.ResponseWriter, r *http.Request) {
 		Path string `json:"path"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Invalid request body"})
+		sendError(w, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 
@@ -545,15 +517,11 @@ func (c *ServeCmd) handleMarkUnplayed(w http.ResponseWriter, r *http.Request) {
 // Body: {"path": "..."}
 func (c *ServeCmd) handleMarkPlayed(w http.ResponseWriter, r *http.Request) {
 	if c.ReadOnly {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusForbidden)
-		json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Read-only mode"})
+		sendError(w, http.StatusForbidden, "Read-only mode")
 		return
 	}
 	if r.Method != http.MethodPost {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Method not allowed"})
+		sendError(w, http.StatusMethodNotAllowed, "Method not allowed")
 		return
 	}
 
@@ -561,9 +529,7 @@ func (c *ServeCmd) handleMarkPlayed(w http.ResponseWriter, r *http.Request) {
 		Path string `json:"path"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Invalid request body"})
+		sendError(w, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 
@@ -595,15 +561,11 @@ func (c *ServeCmd) handleMarkPlayed(w http.ResponseWriter, r *http.Request) {
 // Body: {"path": "...", "score": float64}
 func (c *ServeCmd) handleRate(w http.ResponseWriter, r *http.Request) {
 	if c.ReadOnly {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusForbidden)
-		json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Read-only mode"})
+		sendError(w, http.StatusForbidden, "Read-only mode")
 		return
 	}
 	if r.Method != http.MethodPost {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Method not allowed"})
+		sendError(w, http.StatusMethodNotAllowed, "Method not allowed")
 		return
 	}
 
@@ -612,9 +574,7 @@ func (c *ServeCmd) handleRate(w http.ResponseWriter, r *http.Request) {
 		Score float64 `json:"score"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Invalid request body"})
+		sendError(w, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 

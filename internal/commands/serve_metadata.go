@@ -3,7 +3,6 @@ package commands
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"log/slog"
 	"net/http"
 	"sort"
@@ -53,8 +52,7 @@ func (c *ServeCmd) handleMetadata(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(metadata)
+	writeJSON(w, http.StatusOK, metadata)
 }
 
 // handleDatabases returns server configuration.
@@ -146,8 +144,7 @@ func (c *ServeCmd) handleCategories(w http.ResponseWriter, r *http.Request) {
 		return res[i].Category < res[j].Category
 	})
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(res)
+	writeJSON(w, http.StatusOK, res)
 }
 
 // handleGenres returns genre statistics.
@@ -187,8 +184,7 @@ func (c *ServeCmd) handleGenres(w http.ResponseWriter, r *http.Request) {
 		return res[i].Category < res[j].Category
 	})
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(res)
+	writeJSON(w, http.StatusOK, res)
 }
 
 // handleRatings returns rating statistics.
@@ -210,9 +206,7 @@ func (c *ServeCmd) handleRatings(w http.ResponseWriter, r *http.Request) {
 		})
 		if err != nil {
 			slog.Error("Failed to fetch ratings", "db", dbPath, "error", err)
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusInternalServerError)
-			json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Failed to fetch ratings"})
+			sendError(w, http.StatusInternalServerError, "Failed to fetch ratings")
 			return
 		}
 	}
@@ -227,8 +221,7 @@ func (c *ServeCmd) handleRatings(w http.ResponseWriter, r *http.Request) {
 		return res[i].Rating > res[j].Rating
 	})
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(res)
+	writeJSON(w, http.StatusOK, res)
 }
 
 // handleLanguages returns language statistics.
@@ -268,8 +261,7 @@ func (c *ServeCmd) handleLanguages(w http.ResponseWriter, r *http.Request) {
 		return res[i].Category < res[j].Category
 	})
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(res)
+	writeJSON(w, http.StatusOK, res)
 }
 
 // getCaptionsWithContext fetches captions matching a query along with 2 captions before and after each match

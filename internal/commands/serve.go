@@ -32,6 +32,11 @@ func writeJSON(w http.ResponseWriter, status int, data any) {
 	}
 }
 
+// sendError writes a JSON error response with the given message
+func sendError(w http.ResponseWriter, status int, message string) {
+	writeJSON(w, status, models.ErrorResponse{Error: message})
+}
+
 func init() {
 	_ = mime.AddExtensionType(".js", "text/javascript")
 	_ = mime.AddExtensionType(".mjs", "text/javascript")
