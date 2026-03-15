@@ -1023,10 +1023,23 @@ func extractImageTextFromCBZ(path string, ocrEngine string) ([]db.InsertCaptionP
 
 // extractImageTextFromCBR extracts text from images in CBR (RAR-based) archives
 func extractImageTextFromCBR(path string, ocrEngine string) ([]db.InsertCaptionParams, error) {
-	// Check for unrar
+	// Try unrar first
 	unrarBin := "unrar"
+	unrarErr := false
 	if _, err := exec.LookPath(unrarBin); err != nil {
-		return nil, fmt.Errorf("unrar not found")
+		unrarErr = true
+	}
+
+	// Try unar (The Unarchiver) as alternative
+	unarBin := "unar"
+	unarErr := false
+	if _, err := exec.LookPath(unarBin); err != nil {
+		unarErr = true
+	}
+
+	// Both not found
+	if unrarErr && unarErr {
+		return nil, fmt.Errorf("no RAR extractor found (install unrar or unar)")
 	}
 
 	// Extract to temp directory
@@ -1036,8 +1049,13 @@ func extractImageTextFromCBR(path string, ocrEngine string) ([]db.InsertCaptionP
 	}
 	defer os.RemoveAll(tmpDir)
 
-	// Extract all files
-	cmd := exec.Command(unrarBin, "e", "-y", path, tmpDir)
+	// Extract all files - prefer unrar, fallback to unar
+	var cmd *exec.Cmd
+	if !unrarErr {
+		cmd = exec.Command(unrarBin, "e", "-y", path, tmpDir)
+	} else {
+		cmd = exec.Command(unarBin, "-o", tmpDir, path)
+	}
 	if err := cmd.Run(); err != nil {
 		return nil, err
 	}

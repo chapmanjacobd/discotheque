@@ -1010,20 +1010,33 @@ func listTarContents(path string) (string, error) {
 
 // list7zContents lists file names in a 7-Zip archive
 func list7zContents(path string) (string, error) {
+	// Try 7z first
 	sevenzBin := "7z"
-	if _, err := exec.LookPath(sevenzBin); err != nil {
-		return "", fmt.Errorf("7z not found")
+	if _, err := exec.LookPath(sevenzBin); err == nil {
+		cmd := exec.Command(sevenzBin, "l", "-ba", path)
+		output, err := cmd.Output()
+		if err == nil {
+			return parse7zOutput(string(output)), nil
+		}
 	}
 
-	// Use 7z l (list) command
-	cmd := exec.Command(sevenzBin, "l", "-ba", path)
-	output, err := cmd.Output()
-	if err != nil {
-		return "", err
+	// Try unar (The Unarchiver) as alternative
+	unarBin := "unar"
+	if _, err := exec.LookPath(unarBin); err == nil {
+		cmd := exec.Command(unarBin, "-t", path)
+		output, err := cmd.Output()
+		if err == nil {
+			return parseUnarOutput(string(output)), nil
+		}
 	}
 
+	return "", fmt.Errorf("7z extractor not found (install p7zip-full or unar)")
+}
+
+// parse7zOutput extracts file names from 7z list output
+func parse7zOutput(output string) string {
 	// Parse output to extract file names (lines 5+ contain file info)
-	lines := strings.Split(string(output), "\n")
+	lines := strings.Split(output, "\n")
 	var files []string
 	for i, line := range lines {
 		// Skip header and footer lines
@@ -1041,7 +1054,21 @@ func list7zContents(path string) (string, error) {
 		}
 	}
 
-	return strings.Join(files, "\n"), nil
+	return strings.Join(files, "\n")
+}
+
+// parseUnarOutput extracts file names from unar -t output
+func parseUnarOutput(output string) string {
+	lines := strings.Split(output, "\n")
+	var files []string
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") || strings.HasPrefix(line, "Filename") {
+			continue
+		}
+		files = append(files, line)
+	}
+	return strings.Join(files, "\n")
 }
 
 // listRarContents lists file names in a RAR archive
@@ -1072,11 +1099,21 @@ func listRarContents(path string) (string, error) {
 		cmd := exec.Command(sevenzBin, "l", "-ba", path)
 		output, err := cmd.Output()
 		if err == nil {
-			return string(output), nil
+			return parse7zOutput(string(output)), nil
 		}
 	}
 
-	return "", fmt.Errorf("no RAR extractor found (install unrar or p7zip)")
+	// Try unar (The Unarchiver) as alternative
+	unarBin := "unar"
+	if _, err := exec.LookPath(unarBin); err == nil {
+		cmd := exec.Command(unarBin, "-t", path)
+		output, err := cmd.Output()
+		if err == nil {
+			return parseUnarOutput(string(output)), nil
+		}
+	}
+
+	return "", fmt.Errorf("no RAR extractor found (install unrar, p7zip-full, or unar)")
 }
 
 // extractTorrentMetadata extracts metadata from a .torrent file
