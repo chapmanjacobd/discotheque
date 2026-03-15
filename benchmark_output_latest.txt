@@ -1,0 +1,22 @@
+DEBUG SETUP: media count=20000 (/mnt/media/audio/file_1.mp3), captions count=40000 (/mnt/media/audio/file_1.mp3)
+DEBUG SETUP: captions_fts count after populate=40000
+goos: linux
+goarch: amd64
+pkg: github.com/chapmanjacobd/discoteca/internal/bleve
+cpu: 13th Gen Intel(R) Core(TM) i5-13600KF
+BenchmarkComparison/M20000_C40000/Search_Path_FTS_SQLite-20         	      22	  50218078 ns/op	      1000 results	14997710 B/op	  269978 allocs/op
+BenchmarkComparison/M20000_C40000/Search_Path_FTS_Bleve-20          	     187	   5697215 ns/op	      1000 results	     20000 total_hits	 2569769 B/op	   59763 allocs/op
+BenchmarkComparison/M20000_C40000/Search_Desc_FTS_SQLite-20         	      14	  88641939 ns/op	      1000 results	 3293033 B/op	   19097 allocs/op
+BenchmarkComparison/M20000_C40000/Search_Desc_FTS_Bleve-20          	     424	   2528985 ns/op	      1000 results	     20000 total_hits	  318496 B/op	    2152 allocs/op
+BenchmarkComparison/M20000_C40000/Search_Captions_SQLite-20         	      22	  46878416 ns/op	   20032 B/op	     283 allocs/op
+BenchmarkComparison/M20000_C40000/Search_Captions_Bleve-20          	      68	  19313270 ns/op	 9539413 B/op	   81377 allocs/op
+BenchmarkComparison/M20000_C40000/Complex_FilterSort_SQLite-20      	     295	   4048114 ns/op	    1392 B/op	      54 allocs/op
+BenchmarkComparison/M20000_C40000/Complex_FilterSort_Bleve-20       	     158	   7149911 ns/op	 1732517 B/op	   15167 allocs/op
+BenchmarkComparison/M20000_C40000/Update_Playhead_SQLite-20         	     486	   2462642 ns/op	     715 B/op	      16 allocs/op
+BenchmarkComparison/M20000_C40000/Update_Playhead_Bleve-20          	      40	  39236599 ns/op	 4846906 B/op	   71963 allocs/op
+BenchmarkComparison/M20000_C40000/Stats_Agg_SQLite-20               	    1410	    868955 ns/op	     624 B/op	      27 allocs/op
+BenchmarkComparison/M20000_C40000/Stats_Agg_Bleve-20                	      39	  28115954 ns/op	16614066 B/op	  200202 allocs/op
+BenchmarkComparison/M20000_C40000/Group_By_Parent_SQLite-20         	     243	   6225234 ns/op	     592 B/op	      18 allocs/op
+BenchmarkComparison/M20000_C40000/Group_By_Parent_Bleve-20          	      14	  82376966 ns/op	44966189 B/op	  510646 allocs/op
+PASS
+ok  	github.com/chapmanjacobd/discoteca/internal/bleve	48.472s
