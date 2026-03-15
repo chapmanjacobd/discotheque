@@ -74,7 +74,7 @@ CREATE VIRTUAL TABLE IF NOT EXISTS captions_fts USING fts5(
     media_path UNINDEXED,
     text,
     content='captions',
-    tokenize = 'unicode61',
+    tokenize = 'trigram',
     detail = 'full'
 );
 
@@ -128,7 +128,7 @@ CREATE VIRTUAL TABLE IF NOT EXISTS media_fts USING fts5(
     description,
     content='media',
     content_rowid='rowid',
-    tokenize = 'unicode61',
+    tokenize = 'trigram',
     detail = 'full'
 );
 
