@@ -3,11 +3,32 @@
 ## Configuration
 - **Hardware**: 13th Gen Intel(R) Core(TM) i5-13600KF
 - **OS**: Linux
-- **Scale**: 800,000 Media items / 1,600,000 Captions
 - **Bleve**: v2 (standard mapping, optimized)
 - **SQLite**: FTS5 (trigram, detail='full', optimized)
 
-## Summary of Results (800k Media)
+---
+
+## Latest Results (March 15, 2026) - Scale: 500 Media / 1,000 Captions
+
+| Operation | SQLite FTS5 | Bleve | Difference |
+|-----------|-------------|-------|------------|
+| **Search (Path)** | 4,837.8 ms | 420.0 ms | Bleve is ~11.5x faster |
+| **Search (Description)** | 5,324.2 ms | 373.4 ms | Bleve is ~14.3x faster |
+| **Search (Captions)** | 1,553.3 ms | 631.0 ms | Bleve is ~2.5x faster |
+| **Filter & Sort** | 69.0 ms | 247.5 ms | SQLite is ~3.6x faster |
+| **Update (Playhead)** | 841.6 ms | 47,888.7 ms | SQLite is ~57x faster |
+| **Aggregation (Stats)**| 38.2 ms | 753.4 ms | SQLite is ~19.7x faster |
+| **Group By Parent** | 129.0 ms | 1,364.0 ms | SQLite is ~10.6x faster |
+
+### Analysis (M500_C1000)
+- **Search operations**: Bleve outperforms SQLite by 2.5x-14.3x for full-text search queries
+- **Metadata operations**: SQLite dominates all non-search tasks (updates, aggregations, grouping)
+- **Notable**: Update_Playhead in Bleve is extremely slow (~48s) compared to SQLite (~0.8s), highlighting Bleve's weakness in frequent write scenarios
+- **Filter & Sort**: At this small scale, SQLite's simple queries outperform Bleve's document-based approach
+
+---
+
+## Historical Results - Scale: 800,000 Media / 1,600,000 Captions
 
 | Operation | SQLite FTS5 (Optimized) | Bleve (Optimized) | Difference |
 |-----------|-------------------------|-------------------|------------|
@@ -51,11 +72,29 @@ SQLite remains the superior engine for all non-search tasks.
 - Use Bleve for `GET /search` and `GET /captions/search`.
 - Use SQLite for `GET /media`, `GET /stats`, `POST /progress`, and directory browsing.
 
-## Raw Data (800k Benchmarks)
+---
+
+## Raw Data
+
+### Latest Run (M500_C1000 - March 15, 2026)
 ```
-BenchmarkComparison/M800000_C1600000/Search_Path_FTS_SQLite-20         	       1	4793609205 ns/op	      1000 results
-BenchmarkComparison/M800000_C1600000/Search_Path_FTS_Bleve-20          	      14	  86690157 ns/op	      1000 results	    800000 total_hits
-BenchmarkComparison/M800000_C1600000/Search_Desc_FTS_SQLite-20         	       1	3077555800 ns/op	      1000 results
+BenchmarkComparison/M500_C1000/Search_Path_FTS_SQLite-20         	     240	   4837818 ns/op	       500.0 results	 1331586 B/op	    9605 allocs/op
+BenchmarkComparison/M500_C1000/Search_Path_FTS_Bleve-20          	    2808	    419992 ns/op	       500.0 results	       500.0 total_hits	  290112 B/op	    1575 allocs/op
+BenchmarkComparison/M500_C1000/Search_Desc_FTS_SQLite-20         	     217	   5324214 ns/op	       500.0 results	 1331600 B/op	    9605 allocs/op
+BenchmarkComparison/M500_C1000/Search_Desc_FTS_Bleve-20          	    3236	    373402 ns/op	       500.0 results	       500.0 total_hits	  285565 B/op	    1148 allocs/op
+BenchmarkComparison/M500_C1000/Search_Captions_SQLite-20         	    1071	   1553286 ns/op	   20032 B/op	     283 allocs/op
+BenchmarkComparison/M500_C1000/Search_Captions_Bleve-20          	    2391	    630955 ns/op	  334671 B/op	    2870 allocs/op
+BenchmarkComparison/M500_C1000/Complex_FilterSort_SQLite-20      	   17976	     68975 ns/op	    1392 B/op	      54 allocs/op
+BenchmarkComparison/M500_C1000/Complex_FilterSort_Bleve-20       	    6010	    247469 ns/op	  121799 B/op	     544 allocs/op
+BenchmarkComparison/M500_C1000/Update_Playhead_SQLite-20         	    1429	    841615 ns/op	     718 B/op	      16 allocs/op
+BenchmarkComparison/M500_C1000/Update_Playhead_Bleve-20          	      39	  47888676 ns/op	11004729 B/op	  180815 allocs/op
+BenchmarkComparison/M500_C1000/Stats_Agg_SQLite-20               	   38112	     38213 ns/op	     584 B/op	      23 allocs/op
+BenchmarkComparison/M500_C1000/Stats_Agg_Bleve-20                	    1510	    753353 ns/op	  442518 B/op	    5091 allocs/op
+BenchmarkComparison/M500_C1000/Group_By_Parent_SQLite-20         	    8269	    128992 ns/op	     584 B/op	      17 allocs/op
+BenchmarkComparison/M500_C1000/Group_By_Parent_Bleve-20          	     738	   1363975 ns/op	 1020521 B/op	   10232 allocs/op
+```
+
+### Historical Run (M800000_C1600000)
 BenchmarkComparison/M800000_C1600000/Search_Desc_FTS_Bleve-20          	      14	  94225845 ns/op	      1000 results	    800000 total_hits
 BenchmarkComparison/M800000_C1600000/Search_Captions_SQLite-20         	       1	5275402371 ns/op
 BenchmarkComparison/M800000_C1600000/Search_Captions_Bleve-20          	       2	 531610320 ns/op

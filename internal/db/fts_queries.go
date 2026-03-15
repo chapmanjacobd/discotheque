@@ -212,7 +212,6 @@ ORDER BY fts.rank
 	return results, rows.Err()
 }
 
-
 // RankCaptionsResults applies in-memory ranking to caption search results
 func RankCaptionsResults(results []SearchCaptionsRow, query string) {
 	if len(results) == 0 || query == "" {

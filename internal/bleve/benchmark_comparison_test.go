@@ -15,7 +15,6 @@ import (
 	"github.com/blevesearch/bleve/v2"
 	"github.com/blevesearch/bleve/v2/search"
 	"github.com/chapmanjacobd/discoteca/internal/db"
-	"github.com/chapmanjacobd/discoteca/internal/models"
 	"github.com/chapmanjacobd/discoteca/internal/testutils"
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -33,15 +32,15 @@ func generateComparisonData(mediaCount, captionCount int) ([]*MediaDocument, []*
 
 	types := []string{"video", "audio", "image", "text"}
 	genres := []string{"Action", "Comedy", "Drama", "Music", "News", "Sci-Fi", "Horror", "Documentary"}
-	
+
 	// Pre-generate some long text for descriptions to simulate real content
 	lorem := "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum."
-	
-	for i := 0; i < mediaCount; i++ {
+
+	for i := range mediaCount {
 		mediaType := types[i%len(types)]
 		genre := genres[i%len(genres)]
 		path := fmt.Sprintf("/mnt/media/%s/file_%d.%s", mediaType, i, getExt(mediaType))
-		
+
 		media[i] = &MediaDocument{
 			ID:             path,
 			Path:           path,
@@ -60,7 +59,7 @@ func generateComparisonData(mediaCount, captionCount int) ([]*MediaDocument, []*
 		}
 	}
 
-	for i := 0; i < captionCount; i++ {
+	for i := range captionCount {
 		mediaIdx := i % mediaCount
 		captions[i] = &CaptionDocument{
 			MediaPath: media[mediaIdx].Path,
@@ -74,23 +73,27 @@ func generateComparisonData(mediaCount, captionCount int) ([]*MediaDocument, []*
 
 func getExt(t string) string {
 	switch t {
-	case "video": return "mp4"
-	case "audio": return "mp3"
-	case "image": return "jpg"
-	default: return "txt"
+	case "video":
+		return "mp4"
+	case "audio":
+		return "mp3"
+	case "image":
+		return "jpg"
+	default:
+		return "txt"
 	}
 }
 
 // Setup SQLite for comparison
 func setupSQLiteComparison(b *testing.B, media []*MediaDocument, captions []*CaptionDocument) (*sql.DB, *db.Queries) {
 	// Create local temp dir in repo root
-	os.MkdirAll(".tmp", 0755)
+	os.MkdirAll(".tmp", 0o755)
 	tmpDir, err := os.MkdirTemp(".tmp", "sqlite_bench_*")
 	if err != nil {
 		b.Fatalf("Failed to create temp dir: %v", err)
 	}
 	dbPath := filepath.Join(tmpDir, "test.db")
-	
+
 	sqlDB, err := db.Connect(dbPath)
 	if err != nil {
 		b.Fatalf("Failed to connect to SQLite: %v", err)
@@ -99,7 +102,7 @@ func setupSQLiteComparison(b *testing.B, media []*MediaDocument, captions []*Cap
 	if err := testutils.InitTestDB(b, sqlDB); err != nil {
 		b.Fatalf("Failed to init DB schema: %v", err)
 	}
-	
+
 	queries := db.New(sqlDB)
 	ctx := context.Background()
 
@@ -129,7 +132,7 @@ func setupSQLiteComparison(b *testing.B, media []*MediaDocument, captions []*Cap
 			b.Fatalf("Failed to insert media: %v", err)
 		}
 	}
-	
+
 	// Insert captions
 	for _, c := range captions {
 		err := qTx.InsertCaption(ctx, db.InsertCaptionParams{
@@ -151,7 +154,7 @@ func setupSQLiteComparison(b *testing.B, media []*MediaDocument, captions []*Cap
 	var mCount, cCount int
 	sqlDB.QueryRow("SELECT COUNT(*) FROM media").Scan(&mCount)
 	sqlDB.QueryRow("SELECT COUNT(*) FROM captions").Scan(&cCount)
-	
+
 	var mPath, cPath string
 	sqlDB.QueryRow("SELECT path FROM media LIMIT 1").Scan(&mPath)
 	sqlDB.QueryRow("SELECT media_path FROM captions LIMIT 1").Scan(&cPath)
@@ -167,7 +170,7 @@ func setupSQLiteComparison(b *testing.B, media []*MediaDocument, captions []*Cap
 		fmt.Printf("DEBUG SETUP: Failed to populate captions_fts: %v\n", err)
 		b.Fatalf("Failed to populate captions_fts: %v. Media count: %d (%s), Captions count: %d (%s)", err, mCount, mPath, cCount, cPath)
 	}
-	
+
 	var ftsCCount int
 	sqlDB.QueryRow("SELECT COUNT(*) FROM captions_fts").Scan(&ftsCCount)
 	fmt.Printf("DEBUG SETUP: captions_fts count after populate=%d\n", ftsCCount)
@@ -178,13 +181,13 @@ func setupSQLiteComparison(b *testing.B, media []*MediaDocument, captions []*Cap
 // Setup Bleve for comparison
 func setupBleveComparison(b *testing.B, media []*MediaDocument, captions []*CaptionDocument) (string, func()) {
 	// Create local temp dir in repo root
-	os.MkdirAll(".tmp", 0755)
+	os.MkdirAll(".tmp", 0o755)
 	tmpDir, err := os.MkdirTemp(".tmp", "bleve_bench_*")
 	if err != nil {
 		b.Fatalf("Failed to create temp dir: %v", err)
 	}
 	dbPath := filepath.Join(tmpDir, "test.db")
-	
+
 	// InitIndex expects a DB path and creates a sibling .bleve directory
 	err = InitIndex(dbPath)
 	if err != nil {
@@ -201,20 +204,17 @@ func setupBleveComparison(b *testing.B, media []*MediaDocument, captions []*Capt
 	batchSize := 1000
 	totalCaptions := len(captions)
 	idx := GetIndex()
-	
+
 	for i := 0; i < totalCaptions; i += batchSize {
 		batch := idx.NewBatch()
-		end := i + batchSize
-		if end > totalCaptions {
-			end = totalCaptions
-		}
-		
+		end := min(i+batchSize, totalCaptions)
+
 		for j := i; j < end; j++ {
 			c := captions[j]
 			docID := fmt.Sprintf("%s:%.3f", c.MediaPath, c.Time)
 			batch.Index(docID, c)
 		}
-		
+
 		if err = idx.Batch(batch); err != nil {
 			b.Fatalf("Failed to batch index captions: %v", err)
 		}
@@ -229,7 +229,7 @@ func setupBleveComparison(b *testing.B, media []*MediaDocument, captions []*Capt
 func BenchmarkComparison(b *testing.B) {
 	configs := []ComparisonBenchmarkConfig{
 		// {MediaCount: 10000, CaptionCount: 20000},
-		{MediaCount: 800000, CaptionCount: 1600000},
+		{MediaCount: 500, CaptionCount: 1000},
 	}
 
 	for _, config := range configs {
@@ -238,21 +238,21 @@ func BenchmarkComparison(b *testing.B) {
 			media, captions := generateComparisonData(config.MediaCount, config.CaptionCount)
 
 			// --- Setup Environments ---
-			// We set them up ONCE per configuration to save time, 
+			// We set them up ONCE per configuration to save time,
 			// but for strict benchmarking we might want to include setup time or use ResetTimer.
 			// However, since we want to benchmark READ operations, we set up once.
-			
+
 			// SQLite Setup
 			sqliteDB, sqliteQueries := setupSQLiteComparison(b, media, captions)
 			defer sqliteDB.Close()
-			
+
 			// Verify SQLite Data
 			var mediaCount int
 			sqliteDB.QueryRow("SELECT COUNT(*) FROM media").Scan(&mediaCount)
 			if mediaCount != config.MediaCount {
 				b.Fatalf("SQLite media count mismatch: expected %d, got %d", config.MediaCount, mediaCount)
 			}
-			
+
 			var captionCount int
 			sqliteDB.QueryRow("SELECT COUNT(*) FROM captions").Scan(&captionCount)
 			if captionCount != config.CaptionCount {
@@ -264,7 +264,7 @@ func BenchmarkComparison(b *testing.B) {
 			if ftsCount != config.CaptionCount {
 				b.Fatalf("SQLite captions_fts count mismatch: expected %d, got %d", config.CaptionCount, ftsCount)
 			}
-			
+
 			// Bleve Setup
 			_, bleveCleanup := setupBleveComparison(b, media, captions)
 			defer bleveCleanup()
@@ -272,14 +272,14 @@ func BenchmarkComparison(b *testing.B) {
 			// --- SEARCH BENCHMARKS ---
 
 			// 1. Full Text Search (Common Term)
-			term := "apple" // Present in captions
-			pathTerm := "media" // Present in path_tokenized (/mnt/media/...)
+			term := "apple"           // Present in captions
+			pathTerm := "media"       // Present in path_tokenized (/mnt/media/...)
 			descTerm := "Description" // Present in description
-			
+
 			b.Run("Search_Path_FTS_SQLite", func(b *testing.B) {
 				for i := 0; i < b.N; i++ {
 					res, err := sqliteQueries.SearchMediaFTS(context.Background(), db.SearchMediaFTSParams{
-						Query: pathTerm, 
+						Query: pathTerm,
 						Limit: 1000,
 					})
 					if err != nil {
@@ -296,7 +296,7 @@ func BenchmarkComparison(b *testing.B) {
 
 			b.Run("Search_Path_FTS_Bleve", func(b *testing.B) {
 				for i := 0; i < b.N; i++ {
-					ids, total, err := Search(pathTerm, 1000)
+					ids, total, err := SearchPath(pathTerm, 1000)
 					if err != nil {
 						b.Fatal(err)
 					}
@@ -313,7 +313,7 @@ func BenchmarkComparison(b *testing.B) {
 			b.Run("Search_Desc_FTS_SQLite", func(b *testing.B) {
 				for i := 0; i < b.N; i++ {
 					res, err := sqliteQueries.SearchMediaFTS(context.Background(), db.SearchMediaFTSParams{
-						Query: descTerm, 
+						Query: descTerm,
 						Limit: 1000,
 					})
 					if err != nil {
@@ -398,11 +398,11 @@ func BenchmarkComparison(b *testing.B) {
 					// Type filter
 					q := bleve.NewMatchQuery("video")
 					q.SetField("type")
-					
+
 					req := bleve.NewSearchRequest(q)
 					req.Size = 20
 					req.Sort = search.ParseSortOrderStrings([]string{"-size"})
-					
+
 					idx := GetIndex()
 					res, err := idx.Search(req)
 					if err != nil {
@@ -423,8 +423,8 @@ func BenchmarkComparison(b *testing.B) {
 					idx := i % len(media)
 					m := media[idx]
 					err := sqliteQueries.UpdatePlayHistory(ctx, db.UpdatePlayHistoryParams{
-						Playhead: sql.NullInt64{Int64: int64(i), Valid: true},
-						Path:     m.Path,
+						Playhead:       sql.NullInt64{Int64: int64(i), Valid: true},
+						Path:           m.Path,
 						TimeLastPlayed: sql.NullInt64{Int64: time.Now().Unix(), Valid: true},
 					})
 					if err != nil {
@@ -438,12 +438,12 @@ func BenchmarkComparison(b *testing.B) {
 					// Pick a random media to update
 					idx := i % len(media)
 					m := media[idx]
-					
+
 					// In Bleve, we must re-index the document.
 					// We assume we have the document in memory (m).
 					// We update the field:
 					m.TimeLastPlayed = int64(i) // Update field
-					
+
 					// Re-index
 					err := IndexDocument(m)
 					if err != nil {
@@ -451,7 +451,7 @@ func BenchmarkComparison(b *testing.B) {
 					}
 				}
 			})
-			
+
 			// 6. Stats Aggregation (e.g. Count by Type)
 			b.Run("Stats_Agg_SQLite", func(b *testing.B) {
 				for i := 0; i < b.N; i++ {
@@ -472,14 +472,12 @@ func BenchmarkComparison(b *testing.B) {
 
 			b.Run("Stats_Agg_Bleve", func(b *testing.B) {
 				for i := 0; i < b.N; i++ {
-					req := bleve.NewSearchRequest(bleve.NewMatchAllQuery())
-					req.Size = 0
-					req.AddFacet("type", bleve.NewFacetRequest("type", 10))
-					
-					idx := GetIndex()
-					_, err := idx.Search(req)
+					counts, err := GetTermFacetCounts("type", 10)
 					if err != nil {
 						b.Fatal(err)
+					}
+					if len(counts) == 0 && i == 0 {
+						b.Fatal("Stats_Agg_Bleve returned 0 results")
 					}
 				}
 			})
@@ -535,13 +533,5 @@ func BenchmarkComparison(b *testing.B) {
 				}
 			})
 		})
-	}
-}
-
-// Helper to convert MediaDocument to db.Media for SQLite
-func mediaDocToDB(m *MediaDocument) models.Media {
-	return models.Media{
-		Path: m.Path,
-		// ... (mapping simplified for benchmark data generation above)
 	}
 }

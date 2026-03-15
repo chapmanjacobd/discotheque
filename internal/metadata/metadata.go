@@ -598,14 +598,92 @@ func cleanCaptionText(s string) string {
 // extractImageText extracts text from images using OCR.
 // Returns captions with detected text (time=0 for images).
 func extractImageText(path string, engine string) ([]db.InsertCaptionParams, error) {
+	// Convert image to PNG if it's in a format that OCR engines might struggle with
+	convertedPath, err := convertImageForOCR(path)
+	if err != nil {
+		slog.Warn("Image conversion failed, using original", "path", path, "error", err)
+		convertedPath = path
+	}
+	if convertedPath != path {
+		defer os.Remove(convertedPath) // Clean up temp file
+	}
+
 	switch engine {
 	case "paddle":
-		return extractImageTextPaddleOCR(path)
+		return extractImageTextPaddleOCR(convertedPath)
 	case "tesseract", "":
-		return extractImageTextTesseract(path)
+		return extractImageTextTesseract(convertedPath)
 	default:
-		return extractImageTextTesseract(path)
+		return extractImageTextTesseract(convertedPath)
 	}
+}
+
+// convertImageForOCR converts images to PNG format for better OCR compatibility.
+// Tesseract and PaddleOCR work best with PNG/TIFF. This function converts
+// problematic formats (webp, bmp, gif, tiff) to PNG using ffmpeg or ImageMagick.
+// Returns the path to the converted image, or the original path if no conversion needed.
+func convertImageForOCR(path string) (string, error) {
+	ext := strings.ToLower(filepath.Ext(path))
+	
+	// Formats that OCR engines handle well natively
+	goodFormats := map[string]bool{
+		".png":  true,
+		".jpg":  true,
+		".jpeg": true,
+		".tif":  true,
+		".tiff": true,
+	}
+	
+	if goodFormats[ext] {
+		return path, nil
+	}
+	
+	// Try ffmpeg first (faster, handles most formats)
+	ffmpegBin := "ffmpeg"
+	if _, err := exec.LookPath(ffmpegBin); err == nil {
+		tmpFile, err := os.CreateTemp("", "ocr-convert-*.png")
+		if err != nil {
+			return "", err
+		}
+		tmpPath := tmpFile.Name()
+		tmpFile.Close()
+		
+		args := []string{
+			"-hide_banner",
+			"-loglevel", "error",
+			"-i", path,
+			"-c:v", "png",
+			tmpPath,
+		}
+		
+		cmd := exec.Command(ffmpegBin, args...)
+		if err := cmd.Run(); err == nil {
+			return tmpPath, nil
+		}
+		os.Remove(tmpPath)
+	}
+	
+	// Try ImageMagick (convert)
+	convertBin := "convert"
+	if _, err := exec.LookPath(convertBin); err == nil {
+		tmpFile, err := os.CreateTemp("", "ocr-convert-*.png")
+		if err != nil {
+			return "", err
+		}
+		tmpPath := tmpFile.Name()
+		tmpFile.Close()
+		
+		args := []string{path, tmpPath}
+		cmd := exec.Command(convertBin, args...)
+		if err := cmd.Run(); err == nil {
+			return tmpPath, nil
+		}
+		os.Remove(tmpPath)
+	}
+	
+	// No converter available, return original path
+	// OCR engine may still be able to handle it
+	return path, nil
 }
 
 // extractImageTextTesseract extracts text from images using tesseract OCR
@@ -981,7 +1059,6 @@ func extractImageTextFromCBR(path string, ocrEngine string) ([]db.InsertCaptionP
 		}
 		return nil
 	})
-
 	if err != nil {
 		return nil, err
 	}

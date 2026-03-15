@@ -62,10 +62,10 @@ type Media struct {
 }
 
 type MediaFts struct {
-	Path        string `json:"path"`
+	Path          string `json:"path"`
 	PathTokenized string `json:"path_tokenized"`
-	Title       string `json:"title"`
-	Description string `json:"description"`
+	Title         string `json:"title"`
+	Description   string `json:"description"`
 }
 
 type PlaylistItems struct {

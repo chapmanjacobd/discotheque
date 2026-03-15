@@ -450,7 +450,7 @@ func TestSearchPath(t *testing.T) {
 	}
 
 	// Test path search with wildcard
-	ids, err := SearchPath(filepath.FromSlash("/home/user/videos/"), 10)
+	ids, _, err := SearchPath(filepath.FromSlash("/home/user/videos/"), 10)
 	if err != nil {
 		t.Errorf("SearchPath failed: %v", err)
 	}
@@ -459,7 +459,7 @@ func TestSearchPath(t *testing.T) {
 	}
 
 	// Test path search with limit
-	ids, err = SearchPath(filepath.FromSlash("/home/user/"), 1)
+	ids, _, err = SearchPath(filepath.FromSlash("/home/user/"), 1)
 	if err != nil {
 		t.Errorf("SearchPath with limit failed: %v", err)
 	}
@@ -471,7 +471,7 @@ func TestSearchPath(t *testing.T) {
 func TestSearchPathWithoutInit(t *testing.T) {
 	CloseIndex()
 
-	ids, err := SearchPath(filepath.FromSlash("/test"), 10)
+	ids, _, err := SearchPath(filepath.FromSlash("/test"), 10)
 	if err == nil {
 		t.Error("Expected error when searching path without initialization")
 	}

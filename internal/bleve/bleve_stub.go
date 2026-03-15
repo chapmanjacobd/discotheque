@@ -73,14 +73,14 @@ func DeleteDocument(id string) error {
 	return fmt.Errorf("bleve support not enabled in this build")
 }
 
-// Search performs a search query on the Bleve index
-func Search(query string, limit int) ([]string, float64, error) {
+// Search performs a search query on the Bleve index targeting main FTS fields
+func Search(query string, limit int) ([]string, uint64, error) {
 	return nil, 0, fmt.Errorf("bleve support not enabled in this build")
 }
 
-// SearchPath performs a path-specific search
-func SearchPath(pathPattern string, limit int) ([]string, error) {
-	return nil, fmt.Errorf("bleve support not enabled in this build")
+// SearchPath performs a path-specific search using PrefixQuery for high performance
+func SearchPath(pathPattern string, limit int) ([]string, uint64, error) {
+	return nil, 0, fmt.Errorf("bleve support not enabled in this build")
 }
 
 // Count returns the total number of documents in the index

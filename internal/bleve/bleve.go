@@ -246,8 +246,8 @@ func createIndex(path string) (bleve.Index, error) {
 	pathField := bleve.NewTextFieldMapping()
 	pathField.Analyzer = keyword.Name
 	pathField.DocValues = true
-	pathField.Store = true   // Needed for results display
-	pathField.IncludeInAll = false
+	pathField.Store = true // Needed for results display
+	pathField.IncludeInAll = true
 
 	// Path tokenized - standard analyzer for FTS, no docValues needed
 	pathTokenizedField := bleve.NewTextFieldMapping()
@@ -262,6 +262,13 @@ func createIndex(path string) (bleve.Index, error) {
 	titleField.IncludeInAll = true
 	titleField.DocValues = true
 	titleField.Store = true
+
+	// Title FTS - standard analyzer for better FTS precision
+	titleFtsField := bleve.NewTextFieldMapping()
+	titleFtsField.Analyzer = standard.Name
+	titleFtsField.IncludeInAll = true
+	titleFtsField.DocValues = false
+	titleFtsField.Store = false
 
 	// Description - standard analyzer, no docValues
 	descriptionField := bleve.NewTextFieldMapping()
@@ -344,6 +351,7 @@ func createIndex(path string) (bleve.Index, error) {
 	docMapping.AddFieldMappingsAt("path", pathField)
 	docMapping.AddFieldMappingsAt("path_tokenized", pathTokenizedField)
 	docMapping.AddFieldMappingsAt("title", titleField)
+	docMapping.AddFieldMappingsAt("title_fts", titleFtsField)
 	docMapping.AddFieldMappingsAt("description", descriptionField)
 	docMapping.AddFieldMappingsAt("type", typeField)
 	docMapping.AddFieldMappingsAt("size", sizeField)
@@ -446,6 +454,7 @@ func DeleteDocument(id string) error {
 }
 
 // Search performs a search query on the Bleve index
+// Search performs a search query on the Bleve index targeting main FTS fields
 func Search(queryStr string, limit int) ([]string, uint64, error) {
 	indexMutex.RLock()
 	defer indexMutex.RUnlock()
@@ -454,13 +463,42 @@ func Search(queryStr string, limit int) ([]string, uint64, error) {
 		return nil, 0, fmt.Errorf("bleve index not initialized")
 	}
 
-	// Create a match query that searches all fields
-	bleveQuery := bleve.NewMatchQuery(queryStr)
+	// Split query into terms for precise AND matching within fields
+	terms := strings.Fields(queryStr)
+	if len(terms) == 0 {
+		return nil, 0, nil
+	}
+
+	buildFieldQuery := func(field string, boost float64) query.Query {
+		if len(terms) == 1 {
+			q := query.NewMatchQuery(terms[0])
+			q.SetField(field)
+			q.SetBoost(boost)
+			return q
+		}
+		
+		conjuncts := make([]query.Query, len(terms))
+		for i, term := range terms {
+			q := query.NewMatchQuery(term)
+			q.SetField(field)
+			conjuncts[i] = q
+		}
+		cq := query.NewConjunctionQuery(conjuncts)
+		cq.SetBoost(boost)
+		return cq
+	}
+
+	pathQ := buildFieldQuery("path_tokenized", 5.0)
+	titleQ := buildFieldQuery("title_fts", 3.0)
+	descQ := buildFieldQuery("description", 1.0)
+
+	bleveQuery := query.NewDisjunctionQuery([]query.Query{pathQ, titleQ, descQ})
 
 	// Create search request
 	searchRequest := bleve.NewSearchRequest(bleveQuery)
 	searchRequest.Size = limit
-	searchRequest.Fields = []string{"id", "path"}
+	searchRequest.Fields = nil
+	searchRequest.IncludeLocations = false
 
 	// Execute search
 	results, err := indexInstance.Search(searchRequest)
@@ -487,14 +525,20 @@ func SearchWithPagination(queryStr string, limit, offset int, searchAfter []stri
 		return nil, 0, nil, fmt.Errorf("bleve index not initialized")
 	}
 
-	// Create a match query that searches all fields
-	bleveQuery := bleve.NewMatchQuery(queryStr)
+	// OPTIMIZATION: Multi-field search
+	pathQ := query.NewMatchQuery(queryStr)
+	pathQ.SetField("path_tokenized")
+	pathQ.SetBoost(2.0)
+	titleQ := query.NewMatchQuery(queryStr)
+	titleQ.SetField("title")
+	titleQ.SetBoost(1.5)
+	bleveQuery := query.NewDisjunctionQuery([]query.Query{pathQ, titleQ})
 
 	// Create search request
 	searchRequest := bleve.NewSearchRequest(bleveQuery)
 	searchRequest.Size = limit
 	searchRequest.From = offset
-	searchRequest.Fields = []string{"id", "path"}
+	searchRequest.Fields = nil
 
 	// Add sort for deterministic pagination (score desc, then id for tie-breaking)
 	searchRequest.Sort = search.ParseSortOrderStrings([]string{"-_score", "id"})
@@ -521,25 +565,29 @@ func SearchWithPagination(queryStr string, limit, offset int, searchAfter []stri
 	return ids, results.Total, nextSearchAfter, nil
 }
 
-// SearchPath performs a path-specific search
-func SearchPath(pathPattern string, limit int) ([]string, error) {
+// SearchPath performs a path-specific search using path_tokenized for high performance
+func SearchPath(pathPattern string, limit int) ([]string, uint64, error) {
 	indexMutex.RLock()
 	defer indexMutex.RUnlock()
 
 	if indexInstance == nil {
-		return nil, fmt.Errorf("bleve index not initialized")
+		return nil, 0, fmt.Errorf("bleve index not initialized")
 	}
 
-	// For path searches, use wildcard query
-	bleveQuery := bleve.NewWildcardQuery(pathPattern + "*")
-	bleveQuery.SetField("path")
+	// Use MatchQuery on path_tokenized field for flexible path component matching
+	bleveQuery := query.NewMatchQuery(pathPattern)
+	bleveQuery.SetField("path_tokenized")
+	bleveQuery.SetOperator(query.MatchQueryOperatorAnd)
 
 	searchRequest := bleve.NewSearchRequest(bleveQuery)
 	searchRequest.Size = limit
+	searchRequest.Fields = nil
+	searchRequest.IncludeLocations = false
+	searchRequest.Sort = search.ParseSortOrderStrings([]string{"_id"})
 
 	results, err := indexInstance.Search(searchRequest)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	ids := make([]string, len(results.Hits))
@@ -547,7 +595,7 @@ func SearchPath(pathPattern string, limit int) ([]string, error) {
 		ids[i] = hit.ID
 	}
 
-	return ids, nil
+	return ids, results.Total, nil
 }
 
 // Count returns the total number of documents in the index
@@ -1206,10 +1254,12 @@ func DiskUsageByDirectory(prefix string, limit int) (map[string]*DirectoryStats,
 		bleveQuery = query.NewMatchAllQuery()
 	}
 
+	// OPTIMIZATION: Use _id sort to skip expensive BM25 relevance sorting
 	searchRequest := bleve.NewSearchRequest(bleveQuery)
 	searchRequest.Size = limit
-	searchRequest.Fields = []string{"size"} // We use hit.ID for path to avoid loading 'path' field
-	searchRequest.IncludeLocations = false // Saves memory and time
+	searchRequest.Fields = []string{"size"}                            // We use hit.ID for path to avoid loading 'path' field
+	searchRequest.IncludeLocations = false                             // Saves memory and time
+	searchRequest.Sort = search.ParseSortOrderStrings([]string{"_id"}) // Fast sort
 
 	results, err := indexInstance.Search(searchRequest)
 	if err != nil {
@@ -1223,10 +1273,9 @@ func DiskUsageByDirectory(prefix string, limit int) (map[string]*DirectoryStats,
 	}
 
 	// PARALLEL AGGREGATION: Split hits into chunks and aggregate in Go
-	numWorkers := runtime.NumCPU()
-	if numWorkers > 16 {
-		numWorkers = 16 // Cap workers to avoid excessive overhead
-	}
+	numWorkers := min(runtime.NumCPU(),
+		// Cap workers to avoid excessive overhead
+		16)
 	if numWorkers > numHits {
 		numWorkers = 1
 	}
@@ -1239,10 +1288,7 @@ func DiskUsageByDirectory(prefix string, limit int) (map[string]*DirectoryStats,
 
 	for w := 0; w < numWorkers; w++ {
 		start := w * chunkSize
-		end := start + chunkSize
-		if end > numHits {
-			end = numHits
-		}
+		end := min(start+chunkSize, numHits)
 
 		go func(workerIdx, s, e int) {
 			defer wg.Done()

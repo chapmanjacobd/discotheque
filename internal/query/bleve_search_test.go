@@ -71,11 +71,11 @@ func TestBleveSearch(t *testing.T) {
 			expectIDs:   []string{"doc-1"},
 		},
 		{
-			name:        "Multiple search terms (OR logic)",
+			name:        "Multiple search terms (AND logic within fields)",
 			searchTerms: []string{"video", "action"},
 			limit:       10,
-			expectCount: 2, // Both doc-1 and doc-2 contain "video"
-			expectIDs:   []string{"doc-1", "doc-2"},
+			expectCount: 1, // Only doc-1 contains both 'video' and 'action' in one of the fields
+			expectIDs:   []string{"doc-1"},
 		},
 		{
 			name:        "Search with limit",
@@ -355,7 +355,7 @@ func TestBleveSearchPathIntegration(t *testing.T) {
 	}
 
 	// Use bleve.SearchPath directly for path-specific tests
-	ids, err := bleve.SearchPath("/data/videos/movies/action", 10)
+	ids, _, err := bleve.SearchPath("/data/videos/movies/action", 10)
 	if err != nil {
 		t.Fatalf("SearchPath failed: %v", err)
 	}
@@ -363,7 +363,7 @@ func TestBleveSearchPathIntegration(t *testing.T) {
 		t.Errorf("Expected 2 action movies, got %d: %v", len(ids), ids)
 	}
 
-	ids, err = bleve.SearchPath("/data/music", 10)
+	ids, _, err = bleve.SearchPath("/data/music", 10)
 	if err != nil {
 		t.Fatalf("SearchPath for music failed: %v", err)
 	}

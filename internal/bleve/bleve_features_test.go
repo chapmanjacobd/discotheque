@@ -363,9 +363,9 @@ func TestDateRangeFacet(t *testing.T) {
 		Min  *float64
 		Max  *float64
 	}{
-		{"Last 2 days", ptrFloat64(nowFloat - (2 * daySeconds)), ptrFloat64(nowFloat)},
-		{"2-7 days ago", ptrFloat64(nowFloat - (7 * daySeconds)), ptrFloat64(nowFloat - (2 * daySeconds))},
-		{"Older than 7 days", ptrFloat64(0), ptrFloat64(nowFloat - (7 * daySeconds))},
+		{"Last 2 days", new(nowFloat - (2 * daySeconds)), new(nowFloat)},
+		{"2-7 days ago", new(nowFloat - (7 * daySeconds)), new(nowFloat - (2 * daySeconds))},
+		{"Older than 7 days", new(float64(0)), new(nowFloat - (7 * daySeconds))},
 	})
 
 	// Search with facets
@@ -388,11 +388,6 @@ func TestDateRangeFacet(t *testing.T) {
 	} else {
 		t.Error("Expected date_ranges in results")
 	}
-}
-
-// ptrFloat64 returns a pointer to a float64 value
-func ptrFloat64(f float64) *float64 {
-	return &f
 }
 
 // TestBatchIndexDocuments tests batch indexing

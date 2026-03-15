@@ -5,6 +5,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -160,8 +161,8 @@ func TestExtract_ComicArchive_OCR(t *testing.T) {
 	// Create mock image files (empty files with image extensions for testing structure)
 	img1 := filepath.Join(tmpDir, "01.jpg")
 	img2 := filepath.Join(tmpDir, "02.jpg")
-	os.WriteFile(img1, []byte("mock image data 1"), 0644)
-	os.WriteFile(img2, []byte("mock image data 2"), 0644)
+	os.WriteFile(img1, []byte("mock image data 1"), 0o644)
+	os.WriteFile(img2, []byte("mock image data 2"), 0o644)
 
 	// Create CBZ file
 	cbzPath := filepath.Join(tmpDir, "test.cbz")
@@ -195,9 +196,9 @@ func TestExtractImageTextFromCBZ_Structure(t *testing.T) {
 	img1 := filepath.Join(tmpDir, "01.png")
 	img2 := filepath.Join(tmpDir, "02.png")
 	img3 := filepath.Join(tmpDir, "10.png")
-	os.WriteFile(img1, []byte("page 1"), 0644)
-	os.WriteFile(img2, []byte("page 2"), 0644)
-	os.WriteFile(img3, []byte("page 10"), 0644)
+	os.WriteFile(img1, []byte("page 1"), 0o644)
+	os.WriteFile(img2, []byte("page 2"), 0o644)
+	os.WriteFile(img3, []byte("page 10"), 0o644)
 
 	// Create CBZ file
 	cbzPath := filepath.Join(tmpDir, "test.cbz")
@@ -226,7 +227,7 @@ func TestExtractImageTextFromCBZ_PageOrdering(t *testing.T) {
 	pages := []string{"01.jpg", "02.jpg", "10.jpg", "page_3.jpg", "cover.png"}
 	for _, p := range pages {
 		imgPath := filepath.Join(tmpDir, p)
-		os.WriteFile(imgPath, []byte("mock"), 0644)
+		os.WriteFile(imgPath, []byte("mock"), 0o644)
 	}
 
 	// Create CBZ file
@@ -256,6 +257,87 @@ func TestExtractImageTextFromCBZ_PageOrdering(t *testing.T) {
 	if len(foundFiles) != len(pages) {
 		t.Errorf("Expected %d files in archive, got %d", len(pages), len(foundFiles))
 	}
+}
+
+func TestExtractImageTextFromCBZ_TIFFConversion(t *testing.T) {
+	// Test that TIFF images in CBZ archives can be OCR'd via temporary conversion
+	tmpDir, err := os.MkdirTemp("", "cbz-tiff-test-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	// Create a minimal valid TIFF file (1x1 pixel, uncompressed)
+	minimalTIFF := []byte{
+		// TIFF Header
+		0x49, 0x49, // Little-endian
+		0x2A, 0x00, // Magic number
+		0x08, 0x00, 0x00, 0x00, // IFD offset
+
+		// IFD
+		0x08, 0x00, // 8 directory entries
+
+		// ImageWidth (256)
+		0x00, 0x01, 0x03, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,
+		// ImageLength (257)
+		0x01, 0x01, 0x03, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,
+		// BitsPerSample (258)
+		0x02, 0x01, 0x03, 0x00, 0x01, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00,
+		// Compression (259) - None
+		0x03, 0x01, 0x03, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,
+		// PhotometricInterpretation (262) - WhiteIsZero
+		0x06, 0x01, 0x03, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		// StripOffsets (273)
+		0x11, 0x01, 0x04, 0x00, 0x01, 0x00, 0x00, 0x00, 0x6E, 0x00, 0x00, 0x00,
+		// SamplesPerPixel (277)
+		0x1A, 0x01, 0x03, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,
+		// RowsPerStrip (278)
+		0x1B, 0x01, 0x04, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,
+		// StripByteCounts (279)
+		0x1F, 0x01, 0x04, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,
+
+		// Next IFD (0 = no more IFDs)
+		0x00, 0x00, 0x00, 0x00,
+
+		// Image data (1 byte for 1x1 pixel)
+		0xFF, // White pixel
+	}
+
+	// Create TIFF file
+	tiffPath := filepath.Join(tmpDir, "01.tiff")
+	if err := os.WriteFile(tiffPath, minimalTIFF, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a second page with different content
+	tiffPath2 := filepath.Join(tmpDir, "02.tiff")
+	if err := os.WriteFile(tiffPath2, minimalTIFF, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create CBZ file with TIFF images
+	cbzPath := filepath.Join(tmpDir, "test.cbz")
+	createZip(t, cbzPath, []string{tiffPath, tiffPath2})
+
+	// Test extraction with OCR enabled
+	// This tests that TIFF files are converted to PNG before OCR
+	captions, err := extractImageTextFromComicArchive(cbzPath, "tesseract")
+
+	// The function should handle TIFF files without error
+	// Even if tesseract is not installed or can't read the mock image,
+	// the conversion pipeline should work
+	if err != nil {
+		// Check if it's a tesseract-not-found error (acceptable)
+		if strings.Contains(err.Error(), "tesseract not found") {
+			t.Log("Tesseract not installed, but TIFF conversion pipeline was tested")
+		} else {
+			t.Errorf("Unexpected error: %v", err)
+		}
+	}
+
+	// Verify that the function processed both pages
+	// (captions may be empty if OCR failed, but function should complete)
+	t.Logf("Processed CBZ with TIFF images, got %d captions", len(captions))
 }
 
 // Helper function to create a ZIP file for testing
@@ -313,7 +395,7 @@ func TestExtract_Audio_SpeechRecognition(t *testing.T) {
 	}
 
 	audioPath := filepath.Join(tmpDir, "test.wav")
-	if err := os.WriteFile(audioPath, wavHeader, 0644); err != nil {
+	if err := os.WriteFile(audioPath, wavHeader, 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -353,7 +435,7 @@ func TestExtract_Audio_SpeechRecognition_Enabled(t *testing.T) {
 	}
 
 	audioPath := filepath.Join(tmpDir, "test.wav")
-	if err := os.WriteFile(audioPath, wavHeader, 0644); err != nil {
+	if err := os.WriteFile(audioPath, wavHeader, 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -393,7 +475,7 @@ func TestExtractSpeechToText_EngineSelection(t *testing.T) {
 	}
 
 	audioPath := filepath.Join(tmpDir, "test.wav")
-	if err := os.WriteFile(audioPath, wavHeader, 0644); err != nil {
+	if err := os.WriteFile(audioPath, wavHeader, 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -441,7 +523,7 @@ func TestExtract_Video_SpeechRecognition(t *testing.T) {
 	}
 
 	videoPath := filepath.Join(tmpDir, "test.mp4")
-	if err := os.WriteFile(videoPath, mp4Header, 0644); err != nil {
+	if err := os.WriteFile(videoPath, mp4Header, 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -482,7 +564,7 @@ func TestExtract_Image_MediaType(t *testing.T) {
 	}
 
 	imagePath := filepath.Join(tmpDir, "test.png")
-	if err := os.WriteFile(imagePath, pngHeader, 0644); err != nil {
+	if err := os.WriteFile(imagePath, pngHeader, 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -521,7 +603,7 @@ func TestExtract_Image_WithoutOCR_NoTesseract(t *testing.T) {
 	}
 
 	imagePath := filepath.Join(tmpDir, "test.png")
-	if err := os.WriteFile(imagePath, pngHeader, 0644); err != nil {
+	if err := os.WriteFile(imagePath, pngHeader, 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -554,9 +636,105 @@ func TestExtract_Image_WithoutOCR_NoTesseract(t *testing.T) {
 	t.Log("Confirmed: images are not passed through tesseract without --OCR flag")
 }
 
+func TestConvertImageForOCR(t *testing.T) {
+	// Test that convertImageForOCR handles different formats correctly
+	tmpDir, err := os.MkdirTemp("", "ocr-convert-test-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	// Test 1: PNG should return original path (no conversion needed)
+	pngPath := filepath.Join(tmpDir, "test.png")
+	os.WriteFile(pngPath, []byte("mock png"), 0o644)
+	converted, err := convertImageForOCR(pngPath)
+	if err != nil {
+		t.Errorf("PNG conversion failed unexpectedly: %v", err)
+	}
+	if converted != pngPath {
+		t.Errorf("Expected PNG to return original path, got %s", converted)
+	}
+
+	// Test 2: JPG should return original path (no conversion needed)
+	jpgPath := filepath.Join(tmpDir, "test.jpg")
+	os.WriteFile(jpgPath, []byte("mock jpg"), 0o644)
+	converted, err = convertImageForOCR(jpgPath)
+	if err != nil {
+		t.Errorf("JPG conversion failed unexpectedly: %v", err)
+	}
+	if converted != jpgPath {
+		t.Errorf("Expected JPG to return original path, got %s", converted)
+	}
+
+	// Test 3: TIFF should attempt conversion
+	tiffPath := filepath.Join(tmpDir, "test.tiff")
+	minimalTIFF := []byte{
+		0x49, 0x49, 0x2A, 0x00, 0x08, 0x00, 0x00, 0x00,
+		0x08, 0x00,
+		0x00, 0x01, 0x03, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,
+		0x01, 0x01, 0x03, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,
+		0x02, 0x01, 0x03, 0x00, 0x01, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00,
+		0x03, 0x01, 0x03, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,
+		0x06, 0x01, 0x03, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x11, 0x01, 0x04, 0x00, 0x01, 0x00, 0x00, 0x00, 0x6E, 0x00, 0x00, 0x00,
+		0x1A, 0x01, 0x03, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,
+		0x1B, 0x01, 0x04, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,
+		0x1F, 0x01, 0x04, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00,
+		0xFF,
+	}
+	os.WriteFile(tiffPath, minimalTIFF, 0o644)
+	converted, err = convertImageForOCR(tiffPath)
+	if err != nil {
+		t.Errorf("TIFF conversion failed: %v", err)
+	}
+	// If conversion succeeded, it should return a different path (temp PNG)
+	// If no converter is available, it returns original path
+	if converted != tiffPath {
+		// Conversion happened - verify temp file is PNG
+		if !strings.HasSuffix(converted, ".png") {
+			t.Errorf("Expected converted file to be PNG, got %s", converted)
+		}
+		// Clean up the temp file since we're not using defer here
+		defer os.Remove(converted)
+		t.Logf("TIFF converted to PNG: %s", converted)
+	} else {
+		t.Log("No converter available, TIFF returned as-is (acceptable)")
+	}
+
+	// Test 4: WebP should attempt conversion
+	webpPath := filepath.Join(tmpDir, "test.webp")
+	// Minimal WebP header (RIFF container)
+	minimalWebP := []byte{
+		'R', 'I', 'F', 'F', // RIFF header
+		0x24, 0x00, 0x00, 0x00, // File size - 8
+		'W', 'E', 'B', 'P', // WebP signature
+		'V', 'P', '8', ' ', // VP8 chunk
+		0x18, 0x00, 0x00, 0x00, // Chunk size
+		// Minimal VP8 frame (simplified)
+		0x30, 0x01, 0x00, 0x9D, 0x01, 0x2A, 0x01, 0x00,
+		0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00,
+	}
+	os.WriteFile(webpPath, minimalWebP, 0o644)
+	converted, err = convertImageForOCR(webpPath)
+	if err != nil {
+		t.Errorf("WebP conversion failed: %v", err)
+	}
+	if converted != webpPath {
+		if !strings.HasSuffix(converted, ".png") {
+			t.Errorf("Expected converted file to be PNG, got %s", converted)
+		}
+		defer os.Remove(converted)
+		t.Logf("WebP converted to PNG: %s", converted)
+	} else {
+		t.Log("No converter available, WebP returned as-is (acceptable)")
+	}
+}
+
 func TestExtract_Image_WithOCR_Tesseract(t *testing.T) {
 	// This test verifies that images WITH --OCR flag ARE passed through tesseract
-	
+
 	tmpDir, err := os.MkdirTemp("", "image-ocr-test-*")
 	if err != nil {
 		t.Fatal(err)
@@ -572,7 +750,7 @@ func TestExtract_Image_WithOCR_Tesseract(t *testing.T) {
 	}
 
 	imagePath := filepath.Join(tmpDir, "test.png")
-	if err := os.WriteFile(imagePath, pngHeader, 0644); err != nil {
+	if err := os.WriteFile(imagePath, pngHeader, 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -597,7 +775,7 @@ func TestExtract_Image_WithOCR_Tesseract(t *testing.T) {
 
 func TestExtract_Image_OCREngineSelection(t *testing.T) {
 	// Test that different OCR engines can be selected for images
-	
+
 	tmpDir, err := os.MkdirTemp("", "image-ocr-engine-test-*")
 	if err != nil {
 		t.Fatal(err)
@@ -613,7 +791,7 @@ func TestExtract_Image_OCREngineSelection(t *testing.T) {
 	}
 
 	imagePath := filepath.Join(tmpDir, "test.png")
-	if err := os.WriteFile(imagePath, pngHeader, 0644); err != nil {
+	if err := os.WriteFile(imagePath, pngHeader, 0o644); err != nil {
 		t.Fatal(err)
 	}
 

@@ -271,11 +271,11 @@ func (c *ServeCmd) generateTextSnippetSVG(label, firstLine, filename string) []b
 	firstLine = strings.ReplaceAll(firstLine, "&", "&amp;")
 	firstLine = strings.ReplaceAll(firstLine, "<", "&lt;")
 	firstLine = strings.ReplaceAll(firstLine, ">", "&gt;")
-	
+
 	if firstLine == "" {
 		firstLine = label
 	}
-	
+
 	svg := fmt.Sprintf(`<svg xmlns="http://www.w3.org/2000/svg" width="320" height="240" viewBox="0 0 320 240">
   <defs>
     <linearGradient id="grad-%s" x1="0%%" y1="0%%" x2="100%%" y2="100%%">
@@ -288,7 +288,7 @@ func (c *ServeCmd) generateTextSnippetSVG(label, firstLine, filename string) []b
   <text fill="white" font-family="system-ui,sans-serif" font-size="18" font-weight="600" x="20" y="80" text-overflow="ellipsis">%s</text>
   <text fill="white" font-family="system-ui,sans-serif" font-size="11" opacity="0.5" x="20" y="220">%s</text>
 </svg>`, label, label, label, firstLine, filepath.Base(filename))
-	
+
 	return []byte(svg)
 }
 
@@ -298,19 +298,19 @@ func (c *ServeCmd) generatePDFThumbnail(path string) ([]byte, string, error) {
 	if data, err := exec.Command("pdftoppm", "-png", "-f", "1", "-singlefile", "-scale-to", "320", path, "-").Output(); err == nil {
 		return data, "image/png", nil
 	}
-	
+
 	// Fallback: read first page text and render as SVG
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, "", err
 	}
 	defer f.Close()
-	
+
 	// Read first 1KB to find text
 	buf := make([]byte, 1024)
 	n, _ := f.Read(buf)
 	text := string(buf[:n])
-	
+
 	// Try to extract readable text (skip PDF headers)
 	lines := strings.Split(text, "\n")
 	firstLine := ""
@@ -321,7 +321,7 @@ func (c *ServeCmd) generatePDFThumbnail(path string) ([]byte, string, error) {
 			break
 		}
 	}
-	
+
 	return c.generateTextSnippetSVG("PDF", firstLine, path), "image/svg+xml", nil
 }
 
@@ -332,18 +332,18 @@ func (c *ServeCmd) extractEpubCover(path string) ([]byte, error) {
 		return nil, err
 	}
 	defer r.Close()
-	
+
 	// Look for cover image in common locations
 	coverPatterns := []string{"cover.jpg", "cover.png", "Cover.jpg", "Cover.png", "cover.jpeg"}
 	imageExts := []string{".jpg", ".jpeg", ".png"}
-	
+
 	var coverFile *zip.File
 	var imageFile *zip.File
-	
+
 	for _, f := range r.File {
 		name := f.Name
 		base := filepath.Base(name)
-		
+
 		// Check for explicit cover files
 		for _, pattern := range coverPatterns {
 			if strings.HasSuffix(name, pattern) || strings.HasSuffix(base, pattern) {
@@ -351,7 +351,7 @@ func (c *ServeCmd) extractEpubCover(path string) ([]byte, error) {
 				break
 			}
 		}
-		
+
 		// Also look for images in images/ or cover/ directories
 		if coverFile == nil {
 			dir := filepath.Dir(name)
@@ -365,13 +365,13 @@ func (c *ServeCmd) extractEpubCover(path string) ([]byte, error) {
 			}
 		}
 	}
-	
+
 	// Prefer explicit cover, fallback to any image
 	target := coverFile
 	if target == nil {
 		target = imageFile
 	}
-	
+
 	if target != nil {
 		rc, err := target.Open()
 		if err != nil {
@@ -380,7 +380,7 @@ func (c *ServeCmd) extractEpubCover(path string) ([]byte, error) {
 		defer rc.Close()
 		return io.ReadAll(rc)
 	}
-	
+
 	return nil, fmt.Errorf("no cover image found")
 }
 
@@ -397,14 +397,14 @@ func (c *ServeCmd) generateEpubThumbnail(path string) ([]byte, string, error) {
 		}
 		return coverData, "image/jpeg", nil
 	}
-	
+
 	// Fallback: extract title/author from metadata and render as SVG
 	r, err := zip.OpenReader(path)
 	if err != nil {
 		return c.generateTextSnippetSVG("EPUB", "", path), "image/svg+xml", nil
 	}
 	defer r.Close()
-	
+
 	// Look for content.opf or .opf files for metadata
 	var opfFile *zip.File
 	for _, f := range r.File {
@@ -413,7 +413,7 @@ func (c *ServeCmd) generateEpubThumbnail(path string) ([]byte, string, error) {
 			break
 		}
 	}
-	
+
 	title := ""
 	if opfFile != nil {
 		rc, err := opfFile.Open()
@@ -431,7 +431,7 @@ func (c *ServeCmd) generateEpubThumbnail(path string) ([]byte, string, error) {
 			}
 		}
 	}
-	
+
 	return c.generateTextSnippetSVG("EPUB", title, path), "image/svg+xml", nil
 }
 
@@ -442,12 +442,12 @@ func (c *ServeCmd) generateTextFileThumbnail(path string, ext string) ([]byte, s
 		return c.generateTextSnippetSVG(strings.ToUpper(ext), "", path), "image/svg+xml"
 	}
 	defer f.Close()
-	
+
 	// Read first 500 bytes
 	buf := make([]byte, 500)
 	n, _ := f.Read(buf)
 	text := strings.TrimSpace(string(buf[:n]))
-	
+
 	// Extract first meaningful line
 	lines := strings.Split(text, "\n")
 	firstLine := ""
@@ -459,7 +459,7 @@ func (c *ServeCmd) generateTextFileThumbnail(path string, ext string) ([]byte, s
 			break
 		}
 	}
-	
+
 	return c.generateTextSnippetSVG(strings.ToUpper(ext), firstLine, path), "image/svg+xml"
 }
 
@@ -530,7 +530,7 @@ func (c *ServeCmd) handleThumbnail(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "public, max-age=31536000")
 		w.Write(thumb)
 		return
-		
+
 	case ".epub":
 		thumb, contentType, err := c.generateEpubThumbnail(path)
 		if err != nil {
@@ -541,7 +541,7 @@ func (c *ServeCmd) handleThumbnail(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "public, max-age=31536000")
 		w.Write(thumb)
 		return
-		
+
 	case ".txt", ".md", ".markdown", ".rtf":
 		label := strings.TrimPrefix(ext, ".")
 		if label == "markdown" {
@@ -717,158 +717,6 @@ func (c *ServeCmd) handleHLSSegment(w http.ResponseWriter, r *http.Request) {
 			slog.Error("HLS transcoding failed", "path", path, "index", index, "error", err)
 		}
 	}
-}
-
-// extractImageFromArchive extracts an image from CBR/CBZ archives
-// Returns the image data, content type, and error
-func (c *ServeCmd) extractImageFromArchive(archivePath, imagePath string) ([]byte, string, error) {
-	r, err := zip.OpenReader(archivePath)
-	if err != nil {
-		// Try RAR format
-		return c.extractImageFromRar(archivePath, imagePath)
-	}
-	defer r.Close()
-
-	// Find the image file in the archive
-	for _, f := range r.File {
-		if f.Name == imagePath || strings.HasSuffix(f.Name, imagePath) {
-			rc, err := f.Open()
-			if err != nil {
-				return nil, "", err
-			}
-			defer rc.Close()
-
-			data, err := io.ReadAll(rc)
-			if err != nil {
-				return nil, "", err
-			}
-
-			// Detect mime type from magic bytes
-			mimeType := http.DetectContentType(data[:min(512, len(data))])
-			return data, mimeType, nil
-		}
-	}
-
-	return nil, "", fmt.Errorf("image not found in archive: %s", imagePath)
-}
-
-// extractImageFromRar extracts an image from RAR archives (requires unrar)
-func (c *ServeCmd) extractImageFromRar(archivePath, imagePath string) ([]byte, string, error) {
-	unrarBin := "unrar"
-	if _, err := exec.LookPath(unrarBin); err != nil {
-		return nil, "", fmt.Errorf("unrar not found")
-	}
-
-	// Extract to temp directory
-	tmpDir, err := os.MkdirTemp("", "rar-extract-*")
-	if err != nil {
-		return nil, "", err
-	}
-	defer os.RemoveAll(tmpDir)
-
-	// Extract specific file
-	cmd := exec.Command(unrarBin, "e", "-y", archivePath, imagePath, tmpDir)
-	if err := cmd.Run(); err != nil {
-		return nil, "", err
-	}
-
-	// Read extracted file
-	extractedPath := filepath.Join(tmpDir, filepath.Base(imagePath))
-	data, err := os.ReadFile(extractedPath)
-	if err != nil {
-		return nil, "", err
-	}
-
-	mimeType := http.DetectContentType(data[:min(512, len(data))])
-	return data, mimeType, nil
-}
-
-// convertImage converts an image to a web-friendly format using ffmpeg or ImageMagick
-func (c *ServeCmd) convertImage(inputPath, outputFormat string) ([]byte, string, error) {
-	// Benchmark: ffmpeg is faster for large images (~3MB), ImageMagick better for small
-	// Try ffmpeg first (generally faster)
-	ffmpegBin := "ffmpeg"
-	if _, err := exec.LookPath(ffmpegBin); err == nil {
-		args := []string{
-			"-hide_banner",
-			"-loglevel", "error",
-			"-i", inputPath,
-			"-q:v", "2", // High quality
-			"-f", "image2",
-		}
-
-		var format string
-		switch outputFormat {
-		case "jpeg", "jpg":
-			args = append(args, "-c:v", "mjpeg")
-			format = "image/jpeg"
-		case "png":
-			args = append(args, "-c:v", "png")
-			format = "image/png"
-		case "webp":
-			args = append(args, "-c:v", "libwebp")
-			format = "image/webp"
-		default:
-			args = append(args, "-c:v", "mjpeg")
-			format = "image/jpeg"
-		}
-
-		args = append(args, "pipe:1")
-
-		cmd := exec.Command(ffmpegBin, args...)
-		output, err := cmd.Output()
-		if err == nil {
-			return output, format, nil
-		}
-		// ffmpeg failed, fall through to ImageMagick
-	}
-
-	// Try ImageMagick (convert)
-	convertBin := "convert"
-	if _, err := exec.LookPath(convertBin); err == nil {
-		args := []string{inputPath, "-quality", "90"}
-
-		switch outputFormat {
-		case "jpeg", "jpg":
-			args = append(args, "jpg:-")
-		case "png":
-			args = append(args, "png:-")
-		case "webp":
-			args = append(args, "webp:-")
-		default:
-			args = append(args, "jpg:-")
-		}
-
-		cmd := exec.Command(convertBin, args...)
-		output, err := cmd.Output()
-		if err == nil {
-			var format string
-			switch outputFormat {
-			case "png":
-				format = "image/png"
-			case "webp":
-				format = "image/webp"
-			default:
-				format = "image/jpeg"
-			}
-			return output, format, nil
-		}
-	}
-
-	// No converter available, read original
-	data, err := os.ReadFile(inputPath)
-	if err != nil {
-		return nil, "", err
-	}
-	mimeType := http.DetectContentType(data[:min(512, len(data))])
-	return data, mimeType, nil
-}
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
 }
 
 // serveFileWithMimeType serves a file with the correct MIME type based on extension
