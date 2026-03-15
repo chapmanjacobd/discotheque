@@ -40,14 +40,18 @@ func (c *SearchCmd) Run(ctx *kong.Context) error {
 		FTSFlags:         c.FTSFlags,
 	}
 	// We prefer FTS if not specified
-	if !flags.FTS {
+	if !flags.FTS && !flags.NoFTS {
 		// Check if FTS table exists in first database
 		if len(c.Databases) > 0 {
 			if sqlDB, err := db.Connect(c.Databases[0]); err == nil {
 				var name string
 				err := sqlDB.QueryRow("SELECT name FROM sqlite_master WHERE type='table' AND name='media_fts'").Scan(&name)
 				if err == nil {
-					flags.FTS = true
+					// Verify FTS5 actually works by running a simple query
+					_, testErr := sqlDB.Query("SELECT 1 FROM media_fts LIMIT 1")
+					if testErr == nil {
+						flags.FTS = true
+					}
 				}
 				sqlDB.Close()
 			}

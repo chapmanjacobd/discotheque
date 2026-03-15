@@ -87,7 +87,7 @@ func TestFilterBuilder_Build(t *testing.T) {
 				QueryFlags:   models.QueryFlags{Limit: 10},
 				DeletedFlags: models.DeletedFlags{HideDeleted: true},
 			},
-			"SELECT media.* FROM media JOIN media_fts ON media.rowid = media_fts.rowid WHERE COALESCE(time_deleted, 0) = 0 AND media_fts MATCH ? LIMIT 10",
+			"SELECT media.* FROM media JOIN media_fts ON media.rowid = media_fts.rowid WHERE COALESCE(media.time_deleted, 0) = 0 AND media_fts MATCH ? LIMIT 10",
 		},
 		{
 			"FTS Search (Column specific)",
@@ -97,7 +97,7 @@ func TestFilterBuilder_Build(t *testing.T) {
 				QueryFlags:   models.QueryFlags{Limit: 10},
 				DeletedFlags: models.DeletedFlags{HideDeleted: true},
 			},
-			"SELECT media.* FROM media JOIN media_fts ON media.rowid = media_fts.rowid WHERE COALESCE(time_deleted, 0) = 0 AND media_fts MATCH ? LIMIT 10",
+			"SELECT media.* FROM media JOIN media_fts ON media.rowid = media_fts.rowid WHERE COALESCE(media.time_deleted, 0) = 0 AND media_fts MATCH ? LIMIT 10",
 		},
 		{
 			"Flexible Search",
@@ -117,7 +117,7 @@ func TestFilterBuilder_Build(t *testing.T) {
 				QueryFlags:       models.QueryFlags{Limit: 10},
 				DeletedFlags:     models.DeletedFlags{HideDeleted: true},
 			},
-			"SELECT media.* FROM media JOIN media_fts ON media.rowid = media_fts.rowid WHERE COALESCE(time_deleted, 0) = 0 AND (type = 'video') AND size >= ? AND media_fts MATCH ? LIMIT 10",
+			"SELECT media.* FROM media JOIN media_fts ON media.rowid = media_fts.rowid WHERE COALESCE(media.time_deleted, 0) = 0 AND (media.type = 'video') AND media.size >= ? AND media_fts MATCH ? LIMIT 10",
 		},
 		{
 			"Only Deleted",

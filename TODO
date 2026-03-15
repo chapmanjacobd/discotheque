@@ -44,8 +44,5 @@ lambda x: (
         objects.Reverser(x.get("path")),
     )
 
-
-test large database Web UI performance with FTS5
-
 e2e web safari
 e2e web mobile

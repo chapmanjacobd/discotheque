@@ -29,10 +29,11 @@ func (q *Queries) SearchMediaFTS(ctx context.Context, arg SearchMediaFTSParams) 
 SELECT m.* FROM media m
 JOIN (
     SELECT rowid, rank FROM media_fts
-    WHERE media_fts MATCH ? AND time_deleted = 0
+    WHERE media_fts MATCH ? AND media_fts.time_deleted = 0
     ORDER BY rank
     LIMIT ?
 ) fts ON m.rowid = fts.rowid
+WHERE m.time_deleted = 0
 ORDER BY fts.rank
 `
 	rows, err := q.db.QueryContext(ctx, query, arg.Query, arg.Limit)
