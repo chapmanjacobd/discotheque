@@ -639,6 +639,7 @@ func migrateTables(db *sql.DB, hasStrict bool) error {
 
 func migrateIndexes(db *sql.DB) error {
 	indexes := []string{
+		"CREATE INDEX IF NOT EXISTS idx_path ON media(path)",
 		"CREATE INDEX IF NOT EXISTS idx_type ON media(type)",
 		"CREATE INDEX IF NOT EXISTS idx_genre ON media(genre)",
 		"CREATE INDEX IF NOT EXISTS idx_artist ON media(artist)",

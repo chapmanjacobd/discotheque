@@ -1,30 +1,262 @@
 package query
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"path/filepath"
 	"strconv"
 	"strings"
 
+	"github.com/chapmanjacobd/discoteca/internal/db"
 	"github.com/chapmanjacobd/discoteca/internal/models"
 	"github.com/chapmanjacobd/discoteca/internal/utils"
 	"github.com/chapmanjacobd/discoteca/internal/utils/pathutil"
 )
 
-func AggregateMedia(media []models.MediaWithDB, flags models.GlobalFlags) []models.FolderStats {
-	var stats []models.FolderStats
-	if flags.GroupByExtensions {
-		stats = AggregateExtensions(media)
-	} else if flags.GroupByMimeTypes {
-		stats = AggregateMimeTypes(media)
-	} else if flags.GroupBySize {
-		stats = AggregateSizeBuckets(media)
+// DUQueryResult holds the result of a DU aggregation query
+type DUQueryResult struct {
+	Path          string
+	Count         int
+	TotalSize     int64
+	TotalDuration int64
+}
+
+// AggregateDUByPath performs SQL-level aggregation for DU mode
+// This is much faster than fetching all media and aggregating in Go
+func AggregateDUByPath(ctx context.Context, dbPath string, pathPrefix string, targetDepth int, currentDepth int) ([]DUQueryResult, error) {
+	sqlDB, err := db.Connect(dbPath)
+	if err != nil {
+		return nil, err
+	}
+	defer sqlDB.Close()
+
+	// Build SQL query for aggregation
+	// We use SUBSTR and INSTR to extract the path at target depth
+	var query string
+	var args []any
+
+	if pathPrefix == "" {
+		// Root level: aggregate by first path component
+		// For paths like "/media/video/file.mp4", extract "/media" (without trailing slash)
+		// For paths like "media/video/file.mp4", extract "media"
+		query = `
+			SELECT
+				CASE
+					WHEN substr(path, 1, 1) IN ('/', '\\') THEN
+						substr(path, 1, instr(substr(path, 2), '/'))
+					ELSE
+						CASE
+							WHEN instr(path, '/') > 0 THEN substr(path, 1, instr(path, '/') - 1)
+							ELSE path
+						END
+				END as agg_path,
+				COUNT(*) as count,
+				COALESCE(SUM(size), 0) as total_size,
+				COALESCE(SUM(duration), 0) as total_duration
+			FROM media
+			WHERE COALESCE(time_deleted, 0) = 0
+			GROUP BY agg_path
+			ORDER BY total_size DESC
+		`
 	} else {
-		stats = AggregateByDepth(media, flags)
+		// Subdirectory level: aggregate by path at target depth
+		// Only include paths that start with the prefix
+		// Only include files DEEPER than targetDepth (files at targetDepth are returned separately)
+		escapedPrefix := strings.ReplaceAll(pathPrefix, "'", "''")
+		query = `
+			SELECT
+				CASE
+					WHEN substr(?, 1, 1) IN ('/', '\\') THEN
+						? || substr(
+							substr(path, length(?) + 1),
+							1,
+							CASE
+								WHEN instr(substr(path, length(?) + 2), '/') > 0
+								THEN instr(substr(path, length(?) + 2), '/')
+								ELSE length(substr(path, length(?) + 1))
+							END
+						)
+					ELSE
+						? || CASE
+							WHEN instr(substr(path, length(?) + 1), '/') > 0
+							THEN substr(substr(path, length(?) + 1), 1, instr(substr(path, length(?) + 2), '/') - 1)
+							ELSE substr(path, length(?) + 1)
+						END
+				END as agg_path,
+				COUNT(*) as count,
+				COALESCE(SUM(size), 0) as total_size,
+				COALESCE(SUM(duration), 0) as total_duration
+			FROM media
+			WHERE COALESCE(time_deleted, 0) = 0
+				AND (path LIKE ? || '/%' OR path LIKE ? || '\\%')
+				AND (length(path) - length(replace(replace(path, '/', ''), '\\', ''))) > ?
+			GROUP BY agg_path
+			ORDER BY total_size DESC
+		`
+		// Add args for the placeholders (14 total)
+		args = append(args,
+			pathPrefix,      // 1: substr(?, 1, 1)
+			pathPrefix,      // 2: ? || substr(
+			pathPrefix,      // 3: length(?) + 1
+			pathPrefix,      // 4: length(?) + 2
+			pathPrefix,      // 5: length(?) + 2
+			pathPrefix,      // 6: length(?) + 1
+			pathPrefix,      // 7: ? || CASE
+			pathPrefix,      // 8: length(?) + 1
+			pathPrefix,      // 9: length(?) + 1
+			pathPrefix,      // 10: length(?) + 2
+			pathPrefix,      // 11: length(?) + 1
+			escapedPrefix,   // 12: LIKE ? || '/%'
+			escapedPrefix,   // 13: LIKE ? || '\\%'
+			targetDepth,     // 14: separator count > targetDepth
+		)
 	}
 
-	// Post-aggregation filtering
+	rows, err := sqlDB.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var results []DUQueryResult
+	for rows.Next() {
+		var r DUQueryResult
+		if err := rows.Scan(&r.Path, &r.Count, &r.TotalSize, &r.TotalDuration); err != nil {
+			return nil, err
+		}
+		results = append(results, r)
+	}
+
+	return results, rows.Err()
+}
+
+// AggregateDUByPathMultiDB performs SQL-level aggregation across multiple databases
+func AggregateDUByPathMultiDB(ctx context.Context, dbPaths []string, pathPrefix string, targetDepth int, currentDepth int) ([]DUQueryResult, error) {
+	allResults := make([]DUQueryResult, 0)
+
+	for _, dbPath := range dbPaths {
+		results, err := AggregateDUByPath(ctx, dbPath, pathPrefix, targetDepth, currentDepth)
+		if err != nil {
+			return nil, err
+		}
+		allResults = append(allResults, results...)
+	}
+
+	// Aggregate results from multiple databases by path
+	pathMap := make(map[string]*DUQueryResult)
+	for _, r := range allResults {
+		if _, ok := pathMap[r.Path]; !ok {
+			pathMap[r.Path] = &DUQueryResult{Path: r.Path}
+		}
+		pathMap[r.Path].Count += r.Count
+		pathMap[r.Path].TotalSize += r.TotalSize
+		pathMap[r.Path].TotalDuration += r.TotalDuration
+	}
+
+	// Convert map to slice
+	finalResults := make([]DUQueryResult, 0, len(pathMap))
+	for _, r := range pathMap {
+		finalResults = append(finalResults, *r)
+	}
+
+	return finalResults, nil
+}
+
+// FetchDUDirectFiles fetches files at the target depth for DU mode
+func FetchDUDirectFiles(ctx context.Context, dbPaths []string, pathPrefix string, targetDepth int) ([]models.MediaWithDB, error) {
+	allFiles := make([]models.MediaWithDB, 0)
+
+	for _, dbPath := range dbPaths {
+		sqlDB, err := db.Connect(dbPath)
+		if err != nil {
+			return nil, err
+		}
+
+		var query string
+		var args []any
+
+		if pathPrefix == "" {
+			// Root level: files with no directory separator
+			query = `
+				SELECT path, title, duration, size, time_created, time_modified,
+				       time_deleted, time_first_played, time_last_played, play_count,
+				       playhead, album, artist, genre, categories, description,
+				       language, time_downloaded, score, video_codecs, audio_codecs,
+				       subtitle_codecs, width, height, type
+				FROM media
+				WHERE COALESCE(time_deleted, 0) = 0
+				  AND instr(path, '/') = 0
+				  AND instr(path, '\\') = 0
+			`
+		} else {
+			// Subdirectory: files at exactly target depth
+			// For absolute paths: separator count = targetDepth
+			// For relative paths: separator count = targetDepth - 1
+			// We need to handle both cases
+			escapedPrefix := strings.ReplaceAll(pathPrefix, "'", "''")
+
+			// Check if pathPrefix is absolute
+			isAbs := len(pathPrefix) > 0 && (pathPrefix[0] == '/' || pathPrefix[0] == '\\')
+			separatorCount := targetDepth
+			if !isAbs {
+				separatorCount = targetDepth - 1
+			}
+
+			query = `
+				SELECT path, title, duration, size, time_created, time_modified,
+				       time_deleted, time_first_played, time_last_played, play_count,
+				       playhead, album, artist, genre, categories, description,
+				       language, time_downloaded, score, video_codecs, audio_codecs,
+				       subtitle_codecs, width, height, type
+				FROM media
+				WHERE COALESCE(time_deleted, 0) = 0
+				  AND (path LIKE ? || '/%' OR path LIKE ? || '\\%')
+				  AND (
+					length(path) - length(replace(replace(path, '/', ''), '\\', ''))
+				  ) = ?
+			`
+			args = append(args, escapedPrefix, escapedPrefix, separatorCount)
+		}
+
+		rows, err := sqlDB.QueryContext(ctx, query, args...)
+		if err != nil {
+			sqlDB.Close()
+			return nil, err
+		}
+
+		files, err := ScanMedia(rows, dbPath)
+		rows.Close()
+		sqlDB.Close()
+		if err != nil {
+			return nil, err
+		}
+		allFiles = append(allFiles, files...)
+	}
+
+	return allFiles, nil
+}
+
+// AggregateMedia media using the specified aggregation mode
+func AggregateMedia(media []models.MediaWithDB, flags models.GlobalFlags) []models.FolderStats {
+	return AggregateMediaWithMode(media, flags, false)
+}
+
+// AggregateMediaWithMode aggregates media with optional fast mode
+// fastMode: skip expensive calculations (median, file storage) for faster navigation
+func AggregateMediaWithMode(media []models.MediaWithDB, flags models.GlobalFlags, fastMode bool) []models.FolderStats {
+	var stats []models.FolderStats
+	if flags.GroupByExtensions {
+		stats = AggregateExtensions(media, fastMode)
+	} else if flags.GroupByMimeTypes {
+		stats = AggregateMimeTypes(media, fastMode)
+	} else if flags.GroupBySize {
+		stats = AggregateSizeBuckets(media, fastMode)
+	} else {
+		stats = AggregateByDepth(media, flags, fastMode)
+	}
+
+	// Post-aggregation filtering (unchanged)
 	if flags.FoldersOnly || flags.FilesOnly || flags.FolderSizes != nil || flags.FileCounts != "" || flags.FolderCounts != "" {
 		var filtered []models.FolderStats
 		for _, f := range stats {
@@ -74,7 +306,8 @@ func AggregateMedia(media []models.MediaWithDB, flags models.GlobalFlags) []mode
 	return stats
 }
 
-func AggregateExtensions(media []models.MediaWithDB) []models.FolderStats {
+func AggregateExtensions(media []models.MediaWithDB, fastMode ...bool) []models.FolderStats {
+	fast := len(fastMode) > 0 && fastMode[0]
 	groups := make(map[string]*models.FolderStats)
 	for _, m := range media {
 		ext := strings.ToLower(filepath.Ext(m.Path))
@@ -86,10 +319,11 @@ func AggregateExtensions(media []models.MediaWithDB) []models.FolderStats {
 		}
 		updateStats(groups[ext], m, true)
 	}
-	return finalizeStats(groups)
+	return finalizeStatsWithOptions(groups, !fast, !fast)
 }
 
-func AggregateMimeTypes(media []models.MediaWithDB) []models.FolderStats {
+func AggregateMimeTypes(media []models.MediaWithDB, fastMode ...bool) []models.FolderStats {
+	fast := len(fastMode) > 0 && fastMode[0]
 	groups := make(map[string]*models.FolderStats)
 	for _, m := range media {
 		mime := "unknown"
@@ -101,10 +335,11 @@ func AggregateMimeTypes(media []models.MediaWithDB) []models.FolderStats {
 		}
 		updateStats(groups[mime], m, true)
 	}
-	return finalizeStats(groups)
+	return finalizeStatsWithOptions(groups, !fast, !fast)
 }
 
-func AggregateSizeBuckets(media []models.MediaWithDB) []models.FolderStats {
+func AggregateSizeBuckets(media []models.MediaWithDB, fastMode ...bool) []models.FolderStats {
+	fast := len(fastMode) > 0 && fastMode[0]
 	baseEdges := []int64{2, 5, 10}
 	var multipliers []int64
 	multipliers = append(multipliers, baseEdges...)
@@ -156,10 +391,11 @@ func AggregateSizeBuckets(media []models.MediaWithDB) []models.FolderStats {
 		}
 		updateStats(groups[label], m, true)
 	}
-	return finalizeStats(groups)
+	return finalizeStatsWithOptions(groups, !fast, !fast)
 }
 
-func AggregateByDepth(media []models.MediaWithDB, flags models.GlobalFlags) []models.FolderStats {
+func AggregateByDepth(media []models.MediaWithDB, flags models.GlobalFlags, fastMode ...bool) []models.FolderStats {
+	fast := len(fastMode) > 0 && fastMode[0]
 	groups := make(map[string]*models.FolderStats)
 
 	for _, m := range media {
@@ -218,7 +454,7 @@ func AggregateByDepth(media []models.MediaWithDB, flags models.GlobalFlags) []mo
 		}
 	}
 
-	return finalizeStats(groups)
+	return finalizeStatsWithOptions(groups, !fast, !fast)
 }
 
 func updateStats(f *models.FolderStats, m models.MediaWithDB, isFolder bool) {
@@ -244,7 +480,12 @@ func updateStats(f *models.FolderStats, m models.MediaWithDB, isFolder bool) {
 	f.Files = append(f.Files, m)
 }
 
-func finalizeStats(groups map[string]*models.FolderStats) []models.FolderStats {
+// finalizeStatsWithOptions finalizes stats with optional expensive calculations
+// calculateMedians: whether to calculate median size/duration (expensive)
+// storeFiles: whether to store file references (memory intensive)
+func finalizeStatsWithOptions(groups map[string]*models.FolderStats, calculateMedians bool, storeFiles ...bool) []models.FolderStats {
+	shouldStoreFiles := len(storeFiles) > 0 && storeFiles[0]
+
 	// Identify parents to count subdirectories
 	for path := range groups {
 		parts, isAbs := pathutil.Split(path)
@@ -273,21 +514,29 @@ func finalizeStats(groups map[string]*models.FolderStats) []models.FolderStats {
 			f.AvgSize = f.TotalSize / int64(f.ExistsCount)
 			f.AvgDuration = f.TotalDuration / int64(f.ExistsCount)
 
-			sizes := make([]int64, 0, f.ExistsCount)
-			durations := make([]int64, 0, f.ExistsCount)
-			for _, m := range f.Files {
-				isDeleted := m.TimeDeleted != nil && *m.TimeDeleted > 0
-				if !isDeleted {
-					if m.Size != nil {
-						sizes = append(sizes, *m.Size)
-					}
-					if m.Duration != nil {
-						durations = append(durations, *m.Duration)
+			// Skip expensive median calculation and file storage for fast mode
+			if calculateMedians {
+				sizes := make([]int64, 0, f.ExistsCount)
+				durations := make([]int64, 0, f.ExistsCount)
+				for _, m := range f.Files {
+					isDeleted := m.TimeDeleted != nil && *m.TimeDeleted > 0
+					if !isDeleted {
+						if m.Size != nil {
+							sizes = append(sizes, *m.Size)
+						}
+						if m.Duration != nil {
+							durations = append(durations, *m.Duration)
+						}
 					}
 				}
+				f.MedianSize = int64(utils.SafeMedian(sizes))
+				f.MedianDuration = int64(utils.SafeMedian(durations))
 			}
-			f.MedianSize = int64(utils.SafeMedian(sizes))
-			f.MedianDuration = int64(utils.SafeMedian(durations))
+
+			// Clear files slice if not needed (saves memory)
+			if !shouldStoreFiles {
+				f.Files = nil
+			}
 		}
 		result = append(result, *f)
 	}

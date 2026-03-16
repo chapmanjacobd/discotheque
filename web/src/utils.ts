@@ -87,3 +87,73 @@ export function getIcon(type: string | undefined): string {
     if (type.includes('epub') || type.includes('pdf') || type.includes('mobi')) return '📚';
     return '📄';
 }
+
+/**
+ * Generate a client-side thumbnail using canvas when server thumbnail fails
+ * Creates a colored placeholder with file extension
+ */
+export function generateClientThumbnail(canvas: HTMLCanvasElement, filename: string, type: string | undefined): string {
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return '';
+
+    const width = canvas.width || 320;
+    const height = canvas.height || 240;
+
+    // Get color based on file type
+    const colors: Record<string, string> = {
+        'video': '#8b5cf6',
+        'audio': '#ec4899',
+        'image': '#10b981',
+        'epub': '#f59e0b',
+        'pdf': '#ef4444',
+        'default': '#3b82f6'
+    };
+
+    let color = colors['default'];
+    if (type) {
+        for (const [key, value] of Object.entries(colors)) {
+            if (type.includes(key)) {
+                color = value;
+                break;
+            }
+        }
+    }
+
+    // Get file extension
+    const ext = filename.split('.').pop()?.toUpperCase() || 'FILE';
+
+    // Draw background gradient
+    const gradient = ctx.createLinearGradient(0, 0, width, height);
+    gradient.addColorStop(0, color);
+    gradient.addColorStop(1, adjustColor(color, 20));
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, width, height);
+
+    // Draw extension text
+    ctx.fillStyle = 'white';
+    ctx.font = 'bold 48px system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(ext, width / 2, height / 2 - 20);
+
+    // Draw filename
+    ctx.font = '14px system-ui, sans-serif';
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+    const displayName = filename.split('/').pop() || filename;
+    const truncatedName = displayName.length > 30 ? displayName.substring(0, 27) + '...' : displayName;
+    ctx.fillText(truncatedName, width / 2, height - 30);
+
+    return canvas.toDataURL('image/jpeg');
+}
+
+/**
+ * Adjust color brightness
+ */
+function adjustColor(hex: string, percent: number): string {
+    const num = parseInt(hex.replace('#', ''), 16);
+    const amt = Math.round(2.55 * percent);
+    const R = Math.max(0, Math.min(255, (num >> 16) + amt));
+    const G = Math.max(0, Math.min(255, ((num >> 8) & 0x00FF) + amt));
+    const B = Math.max(0, Math.min(255, (num & 0x0000FF) + amt));
+    return '#' + (0x1000000 + R * 0x10000 + G * 0x100 + B).toString(16).slice(1);
+}

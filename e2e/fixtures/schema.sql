@@ -99,6 +99,7 @@ CREATE TABLE custom_keywords (
 ) STRICT;
 CREATE INDEX idx_time_deleted ON media(time_deleted);
 CREATE INDEX idx_time_last_played ON media(time_last_played);
+CREATE INDEX idx_path ON media(path);
 CREATE INDEX idx_duration ON media(duration);
 CREATE INDEX idx_size ON media(size);
 CREATE INDEX idx_type ON media(type);

@@ -272,6 +272,18 @@ func (c *ServeCmd) generateTextSnippetSVG(label, firstLine, filename string) []b
 	firstLine = strings.ReplaceAll(firstLine, "<", "&lt;")
 	firstLine = strings.ReplaceAll(firstLine, ">", "&gt;")
 
+	// Ensure label is not empty and is safe for SVG ID
+	if label == "" {
+		label = "FILE"
+	}
+	// Remove any characters that are invalid in SVG IDs
+	label = strings.Map(func(r rune) rune {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '-' || r == '_' {
+			return r
+		}
+		return '_'
+	}, label)
+
 	if firstLine == "" {
 		firstLine = label
 	}
@@ -295,8 +307,16 @@ func (c *ServeCmd) generateTextSnippetSVG(label, firstLine, filename string) []b
 // generatePDFThumbnail generates a thumbnail for PDF files using pdftoppm or fallback
 func (c *ServeCmd) generatePDFThumbnail(path string) ([]byte, string, error) {
 	// Try pdftoppm first (fastest, best quality)
-	if data, err := exec.Command("pdftoppm", "-png", "-f", "1", "-singlefile", "-scale-to", "320", path, "-").Output(); err == nil {
-		return data, "image/png", nil
+	tmpFile, err := os.CreateTemp("", "disco-thumb-*")
+	if err == nil {
+		tmpPath := tmpFile.Name()
+		tmpFile.Close()
+		defer os.Remove(tmpPath + ".png")
+		if err = exec.Command("pdftoppm", "-png", "-f", "1", "-singlefile", "-scale-to", "320", path, tmpPath).Run(); err == nil {
+			if data, err := os.ReadFile(tmpPath + ".png"); err == nil {
+				return data, "image/png", nil
+			}
+		}
 	}
 
 	// Fallback: read first page text and render as SVG

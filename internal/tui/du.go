@@ -19,6 +19,128 @@ var (
 	barFullStyle = lipgloss.NewStyle().Foreground(ColorAccent)
 )
 
+// duTreeNode represents a node in the disk usage tree
+type duTreeNode struct {
+	Path          string
+	Name          string
+	Count         int
+	TotalSize     int64
+	TotalDuration int64
+	Children      map[string]*duTreeNode
+	IsDir         bool
+}
+
+// buildDUTree builds a tree structure from media list for fast navigation
+func buildDUTree(media []models.MediaWithDB) *duTreeNode {
+	root := &duTreeNode{
+		Path:     "",
+		Name:     "root",
+		Children: make(map[string]*duTreeNode),
+		IsDir:    true,
+	}
+
+	for _, m := range media {
+		path := m.Path
+		parts := strings.FieldsFunc(path, func(r rune) bool {
+			return r == '/' || r == '\\'
+		})
+		isAbs := len(path) > 0 && (path[0] == '/' || path[0] == '\\')
+
+		// Update root stats
+		if m.Size != nil {
+			root.TotalSize += *m.Size
+		}
+		if m.Duration != nil {
+			root.TotalDuration += *m.Duration
+		}
+		root.Count++
+
+		// Build tree path
+		current := root
+		var currentPath string
+
+		for i, part := range parts {
+			// Build path up to this component
+			if isAbs {
+				if i == 0 {
+					currentPath = "/" + part
+				} else {
+					currentPath = currentPath + "/" + part
+				}
+			} else {
+				if i == 0 {
+					currentPath = part
+				} else {
+					currentPath = currentPath + "/" + part
+				}
+			}
+
+			if _, ok := current.Children[part]; !ok {
+				current.Children[part] = &duTreeNode{
+					Path:     currentPath,
+					Name:     part,
+					Children: make(map[string]*duTreeNode),
+					IsDir:    true,
+				}
+			}
+			current = current.Children[part]
+
+			// Add file stats to this node
+			if m.Size != nil {
+				current.TotalSize += *m.Size
+			}
+			if m.Duration != nil {
+				current.TotalDuration += *m.Duration
+			}
+			current.Count++
+		}
+	}
+
+	return root
+}
+
+// getNodesAtDepth returns nodes at the specified depth from the tree
+func getNodesAtDepth(node *duTreeNode, targetDepth int, currentDepth int, pathPrefix string) []duItem {
+	var results []duItem
+
+	if currentDepth == targetDepth {
+		// Return children of this node
+		for _, child := range node.Children {
+			results = append(results, duItem{
+				stats: models.FolderStats{
+					Path:          child.Path,
+					Count:         child.Count,
+					TotalSize:     child.TotalSize,
+					TotalDuration: child.TotalDuration,
+				},
+				isDir: true,
+			})
+		}
+		return results
+	}
+
+	// Find the child matching the path prefix
+	if pathPrefix != "" {
+		parts := strings.FieldsFunc(pathPrefix, func(r rune) bool {
+			return r == '/' || r == '\\'
+		})
+		if len(parts) > currentDepth {
+			nextPart := parts[currentDepth]
+			if child, ok := node.Children[nextPart]; ok {
+				return getNodesAtDepth(child, targetDepth, currentDepth+1, pathPrefix)
+			}
+		}
+		return results
+	}
+
+	// No path prefix - traverse all children
+	for _, child := range node.Children {
+		results = append(results, getNodesAtDepth(child, targetDepth, currentDepth+1, "")...)
+	}
+
+	return results
+}
+
 type duItem struct {
 	stats models.FolderStats
 	isDir bool
@@ -45,6 +167,7 @@ func (i duItem) FilterValue() string {
 type DUModel struct {
 	list        list.Model
 	allMedia    []models.MediaWithDB
+	tree        *duTreeNode
 	currentPath string
 	history     []string
 	totalSize   int64
@@ -56,42 +179,46 @@ func NewDUModel(media []models.MediaWithDB, flags models.GlobalFlags) DUModel {
 	m := DUModel{
 		allMedia: media,
 		flags:    flags,
+		// Build tree once at startup for O(1) navigation
+		tree: buildDUTree(media),
 	}
 	m.updateList()
 	return m
 }
 
 func (m *DUModel) updateList() {
-	var currentMedia []models.MediaWithDB
-	if m.currentPath == "" {
-		currentMedia = m.allMedia
-	} else {
-		currentPath := m.currentPath
-		for _, med := range m.allMedia {
-			if strings.HasPrefix(med.Path, currentPath) {
-				currentMedia = append(currentMedia, med)
+	// Determine target depth (children of current path)
+	targetDepth := 1
+	if m.currentPath != "" {
+		cleanPath := filepath.Clean(m.currentPath)
+		targetDepth = strings.Count(cleanPath, "/") + strings.Count(cleanPath, "\\") + 1
+	}
+
+	// Get nodes from tree at target depth (O(1) lookup instead of O(n) filtering)
+	var items []list.Item
+	var maxSize int64
+
+	if m.tree != nil {
+		nodes := getNodesAtDepth(m.tree, targetDepth, 0, m.currentPath)
+		items = make([]list.Item, len(nodes))
+		for i, node := range nodes {
+			items[i] = node
+			if node.stats.TotalSize > maxSize {
+				maxSize = node.stats.TotalSize
 			}
 		}
 	}
 
-	// Determine next depth
-	depth := 1
-	if m.currentPath != "" {
-		cleanPath := filepath.Clean(m.currentPath)
-		depth = strings.Count(cleanPath, "/") + strings.Count(cleanPath, "\\") + 1
+	// Sort using the standard sort function
+	stats := make([]models.FolderStats, len(items))
+	for i, item := range items {
+		stats[i] = item.(duItem).stats
 	}
-
-	tempFlags := m.flags
-	tempFlags.Depth = depth
-	tempFlags.Parents = false
-
-	stats := query.AggregateMedia(currentMedia, tempFlags)
 	query.SortFolders(stats, m.flags.SortBy, m.flags.Reverse)
 
-	items := make([]list.Item, len(stats))
-	maxSize := int64(0)
+	// Rebuild items with sorted stats
 	for i, s := range stats {
-		items[i] = duItem{stats: s, isDir: true} // Logic to distinguish files vs dirs could be added
+		items[i] = duItem{stats: s, isDir: true}
 		if s.TotalSize > maxSize {
 			maxSize = s.TotalSize
 		}

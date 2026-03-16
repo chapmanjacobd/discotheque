@@ -303,6 +303,8 @@ func (c *ServeCmd) handleQuery(w http.ResponseWriter, r *http.Request) {
 		sortConfig = flags.SortBy
 	}
 
+	// Only do in-memory sorting for expansion-based sorting or multi-DB queries
+	// Single DB queries are already sorted by SQL with proper LIMIT/OFFSET
 	if strings.Contains(sortConfig, "_related_media") && len(dbs) > 0 {
 		// Use expansion-aware sorting with first database
 		err := c.execDB(ctx, dbs[0], func(sqlDB *sql.DB) error {
@@ -314,10 +316,11 @@ func (c *ServeCmd) handleQuery(w http.ResponseWriter, r *http.Request) {
 			// Fall back to regular sorting
 			query.SortMedia(media, flags)
 		}
-	} else {
-		// Use regular sorting
+	} else if len(dbs) > 1 {
+		// Multi-DB queries need in-memory sorting to merge results from multiple databases
 		query.SortMedia(media, flags)
 	}
+	// For single DB queries, SQL already sorted with LIMIT/OFFSET, so skip in-memory sorting
 
 	w.Header().Set("X-Total-Count", strconv.FormatInt(totalCount, 10))
 	w.Header().Set("Content-Type", "application/json")
@@ -864,7 +867,6 @@ func (c *ServeCmd) handleLs(w http.ResponseWriter, r *http.Request) {
 }
 
 func (c *ServeCmd) handleDU(w http.ResponseWriter, r *http.Request) {
-	flags := c.parseFlags(r)
 	path := r.URL.Query().Get("path")
 
 	// Clean the path
@@ -886,106 +888,31 @@ func (c *ServeCmd) handleDU(w http.ResponseWriter, r *http.Request) {
 	}
 	targetDepth := currentDepth + 1 // We want to show children at this depth
 
-	// Use MediaQuery to get all media with all filters applied
-	// We need to override the path filter to only get children of current path
-	originalWhere := flags.Where
-	if cleanPath != "" {
-		// Add path prefix filter (handle both separators)
-		escapedPath := strings.ReplaceAll(cleanPath, "'", "''")
-		flags.Where = append(flags.Where, "(path LIKE '"+escapedPath+"/%' OR path LIKE '"+escapedPath+"\\%')")
-	} else {
-		// At root level - no path filter needed
-	}
-
-	// Ensure we get all media (no limit for aggregation)
-	flags.All = true
-	flags.Limit = 0
-
-	allMedia, err := query.MediaQuery(r.Context(), c.Databases, flags)
+	// Use SQL-level aggregation for folders (much faster than fetching all media)
+	folderResults, err := query.AggregateDUByPathMultiDB(r.Context(), c.Databases, cleanPath, targetDepth, currentDepth)
 	if err != nil {
-		slog.Error("Failed to fetch media for DU", "error", err)
+		slog.Error("Failed to fetch DU folders", "error", err)
 		http.Error(w, "Query failed", http.StatusInternalServerError)
 		return
 	}
 
-	// Restore original where clause for future use
-	flags.Where = originalWhere
+	// Fetch direct files at target depth
+	directFiles, err := query.FetchDUDirectFiles(r.Context(), c.Databases, cleanPath, targetDepth)
+	if err != nil {
+		slog.Error("Failed to fetch DU files", "error", err)
+		http.Error(w, "Query failed", http.StatusInternalServerError)
+		return
+	}
 
-	// Separate maps for direct files and folders
-	directFiles := make(map[string]*models.MediaWithDB)
-	folders := make(map[string]*models.FolderStats)
-
-	for i := range allMedia {
-		media := &allMedia[i]
-		// Use path as-is
-		filePath := media.Path
-
-		// Calculate the file's depth (number of path components)
-		parts := strings.FieldsFunc(filePath, func(r rune) bool {
-			return r == '/' || r == '\\'
+	// Convert folder results to FolderStats
+	folders := make([]models.FolderStats, 0, len(folderResults))
+	for _, r := range folderResults {
+		folders = append(folders, models.FolderStats{
+			Path:          r.Path,
+			Count:         r.Count,
+			TotalSize:     r.TotalSize,
+			TotalDuration: r.TotalDuration,
 		})
-		isAbsolute := len(filePath) > 0 && (filePath[0] == '/' || filePath[0] == '\\')
-		sep := string(filepath.Separator)
-		fileDepth := len(parts)
-
-		if fileDepth == targetDepth {
-			// This is a direct child file - add to files list
-			directFiles[filePath] = media
-		} else if fileDepth > targetDepth {
-			// This file is in a subfolder - group by subfolder
-			var parent string
-			if currentDepth == 0 {
-				// Root level: parent is first component
-				if len(parts) > 0 {
-					parent = parts[0]
-					if isAbsolute {
-						parent = sep + parent
-					}
-				}
-			} else {
-				// Subdirectory: parent is path up to targetDepth components
-				if len(parts) >= targetDepth {
-					parent = filepath.Join(parts[:targetDepth]...)
-					if isAbsolute {
-						parent = sep + parent
-					}
-				} else {
-					parent = filePath
-				}
-			}
-
-			if parent == "" {
-				continue
-			}
-
-			if _, ok := folders[parent]; !ok {
-				folders[parent] = &models.FolderStats{Path: parent}
-			}
-			stat := folders[parent]
-			stat.Count++
-			if media.Size != nil {
-				stat.TotalSize += *media.Size
-			}
-			if media.Duration != nil {
-				stat.TotalDuration += *media.Duration
-			}
-		}
-	}
-
-	// Combine folders and files into response
-	response := models.DUResponse{
-		Folders: make([]models.FolderStats, 0, len(folders)),
-		Files:   make([]models.MediaWithDB, 0, len(directFiles)),
-	}
-
-	// Add folders
-	for _, stat := range folders {
-		response.Folders = append(response.Folders, *stat)
-	}
-
-	// Add direct files
-	for _, file := range directFiles {
-		response.Files = append(response.Files, *file)
 	}
 
 	// Sort folders
@@ -997,15 +924,120 @@ func (c *ServeCmd) handleDU(w http.ResponseWriter, r *http.Request) {
 		reverse = true
 	}
 
-	query.SortFolders(response.Folders, sortBy, reverse)
+	query.SortFolders(folders, sortBy, reverse)
 
-	// Set aggregate counts
-	response.FolderCount = len(response.Folders)
-	response.FileCount = len(response.Files)
-	response.TotalCount = response.FolderCount + response.FileCount
+	// Sort files using the same sort parameters
+	sort.Slice(directFiles, func(i, j int) bool {
+		var less bool
+		switch sortBy {
+		case "size":
+			iSize := int64(0)
+			jSize := int64(0)
+			if directFiles[i].Size != nil {
+				iSize = *directFiles[i].Size
+			}
+			if directFiles[j].Size != nil {
+				jSize = *directFiles[j].Size
+			}
+			less = iSize < jSize
+		case "duration":
+			iDur := int64(0)
+			jDur := int64(0)
+			if directFiles[i].Duration != nil {
+				iDur = *directFiles[i].Duration
+			}
+			if directFiles[j].Duration != nil {
+				jDur = *directFiles[j].Duration
+			}
+			less = iDur < jDur
+		case "path", "name":
+			less = directFiles[i].Path < directFiles[j].Path
+		case "title":
+			iTitle := ""
+			jTitle := ""
+			if directFiles[i].Title != nil {
+				iTitle = *directFiles[i].Title
+			}
+			if directFiles[j].Title != nil {
+				jTitle = *directFiles[j].Title
+			}
+			less = iTitle < jTitle
+		default:
+			less = directFiles[i].Path < directFiles[j].Path
+		}
+		if reverse {
+			return !less
+		}
+		return less
+	})
+
+	// Apply pagination
+	totalCount := len(folders) + len(directFiles)
+	limitStr := r.URL.Query().Get("limit")
+	offsetStr := r.URL.Query().Get("offset")
+
+	limit := 100 // Default page size
+	offset := 0
+
+	if limitStr != "" {
+		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 {
+			limit = l
+		}
+	}
+	if offsetStr != "" {
+		if o, err := strconv.Atoi(offsetStr); err == nil && o >= 0 {
+			offset = o
+		}
+	}
+
+	// Apply pagination to folders and files separately
+	// Folders come first, then files
+	folderStart := offset
+	folderEnd := offset + limit
+	
+	if folderStart >= len(folders) {
+		// Offset is beyond folders, apply to files
+		fileStart := offset - len(folders)
+		fileEnd := fileStart + limit
+		if fileStart >= len(directFiles) {
+			// Offset is beyond all items
+			folderStart, folderEnd = len(folders), len(folders)
+			fileStart, fileEnd = len(directFiles), len(directFiles)
+		} else {
+			folderStart, folderEnd = len(folders), len(folders)
+			if fileEnd > len(directFiles) {
+				fileEnd = len(directFiles)
+			}
+			directFiles = directFiles[fileStart:fileEnd]
+		}
+	} else {
+		// Offset is within folders
+		if folderEnd > len(folders) {
+			// Pagination spans folders and files
+			fileStart := 0
+			fileEnd := folderEnd - len(folders)
+			if fileEnd > len(directFiles) {
+				fileEnd = len(directFiles)
+			}
+			folders = folders[folderStart:]
+			directFiles = directFiles[fileStart:fileEnd]
+		} else {
+			// Pagination is within folders only
+			folders = folders[folderStart:folderEnd]
+		}
+	}
+
+	// Build response
+	response := models.DUResponse{
+		Folders:     folders,
+		Files:       directFiles,
+		FolderCount: len(folders),
+		FileCount:   len(directFiles),
+		TotalCount:  totalCount,
+	}
 
 	// Set total count header for pagination
-	w.Header().Set("X-Total-Count", strconv.Itoa(response.TotalCount))
+	w.Header().Set("X-Total-Count", strconv.Itoa(totalCount))
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
 }

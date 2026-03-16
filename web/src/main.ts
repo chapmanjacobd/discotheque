@@ -11,7 +11,8 @@ import {
     shortDuration,
     truncateString,
     formatParents,
-    getIcon
+    getIcon,
+    generateClientThumbnail
 } from './utils';
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -1661,6 +1662,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         state.page = 'du';
         state.duPath = path;
+        // Reset to first page when navigating to a new path
+        if (path !== prevPath) {
+            state.currentPage = 1;
+        }
 
         // Set default sort for DU view on first visit: size descending
         if (isFirstDUVisit) {
@@ -1687,6 +1692,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const params = new URLSearchParams();
             params.append('path', String(path));
             appendFilterParams(params);
+
+            // Add pagination parameters
+            params.append('limit', String(state.filters.limit));
+            params.append('offset', String((state.currentPage - 1) * state.filters.limit));
 
             const resp = await fetchAPI(`/api/du?${params.toString()}`);
             clearTimeout(skeletonTimeout);
@@ -1739,6 +1748,10 @@ document.addEventListener('DOMContentLoaded', () => {
         // Use pre-computed aggregates from backend
         const totalFolders = rawResponse?.folder_count || 0;
         const totalFiles = rawResponse?.file_count || 0;
+        const totalCount = rawResponse?.total_count || 0;
+
+        // Store total count for pagination
+        state.totalCount = totalCount;
 
         // Show current path in toolbar input
         const duToolbar = document.getElementById('du-toolbar');
@@ -1770,15 +1783,8 @@ document.addEventListener('DOMContentLoaded', () => {
         // Show folder/file count in results-info (from backend aggregates)
         resultsCount.textContent = `${totalFolders} folders, ${totalFiles} files`;
 
-        // Build mediaItems array for navigation (folders with files + direct files)
+        // Build mediaItems array for navigation (direct files only in new API format)
         let mediaItems = [];
-        if (rawResponse?.folders) {
-            rawResponse.folders.forEach(folder => {
-                if (folder.files && folder.files.length > 0) {
-                    mediaItems = mediaItems.concat(folder.files);
-                }
-            });
-        }
         if (rawResponse?.files) {
             mediaItems = mediaItems.concat(rawResponse.files);
         }
@@ -1795,7 +1801,7 @@ document.addEventListener('DOMContentLoaded', () => {
             renderDUGrid(data);
         }
 
-        paginationContainer.classList.add('hidden');
+        renderPagination();
         updateNavActiveStates();
     }
 
@@ -2003,8 +2009,8 @@ document.addEventListener('DOMContentLoaded', () => {
         data.forEach(item => {
             const card = document.createElement('div');
 
-            // Check if this is a direct file (has type field, no count field)
-            const isDirectFile = item.type !== undefined && item.count === undefined;
+            // Check if this is a direct file (no count field, which folders have)
+            const isDirectFile = item.count === undefined;
 
             if (isDirectFile) {
                 // Render as clickable media card
@@ -2019,10 +2025,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 const thumbUrl = `/api/thumbnail?path=${encodeURIComponent(mediaItem.path)}`;
                 const size = formatSize(mediaItem.size);
                 const duration = formatDuration(mediaItem.duration);
+                const icon = getIcon(mediaItem.type);
+                const filename = mediaItem.path.split('/').pop() || mediaItem.path;
 
                 card.innerHTML = `
                     <div class="media-thumb">
-                        <img src="${thumbUrl}" loading="lazy" onload="this.classList.add('loaded')">
+                        <img src="${thumbUrl}" loading="lazy" onload="this.classList.add('loaded')" onerror="const canvas=document.createElement('canvas');canvas.width=320;canvas.height=240;const dataUrl=generateClientThumbnail(canvas,'${filename.replace(/'/g, "\\'")}','${mediaItem.type || ''}');this.src=dataUrl;this.classList.add('loaded');this.onerror=null">
+                        <div style="display:none; width:100%; height:100%; align-items:center; justify-content:center; background:var(--sidebar-bg); font-size:3rem;">${icon}</div>
                         <span class="media-duration">${duration}</span>
                     </div>
                     <div class="media-info">
@@ -2032,36 +2041,6 @@ document.addEventListener('DOMContentLoaded', () => {
                         </div>
                     </div>
                 `;
-            } else if (item.files && item.files.length > 0) {
-                // Render individual files from the files array as clickable media cards
-                item.files.forEach(mediaItem => {
-                    const fileCard = document.createElement('div');
-                    fileCard.className = 'media-card';
-                    (fileCard as HTMLElement).dataset.path = mediaItem.path;
-                    (fileCard as HTMLElement).dataset.type = mediaItem.type || '';
-                    if (mediaItem.is_dir) (fileCard as HTMLElement).dataset.isDir = 'true';
-                    fileCard.onclick = () => playMedia(mediaItem);
-
-                    const title = truncateString(mediaItem.title || mediaItem.path.split('/').pop());
-                    const thumbUrl = `/api/thumbnail?path=${encodeURIComponent(mediaItem.path)}`;
-                    const size = formatSize(mediaItem.size);
-                    const duration = formatDuration(mediaItem.duration);
-
-                    fileCard.innerHTML = `
-                        <div class="media-thumb">
-                            <img src="${thumbUrl}" loading="lazy" onload="this.classList.add('loaded')">
-                            <span class="media-duration">${duration}</span>
-                        </div>
-                        <div class="media-info">
-                            <div class="media-title">${title}</div>
-                            <div class="media-meta">
-                                <span>${size}</span>
-                            </div>
-                        </div>
-                    `;
-                    resultsContainer.appendChild(fileCard);
-                });
-                return; // Skip the rest for this item since we already added the files
             } else {
                 // Render as folder card
                 card.className = 'media-card du-card';
@@ -5272,9 +5251,16 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        const totalPages = Math.ceil(state.totalCount / state.filters.limit);
+        
+        // Hide pagination if there's only one page or less
+        if (totalPages <= 1) {
+            paginationContainer.classList.add('hidden');
+            return;
+        }
+
         paginationContainer.classList.remove('hidden');
 
-        const totalPages = Math.ceil(state.totalCount / state.filters.limit);
         if (totalPages > 0) {
             pageInfo.textContent = `Page ${state.currentPage} of ${totalPages}`;
         } else {
@@ -5403,8 +5389,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         let thumbHtml = `
-            <img src="${thumbUrl}" loading="lazy" onload="this.classList.add('loaded'); this.closest('.media-thumb').classList.remove('skeleton')" onerror="this.style.display='none'; this.nextElementSibling.style.display='block'; this.closest('.media-thumb').classList.remove('skeleton')">
-            <i style="display: block">${getIcon(item.type)}</i>
+            <img src="${thumbUrl}" loading="lazy" onload="this.classList.add('loaded'); const icon = this.nextElementSibling; if (icon && icon.tagName === 'I') icon.style.display = 'none'; this.closest('.media-thumb').classList.remove('skeleton')" onerror="this.style.display='none'; const icon = this.nextElementSibling; if (icon && icon.tagName === 'I') { icon.style.display = 'block'; icon.innerHTML = '${getIcon(item.type)}'; } this.closest('.media-thumb').classList.remove('skeleton')">
+            <i style="display: none">${getIcon(item.type)}</i>
         `;
 
         if (item.is_dir) {
@@ -7975,7 +7961,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if (prevPageBtn) (prevPageBtn as HTMLElement).onclick = () => {
         if (state.currentPage > 1) {
             state.currentPage--;
-            performSearch();
+            if (state.page === 'du') {
+                fetchDU(state.duPath);
+            } else {
+                performSearch();
+            }
             resultsContainer.scrollTo(0, 0);
         }
     };
@@ -7984,7 +7974,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const totalPages = Math.ceil(state.totalCount / state.filters.limit);
         if (state.currentPage < totalPages) {
             state.currentPage++;
-            performSearch();
+            if (state.page === 'du') {
+                fetchDU(state.duPath);
+            } else {
+                performSearch();
+            }
             resultsContainer.scrollTo(0, 0);
         }
     };
@@ -8137,6 +8131,7 @@ document.addEventListener('DOMContentLoaded', () => {
         renderQueue,
         startSlideshow,
         stopSlideshow,
+        fetchDU,
         state
     };
 });

@@ -108,6 +108,7 @@ CREATE TABLE IF NOT EXISTS custom_keywords (
 
 CREATE INDEX IF NOT EXISTS idx_time_deleted ON media(time_deleted);
 CREATE INDEX IF NOT EXISTS idx_time_last_played ON media(time_last_played);
+CREATE INDEX IF NOT EXISTS idx_path ON media(path);
 CREATE INDEX IF NOT EXISTS idx_duration ON media(duration);
 CREATE INDEX IF NOT EXISTS idx_size ON media(size);
 CREATE INDEX IF NOT EXISTS idx_type ON media(type);
