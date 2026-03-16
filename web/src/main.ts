@@ -1480,6 +1480,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function removeFromPlaylist(title, item) {
+        const itemEl = document.querySelector(`.media-card[data-path="${CSS.escape(item.path)}"]`);
+        if (itemEl) {
+            itemEl.classList.add('fade-out');
+            await new Promise(r => setTimeout(r, 200));
+        }
+
         try {
             const resp = await fetchAPI('/api/playlists/items', {
                 method: 'DELETE',
@@ -1491,9 +1497,23 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             if (!resp.ok) throw new Error('Remove failed');
             showToast('Removed from playlist');
-            fetchPlaylistItems(title);
+
+            if (itemEl) {
+                itemEl.remove();
+                currentMedia = currentMedia.filter(m => m.path !== item.path);
+                state.playlistItems = state.playlistItems.filter(m => m.path !== item.path);
+                
+                // Update results count display
+                const unit = currentMedia.length === 1 ? 'result' : 'results';
+                resultsCount.textContent = `${currentMedia.length} ${unit} in ${state.filters.playlist || 'playlist'}`;
+                
+                renderPagination();
+            } else {
+                fetchPlaylistItems(title);
+            }
         } catch (err) {
             console.error('Remove from playlist failed:', err);
+            if (itemEl) itemEl.classList.remove('fade-out');
         }
     }
 
@@ -2946,8 +2966,56 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    async function fetchNextItem() {
+        if (state.filters.all || state.page === 'curation' || state.view === 'details' || state.page === 'captions') {
+            return;
+        }
+
+        try {
+            const params = new URLSearchParams();
+            if (state.page === 'trash') {
+                params.append('trash', String('true'));
+            } else if (state.page === 'history') {
+                params.append('watched', String('true'));
+            }
+            appendFilterParams(params);
+
+            if (state.filters.sort === 'custom' && state.filters.customSortFields) {
+                params.append('sort_fields', state.filters.customSortFields);
+            } else {
+                params.append('sort', String(state.filters.sort));
+                if (state.filters.reverse) params.append('reverse', String('true'));
+            }
+
+            params.append('limit', '1');
+            params.append('offset', (state.currentPage * state.filters.limit - 1).toString());
+
+            const resp = await fetchAPI(`/api/query?${params.toString()}`);
+            if (!resp.ok) return;
+
+            let data = await resp.json();
+            if (data && typeof data === 'object' && !Array.isArray(data) && data.items) {
+                data = data.items;
+            }
+            if (Array.isArray(data) && data.length > 0) {
+                const item = data[0];
+                currentMedia.push(item);
+                const card = createMediaCard(item, currentMedia.length - 1);
+                resultsContainer.appendChild(card);
+            }
+        } catch (err) {
+            console.error('Failed to fetch next item:', err);
+        }
+    }
+
     async function permanentlyDeleteMedia(path) {
         if (!confirm('Are you sure you want to permanently delete this file?')) return;
+
+        const itemEl = document.querySelector(`.media-card[data-path="${CSS.escape(path)}"]`);
+        if (itemEl) {
+            itemEl.classList.add('fade-out');
+            await new Promise(r => setTimeout(r, 200));
+        }
 
         try {
             const resp = await fetchAPI('/api/empty-bin', {
@@ -2958,15 +3026,39 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!resp.ok) throw new Error('Failed to delete');
             const msg = await resp.text();
             showToast(msg, '🔥');
-            fetchTrash();
+
+            if (itemEl) {
+                itemEl.remove();
+                currentMedia = currentMedia.filter(m => m.path !== path);
+                state.totalCount--;
+                
+                // Update results count display
+                const unit = state.totalCount === 1 ? 'file' : 'files';
+                if (state.page === 'trash') {
+                    resultsCount.innerHTML = `<span>${state.totalCount} ${unit} in trash</span> <button id="empty-bin-btn" class="category-btn" style="margin-left: 1rem; background: #e74c3c; color: white;">Empty Bin</button>`;
+                    const emptyBtn = document.getElementById('empty-bin-btn');
+                    if (emptyBtn) emptyBtn.onclick = emptyBin;
+                } else {
+                    const hasClientFilter = state.filters.unplayed || state.filters.unfinished || state.filters.completed;
+                    const displayCount = hasClientFilter ? currentMedia.length : state.totalCount;
+                    const unit = displayCount === 1 ? 'result' : 'results';
+                    resultsCount.textContent = `${displayCount} ${unit}`;
+                }
+
+                await fetchNextItem();
+                renderPagination();
+            } else {
+                fetchTrash();
+            }
         } catch (err) {
             console.error('Permanent delete failed:', err);
             errorToast(err as any, 'Failed to delete');
+            if (itemEl) itemEl.classList.remove('fade-out');
         }
     }
 
     async function deleteMedia(path, restore = false) {
-        const itemEl = document.querySelector(`[data-path="${CSS.escape(path)}"]`);
+        const itemEl = document.querySelector(`.media-card[data-path="${CSS.escape(path)}"]`);
         const content = document.getElementById('content');
         const main = document.querySelector('main');
 
@@ -2991,15 +3083,38 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (restore) {
                 showToast('Item restored');
+                performSearch(); // Full refresh for restore
             } else {
                 const filename = path.split('/').pop();
                 showToast(`Trashed ${filename}`, '🗑️');
-            }
 
-            if (state.page === 'trash') {
-                fetchTrash();
-            } else {
-                performSearch();
+                if (itemEl) {
+                    itemEl.remove();
+                    currentMedia = currentMedia.filter(m => m.path !== path);
+                    state.totalCount--;
+
+                    // Update results count display
+                    if (state.page === 'trash') {
+                        const unit = state.totalCount === 1 ? 'file' : 'files';
+                        resultsCount.innerHTML = `<span>${state.totalCount} ${unit} in trash</span> <button id="empty-bin-btn" class="category-btn" style="margin-left: 1rem; background: #e74c3c; color: white;">Empty Bin</button>`;
+                        const emptyBtn = document.getElementById('empty-bin-btn');
+                        if (emptyBtn) emptyBtn.onclick = emptyBin;
+                    } else {
+                        const hasClientFilter = state.filters.unplayed || state.filters.unfinished || state.filters.completed;
+                        const displayCount = hasClientFilter ? currentMedia.length : state.totalCount;
+                        const unit = displayCount === 1 ? 'result' : 'results';
+                        resultsCount.textContent = `${displayCount} ${unit}`;
+                    }
+
+                    await fetchNextItem();
+                    renderPagination();
+                } else {
+                    if (state.page === 'trash') {
+                        fetchTrash();
+                    } else {
+                        performSearch();
+                    }
+                }
             }
         } catch (err) {
             console.error('Delete/Restore failed:', err);
@@ -5113,6 +5228,245 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    function createMediaCard(item, index) {
+        const card = document.createElement('div');
+        card.className = 'media-card';
+        (card as HTMLElement).dataset.path = item.path;
+        (card as HTMLElement).dataset.type = item.type || '';
+        if (item.is_dir) (card as HTMLElement).dataset.isDir = 'true';
+        (card as any)._item = item;
+        card.draggable = true;
+
+        card.addEventListener('dragstart', (e) => {
+            state.draggedItem = item;
+            (e as DragEvent).dataTransfer.effectAllowed = 'all';
+            (e as DragEvent).dataTransfer.setData('text/plain', item.path);
+            card.classList.add('dragging');
+            document.body.classList.add('is-dragging');
+        });
+
+        card.addEventListener('dragend', () => {
+            card.classList.remove('dragging');
+            document.body.classList.remove('is-dragging');
+            state.draggedItem = null;
+            clearAllDragOver();
+        });
+
+        (card as HTMLElement).onclick = (e) => {
+            if ((e.target as HTMLElement).closest('.media-actions') || (e.target as HTMLElement).closest('.media-action-btn')) return;
+
+            if (item.is_dir) {
+                (searchInput as HTMLInputElement).value = item.path.endsWith('/') ? item.path : item.path + '/';
+                performSearch();
+                return;
+            }
+
+            if (item.path.toLowerCase().endsWith('.zim')) {
+                window.open(`/api/zim/view?path=${encodeURIComponent(item.path)}`, '_blank');
+                return;
+            }
+
+            const isCaptionClick = (e.target as HTMLElement).closest('.caption-highlight');
+            if (isCaptionClick && item.caption_time) {
+                playMedia(item).then(() => {
+                    const media = pipViewer.querySelector('video, audio');
+                    if (media) (media as HTMLMediaElement).currentTime = item.caption_time;
+                });
+            } else {
+                playMedia(item);
+            }
+        };
+
+        const title = item.title || item.path.split('/').pop();
+        const displayPath = formatParents(item.path);
+        const size = formatSize(item.size);
+        const duration = formatDuration(item.duration);
+        const plays = getPlayCount(item);
+        const thumbUrl = `/api/thumbnail?path=${encodeURIComponent(item.path)}`;
+
+        const localPos = getLocalProgress(item);
+        const playhead = (localPos > 0) ? localPos : (item.playhead || 0);
+        const progress = (item.duration && playhead) ? Math.round((playhead / item.duration) * 100) : 0;
+        const progressHtml = progress > 0 ? `
+            <div class="progress-container" title="${progress}% completed">
+                <div class="progress-bar" style="width: ${progress}%"></div>
+            </div>
+        ` : '';
+
+        const captionHtml = item.caption_text ? `
+            <div class="caption-highlight" title="Click to play at this time">
+                "…${item.caption_text}…"
+                <span class="caption-time">${formatDuration(item.caption_time)}</span>
+            </div>
+        ` : '';
+
+        const isTrash = state.page === 'trash';
+        const isPlaylist = state.page === 'playlist';
+
+        let actionBtns = '';
+        if (isTrash) {
+            actionBtns = `
+                <button class="media-action-btn restore" title="Restore">↺</button>
+                <button class="media-action-btn delete-permanent" title="Permanently Delete">🔥</button>
+            `;
+        } else if (isPlaylist) {
+            actionBtns = `
+                ${!state.readOnly ? `<button class="media-action-btn remove-playlist" title="Remove from Playlist">&times;</button>` : ''}
+            `;
+        } else {
+            actionBtns = `
+                ${!state.readOnly ? `<button class="media-action-btn add-playlist" title="Add to Playlist">+</button>` : ''}
+                ${plays > 0 ?
+            `<button class="media-action-btn mark-unplayed" title="Mark as Unplayed">⭕</button>` :
+            `<button class="media-action-btn mark-played" title="Mark as Played">✅</button>`
+        }
+                ${!state.readOnly ? `<button class="media-action-btn delete" title="Delete">🗑️</button>` : ''}
+            `;
+        }
+
+        let thumbHtml = `
+            <img src="${thumbUrl}" loading="lazy" onload="this.classList.add('loaded')" onerror="this.style.display='none'; this.nextElementSibling.style.display='block'">
+            <i style="display: none">${getIcon(item.type)}</i>
+        `;
+
+        if (item.is_dir) {
+            thumbHtml = `<div style="width:100%; height:100%; display:flex; align-items:center; justify-content:center; background:var(--sidebar-bg); font-size:4rem;">📂</div>`;
+        }
+
+        card.innerHTML = `
+            <div class="media-thumb">
+                ${thumbHtml}
+                ${duration ? `<span class="media-duration">${duration}</span>` : ''}
+                <div class="media-actions">
+                    ${actionBtns}
+                </div>
+            </div>
+            <div class="media-info">
+                <div class="media-title" title="${item.path}">${title}</div>
+                <div class="media-meta">
+                    <span>${size}</span>
+
+                    <span title="${item.path}">${displayPath}</span>
+                    ${plays > 0 ? `<span title="Play count">▶️ ${plays}</span>` : ''}
+                </div>
+                ${progressHtml}
+                ${captionHtml}
+            </div>
+        `;
+
+        // Reordering logic within a playlist
+        if (isPlaylist) {
+            card.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                (e as DragEvent).dataTransfer.dropEffect = 'move';
+
+                const rect = card.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                if (x < rect.width / 2) {
+                    card.style.borderLeft = '4px solid var(--accent-color)';
+                    card.style.borderRight = '';
+                } else {
+                    card.style.borderLeft = '';
+                    card.style.borderRight = '4px solid var(--accent-color)';
+                }
+            });
+
+            card.addEventListener('dragleave', () => {
+                card.style.borderLeft = '';
+                card.style.borderRight = '';
+            });
+
+            card.addEventListener('drop', (e) => {
+                e.preventDefault();
+                card.style.borderLeft = '';
+                card.style.borderRight = '';
+
+                if (state.draggedItem && state.draggedItem !== item) {
+                    const rect = card.getBoundingClientRect();
+                    const x = e.clientX - rect.left;
+                    let dropIndex = index;
+
+                    // Calculate if we drop before (left) or after (right)
+                    if (x > rect.width / 2) {
+                        dropIndex = index + 1;
+                    }
+
+                    // Calculate dragged index
+                    const draggedIndex = currentMedia.findIndex(m => m.path === state.draggedItem.path);
+                    if (draggedIndex !== -1 && draggedIndex < dropIndex) {
+                        dropIndex--;
+                    }
+
+                    handlePlaylistReorder(state.draggedItem, dropIndex);
+                }
+            });
+        }
+
+        const btnDelete = card.querySelector('.media-action-btn.delete');
+        if (btnDelete) (btnDelete as HTMLElement).onclick = (e) => {
+            e.stopPropagation();
+            deleteMedia(item.path, false);
+        };
+
+        const btnRSVP = card.querySelector('.media-action-btn.rsvp');
+        if (btnRSVP) (btnRSVP as HTMLElement).onclick = (e) => {
+            e.stopPropagation();
+            playRSVP(item);
+        };
+
+        const btnRestore = card.querySelector('.media-action-btn.restore');
+        if (btnRestore) (btnRestore as HTMLElement).onclick = (e) => {
+            e.stopPropagation();
+            deleteMedia(item.path, true);
+        };
+
+        const btnDeletePermanent = card.querySelector('.media-action-btn.delete-permanent');
+        if (btnDeletePermanent) (btnDeletePermanent as HTMLElement).onclick = (e) => {
+            e.stopPropagation();
+            permanentlyDeleteMedia(item.path);
+        };
+
+        const btnAddPlaylist = card.querySelector('.media-action-btn.add-playlist');
+        if (btnAddPlaylist) (btnAddPlaylist as HTMLElement).onclick = (e) => {
+            e.stopPropagation();
+            if (state.playlists.length === 0) {
+                showToast('Create a playlist first');
+                return;
+            }
+            // For simplicity, just add to the first playlist if only one, or prompt
+            if (state.playlists.length === 1) {
+                addToPlaylist(state.playlists[0], item);
+            } else {
+                const names = state.playlists.map((title, i) => `${i + 1}: ${title}`).join('\n');
+                const choice = prompt(`Add to which playlist?\n${names}`);
+                const idx = parseInt(choice) - 1;
+                if (state.playlists[idx]) {
+                    addToPlaylist(state.playlists[idx], item);
+                }
+            }
+        };
+
+        const btnMarkPlayed = card.querySelector('.media-action-btn.mark-played');
+        if (btnMarkPlayed) (btnMarkPlayed as HTMLElement).onclick = (e) => {
+            e.stopPropagation();
+            markMediaPlayed(item);
+        };
+
+        const btnMarkUnplayed = card.querySelector('.media-action-btn.mark-unplayed');
+        if (btnMarkUnplayed) (btnMarkUnplayed as HTMLElement).onclick = (e) => {
+            e.stopPropagation();
+            markMediaUnplayed(item);
+        };
+
+        const btnRemovePlaylist = card.querySelector('.media-action-btn.remove-playlist');
+        if (btnRemovePlaylist) (btnRemovePlaylist as HTMLElement).onclick = (e) => {
+            e.stopPropagation();
+            removeFromPlaylist(state.filters.playlist, item);
+        };
+
+        return card;
+    }
+
     // --- Rendering ---
     function renderResults() {
         if (!currentMedia) currentMedia = [];
@@ -5202,242 +5556,7 @@ document.addEventListener('DOMContentLoaded', () => {
         resultsContainer.className = 'grid';
 
         currentMedia.forEach((item, index) => {
-            const card = document.createElement('div');
-            card.className = 'media-card';
-            (card as HTMLElement).dataset.path = item.path;
-            (card as HTMLElement).dataset.type = item.type || '';
-            if (item.is_dir) (card as HTMLElement).dataset.isDir = 'true';
-            (card as any)._item = item;
-            card.draggable = true;
-
-            card.addEventListener('dragstart', (e) => {
-                state.draggedItem = item;
-                (e as DragEvent).dataTransfer.effectAllowed = 'all';
-                (e as DragEvent).dataTransfer.setData('text/plain', item.path);
-                card.classList.add('dragging');
-                document.body.classList.add('is-dragging');
-            });
-
-            card.addEventListener('dragend', () => {
-                card.classList.remove('dragging');
-                document.body.classList.remove('is-dragging');
-                state.draggedItem = null;
-                clearAllDragOver();
-            });
-
-            (card as HTMLElement).onclick = (e) => {
-                if ((e.target as HTMLElement).closest('.media-actions') || (e.target as HTMLElement).closest('.media-action-btn')) return;
-
-                if (item.is_dir) {
-                    (searchInput as HTMLInputElement).value = item.path.endsWith('/') ? item.path : item.path + '/';
-                    performSearch();
-                    return;
-                }
-
-                if (item.path.toLowerCase().endsWith('.zim')) {
-                    window.open(`/api/zim/view?path=${encodeURIComponent(item.path)}`, '_blank');
-                    return;
-                }
-
-                const isCaptionClick = (e.target as HTMLElement).closest('.caption-highlight');
-                if (isCaptionClick && item.caption_time) {
-                    playMedia(item).then(() => {
-                        const media = pipViewer.querySelector('video, audio');
-                        if (media) (media as HTMLMediaElement).currentTime = item.caption_time;
-                    });
-                } else {
-                    playMedia(item);
-                }
-            };
-
-            const title = item.title || item.path.split('/').pop();
-            const displayPath = formatParents(item.path);
-            const size = formatSize(item.size);
-            const duration = formatDuration(item.duration);
-            const plays = getPlayCount(item);
-            const thumbUrl = `/api/thumbnail?path=${encodeURIComponent(item.path)}`;
-
-            const localPos = getLocalProgress(item);
-            const playhead = (localPos > 0) ? localPos : (item.playhead || 0);
-            const progress = (item.duration && playhead) ? Math.round((playhead / item.duration) * 100) : 0;
-            const progressHtml = progress > 0 ? `
-                <div class="progress-container" title="${progress}% completed">
-                    <div class="progress-bar" style="width: ${progress}%"></div>
-                </div>
-            ` : '';
-
-            const captionHtml = item.caption_text ? `
-                <div class="caption-highlight" title="Click to play at this time">
-                    "…${item.caption_text}…"
-                    <span class="caption-time">${formatDuration(item.caption_time)}</span>
-                </div>
-            ` : '';
-
-            const isTrash = state.page === 'trash';
-            const isPlaylist = state.page === 'playlist';
-
-            let actionBtns = '';
-            if (isTrash) {
-                actionBtns = `
-                    <button class="media-action-btn restore" title="Restore">↺</button>
-                    <button class="media-action-btn delete-permanent" title="Permanently Delete">🔥</button>
-                `;
-            } else if (isPlaylist) {
-                actionBtns = `
-                    ${!state.readOnly ? `<button class="media-action-btn remove-playlist" title="Remove from Playlist">&times;</button>` : ''}
-                `;
-            } else {
-                actionBtns = `
-                    ${!state.readOnly ? `<button class="media-action-btn add-playlist" title="Add to Playlist">+</button>` : ''}
-                    ${plays > 0 ?
-                        `<button class="media-action-btn mark-unplayed" title="Mark as Unplayed">⭕</button>` :
-                        `<button class="media-action-btn mark-played" title="Mark as Played">✅</button>`
-                    }
-                    ${!state.readOnly ? `<button class="media-action-btn delete" title="Delete">🗑️</button>` : ''}
-                `;
-            }
-
-            let thumbHtml = `
-                <img src="${thumbUrl}" loading="lazy" onload="this.classList.add('loaded')" onerror="this.style.display='none'; this.nextElementSibling.style.display='block'">
-                <i style="display: none">${getIcon(item.type)}</i>
-            `;
-
-            if (item.is_dir) {
-                thumbHtml = `<div style="width:100%; height:100%; display:flex; align-items:center; justify-content:center; background:var(--sidebar-bg); font-size:4rem;">📂</div>`;
-            }
-
-            card.innerHTML = `
-                <div class="media-thumb">
-                    ${thumbHtml}
-                    ${duration ? `<span class="media-duration">${duration}</span>` : ''}
-                    <div class="media-actions">
-                        ${actionBtns}
-                    </div>
-                </div>
-                <div class="media-info">
-                    <div class="media-title" title="${item.path}">${title}</div>
-                    <div class="media-meta">
-                        <span>${size}</span>
-
-                        <span title="${item.path}">${displayPath}</span>
-                        ${plays > 0 ? `<span title="Play count">▶️ ${plays}</span>` : ''}
-                    </div>
-                    ${progressHtml}
-                    ${captionHtml}
-                </div>
-            `;
-
-            // Reordering logic within a playlist
-            if (isPlaylist) {
-                card.addEventListener('dragover', (e) => {
-                    e.preventDefault();
-                    (e as DragEvent).dataTransfer.dropEffect = 'move';
-
-                    const rect = card.getBoundingClientRect();
-                    const x = e.clientX - rect.left;
-                    if (x < rect.width / 2) {
-                        card.style.borderLeft = '4px solid var(--accent-color)';
-                        card.style.borderRight = '';
-                    } else {
-                        card.style.borderLeft = '';
-                        card.style.borderRight = '4px solid var(--accent-color)';
-                    }
-                });
-
-                card.addEventListener('dragleave', () => {
-                    card.style.borderLeft = '';
-                    card.style.borderRight = '';
-                });
-
-                card.addEventListener('drop', (e) => {
-                    e.preventDefault();
-                    card.style.borderLeft = '';
-                    card.style.borderRight = '';
-
-                    if (state.draggedItem && state.draggedItem !== item) {
-                        const rect = card.getBoundingClientRect();
-                        const x = e.clientX - rect.left;
-                        let dropIndex = index;
-
-                        // Calculate if we drop before (left) or after (right)
-                        if (x > rect.width / 2) {
-                            dropIndex = index + 1;
-                        }
-
-                        // Calculate dragged index
-                        const draggedIndex = currentMedia.findIndex(m => m.path === state.draggedItem.path);
-                        if (draggedIndex !== -1 && draggedIndex < dropIndex) {
-                            dropIndex--;
-                        }
-
-                        handlePlaylistReorder(state.draggedItem, dropIndex);
-                    }
-                });
-            }
-
-            const btnDelete = card.querySelector('.media-action-btn.delete');
-            if (btnDelete) (btnDelete as HTMLElement).onclick = (e) => {
-                e.stopPropagation();
-                deleteMedia(item.path, false);
-            };
-
-            const btnRSVP = card.querySelector('.media-action-btn.rsvp');
-            if (btnRSVP) (btnRSVP as HTMLElement).onclick = (e) => {
-                e.stopPropagation();
-                playRSVP(item);
-            };
-
-            const btnRestore = card.querySelector('.media-action-btn.restore');
-            if (btnRestore) (btnRestore as HTMLElement).onclick = (e) => {
-                e.stopPropagation();
-                deleteMedia(item.path, true);
-            };
-
-            const btnDeletePermanent = card.querySelector('.media-action-btn.delete-permanent');
-            if (btnDeletePermanent) (btnDeletePermanent as HTMLElement).onclick = (e) => {
-                e.stopPropagation();
-                permanentlyDeleteMedia(item.path);
-            };
-
-            const btnAddPlaylist = card.querySelector('.media-action-btn.add-playlist');
-            if (btnAddPlaylist) (btnAddPlaylist as HTMLElement).onclick = (e) => {
-                e.stopPropagation();
-                if (state.playlists.length === 0) {
-                    showToast('Create a playlist first');
-                    return;
-                }
-                // For simplicity, just add to the first playlist if only one, or prompt
-                if (state.playlists.length === 1) {
-                    addToPlaylist(state.playlists[0], item);
-                } else {
-                    const names = state.playlists.map((title, i) => `${i + 1}: ${title}`).join('\n');
-                    const choice = prompt(`Add to which playlist?\n${names}`);
-                    const idx = parseInt(choice) - 1;
-                    if (state.playlists[idx]) {
-                        addToPlaylist(state.playlists[idx], item);
-                    }
-                }
-            };
-
-            const btnMarkPlayed = card.querySelector('.media-action-btn.mark-played');
-            if (btnMarkPlayed) (btnMarkPlayed as HTMLElement).onclick = (e) => {
-                e.stopPropagation();
-                markMediaPlayed(item);
-            };
-
-            const btnMarkUnplayed = card.querySelector('.media-action-btn.mark-unplayed');
-            if (btnMarkUnplayed) (btnMarkUnplayed as HTMLElement).onclick = (e) => {
-                e.stopPropagation();
-                markMediaUnplayed(item);
-            };
-
-            const btnRemovePlaylist = card.querySelector('.media-action-btn.remove-playlist');
-            if (btnRemovePlaylist) (btnRemovePlaylist as HTMLElement).onclick = (e) => {
-                e.stopPropagation();
-                removeFromPlaylist(state.filters.playlist, item);
-            };
-
-            fragment.appendChild(card);
+            fragment.appendChild(createMediaCard(item, index));
         });
 
         resultsContainer.innerHTML = '';
@@ -7868,6 +7987,29 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (isClickable && window.innerWidth <= 768) {
             closeMobileSidebar();
+        }
+    });
+
+    // On touch devices, remove hover state from sidebar buttons when touched
+    // to prevent buttons from staying highlighted after selection
+    document.addEventListener('touchstart', (e) => {
+        const target = e.target as HTMLElement;
+        const sidebarButton = target.closest('.category-btn') ||
+            target.closest('#trash-btn') ||
+            target.closest('#history-btn') ||
+            target.closest('#all-media-btn') ||
+            target.closest('#du-btn') ||
+            target.closest('#captions-btn') ||
+            target.closest('#curation-btn') ||
+            target.closest('#channel-surf-btn') ||
+            target.closest('#settings-button');
+
+        if (sidebarButton) {
+            document.querySelectorAll('.category-btn:hover, #trash-btn:hover, #history-btn:hover, ' +
+                '#all-media-btn:hover, #du-btn:hover, #captions-btn:hover, #curation-btn:hover, ' +
+                '#channel-surf-btn:hover, #settings-button:hover').forEach((el) => {
+                (el as HTMLElement).blur();
+            });
         }
     });
 

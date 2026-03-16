@@ -185,8 +185,9 @@ func (c *ServeCmd) handleQuery(w http.ResponseWriter, r *http.Request) {
 
 		totalCount := len(media)
 
-		// Pagination for captions (since we fetched them all or up to limit per DB)
-		if !flags.All && flags.Limit > 0 && !aggregate {
+		// Pagination for captions
+		// When aggregate=true, we still need pagination but it's applied after aggregation
+		if !flags.All && flags.Limit > 0 {
 			start := flags.Offset
 			if start > len(media) {
 				media = []models.MediaWithDB{}
