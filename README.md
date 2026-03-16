@@ -8,6 +8,32 @@ Golang implementation of xklb/library
 go install -tags fts5 github.com/chapmanjacobd/discoteca/cmd/disco@latest
 ```
 
+## Screenshots
+
+### Grid View
+
+![Search Results](docs/screenshots/search-results.png)
+
+### Details View
+
+![Details View](docs/screenshots/home-details-view.png)
+
+### Video Player
+
+![Video Player](docs/screenshots/video-player.png)
+
+### EPUB Viewer
+
+![EPUB Viewer](docs/screenshots/epub-viewer.png)
+
+### Settings Modal
+
+![Settings Modal](docs/screenshots/settings-modal.png)
+
+### Group View
+
+![Group View](docs/screenshots/group-view.png)
+
 ## Optional dependencies
 
 ### Core Media Features
@@ -50,32 +76,6 @@ go install -tags fts5 github.com/chapmanjacobd/discoteca/cmd/disco@latest
 - `kiwix-serve` - ZIM file serving (Wikipedia offline)
 
 See [INSTALL.md](docs/INSTALL.md) for installation instructions on your platform.
-
-## Screenshots
-
-### Grid View
-
-![Search Results](docs/screenshots/search-results.png)
-
-### Details View
-
-![Details View](docs/screenshots/home-details-view.png)
-
-### Video Player
-
-![Video Player](docs/screenshots/video-player.png)
-
-### EPUB Viewer
-
-![EPUB Viewer](docs/screenshots/epub-viewer.png)
-
-### Settings Modal
-
-![Settings Modal](docs/screenshots/settings-modal.png)
-
-### Group View
-
-![Group View](docs/screenshots/group-view.png)
 
 ## Pre-built Binaries
 
