@@ -1,11 +1,11 @@
-import { Page, Locator } from '@playwright/test';
+import { Locator } from '@playwright/test';
+import { BasePage } from './base-page';
 
 /**
- * Page Object Model for media viewer/player
- * Handles playback controls, theatre mode, and viewer navigation
+ * Page Object for media viewer/player
  */
-export class ViewerPage {
-  readonly page: Page;
+export class ViewerPage extends BasePage {
+  // Player-specific locators
   readonly playerContainer: Locator;
   readonly mediaTitle: Locator;
   readonly videoElement: Locator;
@@ -20,18 +20,15 @@ export class ViewerPage {
   readonly fullscreenBtn: Locator;
   readonly pipBtn: Locator;
   readonly streamTypeBtn: Locator;
-  readonly channelSurfBtn: Locator;
   readonly slideshowBtn: Locator;
   readonly queueContainer: Locator;
   readonly documentModal: Locator;
   readonly documentContainer: Locator;
   readonly documentTitle: Locator;
   readonly documentFullscreenBtn: Locator;
-  readonly metadataModal: Locator;
-  readonly helpModal: Locator;
 
-  constructor(page: Page) {
-    this.page = page;
+  constructor(page: any) {
+    super(page);
     this.playerContainer = page.locator('#pip-player');
     this.mediaTitle = page.locator('#media-title');
     this.videoElement = page.locator('#pip-player video');
@@ -46,15 +43,12 @@ export class ViewerPage {
     this.fullscreenBtn = page.locator('#pip-fullscreen, button:has-text("Fullscreen")').first();
     this.pipBtn = page.locator('#pip-native, button:has-text("PiP")').first();
     this.streamTypeBtn = page.locator('#pip-stream-type');
-    this.channelSurfBtn = page.locator('#channel-surf-btn');
     this.slideshowBtn = page.locator('#pip-slideshow');
     this.queueContainer = page.locator('#queue-container');
     this.documentModal = page.locator('#document-modal');
     this.documentContainer = page.locator('#document-container');
     this.documentTitle = page.locator('#document-title');
     this.documentFullscreenBtn = page.locator('#doc-fullscreen');
-    this.metadataModal = page.locator('#metadata-modal');
-    this.helpModal = page.locator('#help-modal');
   }
 
   /**
@@ -62,17 +56,44 @@ export class ViewerPage {
    */
   async waitForPlayer(timeout: number = 10000): Promise<void> {
     await this.playerContainer.waitFor({ state: 'visible', timeout });
+    const media = this.videoElement.or(this.audioElement);
+    await media.waitFor({ state: 'visible', timeout });
+    await this.page.waitForFunction(() => {
+      const media = document.querySelector('#pip-player video, #pip-player audio') as HTMLMediaElement;
+      return media && media.readyState >= 1;
+    }, { timeout });
   }
 
   /**
-   * Check if player is open/visible
+   * Check if player is open
    */
   async isOpen(): Promise<boolean> {
     return await this.playerContainer.isVisible();
   }
 
   /**
-   * Check if player is in theatre mode
+   * Check if player is hidden
+   */
+  async isHidden(): Promise<boolean> {
+    return await this.playerContainer.first().evaluate((el: Element) => el.classList.contains('hidden'));
+  }
+
+  /**
+   * Wait for player to be hidden (for backward compatibility)
+   */
+  async waitForHidden(timeout: number = 10000): Promise<void> {
+    await this.playerContainer.waitFor({ state: 'hidden', timeout });
+  }
+
+  /**
+   * Wait for player to be hidden (alias)
+   */
+  async waitForPlayerHidden(timeout: number = 10000): Promise<void> {
+    await this.playerContainer.waitFor({ state: 'hidden', timeout });
+  }
+
+  /**
+   * Check if in theatre mode
    */
   async isInTheatreMode(): Promise<boolean> {
     const classes = await this.playerContainer.getAttribute('class');
@@ -102,12 +123,12 @@ export class ViewerPage {
   async exitTheatreMode(): Promise<void> {
     if (await this.isInTheatreMode()) {
       await this.toggleTheatreMode();
-      await this.page.waitForTimeout(300);
+      await this.waitForTimeout(300);
     }
   }
 
   /**
-   * Close the player
+   * Close player
    */
   async close(): Promise<void> {
     if (await this.closeBtn.isVisible()) {
@@ -117,7 +138,7 @@ export class ViewerPage {
   }
 
   /**
-   * Get current playback speed
+   * Get playback speed
    */
   async getPlaybackSpeed(): Promise<string> {
     return await this.speedBtn.textContent() || '1x';
@@ -159,7 +180,7 @@ export class ViewerPage {
   }
 
   /**
-   * Get current playback position in seconds
+   * Get current playback time
    */
   async getCurrentTime(): Promise<number> {
     const media = this.videoElement.or(this.audioElement);
@@ -167,7 +188,7 @@ export class ViewerPage {
   }
 
   /**
-   * Get media duration in seconds
+   * Get media duration
    */
   async getDuration(): Promise<number> {
     const media = this.videoElement.or(this.audioElement);
@@ -175,7 +196,7 @@ export class ViewerPage {
   }
 
   /**
-   * Seek to specific time
+   * Seek to time
    */
   async seekTo(time: number): Promise<void> {
     const media = this.videoElement.or(this.audioElement);
@@ -190,9 +211,7 @@ export class ViewerPage {
   async next(): Promise<void> {
     if (await this.nextBtn.isVisible()) {
       const isDisabled = await this.nextBtn.isDisabled();
-      if (!isDisabled) {
-        await this.nextBtn.click();
-      }
+      if (!isDisabled) await this.nextBtn.click();
     }
   }
 
@@ -202,9 +221,7 @@ export class ViewerPage {
   async previous(): Promise<void> {
     if (await this.prevBtn.isVisible()) {
       const isDisabled = await this.prevBtn.isDisabled();
-      if (!isDisabled) {
-        await this.prevBtn.click();
-      }
+      if (!isDisabled) await this.prevBtn.click();
     }
   }
 
@@ -219,24 +236,22 @@ export class ViewerPage {
   }
 
   /**
-   * Check if queue is enabled and visible
+   * Check if queue is visible
    */
   async isQueueVisible(): Promise<boolean> {
     return await this.queueContainer.isVisible();
   }
 
   /**
-   * Get queue item count
+   * Get queue count
    */
   async getQueueCount(): Promise<number> {
-    if (!await this.isQueueVisible()) {
-      return 0;
-    }
+    if (!await this.isQueueVisible()) return 0;
     return await this.queueContainer.locator('.queue-item').count();
   }
 
   /**
-   * Check if slideshow mode is active
+   * Check if slideshow is active
    */
   async isSlideshowActive(): Promise<boolean> {
     const classes = await this.slideshowBtn.getAttribute('class') || '';
@@ -245,38 +260,35 @@ export class ViewerPage {
   }
 
   /**
-   * Start/stop slideshow
+   * Toggle slideshow
    */
   async toggleSlideshow(): Promise<void> {
     await this.slideshowBtn.click();
   }
 
   /**
-   * Get current stream type (Direct/HLS)
+   * Get stream type
    */
   async getStreamType(): Promise<string> {
     return await this.streamTypeBtn.textContent() || '';
   }
 
   /**
-   * Wait for media to finish loading
+   * Wait for media to load
    */
   async waitForMediaLoaded(timeout: number = 10000): Promise<void> {
     const media = this.videoElement.or(this.audioElement);
     await media.waitFor({ state: 'visible', timeout });
-    await this.page.waitForFunction(
-      () => {
-        const video = document.querySelector('#pip-player video') as HTMLVideoElement;
-        const audio = document.querySelector('#pip-player audio') as HTMLAudioElement;
-        const media = video || audio;
-        return media && !media.readyState;
-      },
-      { timeout }
-    );
+    await this.page.waitForFunction(() => {
+      const video = document.querySelector('#pip-player video') as HTMLVideoElement;
+      const audio = document.querySelector('#pip-player audio') as HTMLAudioElement;
+      const media = video || audio;
+      return media && !media.readyState;
+    }, { timeout });
   }
 
   /**
-   * Take a screenshot of the current frame (for video)
+   * Capture frame screenshot
    */
   async captureFrame(): Promise<Buffer> {
     return await this.playerContainer.screenshot();
@@ -294,36 +306,19 @@ export class ViewerPage {
    * Wait for media to end
    */
   async waitForEnd(timeout: number = 60000): Promise<void> {
-    await this.page.waitForFunction(
-      () => {
-        const video = document.querySelector('#pip-player video') as HTMLVideoElement;
-        const audio = document.querySelector('#pip-player audio') as HTMLAudioElement;
-        const media = video || audio;
-        return media && media.ended;
-      },
-      { timeout }
-    );
+    await this.page.waitForFunction(() => {
+      const video = document.querySelector('#pip-player video') as HTMLVideoElement;
+      const audio = document.querySelector('#pip-player audio') as HTMLAudioElement;
+      const media = video || audio;
+      return media && media.ended;
+    }, { timeout });
   }
 
   /**
-   * Get media element (video or audio)
+   * Get media element
    */
   getMediaElement(): Locator {
     return this.videoElement.or(this.audioElement);
-  }
-
-  /**
-   * Check if player is hidden
-   */
-  async isHidden(): Promise<boolean> {
-    return await this.playerContainer.first().evaluate(el => el.classList.contains('hidden'));
-  }
-
-  /**
-   * Wait for player to be hidden
-   */
-  async waitForHidden(timeout: number = 10000): Promise<void> {
-    await this.playerContainer.waitFor({ state: 'hidden', timeout });
   }
 
   /**
@@ -376,7 +371,7 @@ export class ViewerPage {
   }
 
   /**
-   * Get player class list
+   * Get player classes
    */
   async getPlayerClasses(): Promise<string> {
     return await this.playerContainer.first().getAttribute('class') || '';
@@ -391,7 +386,7 @@ export class ViewerPage {
   }
 
   /**
-   * Get media duration formatted
+   * Get duration formatted
    */
   async getDurationFormatted(): Promise<string> {
     const duration = await this.getDuration();
@@ -473,18 +468,15 @@ export class ViewerPage {
   }
 
   /**
-   * Wait for media to have data
+   * Wait for media data
    */
   async waitForMediaData(timeout: number = 10000): Promise<void> {
-    await this.page.waitForFunction(
-      () => {
-        const video = document.querySelector('#pip-player video') as HTMLVideoElement;
-        const audio = document.querySelector('#pip-player audio') as HTMLAudioElement;
-        const media = video || audio;
-        return media && media.readyState >= 3; // HAVE_FUTURE_DATA
-      },
-      { timeout }
-    );
+    await this.page.waitForFunction(() => {
+      const video = document.querySelector('#pip-player video') as HTMLVideoElement;
+      const audio = document.querySelector('#pip-player audio') as HTMLAudioElement;
+      const media = video || audio;
+      return media && media.readyState >= 3;
+    }, { timeout });
   }
 
   /**
@@ -529,12 +521,10 @@ export class ViewerPage {
    * Close document modal
    */
   async closeDocumentModal(): Promise<void> {
-    // Exit fullscreen first if active, then close modal
     if (await this.isFullscreenActive()) {
       await this.page.keyboard.press('Escape');
-      await this.page.waitForTimeout(300);
+      await this.waitForTimeout(300);
     }
-    // Close the modal with Escape
     await this.page.keyboard.press('Escape');
     await this.documentModal.first().waitFor({ state: 'hidden', timeout: 5000 });
   }
@@ -606,20 +596,14 @@ export class ViewerPage {
    * Wait for fullscreen change
    */
   async waitForFullscreenChange(timeout: number = 5000): Promise<void> {
-    await this.page.waitForFunction(
-      () => !!document.fullscreenElement,
-      { timeout }
-    );
+    await this.page.waitForFunction(() => !!document.fullscreenElement, { timeout });
   }
 
   /**
    * Wait for fullscreen exit
    */
   async waitForFullscreenExit(timeout: number = 5000): Promise<void> {
-    await this.page.waitForFunction(
-      () => !document.fullscreenElement,
-      { timeout }
-    );
+    await this.page.waitForFunction(() => !document.fullscreenElement, { timeout });
   }
 
   /**

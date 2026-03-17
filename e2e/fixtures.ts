@@ -7,41 +7,60 @@ import { ViewerPage } from './pages/viewer-page';
 import * as path from 'path';
 import * as fs from 'fs';
 
+// Custom matchers
+import {
+  toHaveMediaCount,
+  toBeInMode,
+  toHaveJsonOutput,
+  toHaveProgress,
+  toBePlaying,
+  toBePaused,
+  toHaveDataAttribute,
+  toHaveToast,
+  toHaveNoErrorToast,
+} from './utils/matchers';
+
+// Extend expect with custom matchers
+expect.extend({
+  toHaveMediaCount,
+  toBeInMode,
+  toHaveJsonOutput,
+  toHaveProgress,
+  toBePlaying,
+  toBePaused,
+  toHaveDataAttribute,
+  toHaveToast,
+  toHaveNoErrorToast,
+});
+
 /**
  * Wait for media player to be ready
- * Uses robust waiting strategy without hard timeouts
  */
 export async function waitForPlayer(page: Page, timeout: number = 10000): Promise<void> {
   const player = page.locator('#pip-player');
   await player.waitFor({ state: 'visible', timeout });
-  
-  // Wait for media element inside player
   const media = page.locator('#pip-player video, #pip-player audio');
   await media.waitFor({ state: 'visible', timeout });
-  
-  // Wait for media to have loaded metadata
   await page.waitForFunction(() => {
     const media = document.querySelector('#pip-player video, #pip-player audio') as HTMLMediaElement;
-    return media && (media.readyState >= 1); // HAVE_METADATA
+    return media && media.readyState >= 1;
   }, { timeout });
 }
 
 /**
- * Check if player is open/visible
+ * Check if player is open
  */
 export async function isPlayerOpen(page: Page): Promise<boolean> {
   const player = page.locator('#pip-player, #player-container');
   if (await player.count() > 0) {
     return await player.first().isVisible();
   }
-
-  // Check for video/audio elements
   const videoCount = await page.locator('video').count();
   const audioCount = await page.locator('audio').count();
   return videoCount > 0 || audioCount > 0;
 }
 
-// Extended test fixture with server management and page objects
+// Test fixtures
 export const test = base.extend<{
   server: TestServer;
   testDbPath: string;
@@ -51,20 +70,15 @@ export const test = base.extend<{
   sidebarPage: SidebarPage;
   viewerPage: ViewerPage;
 }>({
-  // Test database path (pre-committed to repo)
   testDbPath: async ({}, use) => {
     const fixturesDir = path.join(__dirname, './fixtures');
     const dbPath = path.join(fixturesDir, 'test.db');
-
-    // Verify database exists
     if (!fs.existsSync(dbPath)) {
-      throw new Error(`Test database not found at ${dbPath}. Run 'make e2e-init' to create it.`);
+      throw new Error(`Test database not found at ${dbPath}. Run 'make e2e-init'.`);
     }
-
     await use(dbPath);
   },
 
-  // Page Objects
   mediaPage: async ({ page }, use) => {
     await use(new MediaPage(page));
   },
@@ -77,16 +91,12 @@ export const test = base.extend<{
     await use(new ViewerPage(page));
   },
 
-  // Whether this test is read-only (doesn't modify server state)
   readOnly: [false, { option: true }],
 
-  // Server options (can be overridden per test)
   serverOptions: async ({}, use) => {
-    // Default options
     await use({});
   },
 
-  // Test server instance - shared for readOnly tests, isolated for others
   server: async ({ testDbPath, readOnly, page, serverOptions }, use) => {
     const workerId = process.env.TEST_WORKER_INDEX || 'default';
     const project = process.env.PLAYWRIGHT_PROJECT || 'chromium';
@@ -97,39 +107,23 @@ export const test = base.extend<{
     let tempDbPath: string | null = null;
 
     if (readOnly) {
-      // Use shared global server for read-only tests
       if (!globalServers.has(serverKey)) {
-        server = new TestServer({
-          databasePath: testDbPath,
-          ...serverOptions,
-        });
+        server = new TestServer({ databasePath: testDbPath, ...serverOptions });
         await server.start();
         globalServers.set(serverKey, server);
       } else {
         server = globalServers.get(serverKey)!;
       }
     } else {
-      // Create isolated server with a temporary copy of the database for state-modifying tests
-      // This ensures each test starts with a clean database state
-      try {
-        fs.mkdirSync(tmpDir, { recursive: true });
-      } catch (e) {
-        // Directory may already exist
-      }
+      fs.mkdirSync(tmpDir, { recursive: true });
       tempDbPath = path.join(tmpDir, `test-${process.pid}-${Date.now()}.db`);
       fs.copyFileSync(testDbPath, tempDbPath);
-
-      server = new TestServer({
-        databasePath: tempDbPath,
-        ...serverOptions,
-      });
+      server = new TestServer({ databasePath: tempDbPath, ...serverOptions });
       await server.start();
     }
 
-    // Set base URL for Playwright
     process.env.DISCO_BASE_URL = server.getBaseUrl();
 
-    // Set authentication cookie before the test starts
     const url = new URL(server.getBaseUrl());
     await page.context().addCookies([{
       name: 'disco_token',
@@ -140,23 +134,18 @@ export const test = base.extend<{
 
     page.on('console', msg => {
       const msgText = msg.text();
-
-      if (msg.type() === 'error') {
-        if (!['Failed to load resource: net::ERR_INCOMPLETE_CHUNKED_ENCODING'].includes(msgText)) {
-          console.error(`console.error:`, msgText);
-        }
+      if (msg.type() === 'error' && !['Failed to load resource: net::ERR_INCOMPLETE_CHUNKED_ENCODING'].includes(msgText)) {
+        console.error(`console.error:`, msgText);
       } else {
         console.log(`console.log:`, msgText);
       }
     });
 
     page.on('requestfailed', request => {
-      const errorText = request.failure()?.errorText
-      if (errorText && ['net::ERR_ABORTED', 'net::ERR_INCOMPLETE_CHUNKED_ENCODING'].includes(errorText)) {
-        return
+      const errorText = request.failure()?.errorText;
+      if (errorText && !['net::ERR_ABORTED', 'net::ERR_INCOMPLETE_CHUNKED_ENCODING'].includes(errorText)) {
+        console.error(`request.failed: ${request.url()} - ${errorText}`);
       }
-
-      console.error(`request.failed: ${request.url()} - ${errorText}`);
     });
 
     page.on('response', response => {
@@ -171,23 +160,16 @@ export const test = base.extend<{
 
     await use(server);
 
-    // Cleanup: stop isolated servers and remove temporary database
     if (!readOnly) {
       await server.stop();
-      // Remove temporary database copy
       if (tempDbPath && fs.existsSync(tempDbPath)) {
         try {
           fs.unlinkSync(tempDbPath);
-          // Also remove WAL and SHM files if they exist
           fs.unlinkSync(tempDbPath + '-wal');
-        } catch (e) {
-          // Files may already be deleted
-        }
+        } catch (e) { /* ignore */ }
         try {
           fs.unlinkSync(tempDbPath + '-shm');
-        } catch (e) {
-          // File may not exist
-        }
+        } catch (e) { /* ignore */ }
       }
     }
   },

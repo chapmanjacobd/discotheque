@@ -2,177 +2,143 @@ import { expect, Locator, Page } from '@playwright/test';
 
 /**
  * Custom Playwright matchers for Discoteca E2E tests
+ * Extended automatically via fixtures
  */
 
+// Use Playwright's Response type
+type PlaywrightResponse = import('@playwright/test').Response;
+
 /**
- * Assert that a locator has a specific number of visible items
+ * Assert media card count
  */
-export async function toHaveMediaCount(locator: Locator, expected: number): Promise<{ pass: boolean; message: () => string }> {
+export async function toHaveMediaCount(
+  locator: Locator,
+  expected: number
+): Promise<{ pass: boolean; message: () => string }> {
   const actual = await locator.count();
-  const pass = actual === expected;
-  
   return {
-    pass,
-    message: () => `Expected media count to be ${expected}, but got ${actual}`
+    pass: actual === expected,
+    message: () => `Expected media count to be ${expected}, got ${actual}`
   };
 }
 
 /**
- * Assert that the page is in a specific mode (based on URL hash)
+ * Assert page is in specific mode (URL hash)
  */
-export async function toBeInMode(page: Page, expectedMode: string): Promise<{ pass: boolean; message: () => string }> {
+export async function toBeInMode(
+  page: Page,
+  expectedMode: string
+): Promise<{ pass: boolean; message: () => string }> {
   const url = page.url();
-  const hashIndex = url.indexOf('#');
-  const currentMode = hashIndex === -1 ? '' : url.substring(hashIndex + 1);
-  const pass = currentMode === expectedMode;
-  
+  const currentMode = url.split('#')[1] || '';
   return {
-    pass,
-    message: () => `Expected mode to be "${expectedMode}", but got "${currentMode}" (URL: ${url})`
+    pass: currentMode === expectedMode,
+    message: () => `Expected mode "${expectedMode}", got "${currentMode}" (URL: ${url})`
   };
 }
 
 /**
- * Assert that a JSON response has expected structure
+ * Assert JSON response has expected keys
  */
-export async function toHaveJsonOutput(response: Response, expectedKeys: string[]): Promise<{ pass: boolean; message: () => string }> {
+export async function toHaveJsonOutput(
+  response: Response,
+  expectedKeys: string[]
+): Promise<{ pass: boolean; message: () => string }> {
   try {
     const json = await response.json();
     const missingKeys = expectedKeys.filter(key => !(key in json));
-    const pass = missingKeys.length === 0;
-    
     return {
-      pass,
-      message: () => pass 
-        ? 'JSON response has expected keys'
-        : `JSON response missing keys: ${missingKeys.join(', ')}`
+      pass: missingKeys.length === 0,
+      message: () => missingKeys.length
+        ? `Missing keys: ${missingKeys.join(', ')}`
+        : 'JSON has expected keys'
     };
   } catch (e) {
     return {
       pass: false,
-      message: () => `Response is not valid JSON: ${e}`
+      message: () => `Invalid JSON: ${e}`
     };
   }
 }
 
 /**
- * Assert that a media card has progress indicator
+ * Assert media card has progress indicator
  */
-export async function toHaveProgress(locator: Locator, expectedProgress: number, tolerance: number = 5): Promise<{ pass: boolean; message: () => string }> {
+export async function toHaveProgress(
+  locator: Locator,
+  expectedProgress: number,
+  tolerance: number = 5
+): Promise<{ pass: boolean; message: () => string }> {
   const progressBar = locator.locator('.progress-bar');
-  const isVisible = await progressBar.isVisible();
-  
-  if (!isVisible) {
-    return {
-      pass: false,
-      message: () => 'Progress bar not found'
-    };
+  if (!await progressBar.isVisible()) {
+    return { pass: false, message: () => 'Progress bar not found' };
   }
-  
   const width = await progressBar.evaluate((el: HTMLElement) => {
     const style = window.getComputedStyle(el);
     return parseFloat(style.width) || 0;
   });
-  
-  // Convert percentage to approximate progress
-  const actualProgress = width; // Assuming width is percentage
-  const pass = Math.abs(actualProgress - expectedProgress) <= tolerance;
-  
+  const pass = Math.abs(width - expectedProgress) <= tolerance;
   return {
     pass,
-    message: () => `Expected progress to be ~${expectedProgress}%, but got ${actualProgress}%`
+    message: () => `Expected ~${expectedProgress}%, got ${width}%`
   };
 }
 
 /**
- * Assert that player is in a specific state
+ * Assert media is playing
  */
 export async function toBePlaying(locator: Locator): Promise<{ pass: boolean; message: () => string }> {
   const isPlaying = await locator.evaluate((el: HTMLMediaElement) => !el.paused);
-  
   return {
     pass: isPlaying,
-    message: () => isPlaying 
-      ? 'Media is playing' 
-      : 'Media is not playing'
+    message: () => isPlaying ? 'Media is playing' : 'Media is not playing'
   };
 }
 
 /**
- * Assert that player is paused
+ * Assert media is paused
  */
 export async function toBePaused(locator: Locator): Promise<{ pass: boolean; message: () => string }> {
   const isPaused = await locator.evaluate((el: HTMLMediaElement) => el.paused);
-  
   return {
     pass: isPaused,
-    message: () => isPaused 
-      ? 'Media is paused' 
-      : 'Media is not paused'
+    message: () => isPaused ? 'Media is paused' : 'Media is not paused'
   };
 }
 
 /**
- * Extend Playwright's expect with custom matchers
+ * Assert element has data attribute
  */
-export const customExpect = expect.extend({
-  toHaveMediaCount,
-  toBeInMode,
-  toHaveJsonOutput,
-  toHaveProgress,
-  toBePlaying,
-  toBePaused,
-});
-
-// Re-export expect with custom matchers
-export { expect };
-
-/**
- * Helper: Wait for network response with specific URL pattern
- */
-export async function waitForApiResponse(page: Page, urlPattern: string, timeout: number = 5000): Promise<Response> {
-  const [response] = await Promise.all([
-    page.waitForResponse(resp => resp.url().includes(urlPattern), { timeout }),
-    // Trigger the request if needed
-  ]);
-  return response;
-}
-
-/**
- * Helper: Wait for API request with specific URL pattern
- */
-export async function waitForApiRequest(page: Page, urlPattern: string, timeout: number = 5000): Promise<void> {
-  await page.waitForRequest(req => req.url().includes(urlPattern), { timeout });
-}
-
-/**
- * Helper: Assert that element has specific data attribute
- */
-export async function toHaveDataAttribute(locator: Locator, attr: string, value: string): Promise<{ pass: boolean; message: () => string }> {
+export async function toHaveDataAttribute(
+  locator: Locator,
+  attr: string,
+  value: string
+): Promise<{ pass: boolean; message: () => string }> {
   const actualValue = await locator.getAttribute(attr);
-  const pass = actualValue === value;
-  
   return {
-    pass,
-    message: () => `Expected ${attr} to be "${value}", but got "${actualValue}"`
+    pass: actualValue === value,
+    message: () => `Expected ${attr}="${value}", got "${actualValue}"`
   };
 }
 
 /**
- * Helper: Assert that toast notification appears with specific message
+ * Assert toast notification appears with text
  */
-export async function toHaveToast(page: Page, expectedText: string, timeout: number = 5000): Promise<{ pass: boolean; message: () => string }> {
+export async function toHaveToast(
+  page: Page,
+  expectedText: string,
+  timeout: number = 5000
+): Promise<{ pass: boolean; message: () => string }> {
   try {
     const toast = page.locator('#toast');
     await toast.waitFor({ state: 'visible', timeout });
     const toastText = await toast.textContent();
     const pass = toastText?.includes(expectedText) ?? false;
-    
     return {
       pass,
-      message: () => pass 
-        ? 'Toast message found' 
-        : `Expected toast to contain "${expectedText}", but got "${toastText}"`
+      message: () => pass
+        ? 'Toast found'
+        : `Expected toast "${expectedText}", got "${toastText}"`
     };
   } catch (e) {
     return {
@@ -183,26 +149,60 @@ export async function toHaveToast(page: Page, expectedText: string, timeout: num
 }
 
 /**
- * Helper: Assert that no error toast appears
+ * Assert no error toast appears
  */
-export async function toHaveNoErrorToast(page: Page, timeout: number = 2000): Promise<{ pass: boolean; message: () => string }> {
+export async function toHaveNoErrorToast(
+  page: Page,
+  timeout: number = 2000
+): Promise<{ pass: boolean; message: () => string }> {
   const toast = page.locator('#toast');
-  const isVisible = await toast.isVisible();
-  
-  if (isVisible) {
+  if (await toast.isVisible()) {
     const toastText = await toast.textContent();
     const isError = toastText?.includes('Error') || toastText?.includes('Failed') || toastText?.includes('⚠️');
-    
     if (isError) {
-      return {
-        pass: false,
-        message: () => `Error toast appeared: "${toastText}"`
-      };
+      return { pass: false, message: () => `Error toast: "${toastText}"` };
     }
   }
-  
-  return {
-    pass: true,
-    message: () => 'No error toast appeared'
-  };
+  return { pass: true, message: () => 'No error toast' };
+}
+
+// Extend Playwright expect with custom matchers
+export const customExpect = expect.extend({
+  toHaveMediaCount,
+  toBeInMode,
+  toHaveJsonOutput,
+  toHaveProgress,
+  toBePlaying,
+  toBePaused,
+  toHaveDataAttribute,
+  toHaveToast,
+  toHaveNoErrorToast,
+});
+
+// Re-export expect
+export { expect };
+
+/**
+ * Wait for API response matching URL pattern
+ */
+export async function waitForApiResponse(
+  page: Page,
+  urlPattern: string,
+  timeout: number = 5000
+): Promise<PlaywrightResponse> {
+  const [response] = await Promise.all([
+    page.waitForResponse(resp => resp.url().includes(urlPattern), { timeout }),
+  ]);
+  return response;
+}
+
+/**
+ * Wait for API request matching URL pattern
+ */
+export async function waitForApiRequest(
+  page: Page,
+  urlPattern: string,
+  timeout: number = 5000
+): Promise<void> {
+  await page.waitForRequest(req => req.url().includes(urlPattern), { timeout });
 }
