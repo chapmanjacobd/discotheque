@@ -23,9 +23,18 @@ test.describe('Keyboard Shortcuts', () => {
     test('p key plays previous sibling without player open', async ({ mediaPage, viewerPage, server }) => {
       await mediaPage.goto(server.getBaseUrl());
 
-      // Click second card to have a previous item, then close player using POM
-      const secondCard = mediaPage.getMediaCard(1);
-      await secondCard.click();
+      // Click second video/audio card to have a previous item, then close player using POM
+      // Get all video/audio cards and click the second one
+      const videoCards = mediaPage.page.locator('.media-card[data-type*="video"], .media-card[data-type*="audio"]');
+      const count = await videoCards.count();
+      expect(count).toBeGreaterThan(0); // Fail if no video/audio media available
+
+      if (count >= 2) {
+        await videoCards.nth(1).locator('.media-title, .media-info').first().click();
+      } else {
+        // Only one video/audio, click it
+        await videoCards.nth(0).locator('.media-title, .media-info').first().click();
+      }
       await viewerPage.waitForPlayer();
       await mediaPage.page.waitForTimeout(500);
 
@@ -180,8 +189,8 @@ test.describe('Keyboard Shortcuts', () => {
     test('w key closes player', async ({ mediaPage, viewerPage, server }) => {
       await mediaPage.goto(server.getBaseUrl());
 
-      // Click first card to open player using POM
-      await mediaPage.getMediaCard(0).click();
+      // Click first video/audio card to open player using POM
+      await mediaPage.clickFirstVideoOrAudio();
       await viewerPage.waitForPlayer();
       await mediaPage.page.waitForTimeout(500);
 
@@ -243,8 +252,8 @@ test.describe('Keyboard Shortcuts', () => {
     test('f key toggles fullscreen', async ({ mediaPage, viewerPage, server }) => {
       await mediaPage.goto(server.getBaseUrl());
 
-      // Click first card using POM
-      await mediaPage.getMediaCard(0).click();
+      // Click first video/audio card using POM
+      await mediaPage.clickFirstVideoOrAudio();
       await viewerPage.waitForPlayer();
       await mediaPage.page.waitForTimeout(500);
 
@@ -289,8 +298,8 @@ test.describe('Keyboard Shortcuts', () => {
     test('i key toggles metadata modal', async ({ mediaPage, viewerPage, server }) => {
       await mediaPage.goto(server.getBaseUrl());
 
-      // Click first card to open player using POM
-      await mediaPage.getMediaCard(0).click();
+      // Click first video/audio card to open player using POM
+      await mediaPage.clickFirstVideoOrAudio();
       await viewerPage.waitForPlayer();
       await mediaPage.page.waitForTimeout(500);
 
@@ -314,10 +323,8 @@ test.describe('Keyboard Shortcuts', () => {
     test('c key copies media path to clipboard', async ({ mediaPage, viewerPage, server }) => {
       await mediaPage.goto(server.getBaseUrl());
 
-      // Click first card to open player using POM
-      const firstCard = mediaPage.getMediaCard(0);
-      const expectedPath = await mediaPage.getMediaTitle(0);
-      await firstCard.click();
+      // Click first video/audio card to open player using POM
+      await mediaPage.clickFirstVideoOrAudio();
       await viewerPage.waitForPlayer();
       await mediaPage.page.waitForTimeout(500);
 
@@ -398,8 +405,8 @@ test.describe('Keyboard Shortcuts', () => {
     test('1-5 keys rate media', async ({ mediaPage, viewerPage, server }) => {
       await mediaPage.goto(server.getBaseUrl());
 
-      // Click first card to open player using POM
-      await mediaPage.getMediaCard(0).click();
+      // Click first video/audio card to open player using POM
+      await mediaPage.clickFirstVideoOrAudio();
       await viewerPage.waitForPlayer();
       await mediaPage.page.waitForTimeout(500);
 
@@ -417,8 +424,8 @@ test.describe('Keyboard Shortcuts', () => {
     test('` key unrates media', async ({ mediaPage, viewerPage, server }) => {
       await mediaPage.goto(server.getBaseUrl());
 
-      // Click first card to open player using POM
-      await mediaPage.getMediaCard(0).click();
+      // Click first video/audio card to open player using POM
+      await mediaPage.clickFirstVideoOrAudio();
       await viewerPage.waitForPlayer();
       await mediaPage.page.waitForTimeout(500);
 

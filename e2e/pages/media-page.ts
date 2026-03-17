@@ -1,4 +1,4 @@
-import { Page, Locator } from '@playwright/test';
+import { Page, Locator, expect } from '@playwright/test';
 
 /**
  * Page Object Model for media grid/list view
@@ -128,7 +128,18 @@ export class MediaPage {
     const card = this.mediaCards.filter({
       hasText: titleOrPath
     }).first();
-    await card.click();
+    // Try clicking on media-title first, fallback to media-info
+    const title = card.locator('.media-title').first();
+    if (await title.count() > 0) {
+      await title.click();
+    } else {
+      const info = card.locator('.media-info').first();
+      if (await info.count() > 0) {
+        await info.click();
+      } else {
+        await card.click({ position: { x: 100, y: 50 } });
+      }
+    }
   }
 
   /**
@@ -136,7 +147,18 @@ export class MediaPage {
    */
   async openFirstMediaByType(type: 'video' | 'audio' | 'image' | 'text'): Promise<void> {
     const card = this.page.locator(`.media-card[data-type*="${type}"]`).first();
-    await card.click();
+    // Try clicking on media-title first, fallback to media-info
+    const title = card.locator('.media-title').first();
+    if (await title.count() > 0) {
+      await title.click();
+    } else {
+      const info = card.locator('.media-info').first();
+      if (await info.count() > 0) {
+        await info.click();
+      } else {
+        await card.click({ position: { x: 100, y: 50 } });
+      }
+    }
   }
 
   /**
@@ -202,6 +224,73 @@ export class MediaPage {
   }
 
   /**
+   * Get clickable area of media card (avoids media-actions which blocks playback)
+   */
+  getMediaCardClickable(index: number): Locator {
+    return this.mediaCards.nth(index).locator('.media-title, .media-info').first();
+  }
+
+  /**
+   * Click media card to play it (clicks on title/info area to avoid media-actions)
+   */
+  async clickMediaCard(index: number): Promise<void> {
+    const card = this.getMediaCard(index);
+    // Try clicking on media-title first, fallback to media-info, then the card itself
+    const title = card.locator('.media-title').first();
+    if (await title.count() > 0) {
+      await title.click();
+    } else {
+      const info = card.locator('.media-info').first();
+      if (await info.count() > 0) {
+        await info.click();
+      } else {
+        // Fallback: click on card with position to avoid media-actions
+        await card.click({ position: { x: 100, y: 50 } });
+      }
+    }
+  }
+
+  /**
+   * Find and click first video card (for PiP player tests)
+   * Falls back to audio if no video available
+   * Fails if neither video nor audio is available
+   */
+  async clickFirstVideoOrAudio(): Promise<void> {
+    const videoCard = this.getFirstMediaCardByType('video');
+    if (await videoCard.count() > 0) {
+      await this.clickFirstMediaByType('video');
+    } else {
+      const audioCard = this.getFirstMediaCardByType('audio');
+      expect(await audioCard.count()).toBeGreaterThan(0);
+      await this.clickFirstMediaByType('audio');
+    }
+  }
+
+  /**
+   * Find and click first image card (for PiP player tests without autoplay)
+   * Falls back to video if no image available
+   * Fails if neither image nor video is available
+   */
+  async clickFirstImageOrVideo(): Promise<void> {
+    const imageCard = this.getFirstMediaCardByType('image');
+    if (await imageCard.count() > 0) {
+      await this.clickFirstMediaByType('image');
+    } else {
+      await this.clickFirstVideoOrAudio();
+    }
+  }
+
+  /**
+   * Find and click first document card (for document viewer tests)
+   * Fails if no document is available
+   */
+  async clickFirstDocument(): Promise<void> {
+    const textCard = this.getFirstMediaCardByType('text');
+    expect(await textCard.count()).toBeGreaterThan(0);
+    await this.clickFirstMediaByType('text');
+  }
+
+  /**
    * Get media card title
    */
   async getMediaCardTitle(index: number): Promise<string> {
@@ -243,6 +332,26 @@ export class MediaPage {
    */
   getFirstMediaCardByType(type: 'video' | 'audio' | 'image' | 'text'): Locator {
     return this.page.locator(`.media-card[data-type*="${type}"]`).first();
+  }
+
+  /**
+   * Click first media card matching type (clicks on title/info area to avoid media-actions)
+   */
+  async clickFirstMediaByType(type: 'video' | 'audio' | 'image' | 'text'): Promise<void> {
+    const card = this.getFirstMediaCardByType(type);
+    // Try clicking on media-title first, fallback to media-info
+    const title = card.locator('.media-title').first();
+    if (await title.count() > 0) {
+      await title.click();
+    } else {
+      const info = card.locator('.media-info').first();
+      if (await info.count() > 0) {
+        await info.click();
+      } else {
+        // Fallback: click on card with position to avoid media-actions
+        await card.click({ position: { x: 100, y: 50 } });
+      }
+    }
   }
 
   /**
@@ -612,13 +721,13 @@ export class MediaPage {
   }> {
     const fileCards = this.getDUFileCards();
     const folderCards = this.getFolderCards();
-    
+
     let depth = 0;
     let fileCount = await fileCards.count();
     let folderCount = await folderCards.count();
-    
+
     console.log(`[DU Nav] Depth ${depth}: ${fileCount} files, ${folderCount} folders`);
-    
+
     // Auto-navigate through single folders until we have enough files or hit max depth
     while (depth < maxDepth) {
       // If we have enough files, we're done
@@ -626,13 +735,14 @@ export class MediaPage {
         console.log(`[DU Nav] Found ${fileCount} files at depth ${depth}`);
         break;
       }
-      
-      // If no folders, we can't go deeper
+
+      // If no folders, we can't go deeper - fail explicitly
       if (folderCount === 0) {
         console.log(`[DU Nav] No folders at depth ${depth}, stopping`);
+        expect(fileCount, `Expected at least ${minFiles} files but found ${fileCount} with no more folders to explore`).toBeGreaterThanOrEqual(minFiles);
         break;
       }
-      
+
       // If exactly one folder (single folder auto-skip behavior)
       if (folderCount === 1) {
         console.log(`[DU Nav] Single folder detected, auto-navigating (depth ${depth})...`);
@@ -643,18 +753,24 @@ export class MediaPage {
         console.log(`[DU Nav] No files, ${folderCount} folders - clicking first folder (depth ${depth})...`);
         await folderCards.first().click();
         await this.page.waitForTimeout(1500);
+      } else if (fileCount > 0 && fileCount < minFiles && folderCount > 0) {
+        // Have some files but not enough, and there are folders - try clicking a folder
+        console.log(`[DU Nav] Have ${fileCount} files (need ${minFiles}), ${folderCount} folders - clicking first folder (depth ${depth})...`);
+        await folderCards.first().click();
+        await this.page.waitForTimeout(1500);
       } else {
-        // Have some files but not enough, and multiple folders - stop here
+        // Have some files but not enough, and no more folders to try - fail explicitly
         console.log(`[DU Nav] Have ${fileCount} files and ${folderCount} folders, stopping`);
+        expect(fileCount, `Expected at least ${minFiles} files but found ${fileCount} at depth ${depth}`).toBeGreaterThanOrEqual(minFiles);
         break;
       }
-      
+
       depth++;
       fileCount = await fileCards.count();
       folderCount = await folderCards.count();
       console.log(`[DU Nav] Depth ${depth}: ${fileCount} files, ${folderCount} folders`);
     }
-    
+
     return { fileCards, folderCards, fileCount, folderCount, depth };
   }
 

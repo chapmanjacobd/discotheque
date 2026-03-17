@@ -277,7 +277,7 @@ test.describe('Error Handling and Recovery', () => {
     });
 
     // Click first media card using POM
-    await mediaPage.getMediaCard(0).click();
+    await mediaPage.clickMediaCard(0);
     await mediaPage.page.waitForTimeout(2000);
 
     // Error toast should appear using POM
