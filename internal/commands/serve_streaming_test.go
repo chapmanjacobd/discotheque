@@ -313,6 +313,51 @@ func TestHandleDU(t *testing.T) {
 			}
 		}
 	})
+
+	t.Run("WindowsStylePath", func(t *testing.T) {
+		// Test that Windows-style backslash paths work correctly
+		// This ensures cross-platform compatibility
+		req := httptest.NewRequest("GET", "/api/du?path=\\videos\\movies", nil)
+		req.Header.Set("X-Disco-Token", cmd.APIToken)
+		w := httptest.NewRecorder()
+		mux.ServeHTTP(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Errorf("Expected 200, got %d - Body: %s", w.Code, w.Body.String())
+		}
+
+		var resp models.DUResponse
+		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("Failed to unmarshal response: %v", err)
+		}
+
+		// Should find the same files as forward-slash path
+		if len(resp.Files) == 0 && len(resp.Folders) == 0 {
+			t.Error("Expected files or folders for Windows-style path")
+		}
+	})
+
+	t.Run("MixedStylePath", func(t *testing.T) {
+		// Test that mixed separator paths work correctly
+		req := httptest.NewRequest("GET", "/api/du?path=/videos\\movies", nil)
+		req.Header.Set("X-Disco-Token", cmd.APIToken)
+		w := httptest.NewRecorder()
+		mux.ServeHTTP(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Errorf("Expected 200, got %d - Body: %s", w.Code, w.Body.String())
+		}
+
+		var resp models.DUResponse
+		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("Failed to unmarshal response: %v", err)
+		}
+
+		// Should find the same files as normalized path
+		if len(resp.Files) == 0 && len(resp.Folders) == 0 {
+			t.Error("Expected files or folders for mixed-style path")
+		}
+	})
 }
 
 // TestHandleEpisodes tests the episodes endpoint

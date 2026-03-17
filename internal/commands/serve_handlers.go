@@ -869,8 +869,10 @@ func (c *ServeCmd) handleLs(w http.ResponseWriter, r *http.Request) {
 func (c *ServeCmd) handleDU(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Query().Get("path")
 
-	// Clean the path
-	cleanPath := filepath.Clean(path)
+	// Normalize path: replace backslashes with forward slashes, then clean
+	// This ensures cross-platform compatibility since URLs always use forward slashes
+	// and we store paths consistently in the database
+	cleanPath := filepath.Clean(strings.ReplaceAll(path, "\\", "/"))
 	if cleanPath == "." || cleanPath == "/" {
 		cleanPath = ""
 	}
