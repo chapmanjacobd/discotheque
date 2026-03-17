@@ -327,6 +327,8 @@ test.describe('Metadata Modal', () => {
 });
 
 test.describe('Trash Functionality', () => {
+  // Override readOnly for trash tests - they need to modify the database
+  test.use({ readOnly: false });
   // Run in serial mode to prevent database state interference between tests
   test.describe.configure({ mode: 'serial' });
 

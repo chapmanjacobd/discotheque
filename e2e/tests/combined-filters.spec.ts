@@ -1,5 +1,4 @@
 import { test, expect } from '../fixtures';
-import { execSync } from 'child_process';
 
 test.describe('Combined Filters and Views', () => {
 
@@ -12,13 +11,6 @@ test.describe('Combined Filters and Views', () => {
 
   for (const mode of modes) {
     test(`mode: ${mode.name} - switching views and filtering`, async ({ mediaPage, sidebarPage, viewerPage, server }) => {
-      // Setup data for specific modes
-      if (mode.name === 'Trash') {
-        execSync(`sqlite3 "${server.getDatabasePath()}" "UPDATE media SET time_deleted = strftime('%s', 'now') WHERE path LIKE '%test_video2.mp4';"`);
-      } else if (mode.name === 'History') {
-        execSync(`sqlite3 "${server.getDatabasePath()}" "UPDATE media SET time_last_played = strftime('%s', 'now'), play_count = 1 WHERE path LIKE '%test_video1.mp4';"`);
-      }
-
       await mediaPage.goto(server.getBaseUrl() + (mode.hash ? `#${mode.hash}` : ''));
 
       // Wait for results container using POM
