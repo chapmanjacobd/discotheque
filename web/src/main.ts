@@ -524,7 +524,18 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Modal Management ---
     function openModal(id) {
         state.activeModal = id;
-        document.getElementById(id).classList.remove('hidden');
+        const modal = document.getElementById(id);
+        modal.classList.remove('hidden');
+
+        // Move metadata modal into fullscreen element if active (like toasts)
+        if (id === 'metadata-modal' && document.fullscreenElement) {
+            if (modal.parentElement !== document.fullscreenElement) {
+                document.fullscreenElement.appendChild(modal);
+            }
+        } else if (modal.parentElement !== document.body) {
+            document.body.appendChild(modal);
+        }
+
         syncUrl();
     }
 
@@ -615,8 +626,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 (media as HTMLMediaElement).pause();
                 media.removeAttribute('src');
                 (media as HTMLMediaElement).load();
+
+                // Cleanup cursor auto-hide handler
+                if ((media as any)._cleanupCursor) {
+                    (media as any)._cleanupCursor();
+                }
             }
             pipViewer.innerHTML = '';
+            pipViewer.style.cursor = 'default'; // Reset cursor style
             pipPlayer.classList.add('hidden');
             document.body.classList.remove('has-pip');
 
@@ -4847,6 +4864,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 addTrack(`/api/subtitles?path=${encodeURIComponent(path)}`, 'External', 'auto');
             }
 
+            // Setup cursor auto-hide for video in fullscreen mode
+            setupCursorAutoHide(el as HTMLVideoElement);
+
         } else if (type.includes('audio')) {
             el = document.createElement('audio');
             el.controls = true;
@@ -5283,6 +5303,64 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.error(`Error attempting to enable full-screen mode: ${err.message}`);
             });
         }
+    }
+
+    // Setup cursor auto-hide for video elements in fullscreen mode
+    function setupCursorAutoHide(video: HTMLVideoElement) {
+        let cursorHideTimer: number | null = null;
+        const CURSOR_HIDE_DELAY = 1000; // 1 second
+
+        const showCursor = () => {
+            pipViewer.style.cursor = 'default';
+            if (cursorHideTimer) {
+                clearTimeout(cursorHideTimer);
+                cursorHideTimer = null;
+            }
+        };
+
+        const hideCursor = () => {
+            // Only hide if video is playing and in fullscreen
+            if (!video.paused && document.fullscreenElement) {
+                pipViewer.style.cursor = 'none';
+            }
+        };
+
+        const scheduleCursorHide = () => {
+            showCursor();
+            cursorHideTimer = window.setTimeout(hideCursor, CURSOR_HIDE_DELAY);
+        };
+
+        // Listen to mouse movement on the pipViewer container
+        pipViewer.addEventListener('mousemove', scheduleCursorHide, { passive: true });
+        pipViewer.addEventListener('mousedown', showCursor, { passive: true });
+
+        // Also listen to fullscreen changes to update cursor state
+        const fullscreenHandler = () => {
+            if (!document.fullscreenElement) {
+                showCursor();
+            } else if (!video.paused) {
+                scheduleCursorHide();
+            }
+        };
+
+        document.addEventListener('fullscreenchange', fullscreenHandler);
+
+        // Listen to play/pause to manage cursor state
+        video.addEventListener('play', () => {
+            if (document.fullscreenElement) {
+                scheduleCursorHide();
+            }
+        });
+
+        video.addEventListener('pause', showCursor);
+
+        // Store cleanup function
+        (video as any)._cleanupCursor = () => {
+            if (cursorHideTimer) {
+                clearTimeout(cursorHideTimer);
+            }
+            document.removeEventListener('fullscreenchange', fullscreenHandler);
+        };
     }
 
     // Setup zoom/pan functionality for the viewer container
@@ -8381,9 +8459,27 @@ document.addEventListener('DOMContentLoaded', () => {
             fsBtn.title = document.fullscreenElement ? 'Exit Fullscreen' : 'Toggle Fullscreen';
         }
 
+        // Move metadata modal into/out of fullscreen element when fullscreen state changes
+        const metadataModal = document.getElementById('metadata-modal');
+        if (metadataModal && state.activeModal === 'metadata-modal') {
+            if (document.fullscreenElement) {
+                // Entering fullscreen - move modal into fullscreen element
+                if (metadataModal.parentElement !== document.fullscreenElement) {
+                    document.fullscreenElement.appendChild(metadataModal);
+                }
+            } else {
+                // Exiting fullscreen - move modal back to body
+                if (metadataModal.parentElement !== document.body) {
+                    document.body.appendChild(metadataModal);
+                }
+            }
+        }
+
         // If exiting fullscreen, move toast back to body
-        if (!document.fullscreenElement && toast.parentElement !== document.body) {
-            document.body.appendChild(toast);
+        if (!document.fullscreenElement) {
+            if (toast.parentElement !== document.body) {
+                document.body.appendChild(toast);
+            }
         }
     });
 

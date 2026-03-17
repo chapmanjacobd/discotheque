@@ -77,7 +77,7 @@ func Extract(ctx context.Context, path string, scanSubtitles bool, extractText b
 	ext := strings.ToLower(filepath.Ext(path))
 
 	// Check extension first for formats that are archive-based but treated as documents
-	if ext == ".cbz" || ext == ".cbr" || ext == ".epub" || ext == ".pdf" || ext == ".zim" {
+	if ext == ".cbz" || ext == ".cbr" || ext == ".epub" || ext == ".pdf" || ext == ".zim" || ext == ".djvu" {
 		mediaType = "text"
 	} else if strings.HasPrefix(mimeStr, "image/") {
 		mediaType = "image"
