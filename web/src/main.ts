@@ -1634,7 +1634,10 @@ document.addEventListener('DOMContentLoaded', () => {
         ratingList.querySelectorAll('.category-btn').forEach(btn => {
             (btn as any).onclick = (e) => {
                 const rating = (btn as any).dataset.rating;
-                if (state.page !== 'trash') state.page = 'search';
+                // Don't change page mode if in DU, trash, history, or captions mode
+                if (state.page !== 'trash' && state.page !== 'du' && state.page !== 'history' && state.page !== 'captions') {
+                    state.page = 'search';
+                }
 
                 const idx = state.filters.ratings.indexOf(rating);
                 if (idx !== -1) {
@@ -1647,7 +1650,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 btn.classList.toggle('active');
                 state.currentPage = 1;
                 updateNavActiveStates();
-                performSearch();
+                
+                // Call appropriate fetch function based on current mode
+                if (state.page === 'du') {
+                    fetchDU(state.duPath || '');
+                } else {
+                    performSearch();
+                }
             };
 
             btn.addEventListener('dragenter', (e) => {
@@ -1690,9 +1699,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const prevPath = state.duPath;
         const isForwardNav = prevPath && path.startsWith(prevPath);
         const isBackwardNav = prevPath && prevPath.startsWith(path);
-        // Detect first visit by checking if we haven't loaded any DU data yet
+        // Detect first visit by checking if we haven't loaded any DU data yet AND sort hasn't been set
         const hasLoadedDuData = state.duData && state.duData.length > 0;
-        const isFirstDUVisit = !hasLoadedDuData;
+        const isFirstDUVisit = !hasLoadedDuData && state.page !== 'du';
         // Track if we're auto-skipping to prevent infinite recursion
         const isAutoSkipRecursion = isAutoSkip || (prevPath && path.startsWith(prevPath) && path !== prevPath);
 
@@ -1704,7 +1713,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // Set default sort for DU view on first visit: size descending
-        if (isFirstDUVisit) {
+        // Only apply defaults if user hasn't already set a sort preference
+        if (isFirstDUVisit && !state.filters.sort) {
             state.filters.sort = 'size';
             state.filters.reverse = true;
             state.view = 'grid'; // Default to grid view in DU
@@ -6617,7 +6627,10 @@ document.addEventListener('DOMContentLoaded', () => {
             if (btn.id === 'categorization-link-btn') return;
             (btn as any).onclick = (e) => {
                 const cat = (btn as any).dataset.cat;
-                if (state.page !== 'trash') state.page = 'search';
+                // Don't change page mode if in DU, trash, history, or captions mode
+                if (state.page !== 'trash' && state.page !== 'du' && state.page !== 'history' && state.page !== 'captions') {
+                    state.page = 'search';
+                }
 
                 if (state.filters.categories.includes(cat)) {
                     state.filters.categories = [];
@@ -6628,7 +6641,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 localStorage.setItem('disco-filter-categories', String(JSON.stringify(state.filters.categories)));
                 state.currentPage = 1;
                 updateNavActiveStates();
-                performSearch();
+                
+                // Call appropriate fetch function based on current mode
+                if (state.page === 'du') {
+                    fetchDU(state.duPath || '');
+                } else {
+                    performSearch();
+                }
             };
         });
     }
@@ -6650,7 +6669,10 @@ document.addEventListener('DOMContentLoaded', () => {
         languageList.querySelectorAll('.category-btn').forEach(btn => {
             (btn as any).onclick = (e) => {
                 const lang = (btn as any).dataset.lang;
-                if (state.page !== 'trash') state.page = 'search';
+                // Don't change page mode if in DU, trash, history, or captions mode
+                if (state.page !== 'trash' && state.page !== 'du' && state.page !== 'history' && state.page !== 'captions') {
+                    state.page = 'search';
+                }
 
                 if (state.filters.languages.includes(lang)) {
                     state.filters.languages = [];
@@ -6661,7 +6683,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 localStorage.setItem('disco-filter-languages', String(JSON.stringify(state.filters.languages)));
                 state.currentPage = 1;
                 updateNavActiveStates();
-                performSearch();
+                
+                // Call appropriate fetch function based on current mode
+                if (state.page === 'du') {
+                    fetchDU(state.duPath || '');
+                } else {
+                    performSearch();
+                }
             };
         });
     }

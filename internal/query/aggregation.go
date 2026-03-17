@@ -624,6 +624,8 @@ func AggregateDUByPathWithFilters(ctx context.Context, dbPath string, pathPrefix
 		`
 	} else {
 		// Subdirectory level: aggregate by path at target depth
+		// Normalize both the prefix and stored paths to forward slashes for matching
+		// This ensures /videos/movies matches both /videos/movies/file and \videos\movies\file
 		normalizedPrefix := strings.ReplaceAll(pathPrefix, "\\", "/")
 		escapedPrefix := strings.ReplaceAll(normalizedPrefix, "'", "''")
 
@@ -655,8 +657,22 @@ func AggregateDUByPathWithFilters(ctx context.Context, dbPath string, pathPrefix
 				AND replace(path, '\\', '/') LIKE ? || '/%'
 				AND (length(replace(path, '\\', '/')) - length(replace(replace(path, '\\', '/'), '/', ''))) > ?
 		`
-		args = append(args, escapedPrefix, escapedPrefix, escapedPrefix, escapedPrefix, escapedPrefix, escapedPrefix,
-			escapedPrefix, escapedPrefix, escapedPrefix, escapedPrefix, escapedPrefix, escapedPrefix, escapedPrefix, escapedPrefix)
+		// Add args for the placeholders (13 total, matching original AggregateDUByPath)
+		args = append(args,
+			normalizedPrefix, // 1: substr(?, 1, 1)
+			normalizedPrefix, // 2: ? || substr(
+			normalizedPrefix, // 3: length(?) + 1
+			normalizedPrefix, // 4: length(?) + 2
+			normalizedPrefix, // 5: length(?) + 2
+			normalizedPrefix, // 6: length(?) + 1
+			normalizedPrefix, // 7: ? || CASE
+			normalizedPrefix, // 8: length(?) + 1
+			normalizedPrefix, // 9: length(?) + 1
+			normalizedPrefix, // 10: length(?) + 2
+			normalizedPrefix, // 11: length(?) + 1
+			escapedPrefix,    // 12: LIKE ? || '/%'
+			targetDepth,      // 13: separator count > targetDepth
+		)
 	}
 
 	// Add filter clauses using FilterBuilder
