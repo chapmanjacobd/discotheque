@@ -19,6 +19,7 @@ ubuntu-deps:
 		libatk1.0-0 \
 		libcairo2 \
 		libcups2 \
+		libxcb-cursor0 \
 		libdbus-1-3 \
 		libdrm2 \
 		libegl1 \
