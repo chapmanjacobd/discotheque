@@ -5,7 +5,6 @@ import { test, expect } from '../fixtures';
  * Tests both local resume mode and server-based progress tracking
  */
 test.describe('Playhead Resume', () => {
-  test.use({ readOnly: false });
 
   test('resumes from local progress when localResume is enabled', async ({ mediaPage, viewerPage, sidebarPage, server }) => {
     await mediaPage.goto(server.getBaseUrl());

@@ -5,7 +5,6 @@ import { test, expect } from '../fixtures';
  * Tests creating custom categories, managing keywords, and running categorization
  */
 test.describe('Categorization Workflow - Full Process', () => {
-  test.use({ readOnly: false });
 
   test('completes full categorization workflow: create category, add keywords, run categorization', async ({ mediaPage, server }) => {
     console.log('=== Starting Full Categorization Workflow Test ===');

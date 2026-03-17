@@ -9,7 +9,6 @@
 import { test, expect } from '../fixtures';
 
 test.describe('Progress Synchronization', () => {
-  test.use({ readOnly: false });
 
   test('localStorage progress structure is created on playback', async ({ mediaPage, viewerPage, server }) => {
     console.log('=== Testing progress structure creation ===');

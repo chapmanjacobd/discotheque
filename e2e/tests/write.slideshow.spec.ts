@@ -1,7 +1,6 @@
 import { test, expect } from '../fixtures';
 
 test.describe('Image Slideshow', () => {
-  test.use({ readOnly: false }); // Use false so we can change settings
 
   test('slideshow continues through multiple images', async ({ mediaPage, viewerPage, sidebarPage, server }) => {
     await mediaPage.goto(server.getBaseUrl());

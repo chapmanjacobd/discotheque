@@ -5,7 +5,6 @@ import { test, expect } from '../fixtures';
  * Tests merging of local data with server data and type filtering
  */
 test.describe('History Pages - In Progress / Unplayed / Completed', () => {
-  test.use({ readOnly: false });
 
   test.beforeEach(async ({ mediaPage, server }) => {
     // Enable local resume by setting localStorage before page load using POM

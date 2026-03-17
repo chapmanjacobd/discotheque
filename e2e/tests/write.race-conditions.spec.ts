@@ -4,7 +4,6 @@ import { test, expect } from '../fixtures';
  * E2E tests for race conditions in progress updates, pagination, search, and UI state
  */
 test.describe('Race Conditions - Progress Updates & Pagination', () => {
-  test.use({ readOnly: false });
 
   test('progress update does not interfere with pagination navigation', async ({ mediaPage, viewerPage, server }) => {
     console.log('=== Testing progress update during pagination ===');

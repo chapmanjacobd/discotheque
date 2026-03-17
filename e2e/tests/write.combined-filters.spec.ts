@@ -1,7 +1,6 @@
 import { test, expect } from '../fixtures';
 
 test.describe('Combined Filters and Views', () => {
-  test.use({ readOnly: false });
 
   const modes = [
     { name: 'Search', hash: '', selector: '#all-media-btn' },

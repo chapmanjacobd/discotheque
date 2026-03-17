@@ -1,7 +1,6 @@
 import { test, expect } from '../fixtures';
 
 test.describe('Progress Sync with POM', () => {
-  test.use({ readOnly: false });
 
   // localResume is enabled by default (localStorage !== 'false')
   // No need to set it explicitly

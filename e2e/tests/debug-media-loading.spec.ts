@@ -6,6 +6,8 @@
  */
 import { test, expect } from '../fixtures';
 
+test.use({ readOnly: true });
+
 test.describe('Debug Media Loading', () => {
   test('load audio file and capture network requests', async ({ mediaPage, viewerPage, server }) => {
     // Enable request/response logging

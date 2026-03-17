@@ -1,5 +1,7 @@
 import { test, expect } from '../fixtures';
 
+test.use({ readOnly: true });
+
 test.describe('Group View Error Handling', () => {
   test('Group view should not reset to Grid view on media error', async ({ mediaPage, server }) => {
     await mediaPage.goto(server.getBaseUrl());
