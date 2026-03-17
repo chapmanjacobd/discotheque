@@ -99,7 +99,7 @@ export const test = base.extend<{
 
   server: async ({ testDbPath, readOnly, page, serverOptions }, use) => {
     const workerId = process.env.TEST_WORKER_INDEX || 'default';
-    const project = process.env.PLAYWRIGHT_PROJECT || 'chromium';
+    const project = process.env.PLAYWRIGHT_PROJECT || 'desktop';
     const serverKey = `${project}-${workerId}`;
     const tmpDir = path.join(__dirname, '../tmp');
 
@@ -132,14 +132,14 @@ export const test = base.extend<{
       path: '/',
     }]);
 
-    page.on('console', msg => {
-      const msgText = msg.text();
-      if (msg.type() === 'error' && !['Failed to load resource: net::ERR_INCOMPLETE_CHUNKED_ENCODING'].includes(msgText)) {
-        console.error(`console.error:`, msgText);
-      } else {
-        console.log(`console.log:`, msgText);
-      }
-    });
+    // page.on('console', msg => {
+    //   const msgText = msg.text();
+    //   if (msg.type() === 'error' && !['Failed to load resource: net::ERR_INCOMPLETE_CHUNKED_ENCODING'].includes(msgText)) {
+    //     console.error(`console.error:`, msgText);
+    //   } else {
+    //     console.log(`console.log:`, msgText);
+    //   }
+    // });
 
     page.on('requestfailed', request => {
       const errorText = request.failure()?.errorText;

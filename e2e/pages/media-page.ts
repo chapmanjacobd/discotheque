@@ -587,7 +587,8 @@ export class MediaPage extends BasePage {
    * Get advanced settings summary (for backward compatibility)
    */
   getAdvancedSettingsSummary(): Locator {
-    return this.page.locator('#advanced-settings-summary');
+    // Find the details/summary element containing "Advanced Settings" text
+    return this.page.locator('#settings-modal details').filter({ hasText: 'Advanced Settings' }).first();
   }
 
   /**
@@ -656,6 +657,10 @@ export class MediaPage extends BasePage {
    * Get setting (for backward compatibility)
    */
   getSetting(key: string): Locator {
+    // Handle both id-based and data-setting-based selectors
+    if (key.startsWith('setting-')) {
+      return this.page.locator(`#${key}`);
+    }
     return this.page.locator(`[data-setting="${key}"]`);
   }
 

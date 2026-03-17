@@ -110,7 +110,7 @@ export class SidebarPage extends BasePage {
    */
   async openSettings(): Promise<void> {
     await this.settingsButton.click();
-    await this.metadataModal.waitFor({ state: 'visible' });
+    await this.settingsModal.waitFor({ state: 'visible' });
   }
 
   /**

@@ -4,7 +4,7 @@ import * as path from 'path';
 
 /**
  * E2E tests to capture screenshots for README documentation
- * Run with: npx playwright test screenshots --project=chromium
+ * Run with: npx playwright test screenshots --project=desktop
  */
 test.describe('README Screenshots', () => {
   test.use({

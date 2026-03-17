@@ -13,6 +13,7 @@ export class BasePage {
   readonly toast: Locator;
   readonly queueCountBadge: Locator;
   readonly settingsButton: Locator;
+  readonly settingsModal: Locator;
   readonly metadataModal: Locator;
   readonly helpModal: Locator;
 
@@ -41,6 +42,7 @@ export class BasePage {
     this.toast = page.locator('#toast');
     this.queueCountBadge = page.locator('#queue-count-badge');
     this.settingsButton = page.locator('#settings-button');
+    this.settingsModal = page.locator('#settings-modal');
     this.metadataModal = page.locator('#metadata-modal');
     this.helpModal = page.locator('#help-modal');
 

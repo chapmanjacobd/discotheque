@@ -134,7 +134,7 @@ profiles-svg: profiles
 	@echo "SVG profiles generated: cpu-profile.svg, mem-profile.svg"
 
 screenshots: build
-	cd e2e && npx playwright test screenshots --project=desktop
+	cd e2e && npx playwright test -c playwright.screenshots.config.ts
 
 readme: build
 	./$(BINARY_NAME)$(EXE) readme > README.md
