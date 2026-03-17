@@ -13,28 +13,8 @@ test.describe('DU Mode Navigation', () => {
     await mediaPage.getDUTToolbar().waitFor({ state: 'visible', timeout: 10000 });
     await mediaPage.page.waitForTimeout(1000);
 
-    // Navigate to images folder which has 3 files
-    const folderCards = mediaPage.getFolderCards();
-    const folderCount = await folderCards.count();
-    
-    // Find and click the images folder
-    let imagesFolderClicked = false;
-    for (let i = 0; i < folderCount; i++) {
-      const folderText = await folderCards.nth(i).textContent();
-      if (folderText?.includes('images')) {
-        await folderCards.nth(i).click();
-        await mediaPage.page.waitForTimeout(1500);
-        imagesFolderClicked = true;
-        break;
-      }
-    }
-    
-    // If images folder not found at root, use the generic navigation
-    if (!imagesFolderClicked) {
-      await mediaPage.navigateToDUFiles(2, 5);
-    }
-    
-    const result = await mediaPage.navigateToDUFiles(2, 1);
+    // Navigate to images folder with fallback to auto-navigation
+    const result = await mediaPage.navigateToDUFolderWithFallback('images', 2, 5);
     console.log(`[DU Test] Final: ${result.fileCount} files, ${result.folderCount} folders, depth ${result.depth}`);
 
     // Ensure we have at least 2 files to test
@@ -78,28 +58,8 @@ test.describe('DU Mode Navigation', () => {
     await mediaPage.getDUTToolbar().waitFor({ state: 'visible', timeout: 10000 });
     await mediaPage.page.waitForTimeout(1000);
 
-    // Navigate to images folder which has 3 files
-    const folderCards = mediaPage.getFolderCards();
-    const folderCount = await folderCards.count();
-    
-    // Find and click the images folder
-    let imagesFolderClicked = false;
-    for (let i = 0; i < folderCount; i++) {
-      const folderText = await folderCards.nth(i).textContent();
-      if (folderText?.includes('images')) {
-        await folderCards.nth(i).click();
-        await mediaPage.page.waitForTimeout(1500);
-        imagesFolderClicked = true;
-        break;
-      }
-    }
-    
-    // If images folder not found at root, use the generic navigation
-    if (!imagesFolderClicked) {
-      await mediaPage.navigateToDUFiles(2, 5);
-    }
-    
-    const result = await mediaPage.navigateToDUFiles(2, 1);
+    // Navigate to images folder with fallback to auto-navigation
+    const result = await mediaPage.navigateToDUFolderWithFallback('images', 2, 5);
     console.log(`[DU Delete Test] Final: ${result.fileCount} files, ${result.folderCount} folders, depth ${result.depth}`);
 
     // Ensure we have at least 2 files to test
@@ -134,28 +94,8 @@ test.describe('DU Mode Navigation', () => {
     await mediaPage.getDUTToolbar().waitFor({ state: 'visible', timeout: 10000 });
     await mediaPage.page.waitForTimeout(1000);
 
-    // Navigate to images folder which has 3 files
-    const folderCards = mediaPage.getFolderCards();
-    const folderCount = await folderCards.count();
-    
-    // Find and click the images folder
-    let imagesFolderClicked = false;
-    for (let i = 0; i < folderCount; i++) {
-      const folderText = await folderCards.nth(i).textContent();
-      if (folderText?.includes('images')) {
-        await folderCards.nth(i).click();
-        await mediaPage.page.waitForTimeout(1500);
-        imagesFolderClicked = true;
-        break;
-      }
-    }
-    
-    // If images folder not found at root, use the generic navigation
-    if (!imagesFolderClicked) {
-      await mediaPage.navigateToDUFiles(2, 5);
-    }
-    
-    const result = await mediaPage.navigateToDUFiles(2, 1);
+    // Navigate to images folder with fallback to auto-navigation
+    const result = await mediaPage.navigateToDUFolderWithFallback('images', 2, 5);
     console.log(`[DU Keyboard Test] Final: ${result.fileCount} files, ${result.folderCount} folders, depth ${result.depth}`);
 
     // Ensure we have at least 2 files to test

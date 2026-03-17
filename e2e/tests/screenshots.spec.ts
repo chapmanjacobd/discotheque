@@ -106,8 +106,8 @@ test.describe('README Screenshots', () => {
     // Filter to show only EPUB documents
     await mediaPage.search('.epub');
 
-    // Find and open EPUB
-    const epubCard = mediaPage.page.locator('.media-card[data-type*="text"]').filter({ hasText: /test-book/i }).first();
+    // Find and open EPUB using POM
+    const epubCard = mediaPage.getMediaCardByText('text', /test-book/i);
     if (await epubCard.count() > 0) {
       await epubCard.click();
 

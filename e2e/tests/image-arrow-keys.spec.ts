@@ -7,13 +7,11 @@ test.describe('Image Arrow Key Navigation', () => {
     await mediaPage.goto(server.getBaseUrl());
 
     // Find images using POM
-    const imageCards = mediaPage.page.locator('.media-card[data-type*="image"]');
-    const imageCount = await imageCards.count();
-
+    const imageCount = await mediaPage.getMediaCountByType('image');
     expect(imageCount).toBeGreaterThanOrEqual(2);
 
     // Click second image (so there's a previous sibling) using POM
-    await imageCards.nth(1).click();
+    await mediaPage.clickNthMediaByType('image', 1, 0);
     await viewerPage.waitForImageLoad();
 
     // Verify image is loaded using POM
@@ -37,13 +35,11 @@ test.describe('Image Arrow Key Navigation', () => {
     await mediaPage.goto(server.getBaseUrl());
 
     // Find images using POM
-    const imageCards = mediaPage.page.locator('.media-card[data-type*="image"]');
-    const imageCount = await imageCards.count();
-
+    const imageCount = await mediaPage.getMediaCountByType('image');
     expect(imageCount).toBeGreaterThanOrEqual(2);
 
     // Click first image (so there's a next sibling) using POM
-    await imageCards.first().click();
+    await mediaPage.clickNthMediaByType('image', 0, 0);
     await viewerPage.waitForImageLoad();
 
     // Verify image is loaded using POM
@@ -79,13 +75,11 @@ test.describe('Image Arrow Key Navigation', () => {
     await mediaPage.goto(server.getBaseUrl());
 
     // Find images using POM
-    const imageCards = mediaPage.page.locator('.media-card[data-type*="image"]');
-    const imageCount = await imageCards.count();
-
+    const imageCount = await mediaPage.getMediaCountByType('image');
     expect(imageCount).toBeGreaterThanOrEqual(3);
 
     // Click first image using POM
-    await imageCards.first().click();
+    await mediaPage.clickNthMediaByType('image', 0, 0);
     await viewerPage.waitForImageLoad();
 
     // Get initial src using POM

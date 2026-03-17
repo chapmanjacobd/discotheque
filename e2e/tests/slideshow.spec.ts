@@ -13,12 +13,10 @@ test.describe('Image Slideshow', () => {
     await sidebarPage.closeSettings();
 
     // Find and click an image using POM
-    const imageCard = mediaPage.getFirstMediaCardByType('image');
-    const imageCount = await mediaPage.page.locator('.media-card[data-type*="image"]').count();
-
+    const imageCount = await mediaPage.getMediaCountByType('image');
     expect(imageCount).toBeGreaterThan(0);
 
-    await imageCard.click();
+    await mediaPage.clickNthMediaByType('image', 0, 0);
 
     // Wait for player to open with image using POM
     await viewerPage.waitForImageLoad();
@@ -61,10 +59,10 @@ test.describe('Image Slideshow', () => {
   test('slideshow stops when user clicks button', async ({ mediaPage, viewerPage, server }) => {
     await mediaPage.goto(server.getBaseUrl());
 
-    const imageCard = mediaPage.getFirstMediaCardByType('image');
-    expect(await imageCard.count()).toBeGreaterThan(0);
+    const imageCount = await mediaPage.getMediaCountByType('image');
+    expect(imageCount).toBeGreaterThan(0);
 
-    await imageCard.click();
+    await mediaPage.clickNthMediaByType('image', 0, 0);
     await viewerPage.waitForImageLoad();
 
     // Start slideshow using POM
@@ -79,10 +77,10 @@ test.describe('Image Slideshow', () => {
   test('slideshow can be toggled with keyboard shortcut', async ({ mediaPage, viewerPage, server }) => {
     await mediaPage.goto(server.getBaseUrl());
 
-    const imageCard = mediaPage.getFirstMediaCardByType('image');
-    expect(await imageCard.count()).toBeGreaterThan(0);
+    const imageCount = await mediaPage.getMediaCountByType('image');
+    expect(imageCount).toBeGreaterThan(0);
 
-    await imageCard.click();
+    await mediaPage.clickNthMediaByType('image', 0, 0);
     await viewerPage.waitForImageLoad();
 
     // Press Space to start slideshow
@@ -97,8 +95,8 @@ test.describe('Image Slideshow', () => {
   test('slideshow respects custom delay setting', async ({ mediaPage, viewerPage, sidebarPage, server }) => {
     await mediaPage.goto(server.getBaseUrl());
 
-    const imageCard = mediaPage.getFirstMediaCardByType('image');
-    expect(await imageCard.count()).toBeGreaterThan(0);
+    const imageCount = await mediaPage.getMediaCountByType('image');
+    expect(imageCount).toBeGreaterThan(0);
 
     // Set custom slideshow delay in settings using POM
     await sidebarPage.openSettings();
@@ -106,7 +104,7 @@ test.describe('Image Slideshow', () => {
     await delayInput.fill('1');
     await sidebarPage.closeSettings();
 
-    await imageCard.click();
+    await mediaPage.clickNthMediaByType('image', 0, 0);
     await viewerPage.waitForImageLoad();
 
     // Get initial image src using POM
@@ -125,9 +123,7 @@ test.describe('Image Slideshow', () => {
   test('slideshow loops through all images', async ({ mediaPage, viewerPage, sidebarPage, server }) => {
     await mediaPage.goto(server.getBaseUrl());
 
-    const imageCards = mediaPage.page.locator('.media-card[data-type*="image"]');
-    const imageCount = await imageCards.count();
-
+    const imageCount = await mediaPage.getMediaCountByType('image');
     expect(imageCount).toBeGreaterThanOrEqual(2);
 
     // Set custom slideshow delay to 1s to speed up the test
@@ -136,8 +132,8 @@ test.describe('Image Slideshow', () => {
     await delayInput.fill('1');
     await sidebarPage.closeSettings();
 
-    // Click first image
-    await imageCards.first().click();
+    // Click first image using POM
+    await mediaPage.clickNthMediaByType('image', 0, 0);
     await viewerPage.waitForImageLoad();
 
     // Get initial src using POM

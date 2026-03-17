@@ -706,6 +706,169 @@ export class MediaPage {
   }
 
   /**
+   * Find and click a folder card by text match in DU mode
+   * @param searchText Text or regex pattern to match folder name
+   * @param timeout Timeout to wait after clicking (default: 1500ms)
+   * @returns true if folder was found and clicked, false otherwise
+   */
+  async findAndClickFolderByText(searchText: string | RegExp, timeout: number = 1500): Promise<boolean> {
+    const folderCards = this.getFolderCards();
+    const folderCount = await folderCards.count();
+
+    for (let i = 0; i < folderCount; i++) {
+      const folderText = await folderCards.nth(i).textContent();
+      if (folderText && (
+        typeof searchText === 'string' ? folderText.includes(searchText) : searchText.test(folderText)
+      )) {
+        await folderCards.nth(i).click();
+        await this.page.waitForTimeout(timeout);
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Navigate to DU files by first trying to find a specific folder, with fallback to auto-navigation
+   * @param folderName Folder name to search for (e.g., 'images', 'videos')
+   * @param minFiles Minimum number of files to wait for (default: 2)
+   * @param maxDepth Maximum folder depth to navigate (default: 5)
+   * @param folderTimeout Timeout to wait after clicking folder (default: 1500ms)
+   * @returns Object with fileCards locator and final counts
+   */
+  async navigateToDUFolderWithFallback(
+    folderName: string | RegExp,
+    minFiles: number = 2,
+    maxDepth: number = 5,
+    folderTimeout: number = 1500
+  ): Promise<{
+    fileCards: Locator;
+    folderCards: Locator;
+    fileCount: number;
+    folderCount: number;
+    depth: number;
+  }> {
+    // Try to find and click the specific folder first
+    const folderFound = await this.findAndClickFolderByText(folderName, folderTimeout);
+
+    // If folder not found, use the generic navigation
+    if (!folderFound) {
+      return await this.navigateToDUFiles(minFiles, maxDepth);
+    }
+
+    // Folder was clicked, now ensure we have enough files
+    return await this.navigateToDUFiles(minFiles, maxDepth);
+  }
+
+  /**
+   * Get media cards filtered by type
+   * @param type Media type: 'video', 'audio', 'image', 'text', or 'document'
+   * @returns Locator for media cards of the specified type
+   */
+  getMediaCardsByType(type: 'video' | 'audio' | 'image' | 'text' | 'document'): Locator {
+    // Handle 'document' as alias for 'text'
+    const searchType = type === 'document' ? 'text' : type;
+    return this.page.locator(`.media-card[data-type*="${searchType}"]`);
+  }
+
+  /**
+   * Get combined media cards for multiple types (e.g., video+audio)
+   * @param types Array of media types
+   * @returns Locator for media cards matching any of the specified types
+   */
+  getMediaCardsByTypes(types: Array<'video' | 'audio' | 'image' | 'text' | 'document'>): Locator {
+    const selectors = types.map(type => {
+      const searchType = type === 'document' ? 'text' : type;
+      return `.media-card[data-type*="${searchType}"]`;
+    });
+    return this.page.locator(selectors.join(', '));
+  }
+
+  /**
+   * Click the nth media card of a specific type
+   * @param type Media type: 'video', 'audio', 'image', 'text', or 'document'
+   * @param index Zero-based index of the card to click
+   * @param timeout Timeout to wait after clicking (default: 500ms)
+   */
+  async clickNthMediaByType(
+    type: 'video' | 'audio' | 'image' | 'text' | 'document',
+    index: number = 0,
+    timeout: number = 500
+  ): Promise<void> {
+    const card = this.getMediaCardsByType(type).nth(index);
+    // Try clicking on media-title first, fallback to media-info
+    const title = card.locator('.media-title').first();
+    if (await title.count() > 0) {
+      await title.click();
+    } else {
+      const info = card.locator('.media-info').first();
+      if (await info.count() > 0) {
+        await info.click();
+      } else {
+        await card.click({ position: { x: 100, y: 50 } });
+      }
+    }
+    if (timeout > 0) {
+      await this.page.waitForTimeout(timeout);
+    }
+  }
+
+  /**
+   * Find and click first media card matching text pattern
+   * @param type Media type to filter by
+   * @param textPattern Text or regex pattern to match
+   * @param timeout Timeout to wait after clicking (default: 500ms)
+   */
+  async clickMediaByText(
+    type: 'video' | 'audio' | 'image' | 'text' | 'document',
+    textPattern: string | RegExp,
+    timeout: number = 500
+  ): Promise<void> {
+    const card = this.getMediaCardByText(type, textPattern);
+    // Try clicking on media-title first, fallback to media-info
+    const title = card.locator('.media-title').first();
+    if (await title.count() > 0) {
+      await title.click();
+    } else {
+      const info = card.locator('.media-info').first();
+      if (await info.count() > 0) {
+        await info.click();
+      } else {
+        await card.click({ position: { x: 100, y: 50 } });
+      }
+    }
+    if (timeout > 0) {
+      await this.page.waitForTimeout(timeout);
+    }
+  }
+
+  /**
+   * Get media card by type and text pattern
+   * @param type Media type to filter by
+   * @param textPattern Text or regex pattern to match
+   * @returns Locator for the first matching media card
+   */
+  getMediaCardByText(
+    type: 'video' | 'audio' | 'image' | 'text' | 'document',
+    textPattern: string | RegExp
+  ): Locator {
+    const baseLocator = this.getMediaCardsByType(type);
+    if (typeof textPattern === 'string') {
+      return baseLocator.filter({ hasText: new RegExp(textPattern, 'i') }).first();
+    }
+    return baseLocator.filter({ hasText: textPattern }).first();
+  }
+
+  /**
+   * Get count of media cards by type
+   * @param type Media type to count
+   * @returns Number of media cards matching the type
+   */
+  async getMediaCountByType(type: 'video' | 'audio' | 'image' | 'text' | 'document'): Promise<number> {
+    return await this.getMediaCardsByType(type).count();
+  }
+
+  /**
    * Navigate through DU mode, auto-clicking single folders until we find files
    * Returns when we have at least minFiles file cards or no more single folders
    * @param minFiles Minimum number of files to wait for (default: 2)

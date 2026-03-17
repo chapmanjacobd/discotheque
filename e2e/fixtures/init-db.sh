@@ -182,7 +182,7 @@ echo "Test media files generated successfully"
 # Build disco binary if needed
 if [ ! -f "$REPO_ROOT/disco" ]; then
     echo "Building disco binary..."
-    cd "$REPO_ROOT" && go build -o disco ./cmd/disco
+    cd "$REPO_ROOT" && go build -tags fts5 -o disco ./cmd/disco
 fi
 
 # Create database with disco

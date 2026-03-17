@@ -22,7 +22,7 @@ test.describe('Disk Usage Navigation', () => {
     await mediaPage.getDUTToolbar().waitFor({ state: 'visible', timeout: 10000 });
 
     // Should show folder/file cards using POM
-    const cards = mediaPage.getDUCards();
+    const cards = mediaPage.getFolderCards();
     const count = await cards.count();
     expect(count).toBeGreaterThanOrEqual(1);
 
@@ -39,19 +39,15 @@ test.describe('Disk Usage Navigation', () => {
     const initialPath = await mediaPage.getDUPathInput().inputValue();
 
     // Click first folder card using POM
-    const folderCards = mediaPage.getFolderCards();
-    const count = await folderCards.count();
+    const folderFound = await mediaPage.findAndClickFolderByText(/.*/, 500);
+    expect(folderFound, 'Should find at least one folder to click').toBe(true);
 
-    if (count > 0) {
-      await folderCards.first().click();
+    // Wait for navigation
+    await mediaPage.page.waitForTimeout(500);
 
-      // Wait for navigation
-      await mediaPage.page.waitForTimeout(500);
-
-      // Path should have changed using POM
-      const newPath = await mediaPage.getDUPathInput().inputValue();
-      expect(newPath).not.toBe(initialPath);
-    }
+    // Path should have changed using POM
+    const newPath = await mediaPage.getDUPathInput().inputValue();
+    expect(newPath).not.toBe(initialPath);
   });
 
   test('back button navigates to parent directory', async ({ mediaPage, server }) => {
@@ -60,22 +56,17 @@ test.describe('Disk Usage Navigation', () => {
     await mediaPage.getDUTToolbar().waitFor({ state: 'visible', timeout: 10000 });
 
     // Navigate into a folder first using POM
-    const folderCards = mediaPage.getFolderCards();
-    const count = await folderCards.count();
+    const folderFound = await mediaPage.findAndClickFolderByText(/.*/, 500);
+    expect(folderFound, 'Should find at least one folder to click').toBe(true);
 
-    if (count > 0) {
-      await folderCards.first().click();
+    // Click back button using POM
+    const backBtn = mediaPage.getDUBackBtn();
+    if (await backBtn.isVisible()) {
+      await backBtn.click();
       await mediaPage.page.waitForTimeout(500);
 
-      // Click back button using POM
-      const backBtn = mediaPage.getDUBackBtn();
-      if (await backBtn.isVisible()) {
-        await backBtn.click();
-        await mediaPage.page.waitForTimeout(500);
-
-        // Should be back at previous location using POM
-        await expect(mediaPage.getDUTToolbar()).toBeVisible();
-      }
+      // Should be back at previous location using POM
+      await expect(mediaPage.getDUTToolbar()).toBeVisible();
     }
   });
 

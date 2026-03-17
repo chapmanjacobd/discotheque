@@ -12,8 +12,8 @@ test.describe('Calibre EPUB Viewer', () => {
     // Filter to show only EPUB documents using POM
     await mediaPage.search('.epub');
 
-    // Find and clicking the test-book EPUB media card using POM
-    const epubCard = mediaPage.page.locator('.media-card[data-type*="text"]').filter({ hasText: /test-book/i }).first();
+    // Find and click the test-book EPUB media card using POM
+    const epubCard = mediaPage.getMediaCardByText('text', /test-book/i);
     const epubCount = await epubCard.count();
 
     console.log(`Found ${epubCount} EPUB documents`);
@@ -126,8 +126,8 @@ test.describe('Calibre EPUB Viewer', () => {
     // Filter to show only EPUB documents using POM
     await mediaPage.search('.epub');
 
-    // Find and clicking the test-book EPUB media card using POM
-    const epubCard = mediaPage.page.locator('.media-card[data-type*="text"]').filter({ hasText: /test-book/i }).first();
+    // Find and click the test-book EPUB media card using POM
+    const epubCard = mediaPage.getMediaCardByText('text', /test-book/i);
     await epubCard.click();
 
     // Wait for document modal to open using POM
@@ -156,7 +156,7 @@ test.describe('Calibre EPUB Viewer', () => {
     await mediaPage.search('.epub');
 
     // Find and click the test-book EPUB using POM
-    const epubCard = mediaPage.page.locator('.media-card[data-type*="text"]').filter({ hasText: /test-book/i }).first();
+    const epubCard = mediaPage.getMediaCardByText('text', /test-book/i);
     await epubCard.click();
 
     // Wait for document modal using POM
@@ -188,7 +188,7 @@ test.describe('Calibre EPUB Viewer', () => {
     await mediaPage.search('.epub');
 
     // Find and click an EPUB using POM
-    const epubCard = mediaPage.page.locator('.media-card[data-type*="text"]').filter({ hasText: /test-book/i }).first();
+    const epubCard = mediaPage.getMediaCardByText('text', /test-book/i);
     if (await epubCard.count() > 0) {
       await epubCard.click();
 
@@ -217,7 +217,7 @@ test.describe('Calibre EPUB Viewer', () => {
     expect(epubCount).toBeGreaterThan(0);
 
     // Open first EPUB using POM
-    const epubCard = mediaPage.page.locator('.media-card[data-type*="text"]').first();
+    const epubCard = mediaPage.getMediaCardsByType('text').first();
     await epubCard.click();
 
     // Document modal should open using POM
@@ -238,7 +238,7 @@ test.describe('Calibre EPUB Viewer', () => {
     await mediaPage.search('.epub');
 
     // Find and click an EPUB using POM
-    const epubCard = mediaPage.page.locator('.media-card[data-type*="text"]').filter({ hasText: /test-book/i }).first();
+    const epubCard = mediaPage.getMediaCardByText('text', /test-book/i);
     await epubCard.click();
 
     // Wait for document modal using POM
@@ -265,7 +265,7 @@ test.describe('Calibre EPUB Viewer', () => {
     await mediaPage.search('.epub');
 
     // Find and click an EPUB using POM
-    const epubCard = mediaPage.page.locator('.media-card[data-type*="text"]').filter({ hasText: /test-book/i }).first();
+    const epubCard = mediaPage.getMediaCardByText('text', /test-book/i);
     await epubCard.click();
 
     // Wait for document modal using POM
