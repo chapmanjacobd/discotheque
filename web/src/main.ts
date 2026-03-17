@@ -4908,8 +4908,8 @@ document.addEventListener('DOMContentLoaded', () => {
             if (el.complete) {
                 el.onload();
             }
-            (el as HTMLElement).ondblclick = () => toggleFullscreen(pipViewer as HTMLElement);
-            setupImageZoomPan(el);
+            el.ondblclick = () => toggleFullscreen(pipViewer as HTMLElement);
+            setupViewerZoomPan();
         } else {
             showToast('Unsupported media format');
             return;
@@ -5236,20 +5236,33 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Setup zoom/pan functionality for image elements
-    function setupImageZoomPan(el) {
-        if (!el) return;
-
+    // Setup zoom/pan functionality for the viewer container
+    // Only enabled in fullscreen mode via pinch gestures and mouse wheel
+    function setupViewerZoomPan() {
         let scale = 1;
         let translateX = 0;
         let translateY = 0;
         let isDragging = false;
         let lastX, lastY;
 
-        el.style.transition = 'transform 0.1s ease-out';
-        el.style.cursor = 'zoom-in';
+        // Pinch gesture state
+        let initialPinchDistance: number | null = null;
+        let initialPinchScale = 1;
 
-        el.addEventListener('wheel', (e) => {
+        // Helper to get current image
+        const getCurrentImg = () => pipViewer?.querySelector('img');
+
+        // Helper to check if in fullscreen
+        const isInFullscreen = () => !!document.fullscreenElement;
+
+        // Helper to check if zoomed in
+        const isZoomedIn = () => scale > 1;
+
+        // Mouse wheel zoom - only in fullscreen
+        pipViewer.addEventListener('wheel', (e) => {
+            if (!isInFullscreen()) return;
+            const img = getCurrentImg();
+            if (!img) return;
             e.preventDefault();
             const delta = e.deltaY > 0 ? 0.8 : 1.25;
             const newScale = Math.min(Math.max(1, scale * delta), 15);
@@ -5260,57 +5273,107 @@ document.addEventListener('DOMContentLoaded', () => {
                     scale = 1;
                     translateX = 0;
                     translateY = 0;
-                    el.style.cursor = 'zoom-in';
+                    img.style.cursor = 'zoom-in';
                 } else {
-                    el.style.cursor = 'grab';
+                    img.style.cursor = 'grab';
                 }
-                el.style.transform = `scale(${scale}) translate(${translateX}px, ${translateY}px)`;
+                img.style.transform = `scale(${scale}) translate(${translateX}px, ${translateY}px)`;
             }
         }, { passive: false });
 
-        el.addEventListener('mousedown', (e) => {
-            if (scale <= 1) return;
+        // Mouse drag to pan - only in fullscreen when zoomed
+        pipViewer.addEventListener('mousedown', (e) => {
+            if (!isInFullscreen() || !isZoomedIn()) return;
             isDragging = true;
             lastX = e.clientX;
             lastY = e.clientY;
-            el.style.cursor = 'grabbing';
-            el.style.transition = 'none';
+            const img = getCurrentImg();
+            if (img) {
+                img.style.cursor = 'grabbing';
+                img.style.transition = 'none';
+            }
         });
 
         window.addEventListener('mousemove', (e) => {
-            if (!isDragging) return;
+            if (!isDragging || !isInFullscreen()) return;
+            const img = getCurrentImg();
+            if (!img) return;
             const dx = (e.clientX - lastX) / scale;
             const dy = (e.clientY - lastY) / scale;
             translateX += dx;
             translateY += dy;
             lastX = e.clientX;
             lastY = e.clientY;
-            el.style.transform = `scale(${scale}) translate(${translateX}px, ${translateY}px)`;
+            img.style.transform = `scale(${scale}) translate(${translateX}px, ${translateY}px)`;
         });
 
         window.addEventListener('mouseup', () => {
             if (!isDragging) return;
             isDragging = false;
-            if (el) {
-                el.style.cursor = scale > 1 ? 'grab' : 'zoom-in';
-                el.style.transition = 'transform 0.1s ease-out';
+            const img = getCurrentImg();
+            if (img) {
+                img.style.cursor = scale > 1 ? 'grab' : 'zoom-in';
+                img.style.transition = 'transform 0.1s ease-out';
             }
         });
 
-        // Double click to reset
-        el.addEventListener('dblclick', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            if (scale > 1) {
-                scale = 1;
-                translateX = 0;
-                translateY = 0;
-                el.style.cursor = 'zoom-in';
-            } else {
-                scale = 3;
-                el.style.cursor = 'grab';
+        // Touch events for pinch-to-zoom - only in fullscreen
+        pipViewer.addEventListener('touchstart', (e) => {
+            if (!isInFullscreen()) return;
+            if (e.touches.length === 2) {
+                // Pinch gesture
+                initialPinchDistance = Math.hypot(
+                    e.touches[1].clientX - e.touches[0].clientX,
+                    e.touches[1].clientY - e.touches[0].clientY
+                );
+                initialPinchScale = scale;
+                isDragging = false;
+            } else if (e.touches.length === 1 && isZoomedIn()) {
+                // Single touch drag for panning
+                isDragging = true;
+                lastX = e.touches[0].clientX;
+                lastY = e.touches[0].clientY;
             }
-            el.style.transform = `scale(${scale}) translate(${translateX}px, ${translateY}px)`;
+        }, { passive: false });
+
+        pipViewer.addEventListener('touchmove', (e) => {
+            if (!isInFullscreen()) return;
+            const img = getCurrentImg();
+            if (!img) return;
+            if (e.touches.length === 2 && initialPinchDistance !== null) {
+                // Pinch zoom
+                e.preventDefault();
+                const currentDistance = Math.hypot(
+                    e.touches[1].clientX - e.touches[0].clientX,
+                    e.touches[1].clientY - e.touches[0].clientY
+                );
+                const newScale = Math.min(Math.max(1, initialPinchScale * (currentDistance / initialPinchDistance)), 15);
+                scale = newScale;
+                if (scale <= 1) {
+                    scale = 1;
+                    translateX = 0;
+                    translateY = 0;
+                    img.style.cursor = 'zoom-in';
+                } else {
+                    img.style.cursor = 'grab';
+                }
+                img.style.transform = `scale(${scale}) translate(${translateX}px, ${translateY}px)`;
+            } else if (e.touches.length === 1 && isDragging && isZoomedIn()) {
+                // Single touch pan
+                e.preventDefault();
+                const dx = (e.touches[0].clientX - lastX) / scale;
+                const dy = (e.touches[0].clientY - lastY) / scale;
+                translateX += dx;
+                translateY += dy;
+                lastX = e.touches[0].clientX;
+                lastY = e.touches[0].clientY;
+                img.style.transform = `scale(${scale}) translate(${translateX}px, ${translateY}px)`;
+            }
+        }, { passive: false });
+
+        pipViewer.addEventListener('touchend', () => {
+            isDragging = false;
+            initialPinchDistance = null;
         });
 
         document.addEventListener('fullscreenchange', () => {
@@ -5318,12 +5381,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 scale = 1;
                 translateX = 0;
                 translateY = 0;
-                if (el) {
-                    el.style.transform = '';
-                    el.style.cursor = 'zoom-in';
+                const img = getCurrentImg();
+                if (img) {
+                    img.style.transform = '';
+                    img.style.cursor = 'zoom-in';
                 }
             }
         });
+
+        // Expose isZoomedIn for swipe gesture detection
+        (pipViewer as any)._isZoomedIn = isZoomedIn;
     }
 
     // Fallback function for when video element can't decode a file (e.g., animated GIFs)
@@ -5346,7 +5413,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Replace video with img in the viewer
         pipViewer.innerHTML = '';
         pipViewer.appendChild(imgEl);
-        setupImageZoomPan(imgEl);
+        setupViewerZoomPan();
     }
 
     async function closePiP() {
@@ -7494,17 +7561,23 @@ document.addEventListener('DOMContentLoaded', () => {
             const diffY = touch.screenY - touchStartY;
             const duration = Date.now() - touchStartTime;
 
+            // Check if image is zoomed in using the viewer's isZoomedIn method
+            const isZoomedIn = (pipViewer as any)._isZoomedIn?.() || false;
+
             // Thresholds: < 500ms duration
+            // Much higher threshold when zoomed in to avoid accidental navigation while panning
+            const swipeThreshold = isZoomedIn ? 180 : 60;
+
             if (touchStartTime !== 0 && duration < 500) {
-                if (Math.abs(diffX) > 60 && Math.abs(diffY) < 80) {
-                    if (diffX > 60) {
+                if (Math.abs(diffX) > swipeThreshold && Math.abs(diffY) < 80) {
+                    if (diffX > swipeThreshold) {
                         // Swipe Right -> Previous
                         playSibling(-1, true);
-                    } else if (diffX < -60) {
+                    } else if (diffX < -swipeThreshold) {
                         // Swipe Left -> Next
                         playSibling(1, true);
                     }
-                } else if (diffY > 80 && Math.abs(diffX) < 60) {
+                } else if (diffY > 80 && Math.abs(diffX) < swipeThreshold) {
                     // Swipe Down -> Close
                     closeActivePlayer();
                 }
