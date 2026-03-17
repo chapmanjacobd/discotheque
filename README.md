@@ -14,6 +14,10 @@ go install -tags fts5 github.com/chapmanjacobd/discoteca/cmd/disco@latest
 
 ![Search Results](docs/screenshots/search-results.png)
 
+### Group View
+
+![Group View](docs/screenshots/group-view.png)
+
 ### Details View
 
 ![Details View](docs/screenshots/home-details-view.png)
@@ -37,10 +41,6 @@ go install -tags fts5 github.com/chapmanjacobd/discoteca/cmd/disco@latest
 ### Settings Modal
 
 ![Settings Modal](docs/screenshots/settings-modal.png)
-
-### Group View
-
-![Group View](docs/screenshots/group-view.png)
 
 ## Optional dependencies
 

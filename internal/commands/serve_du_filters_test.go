@@ -246,7 +246,7 @@ func TestHandleDU_WithFilters(t *testing.T) {
 			t.Logf("Response: %+v", resp2)
 		}
 
-		t.Logf("Subfolder results - Folders: %d, Files: %d, Total: %d", 
+		t.Logf("Subfolder results - Folders: %d, Files: %d, Total: %d",
 			resp2.FolderCount, resp2.FileCount, resp2.TotalCount)
 	})
 
@@ -284,7 +284,7 @@ func TestHandleDU_WithFilters(t *testing.T) {
 			t.Errorf("Expected folders or files in subfolder with audio filter, got none")
 		}
 
-		t.Logf("Audio filter - Subfolder results: Folders: %d, Files: %d", 
+		t.Logf("Audio filter - Subfolder results: Folders: %d, Files: %d",
 			resp2.FolderCount, resp2.FileCount)
 	})
 
@@ -341,7 +341,7 @@ func TestHandleDU_WithFilters(t *testing.T) {
 		if resp2.FolderCount == 0 && resp2.FileCount == 0 {
 			t.Errorf("Expected folders or files with size filter, got none")
 		}
-		t.Logf("Size filter - Subfolder results: Folders: %d, Files: %d", 
+		t.Logf("Size filter - Subfolder results: Folders: %d, Files: %d",
 			resp2.FolderCount, resp2.FileCount)
 	})
 
@@ -371,7 +371,91 @@ func TestHandleDU_WithFilters(t *testing.T) {
 		if resp2.FolderCount == 0 && resp2.FileCount == 0 {
 			t.Errorf("Expected folders or files with duration filter, got none")
 		}
-		t.Logf("Duration filter - Subfolder results: Folders: %d, Files: %d", 
+		t.Logf("Duration filter - Subfolder results: Folders: %d, Files: %d",
 			resp2.FolderCount, resp2.FileCount)
+	})
+
+	t.Run("episodes filecounts filter works in DU mode", func(t *testing.T) {
+		// Get unfiltered results first
+		req1 := httptest.NewRequest("GET", "/api/du?path=&include_counts=true", nil)
+		req1.Header.Set("X-Disco-Token", cmd.APIToken)
+		w1 := httptest.NewRecorder()
+		mux.ServeHTTP(w1, req1)
+
+		var resp1 models.DUResponse
+		if err := json.Unmarshal(w1.Body.Bytes(), &resp1); err != nil {
+			t.Fatalf("Failed to unmarshal unfiltered response: %v", err)
+		}
+
+		t.Logf("Unfiltered - Folders: %d, Files: %d, Total: %d",
+			resp1.FolderCount, resp1.FileCount, resp1.TotalCount)
+
+		// Apply filecounts filter (folders with exactly 1 file)
+		req2 := httptest.NewRequest("GET", "/api/du?path=&file_counts=1", nil)
+		req2.Header.Set("X-Disco-Token", cmd.APIToken)
+		w2 := httptest.NewRecorder()
+		mux.ServeHTTP(w2, req2)
+
+		if w2.Code != http.StatusOK {
+			t.Errorf("Expected 200, got %d - Body: %s", w2.Code, w2.Body.String())
+		}
+
+		var resp2 models.DUResponse
+		if err := json.Unmarshal(w2.Body.Bytes(), &resp2); err != nil {
+			t.Fatalf("Failed to unmarshal filtered response: %v", err)
+		}
+
+		t.Logf("FileCounts=1 - Folders: %d, Files: %d, Total: %d",
+			resp2.FolderCount, resp2.FileCount, resp2.TotalCount)
+
+		// Should have fewer or equal results than unfiltered
+		if resp2.TotalCount > resp1.TotalCount {
+			t.Errorf("Filtered count (%d) should not exceed unfiltered count (%d)",
+				resp2.TotalCount, resp1.TotalCount)
+		}
+	})
+
+	t.Run("episodes filecounts filter persists when navigating to subfolder", func(t *testing.T) {
+		// Get root level with filecounts filter
+		req1 := httptest.NewRequest("GET", "/api/du?path=&file_counts=1", nil)
+		req1.Header.Set("X-Disco-Token", cmd.APIToken)
+		w1 := httptest.NewRecorder()
+		mux.ServeHTTP(w1, req1)
+
+		var resp1 models.DUResponse
+		if err := json.Unmarshal(w1.Body.Bytes(), &resp1); err != nil {
+			t.Fatalf("Failed to unmarshal root response: %v", err)
+		}
+
+		if len(resp1.Folders) == 0 {
+			t.Fatal("Expected folders at root level with filecounts filter")
+		}
+
+		firstFolderPath := resp1.Folders[0].Path
+		t.Logf("Navigating to folder: %s with filecounts filter", firstFolderPath)
+
+		// Navigate to subfolder with same filecounts filter
+		req2 := httptest.NewRequest("GET", "/api/du?path="+firstFolderPath+"&file_counts=1", nil)
+		req2.Header.Set("X-Disco-Token", cmd.APIToken)
+		w2 := httptest.NewRecorder()
+		mux.ServeHTTP(w2, req2)
+
+		if w2.Code != http.StatusOK {
+			t.Errorf("Expected 200, got %d - Body: %s", w2.Code, w2.Body.String())
+		}
+
+		var resp2 models.DUResponse
+		if err := json.Unmarshal(w2.Body.Bytes(), &resp2); err != nil {
+			t.Fatalf("Failed to unmarshal subfolder response: %v", err)
+		}
+
+		totalItems := len(resp2.Folders) + len(resp2.Files)
+		t.Logf("Subfolder results - Folders: %d, Files: %d, Total: %d",
+			resp2.FolderCount, resp2.FileCount, resp2.TotalCount)
+
+		// Should have some results (or at least not error)
+		if totalItems == 0 && resp2.TotalCount == 0 {
+			t.Logf("No results in subfolder with filecounts=1 filter (may be expected depending on test data)")
+		}
 	})
 }

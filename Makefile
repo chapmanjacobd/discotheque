@@ -12,7 +12,7 @@ endif
 all: clean webbuild fmt lint build test webtest readme
 
 ubuntu-deps:
-	sudo apt-get update && sudo apt-get install -y \
+	sudo apt-get update && sudo apt-get install -y --no-install-recommends -o APT::Install-Suggests=0 \
 		fonts-dejavu-core \
 		sqlite3 \
 		libcairo2 \
@@ -30,11 +30,15 @@ ubuntu-deps:
 		libxrandr2 \
 		libnspr4 \
 		libnss3 \
-		calibre \
 		ffmpeg \
-		graphviz \
 		groff \
-		pandoc
+		wget
+	PANDOC_VERSION=$(curl -s https://api.github.com/repos/jgm/pandoc/releases/latest | grep tag_name | cut -d '"' -f4)
+	wget -q https://github.com/jgm/pandoc/releases/download/${PANDOC_VERSION}/pandoc-${PANDOC_VERSION}-linux-amd64.tar.gz
+	tar -xzf pandoc-${PANDOC_VERSION}-linux-amd64.tar.gz
+	sudo mv pandoc-${PANDOC_VERSION}/bin/pandoc /usr/local/bin/
+	rm -rf pandoc-${PANDOC_VERSION}*
+	sudo -v && wget -qO- https://download.calibre-ebook.com/linux-installer.sh | sudo sh /dev/stdin
 
 macos-deps:
 	-brew install --formula ffmpeg pandoc sqlite || true

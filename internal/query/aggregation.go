@@ -2,10 +2,12 @@ package query
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"log/slog"
 	"math"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -21,6 +23,69 @@ type DUQueryResult struct {
 	Count         int
 	TotalSize     int64
 	TotalDuration int64
+}
+
+// hasActiveFilters checks if any filters are active that require slow-path processing
+// Returns true if FileCounts (episodes) filter is active, which requires folder backfiltering
+func hasActiveFilters(flags models.GlobalFlags) bool {
+	// FileCounts requires folder-level aggregation before filtering
+	if flags.FileCounts != "" {
+		return true
+	}
+	// FolderCounts also requires folder-level filtering
+	if flags.FolderCounts != "" {
+		return true
+	}
+	// FolderSizes requires post-aggregation filtering
+	if len(flags.FolderSizes) > 0 {
+		return true
+	}
+	return false
+}
+
+// hasBasicFilters checks if only basic SQL-level filters are active (size, duration, type, etc.)
+// These can be applied directly in SQL without folder backfiltering
+func hasBasicFilters(flags models.GlobalFlags) bool {
+	if flags.VideoOnly || flags.AudioOnly || flags.ImageOnly || flags.TextOnly {
+		return true
+	}
+	if len(flags.Size) > 0 || len(flags.Duration) > 0 {
+		return true
+	}
+	if flags.PlayCountMin > 0 || flags.PlayCountMax > 0 {
+		return true
+	}
+	if flags.Genre != "" || len(flags.Language) > 0 || len(flags.Ext) > 0 {
+		return true
+	}
+	if flags.ModifiedAfter != "" || flags.ModifiedBefore != "" {
+		return true
+	}
+	if flags.CreatedAfter != "" || flags.CreatedBefore != "" {
+		return true
+	}
+	if flags.DownloadedAfter != "" || flags.DownloadedBefore != "" {
+		return true
+	}
+	if flags.OnlyDeleted || flags.HideDeleted {
+		return true
+	}
+	if flags.OnlineMediaOnly || flags.LocalMediaOnly {
+		return true
+	}
+	if len(flags.Search) > 0 || len(flags.Include) > 0 || len(flags.PathContains) > 0 {
+		return true
+	}
+	if len(flags.Category) > 0 {
+		return true
+	}
+	if flags.Watched != nil || flags.Unfinished || flags.InProgress || flags.Completed {
+		return true
+	}
+	if flags.Partial != "" {
+		return true
+	}
+	return false
 }
 
 // AggregateDUByPath performs SQL-level aggregation for DU mode
@@ -585,7 +650,164 @@ func AggregateDUByPathMultiDBWithFilters(ctx context.Context, dbPaths []string, 
 	return finalResults, nil
 }
 
+// getMatchingParentDirs queries the database to find parent directories that match the given filters
+// Returns a map of parent directory paths to their file counts
+func getMatchingParentDirs(ctx context.Context, dbPath string, pathPrefix string, targetDepth int, flags models.GlobalFlags) (map[string]int64, error) {
+	sqlDB, err := db.Connect(dbPath)
+	if err != nil {
+		return nil, err
+	}
+	defer sqlDB.Close()
+
+	// Build query to extract parent directory at target depth and count files
+	var query string
+	var args []any
+
+	if pathPrefix == "" {
+		// Root level: extract first path component
+		query = `
+			SELECT
+				CASE
+					WHEN substr(replace(path, '\\', '/'), 1, 1) = '/' THEN
+						substr(replace(path, '\\', '/'), 1,
+							CASE
+								WHEN instr(substr(replace(path, '\\', '/'), 2), '/') > 0
+								THEN instr(substr(replace(path, '\\', '/'), 2), '/')
+								ELSE length(replace(path, '\\', '/'))
+							END
+						)
+					ELSE
+						CASE
+							WHEN instr(replace(path, '\\', '/'), '/') > 0
+							THEN substr(replace(path, '\\', '/'), 1, instr(replace(path, '\\', '/'), '/') - 1)
+							ELSE replace(path, '\\', '/')
+						END
+				END as parent_dir,
+				COUNT(*) as file_count
+			FROM media
+			WHERE COALESCE(time_deleted, 0) = 0
+		`
+	} else {
+		normalizedPrefix := strings.ReplaceAll(pathPrefix, "\\", "/")
+		escapedPrefix := strings.ReplaceAll(normalizedPrefix, "'", "''")
+
+		query = `
+			SELECT
+				CASE
+					WHEN substr(?, 1, 1) = '/' THEN
+						? || substr(
+							substr(replace(path, '\\', '/'), length(?) + 1),
+							1,
+							CASE
+								WHEN instr(substr(replace(path, '\\', '/'), length(?) + 2), '/') > 0
+								THEN instr(substr(replace(path, '\\', '/'), length(?) + 2), '/')
+								ELSE length(substr(replace(path, '\\', '/'), length(?) + 1))
+							END
+						)
+					ELSE
+						? || CASE
+							WHEN instr(substr(replace(path, '\\', '/'), length(?) + 1), '/') > 0
+							THEN substr(substr(replace(path, '\\', '/'), length(?) + 1), 1, instr(substr(replace(path, '\\', '/'), length(?) + 2), '/') - 1)
+							ELSE substr(replace(path, '\\', '/'), length(?) + 1)
+						END
+				END as parent_dir,
+				COUNT(*) as file_count
+			FROM media
+			WHERE COALESCE(time_deleted, 0) = 0
+				AND replace(path, '\\', '/') LIKE ? || '/%'
+				AND (length(replace(path, '\\', '/')) - length(replace(replace(path, '\\', '/'), '/', ''))) > ?
+		`
+		args = append(args,
+			normalizedPrefix, normalizedPrefix, normalizedPrefix, normalizedPrefix, normalizedPrefix,
+			normalizedPrefix, normalizedPrefix, normalizedPrefix, normalizedPrefix, normalizedPrefix,
+			normalizedPrefix, escapedPrefix, targetDepth,
+		)
+	}
+
+	// Add basic filters (size, duration, type, etc.) - but NOT FileCounts/FolderCounts
+	basicFlags := flags
+	basicFlags.FileCounts = ""
+	basicFlags.FolderCounts = ""
+	basicFlags.FolderSizes = nil
+
+	fb := NewFilterBuilder(basicFlags)
+	filterClauses, filterArgs := fb.BuildWhereClauses()
+
+	if len(filterClauses) > 0 {
+		query += " AND " + strings.Join(filterClauses, " AND ")
+		args = append(args, filterArgs...)
+	}
+
+	query += " GROUP BY parent_dir"
+
+	rows, err := sqlDB.QueryContext(ctx, query, args...)
+	if err != nil {
+		slog.Error("Parent directory query failed", "error", err)
+		return nil, err
+	}
+	defer rows.Close()
+
+	parentCounts := make(map[string]int64)
+	for rows.Next() {
+		var parentDir string
+		var count int64
+		if err := rows.Scan(&parentDir, &count); err != nil {
+			return nil, err
+		}
+		parentCounts[parentDir] = count
+	}
+
+	return parentCounts, rows.Err()
+}
+
+// filterParentsByCounts filters parent directories based on FileCounts/FolderCounts/FolderSizes
+func filterParentsByCounts(parentCounts map[string]int64, flags models.GlobalFlags) map[string]struct{} {
+	matchingParents := make(map[string]struct{})
+
+	for parent, count := range parentCounts {
+		keep := true
+
+		// Apply FileCounts filter (episode count per folder)
+		if flags.FileCounts != "" {
+			if r, err := utils.ParseRange(flags.FileCounts, func(s string) (int64, error) {
+				return strconv.ParseInt(s, 10, 64)
+			}); err == nil {
+				if !r.Matches(count) {
+					keep = false
+				}
+			}
+		}
+
+		// Apply FolderCounts filter
+		if keep && flags.FolderCounts != "" {
+			// FolderCounts applies to folder count within a parent, not file count
+			// For now, we'll use the same logic - this may need adjustment based on exact semantics
+			if _, err := utils.ParseRange(flags.FolderCounts, func(s string) (int64, error) {
+				return strconv.ParseInt(s, 10, 64)
+			}); err == nil {
+				// We don't have folder count here, so skip this filter at this level
+				// It will be applied post-aggregation
+			}
+		}
+
+		// Apply FolderSizes filter
+		if keep && len(flags.FolderSizes) > 0 {
+			// FolderSizes applies to total size, which we don't have at this stage
+			// Will be applied post-aggregation
+		}
+
+		if keep {
+			matchingParents[parent] = struct{}{}
+		}
+	}
+
+	return matchingParents
+}
+
 // AggregateDUByPathWithFilters performs SQL-level aggregation with filter support
+// Uses two-path approach:
+// - Fast path: no FileCounts/FolderCounts/FolderSizes filters - direct SQL aggregation
+// - Slow path: folder backfiltering for FileCounts/FolderCounts/FolderSizes
 func AggregateDUByPathWithFilters(ctx context.Context, dbPath string, pathPrefix string, targetDepth int, currentDepth int, flags models.GlobalFlags) ([]DUQueryResult, error) {
 	sqlDB, err := db.Connect(dbPath)
 	if err != nil {
@@ -593,11 +815,39 @@ func AggregateDUByPathWithFilters(ctx context.Context, dbPath string, pathPrefix
 	}
 	defer sqlDB.Close()
 
+	// Check if we need folder backfiltering (slow path)
+	needsBackfiltering := hasActiveFilters(flags)
+
+	if !needsBackfiltering {
+		// FAST PATH: Direct SQL aggregation with basic filters
+		return aggregateDUWithBasicFilters(ctx, sqlDB, pathPrefix, targetDepth, currentDepth, flags)
+	}
+
+	// SLOW PATH: Folder backfiltering
+	// Phase 1: Get parent directories with file counts, applying basic filters
+	parentCounts, err := getMatchingParentDirs(ctx, dbPath, pathPrefix, targetDepth, flags)
+	if err != nil {
+		return nil, err
+	}
+
+	// Phase 2: Filter parents by FileCounts/FolderCounts/FolderSizes
+	matchingParents := filterParentsByCounts(parentCounts, flags)
+
+	if len(matchingParents) == 0 {
+		// No matching parents, return empty result
+		return []DUQueryResult{}, nil
+	}
+
+	// Phase 3: Aggregate only matching parent directories
+	return aggregateDUWithParentFilter(ctx, sqlDB, pathPrefix, targetDepth, currentDepth, flags, matchingParents)
+}
+
+// aggregateDUWithBasicFilters performs SQL aggregation with only basic filters (fast path)
+func aggregateDUWithBasicFilters(ctx context.Context, sqlDB *sql.DB, pathPrefix string, targetDepth int, currentDepth int, flags models.GlobalFlags) ([]DUQueryResult, error) {
 	var query string
 	var args []any
 
 	if pathPrefix == "" {
-		// Root level: aggregate by first path component
 		query = `
 			SELECT
 				CASE
@@ -623,9 +873,6 @@ func AggregateDUByPathWithFilters(ctx context.Context, dbPath string, pathPrefix
 			WHERE COALESCE(time_deleted, 0) = 0
 		`
 	} else {
-		// Subdirectory level: aggregate by path at target depth
-		// Normalize both the prefix and stored paths to forward slashes for matching
-		// This ensures /videos/movies matches both /videos/movies/file and \videos\movies\file
 		normalizedPrefix := strings.ReplaceAll(pathPrefix, "\\", "/")
 		escapedPrefix := strings.ReplaceAll(normalizedPrefix, "'", "''")
 
@@ -657,32 +904,26 @@ func AggregateDUByPathWithFilters(ctx context.Context, dbPath string, pathPrefix
 				AND replace(path, '\\', '/') LIKE ? || '/%'
 				AND (length(replace(path, '\\', '/')) - length(replace(replace(path, '\\', '/'), '/', ''))) > ?
 		`
-		// Add args for the placeholders (13 total, matching original AggregateDUByPath)
 		args = append(args,
-			normalizedPrefix, // 1: substr(?, 1, 1)
-			normalizedPrefix, // 2: ? || substr(
-			normalizedPrefix, // 3: length(?) + 1
-			normalizedPrefix, // 4: length(?) + 2
-			normalizedPrefix, // 5: length(?) + 2
-			normalizedPrefix, // 6: length(?) + 1
-			normalizedPrefix, // 7: ? || CASE
-			normalizedPrefix, // 8: length(?) + 1
-			normalizedPrefix, // 9: length(?) + 1
-			normalizedPrefix, // 10: length(?) + 2
-			normalizedPrefix, // 11: length(?) + 1
-			escapedPrefix,    // 12: LIKE ? || '/%'
-			targetDepth,      // 13: separator count > targetDepth
+			normalizedPrefix, normalizedPrefix, normalizedPrefix, normalizedPrefix, normalizedPrefix,
+			normalizedPrefix, normalizedPrefix, normalizedPrefix, normalizedPrefix, normalizedPrefix,
+			normalizedPrefix, escapedPrefix, targetDepth,
 		)
 	}
 
-	// Add filter clauses using FilterBuilder
-	fb := NewFilterBuilder(flags)
-	filterClauses, filterArgs := fb.BuildWhereClauses()
+	// Add only basic filters (skip FileCounts, FolderCounts, FolderSizes which require post-aggregation)
+	basicFlags := flags
+	basicFlags.FileCounts = ""
+	basicFlags.FolderCounts = ""
+	basicFlags.FolderSizes = nil
 
-	// Append filter clauses
-	if len(filterClauses) > 0 {
-		query += " AND " + strings.Join(filterClauses, " AND ")
-		args = append(args, filterArgs...)
+	if hasBasicFilters(basicFlags) {
+		fb := NewFilterBuilder(basicFlags)
+		filterClauses, filterArgs := fb.BuildWhereClauses()
+		if len(filterClauses) > 0 {
+			query += " AND " + strings.Join(filterClauses, " AND ")
+			args = append(args, filterArgs...)
+		}
 	}
 
 	query += " GROUP BY agg_path ORDER BY total_size DESC"
@@ -703,12 +944,206 @@ func AggregateDUByPathWithFilters(ctx context.Context, dbPath string, pathPrefix
 		results = append(results, r)
 	}
 
+	// Apply post-aggregation filters (FolderCounts, FolderSizes)
+	results = applyPostAggregationFilters(results, flags)
+
 	return results, rows.Err()
 }
 
+// aggregateDUWithParentFilter performs SQL aggregation filtered by matching parent directories (slow path)
+func aggregateDUWithParentFilter(ctx context.Context, sqlDB *sql.DB, pathPrefix string, targetDepth int, currentDepth int, flags models.GlobalFlags, matchingParents map[string]struct{}) ([]DUQueryResult, error) {
+	var query string
+	var args []any
+
+	// Convert matching parents map to IN clause
+	parentList := make([]string, 0, len(matchingParents))
+	for parent := range matchingParents {
+		parentList = append(parentList, parent)
+	}
+
+	// Sort for consistent ordering
+	slices.Sort(parentList)
+
+	if pathPrefix == "" {
+		query = `
+			SELECT
+				CASE
+					WHEN substr(replace(path, '\\', '/'), 1, 1) = '/' THEN
+						substr(replace(path, '\\', '/'), 1,
+							CASE
+								WHEN instr(substr(replace(path, '\\', '/'), 2), '/') > 0
+								THEN instr(substr(replace(path, '\\', '/'), 2), '/')
+								ELSE length(replace(path, '\\', '/'))
+							END
+						)
+					ELSE
+						CASE
+							WHEN instr(replace(path, '\\', '/'), '/') > 0
+							THEN substr(replace(path, '\\', '/'), 1, instr(replace(path, '\\', '/'), '/') - 1)
+							ELSE replace(path, '\\', '/')
+						END
+				END as agg_path,
+				COUNT(*) as count,
+				COALESCE(SUM(size), 0) as total_size,
+				COALESCE(SUM(duration), 0) as total_duration
+			FROM media
+			WHERE COALESCE(time_deleted, 0) = 0
+		`
+
+		// Add parent filter
+		if len(parentList) > 0 {
+			placeholders := make([]string, len(parentList))
+			for i, p := range parentList {
+				placeholders[i] = "?"
+				args = append(args, p)
+			}
+			query += fmt.Sprintf(" AND CASE WHEN substr(replace(path, '\\\\', '/'), 1, 1) = '/' THEN substr(replace(path, '\\\\', '/'), 1, CASE WHEN instr(substr(replace(path, '\\\\', '/'), 2), '/') > 0 THEN instr(substr(replace(path, '\\\\', '/'), 2), '/') ELSE length(replace(path, '\\\\', '/')) END) ELSE CASE WHEN instr(replace(path, '\\\\', '/'), '/') > 0 THEN substr(replace(path, '\\\\', '/'), 1, instr(replace(path, '\\\\', '/'), '/') - 1) ELSE replace(path, '\\\\', '/') END END IN (%s)", strings.Join(placeholders, ", "))
+		}
+	} else {
+		normalizedPrefix := strings.ReplaceAll(pathPrefix, "\\", "/")
+		escapedPrefix := strings.ReplaceAll(normalizedPrefix, "'", "''")
+
+		query = `
+			SELECT
+				CASE
+					WHEN substr(?, 1, 1) = '/' THEN
+						? || substr(
+							substr(replace(path, '\\', '/'), length(?) + 1),
+							1,
+							CASE
+								WHEN instr(substr(replace(path, '\\', '/'), length(?) + 2), '/') > 0
+								THEN instr(substr(replace(path, '\\', '/'), length(?) + 2), '/')
+								ELSE length(substr(replace(path, '\\', '/'), length(?) + 1))
+							END
+						)
+					ELSE
+						? || CASE
+							WHEN instr(substr(replace(path, '\\', '/'), length(?) + 1), '/') > 0
+							THEN substr(substr(replace(path, '\\', '/'), length(?) + 1), 1, instr(substr(replace(path, '\\', '/'), length(?) + 2), '/') - 1)
+							ELSE substr(replace(path, '\\', '/'), length(?) + 1)
+						END
+				END as agg_path,
+				COUNT(*) as count,
+				COALESCE(SUM(size), 0) as total_size,
+				COALESCE(SUM(duration), 0) as total_duration
+			FROM media
+			WHERE COALESCE(time_deleted, 0) = 0
+				AND replace(path, '\\', '/') LIKE ? || '/%'
+				AND (length(replace(path, '\\', '/')) - length(replace(replace(path, '\\', '/'), '/', ''))) > ?
+		`
+		args = append(args,
+			normalizedPrefix, normalizedPrefix, normalizedPrefix, normalizedPrefix, normalizedPrefix,
+			normalizedPrefix, normalizedPrefix, normalizedPrefix, normalizedPrefix, normalizedPrefix,
+			escapedPrefix, targetDepth,
+		)
+
+		// Add parent filter
+		if len(parentList) > 0 {
+			placeholders := make([]string, len(parentList))
+			for i, p := range parentList {
+				placeholders[i] = "?"
+				args = append(args, p)
+			}
+			// Reuse the same CASE expression for extracting parent path
+			query += fmt.Sprintf(" AND CASE WHEN substr(?, 1, 1) = '/' THEN ? || substr(substr(replace(path, '\\\\', '/'), length(?) + 1), 1, CASE WHEN instr(substr(replace(path, '\\\\', '/'), length(?) + 2), '/') > 0 THEN instr(substr(replace(path, '\\\\', '/'), length(?) + 2), '/') ELSE length(substr(replace(path, '\\\\', '/'), length(?) + 1)) END) ELSE ? || CASE WHEN instr(substr(replace(path, '\\\\', '/'), length(?) + 1), '/') > 0 THEN substr(substr(replace(path, '\\\\', '/'), length(?) + 1), 1, instr(substr(replace(path, '\\\\', '/'), length(?) + 2), '/') - 1) ELSE substr(replace(path, '\\\\', '/'), length(?) + 1) END END IN (%s)", strings.Join(placeholders, ", "))
+			// Add the same args again for the CASE expression (11 total)
+			args = append(args,
+				normalizedPrefix, normalizedPrefix, normalizedPrefix, normalizedPrefix, normalizedPrefix,
+				normalizedPrefix, normalizedPrefix, normalizedPrefix, normalizedPrefix, normalizedPrefix,
+				normalizedPrefix,
+			)
+		}
+	}
+
+	// Add basic filters
+	basicFlags := flags
+	basicFlags.FileCounts = ""
+	basicFlags.FolderCounts = ""
+	basicFlags.FolderSizes = nil
+
+	if hasBasicFilters(basicFlags) {
+		fb := NewFilterBuilder(basicFlags)
+		filterClauses, filterArgs := fb.BuildWhereClauses()
+		if len(filterClauses) > 0 {
+			query += " AND " + strings.Join(filterClauses, " AND ")
+			args = append(args, filterArgs...)
+		}
+	}
+
+	query += " GROUP BY agg_path ORDER BY total_size DESC"
+
+	rows, err := sqlDB.QueryContext(ctx, query, args...)
+	if err != nil {
+		slog.Error("DU aggregation with parent filter failed", "error", err)
+		return nil, err
+	}
+	defer rows.Close()
+
+	var results []DUQueryResult
+	for rows.Next() {
+		var r DUQueryResult
+		if err := rows.Scan(&r.Path, &r.Count, &r.TotalSize, &r.TotalDuration); err != nil {
+			return nil, err
+		}
+		results = append(results, r)
+	}
+
+	// Apply post-aggregation filters (FolderCounts, FolderSizes)
+	results = applyPostAggregationFilters(results, flags)
+
+	return results, rows.Err()
+}
+
+// applyPostAggregationFilters applies filters that require aggregated data (FolderCounts, FolderSizes)
+func applyPostAggregationFilters(results []DUQueryResult, flags models.GlobalFlags) []DUQueryResult {
+	if flags.FolderCounts == "" && len(flags.FolderSizes) == 0 {
+		return results
+	}
+
+	var filtered []DUQueryResult
+	for _, r := range results {
+		keep := true
+
+		// Apply FolderCounts filter
+		if keep && flags.FolderCounts != "" {
+			if rCount, err := utils.ParseRange(flags.FolderCounts, func(s string) (int64, error) {
+				return strconv.ParseInt(s, 10, 64)
+			}); err == nil {
+				if !rCount.Matches(int64(r.Count)) {
+					keep = false
+				}
+			}
+		}
+
+		// Apply FolderSizes filter
+		if keep && len(flags.FolderSizes) > 0 {
+			for _, fs := range flags.FolderSizes {
+				if rSize, err := utils.ParseRange(fs, utils.HumanToBytes); err == nil {
+					if !rSize.Matches(r.TotalSize) {
+						keep = false
+						break
+					}
+				}
+			}
+		}
+
+		if keep {
+			filtered = append(filtered, r)
+		}
+	}
+
+	return filtered
+}
+
 // FetchDUDirectFilesWithFilters fetches files at the target depth with filter support
+// Uses two-path approach:
+// - Fast path: no filters - direct SQL query
+// - Filter path: applies SQL-level filters
 func FetchDUDirectFilesWithFilters(ctx context.Context, dbPaths []string, pathPrefix string, targetDepth int, flags models.GlobalFlags) ([]models.MediaWithDB, error) {
 	allFiles := make([]models.MediaWithDB, 0)
+
+	// Check if any filters are active
+	hasFilters := hasBasicFilters(flags) || hasActiveFilters(flags)
 
 	for _, dbPath := range dbPaths {
 		sqlDB, err := db.Connect(dbPath)
@@ -756,13 +1191,15 @@ func FetchDUDirectFilesWithFilters(ctx context.Context, dbPaths []string, pathPr
 			args = append(args, escapedPrefix, separatorCount)
 		}
 
-		// Add filter clauses
-		fb := NewFilterBuilder(flags)
-		filterClauses, filterArgs := fb.BuildWhereClauses()
+		// Only add filter clauses if filters are active
+		if hasFilters {
+			fb := NewFilterBuilder(flags)
+			filterClauses, filterArgs := fb.BuildWhereClauses()
 
-		if len(filterClauses) > 0 {
-			query += " AND " + strings.Join(filterClauses, " AND ")
-			args = append(args, filterArgs...)
+			if len(filterClauses) > 0 {
+				query += " AND " + strings.Join(filterClauses, " AND ")
+				args = append(args, filterArgs...)
+			}
 		}
 
 		rows, err := sqlDB.QueryContext(ctx, query, args...)
