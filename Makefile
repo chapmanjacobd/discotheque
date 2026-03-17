@@ -14,26 +14,36 @@ all: clean webbuild fmt lint build test webtest readme
 ubuntu-deps:
 	sudo apt-get update && sudo apt-get install -y --no-install-recommends -o APT::Install-Suggests=0 \
 		fonts-dejavu-core \
-		sqlite3 \
-		libcairo2 \
-		libpango-1.0-0 \
+		libasound2 \
 		libasound2t64 \
-		libdrm2 \
-		libgbm1 \
-		libxkbcommon0 \
-		libatk1.0-0 \
 		libatk-bridge2.0-0 \
+		libatk1.0-0 \
+		libcairo2 \
 		libcups2 \
+		libdbus-1-3 \
+		libdrm2 \
+		libegl1 \
+		libexpat1 \
+		libfontconfig1 \
+		libfreetype6 \
+		libgbm1 \
+		libglib2.0-0 \
+		libnspr4 \
+		libnss3 \
+		libopengl0 \
+		libpango-1.0-0 \
+		libx11-6 \
+		libxcb1 \
 		libxcomposite1 \
 		libxdamage1 \
 		libxfixes3 \
+		libxkbcommon0 \
 		libxrandr2 \
-		libnspr4 \
-		libnss3 \
+		sqlite3 \
 		ffmpeg \
 		groff \
-		wget \
-		pandoc
+		pandoc \
+		wget
 	sudo -v && wget -qO- https://download.calibre-ebook.com/linux-installer.sh | sudo sh /dev/stdin
 
 macos-deps:
