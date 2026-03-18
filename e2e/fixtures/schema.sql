@@ -116,6 +116,24 @@ CREATE INDEX idx_score ON media(score);
 CREATE INDEX idx_time_created ON media(time_created);
 CREATE INDEX idx_time_modified ON media(time_modified);
 CREATE INDEX idx_time_downloaded ON media(time_downloaded);
+CREATE INDEX idx_media_active_size ON media(size) WHERE time_deleted = 0 AND size > 0;
+CREATE INDEX idx_media_active_duration ON media(duration) WHERE time_deleted = 0 AND duration > 0;
+CREATE INDEX idx_media_active_time_modified ON media(time_modified) WHERE time_deleted = 0 AND time_modified > 0;
+CREATE INDEX idx_media_active_time_created ON media(time_created) WHERE time_deleted = 0 AND time_created > 0;
+CREATE INDEX idx_media_active_time_downloaded ON media(time_downloaded) WHERE time_deleted = 0 AND time_downloaded > 0;
+CREATE TABLE folder_stats (
+    parent TEXT PRIMARY KEY,
+    depth INTEGER,
+    file_count INTEGER,
+    total_size INTEGER,
+    total_duration INTEGER
+);
+CREATE INDEX idx_folder_stats_depth ON folder_stats(depth);
+CREATE TABLE _maintenance_meta (
+    key TEXT PRIMARY KEY,
+    value TEXT,
+    last_updated INTEGER
+);
 CREATE VIRTUAL TABLE media_fts USING fts5(
     path,
     path_tokenized,

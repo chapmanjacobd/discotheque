@@ -2,14 +2,12 @@ package commands
 
 import (
 	"context"
-	"database/sql"
 	"net/http"
 	"sort"
 	"sync"
 	"time"
 
 	"github.com/chapmanjacobd/discoteca/internal/db"
-	"github.com/chapmanjacobd/discoteca/internal/models"
 )
 
 // QueryStats tracks slow query statistics
@@ -155,52 +153,6 @@ func (c *ServeCmd) handleQueries(w http.ResponseWriter, r *http.Request) {
 
 		sendJSON(w, http.StatusOK, resp)
 	}
-}
-
-// analyzeIndexUsage returns index usage statistics for the media table
-func (c *ServeCmd) analyzeIndexUsage(ctx context.Context, dbPath string) ([]models.IndexStat, error) {
-	var results []models.IndexStat
-
-	err := c.execDB(ctx, dbPath, func(sqlDB *sql.DB) error {
-		// Get index list
-		rows, err := sqlDB.Query("SELECT name, tbl_name FROM sqlite_master WHERE type='index' AND tbl_name='media' AND name NOT LIKE 'sqlite_%'")
-		if err != nil {
-			return err
-		}
-		defer rows.Close()
-
-		for rows.Next() {
-			var indexName, tableName string
-			if err := rows.Scan(&indexName, &tableName); err != nil {
-				return err
-			}
-
-			// Get index stats using sqlite_stat1 if available
-			var sizeEst int64
-			statRows, err := sqlDB.Query("SELECT stat FROM sqlite_stat1 WHERE idx=?", indexName)
-			if err == nil {
-				defer statRows.Close()
-				if statRows.Next() {
-					var statStr string
-					if err := statRows.Scan(&statStr); err == nil {
-						// stat format is "rows pages leaf_pages"
-						// We'll just store it as-is for now
-						sizeEst = 1 // Placeholder
-					}
-				}
-			}
-
-			results = append(results, models.IndexStat{
-				IndexName: indexName,
-				TableName: tableName,
-				SizeEst:   sizeEst,
-			})
-		}
-
-		return nil
-	})
-
-	return results, err
 }
 
 // TimedQuery executes a query function and records timing if it exceeds the threshold

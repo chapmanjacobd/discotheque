@@ -287,69 +287,32 @@ func buildEpisodeBins(parentCounts map[string]int64) (minVal, maxVal int64, bins
 	}
 
 	var allCounts []int64
-	var countsGT1 []int64
 	for _, count := range parentCounts {
 		allCounts = append(allCounts, count)
-		if count > 1 {
-			countsGT1 = append(countsGT1, count)
-		}
 	}
+
+	slog.Debug("buildEpisodeBins", "total_parents", len(parentCounts), "min", slices.Min(allCounts), "max", slices.Max(allCounts))
 
 	minVal = slices.Min(allCounts)
 	maxVal = slices.Max(allCounts)
 	percentiles = utils.CalculatePercentiles(allCounts)
 
-	// Always include "Specials" bin for single files
-	bins = append(bins, models.FilterBin{Label: "Specials", Value: 1})
+	p16 := int64(utils.Percentile(allCounts, 16.6))
+	p33 := int64(utils.Percentile(allCounts, 33.3))
+	p50 := int64(utils.Percentile(allCounts, 50.0))
+	p66 := int64(utils.Percentile(allCounts, 66.6))
+	p83 := int64(utils.Percentile(allCounts, 83.3))
 
-	if len(countsGT1) > 0 {
-		q1 := int64(utils.Percentile(countsGT1, 16.6))
-		q2 := int64(utils.Percentile(countsGT1, 33.3))
-		q3 := int64(utils.Percentile(countsGT1, 50.0))
-		q4 := int64(utils.Percentile(countsGT1, 66.6))
-		q5 := int64(utils.Percentile(countsGT1, 83.3))
-		maxCount := int64(utils.Percentile(countsGT1, 100))
-
-		rawBins := []int64{2, q1, q2, q3, q4, q5, maxCount}
-		slices.Sort(rawBins)
-
-		// Remove duplicates
-		uniqueBins := []int64{rawBins[0]}
-		for i := 1; i < len(rawBins); i++ {
-			if rawBins[i] > uniqueBins[len(uniqueBins)-1] {
-				uniqueBins = append(uniqueBins, rawBins[i])
-			}
-		}
-
-		// Build range bins
-		for i := 0; i < len(uniqueBins)-1; i++ {
-			minE := uniqueBins[i]
-			maxE := uniqueBins[i+1]
-			displayMin := minE
-			if i > 0 {
-				displayMin = uniqueBins[i] + 1
-			}
-			if displayMin > maxE {
-				continue
-			}
-			if displayMin == maxE {
-				bins = append(bins, models.FilterBin{Label: fmt.Sprintf("%d", displayMin), Value: displayMin})
-			} else {
-				bins = append(bins, models.FilterBin{Label: fmt.Sprintf("%d-%d", displayMin, maxE), Min: displayMin, Max: maxE})
-			}
-		}
-
-		// Add final "X+" bin if not already covered
-		lastMax := uniqueBins[len(uniqueBins)-1]
-		alreadyAdded := false
-		if len(bins) > 0 {
-			lastBin := bins[len(bins)-1]
-			if lastBin.Max == lastMax || lastBin.Value == lastMax {
-				alreadyAdded = true
-			}
-		}
-		if !alreadyAdded {
-			bins = append(bins, models.FilterBin{Label: fmt.Sprintf("%d+", lastMax), Min: lastMax})
+	ebins := []int64{0, p16, p33, p50, p66, p83, maxVal}
+	for i := 0; i < len(ebins)-1; i++ {
+		minE := ebins[i]
+		maxE := ebins[i+1]
+		if i == 0 {
+			bins = append(bins, models.FilterBin{Label: "less than " + strconv.FormatInt(maxE, 10) + " episodes", Max: maxE})
+		} else if i == len(ebins)-2 {
+			bins = append(bins, models.FilterBin{Label: strconv.FormatInt(minE, 10) + "+ episodes", Min: minE})
+		} else {
+			bins = append(bins, models.FilterBin{Label: strconv.FormatInt(minE, 10) + " - " + strconv.FormatInt(maxE, 10), Min: minE, Max: maxE})
 		}
 	}
 
@@ -574,36 +537,65 @@ func (c *ServeCmd) computeFilterBinsDataOptimized(ctx context.Context, flags mod
 				// OPTIMIZATION: Use SQL aggregation instead of fetching all rows
 				// This is much faster for large datasets
 
-				// 1. Get parent counts (for episode filtering)
+				// 1. Get parent counts from folder_stats materialized view (for episode filtering)
 				// Only fetch this if we need episode counts
 				if filterToIgnore != "episodes" {
-					// Use a simpler approach: get all paths and extract parent in Go
-					// This avoids complex SQL that may not work on all SQLite versions
 					parentCountQuery := `
-						SELECT path
-						FROM media
-						WHERE COALESCE(time_deleted, 0) = 0
+						SELECT parent, file_count
+						FROM folder_stats
 					`
-
 					rows, err := sqlDB.QueryContext(ctx, parentCountQuery)
+					hasData := false
+					folderStatsCount := 0
 					if err != nil {
-						slog.Debug("Parent count query failed", "error", err)
+						slog.Debug("Parent count query failed (folder_stats may not exist)", "error", err)
 					} else {
 						defer rows.Close()
-						localParentCounts := make(map[string]int64)
 						for rows.Next() {
-							var path string
-							if err := rows.Scan(&path); err == nil {
-								// Extract parent directory in Go
-								parent := filepath.Dir(path)
-								localParentCounts[parent]++
+							hasData = true
+							folderStatsCount++
+							var parent string
+							var cnt int64
+							if err := rows.Scan(&parent, &cnt); err == nil {
+								mu.Lock()
+								allParentCounts[parent] += cnt
+								mu.Unlock()
 							}
 						}
-						mu.Lock()
-						for p, cnt := range localParentCounts {
-							allParentCounts[p] += cnt
+					}
+
+					// If folder_stats was empty or had errors, fall back to counting from media table
+					if !hasData {
+						slog.Debug("folder_stats empty, using fallback to media table")
+						parentCountQuery = `
+							SELECT path
+							FROM media
+							WHERE COALESCE(time_deleted, 0) = 0
+						`
+						rows, err = sqlDB.QueryContext(ctx, parentCountQuery)
+						if err != nil {
+							slog.Debug("Fallback parent count query failed", "error", err)
+						} else {
+							defer rows.Close()
+							localParentCounts := make(map[string]int64)
+							fallbackCount := 0
+							for rows.Next() {
+								fallbackCount++
+								var path string
+								if err := rows.Scan(&path); err == nil {
+									parent := filepath.Dir(path)
+									localParentCounts[parent]++
+								}
+							}
+							slog.Debug("Fallback parent count", "paths_scanned", fallbackCount, "unique_parents", len(localParentCounts))
+							mu.Lock()
+							for p, cnt := range localParentCounts {
+								allParentCounts[p] += cnt
+							}
+							mu.Unlock()
 						}
-						mu.Unlock()
+					} else {
+						slog.Debug("folder_stats data", "rows", folderStatsCount, "unique_parents", len(allParentCounts))
 					}
 				}
 

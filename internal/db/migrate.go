@@ -543,6 +543,38 @@ func migrateTables(db *sql.DB, hasStrict bool) error {
 		}
 	}
 
+	// Ensure folder_stats and _maintenance_meta tables exist
+	if _, err := db.Exec(`CREATE TABLE IF NOT EXISTS folder_stats (
+		parent TEXT PRIMARY KEY,
+		depth INTEGER,
+		file_count INTEGER,
+		total_size INTEGER,
+		total_duration INTEGER
+	)`); err != nil {
+		return fmt.Errorf("failed to create folder_stats table: %w", err)
+	}
+
+	if _, err := db.Exec(`CREATE TABLE IF NOT EXISTS _maintenance_meta (
+		key TEXT PRIMARY KEY,
+		value TEXT,
+		last_updated INTEGER
+	)`); err != nil {
+		return fmt.Errorf("failed to create _maintenance_meta table: %w", err)
+	}
+
+	// Initialize maintenance tracking keys
+	if _, err := db.Exec(`INSERT OR IGNORE INTO _maintenance_meta (key, value, last_updated) VALUES ('folder_stats_last_refresh', '0', 0)`); err != nil {
+		return fmt.Errorf("failed to initialize maintenance metadata: %w", err)
+	}
+	if _, err := db.Exec(`INSERT OR IGNORE INTO _maintenance_meta (key, value, last_updated) VALUES ('fts_last_rebuild', '0', 0)`); err != nil {
+		return fmt.Errorf("failed to initialize maintenance metadata: %w", err)
+	}
+
+	// Create index on folder_stats for faster depth-based queries
+	if _, err := db.Exec(`CREATE INDEX IF NOT EXISTS idx_folder_stats_depth ON folder_stats(depth)`); err != nil {
+		return fmt.Errorf("failed to create folder_stats index: %w", err)
+	}
+
 	// Check if FTS tables need upgrade to trigram or new columns
 	upgradeFTS := func(tableName string, expectedSqlPart string) error {
 		var existingSql string
@@ -676,6 +708,11 @@ func migrateIndexes(db *sql.DB) error {
 	// Remove unused function-based index (SQLite can't use it efficiently)
 	if _, err := db.Exec("DROP INDEX IF EXISTS idx_path_prefix"); err != nil {
 		return fmt.Errorf("failed to drop idx_path_prefix: %w", err)
+	}
+
+	// Populate folder_stats materialized view
+	if err := PopulateFolderStatsInGo(db); err != nil {
+		return fmt.Errorf("failed to populate folder_stats: %w", err)
 	}
 
 	return nil

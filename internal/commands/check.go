@@ -150,6 +150,17 @@ func (c *CheckCmd) Run(ctx *kong.Context) error {
 			slog.Info("Check complete (dry-run)", "missing", missingCount)
 		} else {
 			slog.Info("Check complete", "marked_deleted", missingCount)
+
+			// Refresh folder_stats and FTS if files were marked as deleted
+			if missingCount > 0 {
+				slog.Info("Refreshing folder_stats and FTS after marking files deleted...")
+				if err := db.RefreshFolderStats(sqlDB); err != nil {
+					slog.Error("Failed to refresh folder_stats", "error", err)
+				}
+				if err := db.RebuildFTS(sqlDB, dbPath); err != nil {
+					slog.Error("Failed to rebuild FTS", "error", err)
+				}
+			}
 		}
 	}
 	return nil

@@ -349,5 +349,14 @@ func (c *AddCmd) Run(ctx *kong.Context) error {
 		fmt.Println()
 	}
 
+	// Refresh folder_stats and FTS after adding new media
+	slog.Info("Refreshing folder_stats and FTS after scan...")
+	if err := db.RefreshFolderStats(sqlDB); err != nil {
+		slog.Error("Failed to refresh folder_stats", "error", err)
+	}
+	if err := db.RebuildFTS(sqlDB, dbPath); err != nil {
+		slog.Error("Failed to rebuild FTS", "error", err)
+	}
+
 	return nil
 }

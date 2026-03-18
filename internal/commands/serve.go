@@ -350,6 +350,19 @@ func (c *ServeCmd) Run(ctx *kong.Context) error {
 		c.dbCache.Store(dbPath, sqlDB)
 	}
 
+	// Run maintenance on all databases (refresh folder_stats and FTS if needed)
+	// This runs asynchronously so it doesn't block server startup
+	go func() {
+		config := db.DefaultMaintenanceConfig()
+		for _, dbPath := range c.Databases {
+			if sqlDB, ok := c.dbCache.Load(dbPath); ok {
+				if err := db.RunMaintenance(sqlDB.(*sql.DB), config, dbPath); err != nil {
+					slog.Error("Maintenance failed", "db", dbPath, "error", err)
+				}
+			}
+		}
+	}()
+
 	if _, err := exec.LookPath("ffmpeg"); err != nil {
 		slog.Warn("ffmpeg not found in PATH, on-the-fly transcoding will be unavailable")
 		c.hasFfmpeg = false

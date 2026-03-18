@@ -140,6 +140,30 @@ CREATE INDEX IF NOT EXISTS idx_media_active_time_modified ON media(time_modified
 CREATE INDEX IF NOT EXISTS idx_media_active_time_created ON media(time_created) WHERE time_deleted = 0 AND time_created > 0;
 CREATE INDEX IF NOT EXISTS idx_media_active_time_downloaded ON media(time_downloaded) WHERE time_deleted = 0 AND time_downloaded > 0;
 
+-- Materialized view for folder statistics (optimizes /api/du endpoint)
+-- This pre-aggregates folder-level stats to avoid expensive GROUP BY queries
+CREATE TABLE IF NOT EXISTS folder_stats (
+    parent TEXT PRIMARY KEY,
+    depth INTEGER,
+    file_count INTEGER,
+    total_size INTEGER,
+    total_duration INTEGER
+);
+
+-- Index for fast folder_stats queries
+CREATE INDEX IF NOT EXISTS idx_folder_stats_depth ON folder_stats(depth);
+
+-- Metadata table for tracking maintenance tasks
+CREATE TABLE IF NOT EXISTS _maintenance_meta (
+    key TEXT PRIMARY KEY,
+    value TEXT,
+    last_updated INTEGER
+);
+
+-- Initialize maintenance tracking keys
+INSERT OR IGNORE INTO _maintenance_meta (key, value, last_updated) VALUES ('folder_stats_last_refresh', '0', 0);
+INSERT OR IGNORE INTO _maintenance_meta (key, value, last_updated) VALUES ('fts_last_rebuild', '0', 0);
+
 -- Optional FTS table
 CREATE VIRTUAL TABLE IF NOT EXISTS media_fts USING fts5(
     path,
