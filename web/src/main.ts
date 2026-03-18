@@ -2212,7 +2212,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <div class="loading-container" style="text-align: center; padding: 3rem;">
                 <div class="spinner"></div>
                 <h3>Grouping by Parent Folder...</h3>
-                <p>Organizing media into episodic groups.</p>
+                <p>Organizing media files by their parent folders.</p>
             </div>
         `;
     }

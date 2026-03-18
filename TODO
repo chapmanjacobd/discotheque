@@ -1,3 +1,9 @@
+print less during tests except for assertions
+
+only print response details during verbose e2e
+
+
+
 ### 🎯 **DU (Disk Usage) Mode Optimizations**
 
 #### 1. **Query-Level Optimizations**

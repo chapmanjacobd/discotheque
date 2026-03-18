@@ -217,73 +217,38 @@ func (c *ServeCmd) computeFilterBinsData(ctx context.Context, flags models.Globa
 }
 
 // buildSizeBins creates size filter bins from raw size data
-func buildSizeBins(sizes []int64) (minVal, maxVal int64, bins []models.FilterBin, percentiles []int64) {
+// Returns only percentiles for the slider (frontend uses percentiles for range slider)
+func buildSizeBins(sizes []int64) (minVal, maxVal int64, percentiles []int64) {
 	if len(sizes) == 0 {
-		return 0, 0, nil, nil
+		return 0, 0, nil
 	}
 
 	minVal = slices.Min(sizes)
 	maxVal = slices.Max(sizes)
 	percentiles = utils.CalculatePercentiles(sizes)
 
-	p16 := int64(utils.Percentile(sizes, 16.6))
-	p33 := int64(utils.Percentile(sizes, 33.3))
-	p50 := int64(utils.Percentile(sizes, 50.0))
-	p66 := int64(utils.Percentile(sizes, 66.6))
-	p83 := int64(utils.Percentile(sizes, 83.3))
-
-	sbins := []int64{0, p16, p33, p50, p66, p83, maxVal}
-	for i := 0; i < len(sbins)-1; i++ {
-		minS := sbins[i]
-		maxS := sbins[i+1]
-		if i == 0 {
-			bins = append(bins, models.FilterBin{Label: "less than " + utils.FormatSize(maxS), Max: maxS})
-		} else if i == len(sbins)-2 {
-			bins = append(bins, models.FilterBin{Label: utils.FormatSize(minS) + "+", Min: minS})
-		} else {
-			bins = append(bins, models.FilterBin{Label: utils.FormatSize(minS) + " - " + utils.FormatSize(maxS), Min: minS, Max: maxS})
-		}
-	}
-
-	return minVal, maxVal, bins, percentiles
+	return minVal, maxVal, percentiles
 }
 
 // buildDurationBins creates duration filter bins from raw duration data
-func buildDurationBins(durations []int64) (minVal, maxVal int64, bins []models.FilterBin, percentiles []int64) {
+// Returns only percentiles for the slider (frontend uses percentiles for range slider)
+func buildDurationBins(durations []int64) (minVal, maxVal int64, percentiles []int64) {
 	if len(durations) == 0 {
-		return 0, 0, nil, nil
+		return 0, 0, nil
 	}
 
 	minVal = slices.Min(durations)
 	maxVal = slices.Max(durations)
 	percentiles = utils.CalculatePercentiles(durations)
 
-	p16 := int64(utils.Percentile(durations, 16.6))
-	p33 := int64(utils.Percentile(durations, 33.3))
-	p50 := int64(utils.Percentile(durations, 50.0))
-	p66 := int64(utils.Percentile(durations, 66.6))
-	p83 := int64(utils.Percentile(durations, 83.3))
-
-	dbins := []int64{0, p16, p33, p50, p66, p83, maxVal}
-	for i := 0; i < len(dbins)-1; i++ {
-		minD := dbins[i]
-		maxD := dbins[i+1]
-		if i == 0 {
-			bins = append(bins, models.FilterBin{Label: "under " + utils.FormatDuration(int(maxD)), Max: maxD})
-		} else if i == len(dbins)-2 {
-			bins = append(bins, models.FilterBin{Label: utils.FormatDuration(int(minD)) + "+", Min: minD})
-		} else {
-			bins = append(bins, models.FilterBin{Label: utils.FormatDuration(int(minD)) + " - " + utils.FormatDuration(int(maxD)), Min: minD, Max: maxD})
-		}
-	}
-
-	return minVal, maxVal, bins, percentiles
+	return minVal, maxVal, percentiles
 }
 
 // buildEpisodeBins creates episode count filter bins from parent counts
-func buildEpisodeBins(parentCounts map[string]int64) (minVal, maxVal int64, bins []models.FilterBin, percentiles []int64) {
+// Returns only percentiles for the slider (frontend uses percentiles for range slider)
+func buildEpisodeBins(parentCounts map[string]int64) (minVal, maxVal int64, percentiles []int64) {
 	if len(parentCounts) == 0 {
-		return 0, 0, nil, nil
+		return 0, 0, nil
 	}
 
 	var allCounts []int64
@@ -291,32 +256,11 @@ func buildEpisodeBins(parentCounts map[string]int64) (minVal, maxVal int64, bins
 		allCounts = append(allCounts, count)
 	}
 
-	slog.Debug("buildEpisodeBins", "total_parents", len(parentCounts), "min", slices.Min(allCounts), "max", slices.Max(allCounts))
-
 	minVal = slices.Min(allCounts)
 	maxVal = slices.Max(allCounts)
 	percentiles = utils.CalculatePercentiles(allCounts)
 
-	p16 := int64(utils.Percentile(allCounts, 16.6))
-	p33 := int64(utils.Percentile(allCounts, 33.3))
-	p50 := int64(utils.Percentile(allCounts, 50.0))
-	p66 := int64(utils.Percentile(allCounts, 66.6))
-	p83 := int64(utils.Percentile(allCounts, 83.3))
-
-	ebins := []int64{0, p16, p33, p50, p66, p83, maxVal}
-	for i := 0; i < len(ebins)-1; i++ {
-		minE := ebins[i]
-		maxE := ebins[i+1]
-		if i == 0 {
-			bins = append(bins, models.FilterBin{Label: "less than " + strconv.FormatInt(maxE, 10) + " episodes", Max: maxE})
-		} else if i == len(ebins)-2 {
-			bins = append(bins, models.FilterBin{Label: strconv.FormatInt(minE, 10) + "+ episodes", Min: minE})
-		} else {
-			bins = append(bins, models.FilterBin{Label: strconv.FormatInt(minE, 10) + " - " + strconv.FormatInt(maxE, 10), Min: minE, Max: maxE})
-		}
-	}
-
-	return minVal, maxVal, bins, percentiles
+	return minVal, maxVal, percentiles
 }
 
 // buildTypeBins creates type filter bins from type counts
@@ -338,40 +282,17 @@ func buildTypeBins(typeCounts map[string]int64) []models.FilterBin {
 }
 
 // buildTimeBins creates time filter bins from raw time data
-func buildTimeBins(times []int64) (minVal, maxVal int64, bins []models.FilterBin, percentiles []int64) {
+// Returns only percentiles for the slider (frontend uses percentiles for range slider)
+func buildTimeBins(times []int64) (minVal, maxVal int64, percentiles []int64) {
 	if len(times) == 0 {
-		return 0, 0, nil, nil
+		return 0, 0, nil
 	}
 
 	minVal = slices.Min(times)
 	maxVal = slices.Max(times)
 	percentiles = utils.CalculatePercentiles(times)
 
-	p16 := int64(utils.Percentile(times, 16.6))
-	p33 := int64(utils.Percentile(times, 33.3))
-	p50 := int64(utils.Percentile(times, 50.0))
-	p66 := int64(utils.Percentile(times, 66.6))
-	p83 := int64(utils.Percentile(times, 83.3))
-
-	tbins := []int64{minVal, p16, p33, p50, p66, p83, maxVal}
-	// Sort to handle potential duplicates or out of order due to small datasets
-	slices.Sort(tbins)
-
-	// Remove duplicates
-	uniqueBins := []int64{tbins[0]}
-	for i := 1; i < len(tbins); i++ {
-		if tbins[i] > uniqueBins[len(uniqueBins)-1] {
-			uniqueBins = append(uniqueBins, tbins[i])
-		}
-	}
-
-	for i := 0; i < len(uniqueBins)-1; i++ {
-		minT := uniqueBins[i]
-		maxT := uniqueBins[i+1]
-		bins = append(bins, models.FilterBin{Min: minT, Max: maxT})
-	}
-
-	return minVal, maxVal, bins, percentiles
+	return minVal, maxVal, percentiles
 }
 
 // handleFilterBins handles the /api/filter-bins endpoint
@@ -402,27 +323,27 @@ func (c *ServeCmd) handleFilterBins(w http.ResponseWriter, r *http.Request) {
 
 	// Get episode data - only store percentiles
 	epData := c.computeFilterBinsData(r.Context(), flags, "episodes", dbs)
-	_, _, _, resp.EpisodesPercentiles = buildEpisodeBins(epData.parentCounts)
+	_, _, resp.EpisodesPercentiles = buildEpisodeBins(epData.parentCounts)
 
 	// Get size data - only store percentiles
 	sizeData := c.computeFilterBinsData(r.Context(), flags, "size", dbs)
-	_, _, _, resp.SizePercentiles = buildSizeBins(sizeData.sizes)
+	_, _, resp.SizePercentiles = buildSizeBins(sizeData.sizes)
 
 	// Get duration data - only store percentiles
 	durData := c.computeFilterBinsData(r.Context(), flags, "duration", dbs)
-	_, _, _, resp.DurationPercentiles = buildDurationBins(durData.durations)
+	_, _, resp.DurationPercentiles = buildDurationBins(durData.durations)
 
 	// Get modified data - only store percentiles
 	modData := c.computeFilterBinsData(r.Context(), flags, "modified", dbs)
-	_, _, _, resp.ModifiedPercentiles = buildTimeBins(modData.modified)
+	_, _, resp.ModifiedPercentiles = buildTimeBins(modData.modified)
 
 	// Get created data - only store percentiles
 	creData := c.computeFilterBinsData(r.Context(), flags, "created", dbs)
-	_, _, _, resp.CreatedPercentiles = buildTimeBins(creData.created)
+	_, _, resp.CreatedPercentiles = buildTimeBins(creData.created)
 
 	// Get downloaded data - only store percentiles
 	dlData := c.computeFilterBinsData(r.Context(), flags, "downloaded", dbs)
-	_, _, _, resp.DownloadedPercentiles = buildTimeBins(dlData.downloaded)
+	_, _, resp.DownloadedPercentiles = buildTimeBins(dlData.downloaded)
 
 	// Get type data - keep as bins (special case, not percentile-based)
 	typeData := c.computeFilterBinsData(r.Context(), flags, "type", dbs)
@@ -460,22 +381,22 @@ func (c *ServeCmd) calculateFilterCountsOptimized(ctx context.Context, flags mod
 	// Collect data for each filter type, ignoring that filter to get full distribution
 	// This prevents recursive constraints where filtering by duration would shrink the duration range itself
 	epData := c.computeFilterBinsDataOptimized(ctx, flags, "episodes", dbs)
-	_, _, _, resp.EpisodesPercentiles = buildEpisodeBins(epData.parentCounts)
+	_, _, resp.EpisodesPercentiles = buildEpisodeBins(epData.parentCounts)
 
 	sizeData := c.computeFilterBinsDataOptimized(ctx, flags, "size", dbs)
-	_, _, _, resp.SizePercentiles = buildSizeBins(sizeData.sizes)
+	_, _, resp.SizePercentiles = buildSizeBins(sizeData.sizes)
 
 	durData := c.computeFilterBinsDataOptimized(ctx, flags, "duration", dbs)
-	_, _, _, resp.DurationPercentiles = buildDurationBins(durData.durations)
+	_, _, resp.DurationPercentiles = buildDurationBins(durData.durations)
 
 	modData := c.computeFilterBinsDataOptimized(ctx, flags, "modified", dbs)
-	_, _, _, resp.ModifiedPercentiles = buildTimeBins(modData.modified)
+	_, _, resp.ModifiedPercentiles = buildTimeBins(modData.modified)
 
 	creData := c.computeFilterBinsDataOptimized(ctx, flags, "created", dbs)
-	_, _, _, resp.CreatedPercentiles = buildTimeBins(creData.created)
+	_, _, resp.CreatedPercentiles = buildTimeBins(creData.created)
 
 	dlData := c.computeFilterBinsDataOptimized(ctx, flags, "downloaded", dbs)
-	_, _, _, resp.DownloadedPercentiles = buildTimeBins(dlData.downloaded)
+	_, _, resp.DownloadedPercentiles = buildTimeBins(dlData.downloaded)
 
 	typeData := c.computeFilterBinsDataOptimized(ctx, flags, "type", dbs)
 	resp.Type = buildTypeBins(typeData.typeCounts)
@@ -538,8 +459,8 @@ func (c *ServeCmd) computeFilterBinsDataOptimized(ctx context.Context, flags mod
 				// This is much faster for large datasets
 
 				// 1. Get parent counts from folder_stats materialized view (for episode filtering)
-				// Only fetch this if we need episode counts
-				if filterToIgnore != "episodes" {
+				// Fetch parent counts when computing episodes filter (filterToIgnore == "episodes")
+				if filterToIgnore == "episodes" {
 					parentCountQuery := `
 						SELECT parent, file_count
 						FROM folder_stats

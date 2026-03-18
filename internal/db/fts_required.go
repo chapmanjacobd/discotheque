@@ -21,7 +21,7 @@ package db
 // FtsEnabled is false when fts5 tag is not used (but this build is not supported)
 const FtsEnabled = false
 
-// _fts5MustBeEnabled triggers a compile error when fts5 tag is missing.
-// The undefined identifier below causes: "undefined: _fts5MustBeEnabled"
+// _fts5BuildTagRequired triggers a compile error when fts5 tag is missing.
+// The undefined identifier below causes: "undefined: _fts5BuildTagRequired"
 // See: https://github.com/chapmanjacobd/discoteca#installation
-var _ = _fts5MustBeEnabled
+var _ = _fts5BuildTagRequired

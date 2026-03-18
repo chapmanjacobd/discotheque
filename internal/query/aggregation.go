@@ -1034,7 +1034,7 @@ func aggregateDUWithParentFilter(ctx context.Context, sqlDB *sql.DB, pathPrefix 
 		args = append(args,
 			normalizedPrefix, normalizedPrefix, normalizedPrefix, normalizedPrefix, normalizedPrefix,
 			normalizedPrefix, normalizedPrefix, normalizedPrefix, normalizedPrefix, normalizedPrefix,
-			escapedPrefix, targetDepth,
+			normalizedPrefix, escapedPrefix, targetDepth,
 		)
 
 		// Add parent filter

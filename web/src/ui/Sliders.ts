@@ -21,23 +21,12 @@ export function updateSliderLabels() {
 
         const percentiles = (state.filterBins as any)[`${type}_percentiles`] || [];
         const getVal = (p: number) => {
-            if (percentiles.length > p) return percentiles[p];
-
-            // Fallback: use first/last percentile if index out of range
-            if (percentiles.length > 0) {
-                // Linear interpolation between known percentiles
-                const lastIdx = percentiles.length - 1;
-                const lastP = lastIdx * (100 / lastIdx); // e.g., if 7 percentiles, last is at 100%
-                if (p >= lastP) return percentiles[lastIdx];
-                if (p <= 0) return percentiles[0];
-                // Linear interpolation
-                const segment = Math.floor(p / (100 / lastIdx));
-                const segmentProgress = (p % (100 / lastIdx)) / (100 / lastIdx);
-                return percentiles[segment] + (percentiles[segment + 1] - percentiles[segment]) * segmentProgress;
-            }
-
-            // Ultimate fallback
-            return 0;
+            if (percentiles.length === 0) return 0;
+            // percentiles array has 101 values (0-100), use percentage directly as index
+            const idx = Math.round(p);
+            if (idx < 0) return percentiles[0];
+            if (idx >= percentiles.length) return percentiles[percentiles.length - 1];
+            return percentiles[idx];
         };
 
         const valMin = getVal(minP);
@@ -47,6 +36,7 @@ export function updateSliderLabels() {
             if (type === 'size') return formatSize(v);
             if (type === 'duration') return formatDuration(v);
             if (['modified', 'created', 'downloaded'].includes(type)) return formatRelativeDate(v);
+            if (type === 'episodes') return `${Math.round(v)} files`;
             return Math.round(v).toString();
         };
 

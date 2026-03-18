@@ -149,7 +149,7 @@ export const test = base.extend<{
     });
 
     page.on('response', response => {
-      if (response.status() >= 400) {
+      if (response.status() >= 400 && response.status() != 404) {
         console.error(`response.error: ${response.url()} - status ${response.status()}`);
       }
     });
