@@ -204,7 +204,7 @@ func TestHandleDU(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Don't close sqlDB here - it will be closed by cmd.Close()
+	defer sqlDB.Close()
 
 	// Initialize database schema
 	if err := db.InitDB(sqlDB); err != nil {

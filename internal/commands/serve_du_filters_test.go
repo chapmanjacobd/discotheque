@@ -1,27 +1,55 @@
 package commands
 
 import (
+	"database/sql"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/chapmanjacobd/discoteca/internal/db"
 	"github.com/chapmanjacobd/discoteca/internal/models"
+	_ "github.com/mattn/go-sqlite3"
 )
 
-const e2eTestDBPath = "../../e2e/fixtures/test.db"
-
 func TestHandleDU_WithFilters(t *testing.T) {
-	// Check if e2e test database exists
-	dbPath, err := filepath.Abs(e2eTestDBPath)
+	tempDir := t.TempDir()
+	dbPath := filepath.Join(tempDir, "test_du_filters.db")
+
+	sqlDB, err := sql.Open("sqlite3", dbPath)
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer sqlDB.Close()
 
-	if _, err := os.Stat(dbPath); os.IsNotExist(err) {
-		t.Skipf("E2E test database not found at %s. Run 'make e2e-init' first.", dbPath)
+	// Initialize database schema
+	if err := db.InitDB(sqlDB); err != nil {
+		t.Fatalf("Failed to initialize DB: %v", err)
+	}
+
+	// Create test media with various types, sizes, and durations for filter testing
+	// Organized under /home directory to test folder navigation
+	_, err = sqlDB.Exec(`INSERT INTO media (path, title, type, size, duration, time_deleted) VALUES
+		-- Videos (5 files)
+		('/home/videos/movie1.mp4', 'Movie1', 'video', 500000000, 7200, 0),
+		('/home/videos/movie2.mp4', 'Movie2', 'video', 300000000, 5400, 0),
+		('/home/videos/clip1.mp4', 'Clip1', 'video', 50000000, 30, 0),
+		('/home/videos/clip2.mp4', 'Clip2', 'video', 25000000, 15, 0),
+		('/home/videos/short.mp4', 'Short', 'video', 10000000, 5, 0),
+		-- Audio files (3 files)
+		('/home/audio/song1.mp3', 'Song1', 'audio', 5000000, 180, 0),
+		('/home/audio/song2.mp3', 'Song2', 'audio', 4000000, 150, 0),
+		('/home/audio/podcast.mp3', 'Podcast', 'audio', 15000000, 900, 0),
+		-- Image files (3 files)
+		('/home/images/photo1.png', 'Photo1', 'image', 2000000, 0, 0),
+		('/home/images/photo2.png', 'Photo2', 'image', 1500000, 0, 0),
+		('/home/images/photo3.png', 'Photo3', 'image', 3000000, 0, 0),
+		-- Text/document files (2 files)
+		('/home/documents/doc1.txt', 'Doc1', 'text', 50000, 0, 0),
+		('/home/documents/doc2.pdf', 'Doc2', 'text', 100000, 0, 0)`)
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	cmd := setupTestServeCmd(dbPath)
@@ -511,5 +539,214 @@ func TestHandleDU_WithFilters(t *testing.T) {
 		if totalItems == 0 && resp2.TotalCount == 0 {
 			t.Logf("No results in subfolder with filecounts=1 filter (may be expected depending on test data)")
 		}
+	})
+}
+
+// TestHandleDU_WithFilters_WindowsPaths tests filter functionality with mixed path separators
+// This test verifies that the DU endpoint correctly handles paths with backslash separators
+// which is important for Windows clients and cross-platform compatibility
+func TestHandleDU_WithFilters_WindowsPaths(t *testing.T) {
+	tempDir := t.TempDir()
+	dbPath := filepath.Join(tempDir, "test_du_filters_windows.db")
+
+	sqlDB, err := sql.Open("sqlite3", dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer sqlDB.Close()
+
+	// Initialize database schema
+	if err := db.InitDB(sqlDB); err != nil {
+		t.Fatalf("Failed to initialize DB: %v", err)
+	}
+
+	// Create test media with mixed path separators (simulating Windows and Unix paths)
+	// This tests that the DU endpoint normalizes paths correctly regardless of separator style
+	_, err = sqlDB.Exec(`INSERT INTO media (path, title, type, size, duration, time_deleted) VALUES
+		-- Unix-style paths (5 videos)
+		('/media/videos/movie1.mp4', 'Movie1', 'video', 500000000, 7200, 0),
+		('/media/videos/movie2.mp4', 'Movie2', 'video', 300000000, 5400, 0),
+		('/media/videos/clip1.mp4', 'Clip1', 'video', 50000000, 30, 0),
+		('/media/videos/clip2.mp4', 'Clip2', 'video', 25000000, 15, 0),
+		('/media/videos/short.mp4', 'Short', 'video', 10000000, 5, 0),
+		-- Windows-style paths with backslashes (3 audio)
+		('\\media\\audio\\song1.mp3', 'Song1', 'audio', 5000000, 180, 0),
+		('\\media\\audio\\song2.mp3', 'Song2', 'audio', 4000000, 150, 0),
+		('\\media\\audio\\podcast.mp3', 'Podcast', 'audio', 15000000, 900, 0),
+		-- Mixed separator paths (3 images)
+		('/media\\images\\photo1.png', 'Photo1', 'image', 2000000, 0, 0),
+		('/media\\images\\photo2.png', 'Photo2', 'image', 1500000, 0, 0),
+		('/media\\images\\photo3.png', 'Photo3', 'image', 3000000, 0, 0),
+		-- More Windows-style paths (2 documents)
+		('\\media\\documents\\doc1.txt', 'Doc1', 'text', 50000, 0, 0),
+		('\\media\\documents\\doc2.pdf', 'Doc2', 'text', 100000, 0, 0)`)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cmd := setupTestServeCmd(dbPath)
+	defer cmd.Close()
+	mux := cmd.Mux()
+
+	t.Run("video-only filter returns only video folders", func(t *testing.T) {
+		// Query root level with video filter
+		req := httptest.NewRequest("GET", "/api/du?video=true", nil)
+		req.Header.Set("X-Disco-Token", cmd.APIToken)
+		w := httptest.NewRecorder()
+		mux.ServeHTTP(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Errorf("Expected 200, got %d - Body: %s", w.Code, w.Body.String())
+		}
+
+		var resp models.DUResponse
+		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("Failed to unmarshal response: %v", err)
+		}
+
+		// Should have video folders (from /media/videos)
+		if resp.TotalCount == 0 {
+			t.Error("Expected video results")
+		}
+
+		t.Logf("Folders: %d, Files: %d, Total: %d", resp.FolderCount, resp.FileCount, resp.TotalCount)
+	})
+
+	t.Run("type=video filter returns only video folders", func(t *testing.T) {
+		// Get unfiltered results first
+		req1 := httptest.NewRequest("GET", "/api/du?include_counts=true", nil)
+		req1.Header.Set("X-Disco-Token", cmd.APIToken)
+		w1 := httptest.NewRecorder()
+		mux.ServeHTTP(w1, req1)
+
+		var resp1 models.DUResponse
+		if err := json.Unmarshal(w1.Body.Bytes(), &resp1); err != nil {
+			t.Fatalf("Failed to unmarshal unfiltered response: %v", err)
+		}
+		unfilteredTotal := resp1.TotalCount
+		t.Logf("Unfiltered - Total: %d", unfilteredTotal)
+
+		// Get total file count from folders
+		unfilteredFileCount := 0
+		for _, f := range resp1.Folders {
+			unfilteredFileCount += f.Count
+		}
+		t.Logf("Unfiltered file count in folders: %d", unfilteredFileCount)
+
+		// Apply type=video filter
+		req2 := httptest.NewRequest("GET", "/api/du?type=video", nil)
+		req2.Header.Set("X-Disco-Token", cmd.APIToken)
+		w2 := httptest.NewRecorder()
+		mux.ServeHTTP(w2, req2)
+
+		if w2.Code != http.StatusOK {
+			t.Errorf("Expected 200, got %d - Body: %s", w2.Code, w2.Body.String())
+		}
+
+		var resp2 models.DUResponse
+		if err := json.Unmarshal(w2.Body.Bytes(), &resp2); err != nil {
+			t.Fatalf("Failed to unmarshal response: %v", err)
+		}
+
+		t.Logf("type=video - Total: %d", resp2.TotalCount)
+
+		// Get filtered file count from folders
+		filteredFileCount := 0
+		for _, f := range resp2.Folders {
+			filteredFileCount += f.Count
+		}
+		t.Logf("Filtered file count in folders: %d", filteredFileCount)
+
+		// File count within folders should be less (5 videos out of 13 total)
+		if filteredFileCount >= unfilteredFileCount {
+			t.Errorf("Expected filtered file count (%d) to be less than unfiltered (%d)", filteredFileCount, unfilteredFileCount)
+		}
+		if filteredFileCount == 0 {
+			t.Error("Expected some video results")
+		}
+	})
+
+	t.Run("audio-only filter returns only audio folders", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/api/du?audio=true", nil)
+		req.Header.Set("X-Disco-Token", cmd.APIToken)
+		w := httptest.NewRecorder()
+		mux.ServeHTTP(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Errorf("Expected 200, got %d - Body: %s", w.Code, w.Body.String())
+		}
+
+		var resp models.DUResponse
+		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("Failed to unmarshal response: %v", err)
+		}
+
+		if resp.TotalCount == 0 {
+			t.Error("Expected audio results")
+		}
+		t.Logf("Audio - Total: %d", resp.TotalCount)
+	})
+
+	t.Run("image-only filter returns only image folders", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/api/du?image=true", nil)
+		req.Header.Set("X-Disco-Token", cmd.APIToken)
+		w := httptest.NewRecorder()
+		mux.ServeHTTP(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Errorf("Expected 200, got %d - Body: %s", w.Code, w.Body.String())
+		}
+
+		var resp models.DUResponse
+		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("Failed to unmarshal response: %v", err)
+		}
+
+		if resp.TotalCount == 0 {
+			t.Error("Expected image results")
+		}
+		t.Logf("Image - Total: %d", resp.TotalCount)
+	})
+
+	t.Run("filters persist when navigating to subfolder", func(t *testing.T) {
+		// First, get root level with video filter
+		req1 := httptest.NewRequest("GET", "/api/du?video=true", nil)
+		req1.Header.Set("X-Disco-Token", cmd.APIToken)
+		w1 := httptest.NewRecorder()
+		mux.ServeHTTP(w1, req1)
+
+		var resp1 models.DUResponse
+		if err := json.Unmarshal(w1.Body.Bytes(), &resp1); err != nil {
+			t.Fatalf("Failed to unmarshal root response: %v", err)
+		}
+
+		if len(resp1.Folders) == 0 {
+			t.Fatal("Expected folders at root level with video filter")
+		}
+
+		// Get the first folder path
+		firstFolderPath := resp1.Folders[0].Path
+		t.Logf("Navigating to folder: %s", firstFolderPath)
+
+		// Navigate to subfolder with same video filter
+		req2 := httptest.NewRequest("GET", "/api/du?path="+firstFolderPath+"&video=true", nil)
+		req2.Header.Set("X-Disco-Token", cmd.APIToken)
+		w2 := httptest.NewRecorder()
+		mux.ServeHTTP(w2, req2)
+
+		var resp2 models.DUResponse
+		if err := json.Unmarshal(w2.Body.Bytes(), &resp2); err != nil {
+			t.Fatalf("Failed to unmarshal subfolder response: %v", err)
+		}
+
+		// Should have subfolders and/or files
+		totalItems := len(resp2.Folders) + len(resp2.Files)
+		if totalItems == 0 {
+			t.Errorf("Expected folders or files in subfolder with video filter, got none")
+			t.Logf("Response: %+v", resp2)
+		}
+
+		t.Logf("Subfolder results - Folders: %d, Files: %d, Total: %d",
+			resp2.FolderCount, resp2.FileCount, resp2.TotalCount)
 	})
 }
