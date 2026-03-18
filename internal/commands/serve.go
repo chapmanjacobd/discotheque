@@ -1,7 +1,6 @@
 package commands
 
 import (
-	"compress/gzip"
 	"context"
 	"database/sql"
 	"encoding/json"
@@ -127,71 +126,6 @@ func (c *ServeCmd) isPathBlocklisted(path string) bool {
 		}
 	}
 	return false
-}
-
-// gzipResponseWriter wraps http.ResponseWriter to support gzip compression
-type gzipResponseWriter struct {
-	http.ResponseWriter
-	writer *gzip.Writer
-	code   int
-}
-
-func (w *gzipResponseWriter) Write(b []byte) (int, error) {
-	if w.writer == nil {
-		return w.ResponseWriter.Write(b)
-	}
-	return w.writer.Write(b)
-}
-
-func (w *gzipResponseWriter) WriteHeader(code int) {
-	w.code = code
-	w.ResponseWriter.WriteHeader(code)
-}
-
-// withGzip wraps an http.Handler with gzip compression support
-// Compresses responses if client accepts gzip and response is text/JSON
-// Excludes streaming endpoints (SSE, HLS) which don't work with compression
-func withGzip(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Check if client accepts gzip encoding
-		if !strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
-			next.ServeHTTP(w, r)
-			return
-		}
-
-		// Skip gzip for streaming endpoints and non-GET requests
-		if r.URL.Path == "/api/events" ||
-			strings.HasPrefix(r.URL.Path, "/api/hls/") ||
-			strings.HasPrefix(r.URL.Path, "/api/subtitles") ||
-			strings.HasPrefix(r.URL.Path, "/api/thumbnail") ||
-			strings.HasPrefix(r.URL.Path, "/api/raw") ||
-			r.Method != http.MethodGet {
-			next.ServeHTTP(w, r)
-			return
-		}
-
-		// Skip gzip for /api/ paths without Accept-Encoding: gzip
-		if strings.HasPrefix(r.URL.Path, "/api/") {
-			acceptEncoding := r.Header.Get("Accept-Encoding")
-			if !strings.Contains(acceptEncoding, "gzip") {
-				next.ServeHTTP(w, r)
-				return
-			}
-		}
-
-		// Create gzip writer
-		gw := &gzipResponseWriter{
-			ResponseWriter: w,
-			writer:         gzip.NewWriter(w),
-		}
-		defer gw.writer.Close()
-
-		// Set headers for gzip
-		w.Header().Set("Content-Encoding", "gzip")
-		w.Header().Set("Vary", "Accept-Encoding")
-
-		next.ServeHTTP(gw, r)
-	})
 }
 
 // Mux creates the HTTP request multiplexer with all routes
@@ -424,9 +358,6 @@ func (c *ServeCmd) Run(ctx *kong.Context) error {
 	}
 
 	handler := c.Mux()
-
-	// Wrap with gzip compression middleware
-	handler = withGzip(handler)
 
 	addr := fmt.Sprintf(":%d", c.Port)
 	baseURL := fmt.Sprintf("http://localhost:%d", c.Port)
