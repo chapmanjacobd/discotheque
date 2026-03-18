@@ -659,6 +659,12 @@ func migrateIndexes(db *sql.DB) error {
 		"CREATE INDEX IF NOT EXISTS idx_media_deleted_path ON media(time_deleted, path)",
 		// Partial index for active media (most common query pattern)
 		"CREATE INDEX IF NOT EXISTS idx_media_active ON media(path, type) WHERE time_deleted = 0",
+		// Indexes for filter bins calculation (optimize include_counts)
+		"CREATE INDEX IF NOT EXISTS idx_media_active_size ON media(size) WHERE time_deleted = 0 AND size > 0",
+		"CREATE INDEX IF NOT EXISTS idx_media_active_duration ON media(duration) WHERE time_deleted = 0 AND duration > 0",
+		"CREATE INDEX IF NOT EXISTS idx_media_active_time_modified ON media(time_modified) WHERE time_deleted = 0 AND time_modified > 0",
+		"CREATE INDEX IF NOT EXISTS idx_media_active_time_created ON media(time_created) WHERE time_deleted = 0 AND time_created > 0",
+		"CREATE INDEX IF NOT EXISTS idx_media_active_time_downloaded ON media(time_downloaded) WHERE time_deleted = 0 AND time_downloaded > 0",
 	}
 
 	for _, idx := range indexes {

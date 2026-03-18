@@ -133,6 +133,13 @@ CREATE INDEX IF NOT EXISTS idx_time_created ON media(time_created);
 CREATE INDEX IF NOT EXISTS idx_time_modified ON media(time_modified);
 CREATE INDEX IF NOT EXISTS idx_time_downloaded ON media(time_downloaded);
 
+-- Indexes for filter bins calculation (optimize include_counts)
+CREATE INDEX IF NOT EXISTS idx_media_active_size ON media(size) WHERE time_deleted = 0 AND size > 0;
+CREATE INDEX IF NOT EXISTS idx_media_active_duration ON media(duration) WHERE time_deleted = 0 AND duration > 0;
+CREATE INDEX IF NOT EXISTS idx_media_active_time_modified ON media(time_modified) WHERE time_deleted = 0 AND time_modified > 0;
+CREATE INDEX IF NOT EXISTS idx_media_active_time_created ON media(time_created) WHERE time_deleted = 0 AND time_created > 0;
+CREATE INDEX IF NOT EXISTS idx_media_active_time_downloaded ON media(time_downloaded) WHERE time_deleted = 0 AND time_downloaded > 0;
+
 -- Optional FTS table
 CREATE VIRTUAL TABLE IF NOT EXISTS media_fts USING fts5(
     path,

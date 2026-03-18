@@ -540,7 +540,7 @@ func (c *ServeCmd) handleThumbnail(w http.ResponseWriter, r *http.Request) {
 	thumb, err := cmd.Output()
 
 	// If video thumbnail is too dark, try seeking further (e.g. 60 seconds later)
-	if err == nil && is_video && utils.IsImageTooDark(thumb, 0.5) {
+	if err == nil && is_video && utils.IsImageTooDark(thumb, 0.05) {
 		slog.Debug("Thumbnail too dark, retrying further in the video", "path", path)
 		retryArgs := []string{"-ss", "85", "-i", path, "-frames:v", "1", "-q:v", "4", "-vf", "scale=320:-1", "-f", "image2", "pipe:1"}
 		cmdRetry := exec.CommandContext(r.Context(), "ffmpeg", append([]string{"-hide_banner", "-loglevel", "error"}, retryArgs...)...)
