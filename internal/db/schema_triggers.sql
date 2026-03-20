@@ -1,7 +1,5 @@
 -- SQLite schema for media library - Core Triggers and Indexes
 
-CREATE INDEX IF NOT EXISTS idx_captions_path ON captions(media_path);
-
 CREATE INDEX IF NOT EXISTS idx_history_path ON history(media_path);
 CREATE INDEX IF NOT EXISTS idx_history_time ON history(time_played);
 

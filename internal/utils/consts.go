@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"time"
 )
 
@@ -135,6 +136,120 @@ var SubtitleExtensions = []string{
 
 var ArchiveExtensions = []string{
 	"7z", "arj", "arc", "adf", "br", "bz2", "gz", "iso", "lha", "lzh", "lzx", "pak", "rar", "sit", "tar", "tar.bz2", "tar.gz", "tar.xz", "tar.zst", "tbz2", "tgz", "txz", "tzst", "xz", "zoo", "zip", "zst", "zstd",
+}
+
+// UnreliableDurationFormats are formats known to have unreliable duration metadata
+// (DVD, Blu-ray, camcorder formats, and older codecs)
+// The int value is the estimated bitrate in bits per second for each format
+var UnreliableDurationFormats = map[string]int{
+	// DVD formats (lower bitrate, ~5-10 Mbps typical)
+	".vob":  5000000, // DVD Video Object
+	".ifo":  5000000, // DVD Information
+	".vro":  5000000, // DVD Recording format
+	
+	// AVCHD / Camcorder formats (medium bitrate, ~10-20 Mbps typical)
+	".m2t":  15000000, // MPEG-2 Transport Stream
+	".m2ts": 15000000, // Blu-ray MPEG-2 Transport Stream
+	".mts":  15000000, // AVCHD Video
+	".mod":  10000000, // Canon/ JVC camcorder format
+	".tod":  12000000, // JVC camcorder format
+	
+	// Older/lossy codecs (variable bitrate, ~2-8 Mbps typical)
+	".divx":  4000000, // DivX codec
+	".xvid":  4000000, // Xvid codec
+	".rm":    2000000, // RealMedia
+	".rmvb":  3000000, // RealMedia Variable Bitrate
+	".wmv":   3000000, // Windows Media Video
+	".asf":   3000000, // Advanced Systems Format
+	
+	// Blu-ray formats (high bitrate, ~20-40 Mbps typical)
+	".avchd": 20000000, // AVCHD container
+	".bdmv":  30000000, // Blu-ray Disc Movie
+	".mpls":  30000000, // Blu-ray Playlist
+	
+	// Disc images (use average of contained formats)
+	".iso": 8000000, // Disc image (average estimate)
+}
+
+// HasUnreliableDuration checks if a file extension is known to have unreliable duration metadata
+func HasUnreliableDuration(ext string) bool {
+	_, ok := UnreliableDurationFormats[strings.ToLower(ext)]
+	return ok
+}
+
+// GetEstimatedBitrate returns the estimated bitrate for a format
+// Returns 0 if the format is not in the unreliable formats map
+func GetEstimatedBitrate(ext string) int {
+	return UnreliableDurationFormats[strings.ToLower(ext)]
+}
+
+// Default bitrates for duration estimation (bits per second)
+const (
+	DefaultAudioBitrate = 256000 // 256 kbps
+	DefaultVideoBitrate = 1500000 // 1500 kbps
+)
+
+// EstimateDurationFromSize estimates duration from file size and bitrate
+// Returns duration in seconds
+func EstimateDurationFromSize(size int64, isVideo bool) float64 {
+	bitrate := DefaultAudioBitrate
+	if isVideo {
+		bitrate = DefaultVideoBitrate
+	}
+	return float64(size) / float64(bitrate) * 8
+}
+
+// EstimateDurationFromSizeWithFormat estimates duration from file size using format-specific bitrate
+// Returns duration in seconds
+func EstimateDurationFromSizeWithFormat(size int64, ext string) float64 {
+	bitrate := GetEstimatedBitrate(ext)
+	if bitrate <= 0 {
+		// Fallback to default estimation
+		return EstimateDurationFromSize(size, true)
+	}
+	return float64(size) / float64(bitrate) * 8
+}
+
+// GetDurationForTimeout returns a duration value suitable for timeout calculations.
+// If the provided duration is valid (> 0), it returns it as-is.
+// If duration is <= 0, it estimates from file size:
+//   - For unreliable formats (DVD, Blu-ray, etc.), uses format-specific bitrate
+//   - For other formats, uses default video bitrate
+//
+// Returns 0 if size is invalid (<= 0)
+func GetDurationForTimeout(duration float64, size int64, ext string) float64 {
+	if duration > 0 {
+		return duration
+	}
+	if size <= 0 {
+		return 0
+	}
+	return EstimateDurationFromSizeWithFormat(size, ext)
+}
+
+// ShouldOverrideDuration determines if reported duration should be overridden
+// with an estimate based on file size. Returns true only when:
+//   - File extension matches an unreliable format
+//   - Reported duration is suspiciously low (< 2 minutes)
+//   - Estimated duration is much higher (> 2 minutes)
+func ShouldOverrideDuration(reportedDuration float64, size int64, ext string) (float64, bool) {
+	if reportedDuration >= 120 {
+		// Duration is >= 2 minutes, trust it
+		return 0, false
+	}
+	if !HasUnreliableDuration(ext) {
+		// Not an unreliable format, trust reported duration
+		return 0, false
+	}
+	
+	estimatedDuration := EstimateDurationFromSizeWithFormat(size, ext)
+	if estimatedDuration <= 120 {
+		// Estimated duration is also low, trust reported duration
+		return 0, false
+	}
+	
+	// Override with estimated duration
+	return estimatedDuration, true
 }
 
 func GetTempDir() string {

@@ -198,6 +198,14 @@ func Extract(ctx context.Context, path string, scanSubtitles bool, extractText b
 				duration = int64(d)
 				// Validate duration is reasonable (max 31 days for sanity)
 				if duration > 0 && duration < 2678400 {
+					// Check if we should override duration with format-specific estimate
+					ext := strings.ToLower(filepath.Ext(path))
+					if estimated, shouldOverride := utils.ShouldOverrideDuration(float64(duration), stat.Size(), ext); shouldOverride {
+						slog.Debug("Replacing suspiciously low duration with format-specific estimate",
+							"path", path, "reported", duration, "estimated", int64(estimated),
+							"bitrate", utils.GetEstimatedBitrate(ext))
+						duration = int64(estimated)
+					}
 					params.Duration = utils.ToNullInt64(duration)
 				}
 			}
@@ -345,6 +353,7 @@ func Extract(ctx context.Context, path string, scanSubtitles bool, extractText b
 	} else {
 		// If ffprobe fails, it might be a corrupted file or non-media file
 		// We already have some basic info from os.Stat and mimetype
+		// Don't estimate duration - leave it as zero/null
 		slog.Debug("ffprobe failed to extract metadata (empty output)", "path", path)
 	}
 

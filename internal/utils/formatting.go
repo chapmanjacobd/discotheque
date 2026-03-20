@@ -2,9 +2,33 @@ package utils
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 )
+
+// ParseDurationString parses duration strings like "10s", "20m", "1h".
+// Defaults to minutes if no unit is specified.
+func ParseDurationString(s string) time.Duration {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return 0
+	}
+
+	// Try Go's built-in ParseDuration first (handles "10s", "20m", "1h", etc.)
+	if d, err := time.ParseDuration(s); err == nil {
+		return d
+	}
+
+	// Try parsing as a plain number (default to minutes)
+	n, err := strconv.ParseFloat(s, 64)
+	if err != nil {
+		return 0
+	}
+
+	// Default to minutes
+	return time.Duration(n * float64(time.Minute))
+}
 
 func FormatDuration(seconds int) string {
 	if seconds == 0 {

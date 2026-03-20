@@ -36,8 +36,5 @@ CREATE INDEX IF NOT EXISTS idx_media_active_time_downloaded ON media(time_downlo
 CREATE INDEX IF NOT EXISTS idx_history_path ON history(media_path);
 CREATE INDEX IF NOT EXISTS idx_history_time ON history(time_played);
 
--- Captions indexes
-CREATE INDEX IF NOT EXISTS idx_captions_path ON captions(media_path);
-
 -- Meta indexes
 CREATE INDEX IF NOT EXISTS idx_folder_stats_depth ON folder_stats(depth);

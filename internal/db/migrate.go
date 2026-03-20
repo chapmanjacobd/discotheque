@@ -135,6 +135,159 @@ func migrateToStrict(db *sql.DB, tableName string, createSql string) error {
 	return tx.Commit()
 }
 
+// convertColumnsBeforeStrict handles column type conversions before STRICT migration
+// e.g., history.media_id (INTEGER) -> history.media_path (TEXT)
+func convertColumnsBeforeStrict(db *sql.DB) error {
+	// Check if history table has media_id column that needs conversion
+	if err := convertHistoryMediaID(db); err != nil {
+		return fmt.Errorf("failed to convert history.media_id: %w", err)
+	}
+
+	// Check if captions table has media_id column that needs conversion
+	if err := convertCaptionsMediaID(db); err != nil {
+		return fmt.Errorf("failed to convert captions.media_id: %w", err)
+	}
+
+	return nil
+}
+
+func convertHistoryMediaID(db *sql.DB) error {
+	var hasMediaID bool
+	rows, err := db.Query("PRAGMA table_info(history)")
+	if err != nil {
+		if strings.Contains(err.Error(), "no such table") {
+			return nil // Table doesn't exist yet, nothing to convert
+		}
+		return err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var cid int
+		var name, dtype string
+		var notnull, pk int
+		var dfltValue any
+		if err := rows.Scan(&cid, &name, &dtype, &notnull, &dfltValue, &pk); err != nil {
+			return err
+		}
+		if strings.EqualFold(name, "media_id") {
+			hasMediaID = true
+			break
+		}
+	}
+	rows.Close()
+
+	if !hasMediaID {
+		return nil // No conversion needed
+	}
+
+	// Convert media_id to media_path by joining with media table
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// Create temp history table with media_path
+	if _, err := tx.Exec(`CREATE TABLE history_tmp (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		media_path TEXT NOT NULL,
+		time_played INTEGER,
+		playhead INTEGER,
+		done INTEGER,
+		FOREIGN KEY (media_path) REFERENCES media(path) ON DELETE CASCADE
+	)`); err != nil {
+		return fmt.Errorf("failed to create history_tmp: %w", err)
+	}
+
+	// Copy data, converting media_id to media_path via JOIN
+	// LEFT JOIN to preserve history entries even if media was deleted
+	if _, err := tx.Exec(`INSERT INTO history_tmp (id, media_path, time_played, playhead, done)
+		SELECT h.id, COALESCE(m.path, ''), h.time_played, h.playhead, h.done
+		FROM history h
+		LEFT JOIN media m ON h.media_id = m.rowid`); err != nil {
+		return fmt.Errorf("failed to convert history media_id to media_path: %w", err)
+	}
+
+	// Drop old table and rename new one
+	if _, err := tx.Exec("DROP TABLE history"); err != nil {
+		return fmt.Errorf("failed to drop old history: %w", err)
+	}
+
+	if _, err := tx.Exec("ALTER TABLE history_tmp RENAME TO history"); err != nil {
+		return fmt.Errorf("failed to rename history_tmp: %w", err)
+	}
+
+	return tx.Commit()
+}
+
+func convertCaptionsMediaID(db *sql.DB) error {
+	var hasMediaID bool
+	rows, err := db.Query("PRAGMA table_info(captions)")
+	if err != nil {
+		if strings.Contains(err.Error(), "no such table") {
+			return nil // Table doesn't exist yet, nothing to convert
+		}
+		return err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var cid int
+		var name, dtype string
+		var notnull, pk int
+		var dfltValue any
+		if err := rows.Scan(&cid, &name, &dtype, &notnull, &dfltValue, &pk); err != nil {
+			return err
+		}
+		if strings.EqualFold(name, "media_id") {
+			hasMediaID = true
+			break
+		}
+	}
+	rows.Close()
+
+	if !hasMediaID {
+		return nil // No conversion needed
+	}
+
+	// Convert media_id to media_path by joining with media table
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// Create temp captions table with media_path
+	if _, err := tx.Exec(`CREATE TABLE captions_tmp (
+		media_path TEXT NOT NULL,
+		time REAL,
+		text TEXT,
+		FOREIGN KEY (media_path) REFERENCES media(path) ON DELETE CASCADE
+	)`); err != nil {
+		return fmt.Errorf("failed to create captions_tmp: %w", err)
+	}
+
+	// Copy data, converting media_id to media_path via JOIN
+	if _, err := tx.Exec(`INSERT INTO captions_tmp (media_path, time, text)
+		SELECT COALESCE(m.path, ''), c.time, c.text
+		FROM captions c
+		LEFT JOIN media m ON c.media_id = m.rowid`); err != nil {
+		return fmt.Errorf("failed to convert captions media_id to media_path: %w", err)
+	}
+
+	// Drop old table and rename new one
+	if _, err := tx.Exec("DROP TABLE captions"); err != nil {
+		return fmt.Errorf("failed to drop old captions: %w", err)
+	}
+
+	if _, err := tx.Exec("ALTER TABLE captions_tmp RENAME TO captions"); err != nil {
+		return fmt.Errorf("failed to rename captions_tmp: %w", err)
+	}
+
+	return tx.Commit()
+}
+
 // pathToTokenized converts a file path to FTS-friendly format
 func pathToTokenized(path string) string {
 	re := regexp.MustCompile(`[/\\.\[\]\-\+(){}_&]`)
@@ -465,6 +618,11 @@ func migrateTables(db *sql.DB, hasStrict bool) error {
 		strictSql = "STRICT"
 	}
 
+	// 0. Pre-migration: Handle column renames/conversions for tables with schema changes
+	if err := convertColumnsBeforeStrict(db); err != nil {
+		return fmt.Errorf("failed to convert columns: %w", err)
+	}
+
 	// 1. Migrate small tables to STRICT
 	if hasStrict {
 		migrations := []struct {
@@ -477,6 +635,9 @@ func migrateTables(db *sql.DB, hasStrict bool) error {
                 title TEXT,
                 extractor_key TEXT,
                 extractor_config TEXT,
+                time_created INTEGER,
+                time_modified INTEGER,
+                hours_update_delay INTEGER,
                 time_deleted INTEGER DEFAULT 0
             ) %s`, strictSql)},
 			{"playlist_items", fmt.Sprintf(`CREATE TABLE playlist_items (

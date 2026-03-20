@@ -1419,7 +1419,70 @@ func ConvertEpubToOEB(inputPath string) (string, error) {
 		return "", fmt.Errorf("output directory not created: %w", err)
 	}
 
+	// Replace CSS with optimized version
+	replaceCalibreCSS(outputDir)
+
 	return outputDir, nil
+}
+
+// replaceCalibreCSS replaces the generated stylesheet with an optimized version
+func replaceCalibreCSS(outputDir string) {
+	cssPath := filepath.Join(outputDir, "stylesheet.css")
+	// Optimized CSS for ebooks (matching Python implementation)
+	css := `.calibre, body {
+  font-family: Times New Roman,serif;
+  display: block;
+  font-size: 1em;
+  padding-left: 0;
+  padding-right: 0;
+  margin: 0 5pt;
+}
+@media (min-width: 40em) {
+  .calibre, body {
+    width: 38em;
+    margin: 0 auto;
+  }
+}
+.calibre1 {
+  font-size: 1.25em;
+  border-bottom: 0;
+  border-top: 0;
+  display: block;
+  padding-bottom: 0;
+  padding-top: 0;
+  margin: 0.5em 0;
+}
+.calibre2, img {
+  max-height:100%;
+  max-width:100%;
+}
+.calibre3 {
+  font-weight: bold;
+}
+.calibre4 {
+  font-style: italic;
+}
+p > .calibre3:not(:only-of-type) {
+  font-size: 1.5em;
+}
+.calibre5 {
+  display: block;
+  font-size: 2em;
+  font-weight: bold;
+  line-height: 1.05;
+  page-break-before: always;
+  margin: 0.67em 0;
+}
+.calibre6 {
+  display: block;
+  list-style-type: disc;
+  margin: 1em 0;
+}
+.calibre7 {
+  display: list-item;
+}
+`
+	os.WriteFile(cssPath, []byte(css), 0644)
 }
 
 // SanitizeFilename replaces special characters with underscores for calibre compatibility

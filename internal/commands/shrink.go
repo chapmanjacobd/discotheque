@@ -1,16 +1,19 @@
 package commands
 
 import (
+	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"log/slog"
-	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/alecthomas/kong"
 	"github.com/chapmanjacobd/discoteca/internal/db"
@@ -18,6 +21,7 @@ import (
 	"github.com/chapmanjacobd/discoteca/internal/utils"
 )
 
+// ShrinkCmd is the main command for shrinking media files
 type ShrinkCmd struct {
 	models.CoreFlags        `embed:""`
 	models.PathFilterFlags  `embed:""`
@@ -25,7 +29,6 @@ type ShrinkCmd struct {
 	models.MediaFilterFlags `embed:""`
 	models.TimeFilterFlags  `embed:""`
 	models.DeletedFlags     `embed:""`
-	models.HashingFlags     `embed:""`
 
 	Databases []string `arg:"" required:"" help:"SQLite database files" type:"existingfile"`
 
@@ -51,17 +54,45 @@ type ShrinkCmd struct {
 	Preset         string `default:"7" help:"SVT-AV1 preset (0-13, lower is slower/better)"`
 	CRF            string `default:"40" help:"CRF value for SVT-AV1 (0-63, lower is better)"`
 
-	ContinueFrom     string `help:"Skip media until specific file path is seen"`
-	Move             string `help:"Directory to move successful files"`
-	MoveBroken       string `help:"Directory to move unsuccessful files"`
-	DeleteUnplayable bool   `help:"Delete unplayable files"`
+	ContinueFrom     string  `help:"Skip media until specific file path is seen"`
+	Move             string  `help:"Directory to move successful files"`
+	MoveBroken       string  `help:"Directory to move unsuccessful files"`
+	DeleteUnplayable bool    `help:"Delete unplayable files"`
+	DeleteLarger     bool    `default:"true" help:"Delete larger of transcode or original files"`
+	DeleteNoVideo    bool    `help:"Delete files without video stream"`
+	DeleteNoAudio    bool    `help:"Delete files without audio stream"`
+	AlwaysSplit      bool    `help:"Always split audio on silence"`
+	SplitLongerThan  float64 `help:"Split audio longer than N seconds"`
+	MinSplitSegment  float64 `default:"60" help:"Minimum split segment duration in seconds"`
+	MaxWidthBuffer   float64 `default:"0.05" help:"Buffer percentage for width upscaling"`
+	MaxHeightBuffer  float64 `default:"0.05" help:"Buffer percentage for height upscaling"`
+	Keyframes        bool    `help:"Extract keyframes only"`
+	NoPreserveVideo  bool    `help:"Don't preserve video when audio-only"`
+	IncludeTimecode  bool    `help:"Include timecode streams in output"`
+	VerboseFFmpeg    bool    `help:"Enable verbose FFmpeg logging"`
+	SkipOCR          bool    `help:"Skip OCR for PDFs that already contain text"`
+	ForceOCR         bool    `help:"Force OCR even on PDFs with text"`
+	RedoOCR          bool    `help:"Re-do OCR on PDFs that already have OCR"`
+	NoOCR            bool    `help:"Skip OCR entirely"`
 
-	OnlyHash      bool `help:"Only calculate hashes, don't shrink"`
-	OnlyDedupe    bool `help:"Only mark deduplicated files, don't shrink"`
-	ForceRehash   bool `help:"Force recalculation of hashes"`
+	// Parallelism
+	VideoThreads int `default:"2" help:"Maximum concurrent video transcodes"`
+	AudioThreads int `default:"4" help:"Maximum concurrent audio transcodes"`
+	ImageThreads int `default:"8" help:"Maximum concurrent image conversions"`
+	TextThreads  int `default:"2" help:"Maximum concurrent text conversions"`
+
+	// Timeouts
+	VideoTimeoutMult float64 `default:"3.0" help:"Video timeout multiplier (timeout = duration * multiplier)"`
+	AudioTimeoutMult float64 `default:"0.5" help:"Audio timeout multiplier (timeout = duration * multiplier)"`
+	VideoTimeout     string  `default:"90m" help:"Video timeout when duration is unknown"`
+	AudioTimeout     string  `default:"10m" help:"Audio timeout when duration is unknown"`
+	ImageTimeout     string  `default:"10m" help:"Image timeout"`
+	TextTimeout      string  `default:"20m" help:"Text timeout"`
+
 	ForceReshrink bool `help:"Force reprocessing of already shrinked files"`
 }
 
+// ShrinkMedia represents a media file to be processed
 type ShrinkMedia struct {
 	Path           string
 	Size           int64
@@ -70,6 +101,7 @@ type ShrinkMedia struct {
 	AudioCount     int
 	VideoCodecs    string
 	AudioCodecs    string
+	SubtitleCodecs string
 	Type           string
 	Ext            string
 	MediaType      string
@@ -77,92 +109,165 @@ type ShrinkMedia struct {
 	Savings        int64
 	ProcessingTime int
 	CompressedSize int64
-	IsArchived     bool
 	ArchivePath    string
-	FastHash       string
-	Sha256         string
+	NewPath        string
+	NewSize        int64
+	TimeDeleted    int64
+	Invalid        bool
 }
 
 func (c *ShrinkCmd) Run(ctx *kong.Context) error {
 	models.SetupLogging(c.Verbose)
 
-	for _, dbPath := range c.Databases {
-		sqlDB, _, err := db.ConnectWithInit(dbPath)
-		if err != nil {
-			return err
-		}
-		// Micro-migration for shrink
-		err = db.EnsureColumns(sqlDB, []db.ColumnDef{
-			{Table: "media", Column: "fasthash", Schema: "TEXT"},
-			{Table: "media", Column: "sha256", Schema: "TEXT"},
-			{Table: "media", Column: "is_shrinked", Schema: "INTEGER DEFAULT 0"},
-		})
-		if err != nil {
-			sqlDB.Close()
-			return err
-		}
-		err = db.EnsureIndexes(sqlDB, []db.IndexDef{
-			{Name: "idx_media_fasthash", SQL: "CREATE INDEX IF NOT EXISTS idx_media_fasthash ON media(fasthash) WHERE fasthash IS NOT NULL"},
-			{Name: "idx_media_sha256", SQL: "CREATE INDEX IF NOT EXISTS idx_media_sha256 ON media(sha256) WHERE sha256 IS NOT NULL"},
-			{Name: "idx_media_is_shrinked", SQL: "CREATE INDEX IF NOT EXISTS idx_media_is_shrinked ON media(is_shrinked) WHERE is_shrinked = 1"},
-			{Name: "idx_media_unshrinked", SQL: "CREATE INDEX IF NOT EXISTS idx_media_unshrinked ON media(path) WHERE is_shrinked = 0 OR is_shrinked IS NULL"},
-		})
-		if err != nil {
-			sqlDB.Close()
-			return err
-		}
-		sqlDB.Close()
-	}
+	// Build processor configuration
+	cfg := c.buildProcessorConfig()
 
-	// Parse size/duration strings
-	minSavingsVideo := utils.ParsePercentOrBytes(c.MinSavingsVideo)
-	minSavingsAudio := utils.ParsePercentOrBytes(c.MinSavingsAudio)
-	minSavingsImage := utils.ParsePercentOrBytes(c.MinSavingsImage)
-	sourceAudioBitrate := utils.ParseBitrate(c.SourceAudioBitrate)
-	sourceVideoBitrate := utils.ParseBitrate(c.SourceVideoBitrate)
-	targetAudioBitrate := utils.ParseBitrate(c.TargetAudioBitrate)
-	targetVideoBitrate := utils.ParseBitrate(c.TargetVideoBitrate)
-	targetImageSize := utils.ParseSize(c.TargetImageSize)
+	// Check installed tools
+	tools := c.checkInstalledTools()
 
-	// Check for required tools
-	ffmpegInstalled := utils.CommandExists("ffmpeg")
-	magickInstalled := utils.CommandExists("magick")
-	if !ffmpegInstalled {
-		slog.Warn("ffmpeg not installed. Video and Audio files will be skipped")
-	}
-	if !magickInstalled {
-		slog.Warn("ImageMagick not installed. Image files will be skipped")
-	}
+	// Initialize components
+	ffmpeg := NewFFmpegProcessor(cfg)
+	registry := NewProcessorRegistry(ffmpeg)
+	metrics := NewShrinkMetrics()
 
-	for _, dbPath := range c.Databases {
-		if err := c.processDatabase(dbPath, ffmpegInstalled, magickInstalled,
-			minSavingsVideo, minSavingsAudio, minSavingsImage,
-			sourceAudioBitrate, sourceVideoBitrate,
-			targetAudioBitrate, targetVideoBitrate, targetImageSize); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func (c *ShrinkCmd) processDatabase(dbPath string, ffmpegInstalled, magickInstalled bool,
-	minSavingsVideo, minSavingsAudio, minSavingsImage float64,
-	sourceAudioBitrate, sourceVideoBitrate, targetAudioBitrate, targetVideoBitrate, targetImageSize int64,
-) error {
-	sqlDB, _, err := db.ConnectWithInit(dbPath)
+	// Load all media from databases
+	allMedia, err := c.loadAllMedia()
 	if err != nil {
 		return err
 	}
-	defer sqlDB.Close()
 
-	// Build query to get media
+	slog.Info("Loaded media", "count", len(allMedia))
+	if len(allMedia) == 0 {
+		slog.Info("No media found")
+		return nil
+	}
+
+	// Filter by available tools
+	filteredMedia := c.filterByTools(allMedia, tools)
+	slog.Info("Filtered media by tools",
+		"count", len(filteredMedia),
+		"ffmpeg", tools.FFmpeg,
+		"magick", tools.ImageMagick,
+		"calibre", tools.Calibre)
+
+	if len(filteredMedia) == 0 {
+		slog.Info("No processable media found")
+		return nil
+	}
+
+	// Analyze and decide what to shrink
+	toShrink := c.analyzeMedia(filteredMedia, cfg, registry, metrics)
+	if len(toShrink) == 0 {
+		slog.Info("No files to shrink")
+		metrics.LogSummary()
+		return nil
+	}
+
+	// Apply continue-from filter
+	if c.ContinueFrom != "" {
+		toShrink = c.applyContinueFrom(toShrink)
+	}
+
+	// Sort by efficiency (most space freed per second)
+	c.sortByEfficiency(toShrink)
+
+	// Print summary
+	c.printSummary(toShrink)
+
+	if c.Simulate {
+		slog.Info("Simulation mode - no files will be processed")
+		return nil
+	}
+
+	// Confirm
+	if !c.NoConfirm && !c.confirm() {
+		return nil
+	}
+
+	// Process with parallelism
+	c.processMedia(toShrink, registry, cfg, metrics)
+
+	// Final summary
+	metrics.LogSummary()
+	return nil
+}
+
+func (c *ShrinkCmd) buildProcessorConfig() *ProcessorConfig {
+	return &ProcessorConfig{
+		SourceAudioBitrate:   utils.ParseBitrate(c.SourceAudioBitrate),
+		SourceVideoBitrate:   utils.ParseBitrate(c.SourceVideoBitrate),
+		TargetAudioBitrate:   utils.ParseBitrate(c.TargetAudioBitrate),
+		TargetVideoBitrate:   utils.ParseBitrate(c.TargetVideoBitrate),
+		TargetImageSize:      utils.ParseSize(c.TargetImageSize),
+		MinSavingsVideo:      utils.ParsePercentOrBytes(c.MinSavingsVideo),
+		MinSavingsAudio:      utils.ParsePercentOrBytes(c.MinSavingsAudio),
+		MinSavingsImage:      utils.ParsePercentOrBytes(c.MinSavingsImage),
+		TranscodingVideoRate: c.TranscodingVideoRate,
+		TranscodingAudioRate: c.TranscodingAudioRate,
+		TranscodingImageTime: c.TranscodingImageTime,
+		Preset:               c.Preset,
+		CRF:                  c.CRF,
+		MaxVideoWidth:        c.MaxVideoWidth,
+		MaxVideoHeight:       c.MaxVideoHeight,
+		Keyframes:            c.Keyframes,
+		AudioOnly:            c.AudioOnly,
+		VideoOnly:            c.VideoOnly,
+		DeleteNoAudio:        c.DeleteNoAudio,
+		DeleteNoVideo:        c.DeleteNoVideo,
+		AlwaysSplit:          c.AlwaysSplit,
+		SplitLongerThan:      c.SplitLongerThan,
+		MinSplitSegment:      c.MinSplitSegment,
+		MaxWidthBuffer:       c.MaxWidthBuffer,
+		MaxHeightBuffer:      c.MaxHeightBuffer,
+		NoPreserveVideo:      c.NoPreserveVideo,
+		IncludeTimecode:      c.IncludeTimecode,
+		VerboseFFmpeg:        c.VerboseFFmpeg,
+		SkipOCR:              c.SkipOCR,
+		ForceOCR:             c.ForceOCR,
+		RedoOCR:              c.RedoOCR,
+		NoOCR:                c.NoOCR,
+		DeleteUnplayable:     c.DeleteUnplayable,
+		DeleteLarger:         c.DeleteLarger,
+		MoveBroken:           c.MoveBroken,
+		Valid:                c.Valid,
+		Invalid:              c.Invalid,
+	}
+}
+
+func (c *ShrinkCmd) loadAllMedia() ([]ShrinkMedia, error) {
+	var allMedia []ShrinkMedia
+
+	for _, dbPath := range c.Databases {
+		sqlDB, _, err := db.ConnectWithInit(dbPath)
+		if err != nil {
+			return nil, err
+		}
+
+		media, err := c.loadMediaFromDB(sqlDB)
+		sqlDB.Close()
+		if err != nil {
+			return nil, err
+		}
+		allMedia = append(allMedia, media...)
+	}
+
+	return allMedia, nil
+}
+
+func (c *ShrinkCmd) loadMediaFromDB(sqlDB *sql.DB) ([]ShrinkMedia, error) {
 	query := `
-		SELECT path, size, duration, video_count, audio_count, 
-		       video_codecs, audio_codecs, type, fasthash, sha256, is_shrinked
+		SELECT path,
+            size,
+            COALESCE(duration, 0),
+            COALESCE(video_count, 0),
+            COALESCE(audio_count, 0),
+            COALESCE(video_codecs, ''),
+            COALESCE(audio_codecs, ''),
+            COALESCE(subtitle_codecs, ''),
+            COALESCE(type, '')
 		FROM media
 		WHERE COALESCE(time_deleted, 0) = 0
-		  AND size > 0
+            AND size > 0
 	`
 
 	if !c.ForceReshrink {
@@ -171,388 +276,491 @@ func (c *ShrinkCmd) processDatabase(dbPath string, ffmpegInstalled, magickInstal
 
 	rows, err := sqlDB.Query(query)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer rows.Close()
 
 	var media []ShrinkMedia
 	for rows.Next() {
 		var m ShrinkMedia
-		var fastHash, sha256 sql.NullString
-		var isShrinked sql.NullInt64
 		err := rows.Scan(&m.Path, &m.Size, &m.Duration, &m.VideoCount, &m.AudioCount,
-			&m.VideoCodecs, &m.AudioCodecs, &m.Type, &fastHash, &sha256, &isShrinked)
+			&m.VideoCodecs, &m.AudioCodecs, &m.SubtitleCodecs, &m.Type)
 		if err != nil {
 			slog.Error("Scan error", "error", err)
 			continue
-		}
-		if fastHash.Valid {
-			m.FastHash = fastHash.String
-		}
-		if sha256.Valid {
-			m.Sha256 = sha256.String
 		}
 		m.Ext = strings.ToLower(filepath.Ext(m.Path))
 		media = append(media, m)
 	}
 
-	if err = rows.Err(); err != nil {
-		return err
+	return media, rows.Err()
+}
+
+func (c *ShrinkCmd) filterByTools(media []ShrinkMedia, tools InstalledTools) []ShrinkMedia {
+	filtered := make([]ShrinkMedia, 0, len(media))
+
+	for _, m := range media {
+		canProcess := false
+		filetype := strings.ToLower(m.Type)
+
+		// Audio/Video
+		if ((strings.HasPrefix(filetype, "audio/") || strings.Contains(filetype, " audio")) ||
+			(utils.AudioExtensionMap[m.Ext] && m.VideoCount == 0)) ||
+			((strings.HasPrefix(filetype, "video/") || strings.Contains(filetype, " video")) ||
+				(utils.VideoExtensionMap[m.Ext] && m.VideoCount >= 1)) {
+			canProcess = tools.FFmpeg
+		}
+		// Image
+		if (strings.HasPrefix(filetype, "image/") || strings.Contains(filetype, " image")) ||
+			(utils.ImageExtensionMap[m.Ext] && m.Duration == 0) {
+			canProcess = tools.ImageMagick
+		}
+		// Text
+		if utils.TextExtensionMap[m.Ext] {
+			canProcess = tools.Calibre
+		}
+		// Archives
+		if strings.HasPrefix(filetype, "archive/") || utils.ArchiveExtensionMap[m.Ext] {
+			canProcess = tools.Unar
+		}
+
+		if canProcess {
+			filtered = append(filtered, m)
+		}
 	}
 
-	slog.Info("Found media to process", "count", len(media))
+	return filtered
+}
 
-	// Process media and calculate hashes
+func (c *ShrinkCmd) analyzeMedia(media []ShrinkMedia, cfg *ProcessorConfig,
+	registry *ProcessorRegistry, metrics *ShrinkMetrics) []ShrinkMedia {
+
 	var toShrink []ShrinkMedia
-	var hashWg sync.WaitGroup
-	hashSem := make(chan struct{}, c.HashThreads)
 
 	for i := range media {
 		m := &media[i]
-
-		// Calculate hashes if needed
-		if c.ForceRehash || m.FastHash == "" {
-			hashWg.Add(1)
-			go func(mediaItem *ShrinkMedia) {
-				defer hashWg.Done()
-				hashSem <- struct{}{}
-				defer func() { <-hashSem }()
-
-				// Calculate sample hash
-				h, err := utils.SampleHashFile(mediaItem.Path, c.HashThreads, c.HashGap, c.HashChunkSize)
-				if err == nil && h != "" {
-					mediaItem.FastHash = h
-					updateHash(sqlDB, mediaItem.Path, h, "", false)
-				}
-
-				// Calculate full hash
-				h, err = utils.FullHashFile(mediaItem.Path)
-				if err == nil && h != "" {
-					mediaItem.Sha256 = h
-					updateHash(sqlDB, mediaItem.Path, "", h, false)
-				}
-			}(m)
+		processor := registry.GetProcessor(m)
+		if processor == nil {
+			metrics.RecordSkipped("Unknown")
+			continue
 		}
 
-		// Check if file should be shrinked
-		if shouldShrink := c.checkShrink(m, ffmpegInstalled, magickInstalled,
-			minSavingsVideo, minSavingsAudio, minSavingsImage,
-			sourceAudioBitrate, sourceVideoBitrate,
-			targetAudioBitrate, targetVideoBitrate, targetImageSize); shouldShrink {
+		// Get processor's media type
+		m.MediaType = processor.MediaType()
+		metrics.RecordStarted(m.MediaType, m.Path)
+
+		// Estimate size and time
+		futureSize, processingTime := processor.EstimateSize(m, cfg)
+
+		// For archives, check if they contain processable content
+		if m.MediaType == "Archived" {
+			if archiveProc, ok := processor.(*ArchiveProcessor); ok {
+				var hasProcessable bool
+				futureSize, processingTime, hasProcessable = archiveProc.EstimateSizeForArchive(m, cfg)
+				if !hasProcessable {
+					metrics.RecordSkipped(m.MediaType)
+					continue
+				}
+				// Use compressed size for savings calculation
+				if m.CompressedSize > 0 {
+					m.Size = m.CompressedSize
+				}
+			}
+		}
+
+		// Check if we should shrink
+		if ShouldShrink(m, futureSize, cfg) {
+			m.FutureSize = futureSize
+			m.ProcessingTime = processingTime
+			m.Savings = m.Size - futureSize
 			toShrink = append(toShrink, *m)
+		} else {
+			metrics.RecordSkipped(m.MediaType)
 		}
 	}
 
-	hashWg.Wait()
+	return toShrink
+}
 
-	if c.OnlyHash {
-		slog.Info("Hash calculation complete")
-		return nil
+func (c *ShrinkCmd) applyContinueFrom(media []ShrinkMedia) []ShrinkMedia {
+	found := false
+	var filtered []ShrinkMedia
+
+	for _, m := range media {
+		if m.Path == c.ContinueFrom {
+			found = true
+		}
+		if found {
+			filtered = append(filtered, m)
+		}
 	}
 
-	if len(toShrink) == 0 {
-		slog.Info("No files to shrink")
-		return nil
-	}
+	return filtered
+}
 
-	// Sort by savings/processing_time ratio
-	sort.Slice(toShrink, func(i, j int) bool {
-		ratioI := float64(toShrink[i].Savings) / float64(max(toShrink[i].ProcessingTime, 1))
-		ratioJ := float64(toShrink[j].Savings) / float64(max(toShrink[j].ProcessingTime, 1))
+func (c *ShrinkCmd) sortByEfficiency(media []ShrinkMedia) {
+	sort.Slice(media, func(i, j int) bool {
+		timeI := max(media[i].ProcessingTime, 1)
+		timeJ := max(media[j].ProcessingTime, 1)
+		ratioI := float64(media[i].Savings) / float64(timeI)
+		ratioJ := float64(media[j].Savings) / float64(timeJ)
 		return ratioI > ratioJ
 	})
+}
 
-	// Print summary
-	var totalCurrentSize, totalFutureSize, totalSavings int64
-	for _, m := range toShrink {
-		totalCurrentSize += m.Size
-		totalFutureSize += m.FutureSize
+func (c *ShrinkCmd) printSummary(media []ShrinkMedia) {
+	var totalSize, totalFuture, totalSavings int64
+	for _, m := range media {
+		totalSize += m.Size
+		totalFuture += m.FutureSize
 		totalSavings += m.Savings
-		slog.Info("To shrink",
-			"path", m.Path,
-			"type", m.MediaType,
-			"current", utils.FormatSize(m.Size),
-			"future", utils.FormatSize(m.FutureSize),
-			"savings", utils.FormatSize(m.Savings))
 	}
 
 	slog.Info("Summary",
-		"current_size", utils.FormatSize(totalCurrentSize),
-		"future_size", utils.FormatSize(totalFutureSize),
-		"savings", utils.FormatSize(totalSavings),
-		"count", len(toShrink))
+		"count", len(media),
+		"current", utils.FormatSize(totalSize),
+		"future", utils.FormatSize(totalFuture),
+		"savings", utils.FormatSize(totalSavings))
+}
 
-	if c.Simulate {
-		slog.Info("Simulation mode - no files will be processed")
-		return nil
+func (c *ShrinkCmd) confirm() bool {
+	fmt.Print("Proceed with shrinking? [y/N] ")
+	var response string
+	fmt.Scanln(&response)
+	return strings.ToLower(response) == "y"
+}
+
+func (c *ShrinkCmd) processMedia(media []ShrinkMedia, registry *ProcessorRegistry,
+	cfg *ProcessorConfig, metrics *ShrinkMetrics) {
+
+	// Create worker pools
+	sems := map[string]chan struct{}{
+		"Video":    make(chan struct{}, c.VideoThreads),
+		"Audio":    make(chan struct{}, c.AudioThreads),
+		"Image":    make(chan struct{}, c.ImageThreads),
+		"Text":     make(chan struct{}, c.TextThreads),
+		"Archived": make(chan struct{}, 1),
 	}
 
-	if !c.NoConfirm {
-		fmt.Print("Proceed with shrinking? [y/N] ")
-		var response string
-		fmt.Scanln(&response)
-		if strings.ToLower(response) != "y" {
-			return nil
-		}
-	}
+	var wg sync.WaitGroup
+	done := make(chan struct{})
 
-	// Process files
-	var successCount, failCount int
-	for _, m := range toShrink {
-		slog.Info("Processing", "path", m.Path, "type", m.MediaType)
-
-		var err error
-		switch m.MediaType {
-		case "Audio":
-			err = c.shrinkAudio(m.Path, m.Duration, targetAudioBitrate)
-		case "Video":
-			err = c.shrinkVideo(m.Path, m.Duration, targetVideoBitrate)
-		case "Image":
-			err = c.shrinkImage(m.Path)
-		}
-
-		if err != nil {
-			slog.Error("Failed to process", "path", m.Path, "error", err)
-			failCount++
-			if c.MoveBroken != "" {
-				dest := filepath.Join(c.MoveBroken, filepath.Base(m.Path))
-				os.Rename(m.Path, dest)
-			}
-		} else {
-			successCount++
-			updateShrinkStatus(sqlDB, m.Path, true)
-			if c.Move != "" {
-				dest := filepath.Join(c.Move, filepath.Base(m.Path))
-				os.Rename(m.Path, dest)
+	// Progress printer goroutine
+	go func() {
+		ticker := time.NewTicker(200 * time.Millisecond)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				metrics.PrintProgress()
+			case <-done:
+				metrics.PrintProgress() // Final update
+				return
 			}
 		}
+	}()
+
+	for _, m := range media {
+		wg.Add(1)
+		go func(original ShrinkMedia) {
+			defer wg.Done()
+
+			sem := sems[original.MediaType]
+			if sem == nil {
+				sem = sems["Archived"]
+			}
+
+			sem <- struct{}{}
+			defer func() { <-sem }()
+
+			// Set current file for progress display
+			metrics.SetCurrentFile(original.Path)
+
+			c.processSingle(original, registry, cfg, metrics)
+
+			// Clear current file when done
+			metrics.SetCurrentFile("")
+		}(m)
 	}
 
-	slog.Info("Complete", "success", successCount, "failed", failCount)
-	return nil
+	wg.Wait()
+	close(done)
 }
 
-func (c *ShrinkCmd) checkShrink(m *ShrinkMedia, ffmpegInstalled, magickInstalled bool,
-	minSavingsVideo, minSavingsAudio, minSavingsImage float64,
-	sourceAudioBitrate, sourceVideoBitrate, targetAudioBitrate, targetVideoBitrate, targetImageSize int64,
-) bool {
-	if m.Size == 0 {
-		return false
+func (c *ShrinkCmd) processSingle(m ShrinkMedia, registry *ProcessorRegistry,
+	cfg *ProcessorConfig, metrics *ShrinkMetrics) []ProcessResult {
+
+	// Capture original timestamps before processing
+	var originalAtime, originalMtime time.Time
+	if stat, err := os.Stat(m.Path); err != nil {
+		// File doesn't exist - mark as deleted in DB
+		slog.Error("File not found", "path", m.Path)
+		metrics.RecordFailure(m.MediaType)
+		c.markDeleted(m.Path)
+		return []ProcessResult{{Path: m.Path, TimeDeleted: time.Now().Unix(), IsOriginal: true}}
+	} else {
+		originalAtime = stat.ModTime()
+		originalMtime = stat.ModTime()
 	}
 
-	filetype := strings.ToLower(m.Type)
-	ext := m.Ext
+	slog.Info("Processing",
+		"path", m.Path,
+		"type", m.MediaType,
+		"size", utils.FormatSize(m.Size))
 
-	// Audio files
-	if (strings.HasPrefix(filetype, "audio/") || strings.Contains(filetype, " audio")) ||
-		(utils.AudioExtensionMap[ext] && m.VideoCount == 0) {
+	processor := registry.GetProcessor(&m)
+	if processor == nil {
+		metrics.RecordFailure(m.MediaType)
+		return []ProcessResult{{Path: m.Path}}
+	}
 
-		if !ffmpegInstalled {
-			return false
+	ctx, cancel := context.WithTimeout(context.Background(), c.getTimeout(m))
+	defer cancel()
+
+	results := processor.Process(ctx, &m, cfg)
+
+	// Track overall success/failure for this input file
+	// and total size of new files created
+	var totalNewSize int64
+	var hasError bool
+
+	for i, result := range results {
+		if result.Error != nil {
+			hasError = true
+			slog.Error("Processing failed", "path", result.Path, "error", result.Error)
 		}
 
-		// Check if already opus
-		if strings.ToLower(m.AudioCodecs) == "opus" {
-			slog.Debug("Already opus", "path", m.Path)
-			return false
+		if result.TimeDeleted > 0 {
+			// File was deleted (broken/unplayable)
+			hasError = true
+			c.markDeleted(result.Path)
+			if cfg.MoveBroken != "" {
+				c.moveToBroken(result.Path)
+			}
+		} else if result.NewPath != "" && result.NewPath != result.Path {
+			// New file created
+			if result.Success {
+				totalNewSize += result.NewSize
+				// Add new file to database (for split files, archives, etc.)
+				c.addDatabaseEntry(result.NewPath, result.NewSize, m.Duration)
+				c.moveTo(result.NewPath)
+			} else {
+				hasError = true
+			}
+		} else if result.Success {
+			// Original file kept or path updated
+			if result.IsOriginal {
+				if result.NewPath != "" && result.NewPath != result.Path {
+					// Path changed (e.g., archive extraction) - update database
+					c.updateDatabase(result.Path, result.NewPath, result.NewSize, m.Duration)
+					c.moveTo(result.NewPath)
+				} else {
+					// Same path - just mark as shrinked
+					c.markShrinked(result.Path)
+					c.moveTo(result.Path)
+				}
+			}
 		}
 
+		// Apply original timestamps to the first successful output
+		if result.NewPath != "" && result.Success && i == 0 {
+			if !originalAtime.IsZero() {
+				applyTimestamps(result.NewPath, originalAtime, originalMtime)
+			}
+
+			// For audio/video, update duration from transcoded file
+			if m.MediaType == "Audio" || m.MediaType == "Video" {
+				if newDuration := c.getActualDuration(result.NewPath); newDuration > 0 {
+					m.Duration = newDuration
+					slog.Debug("Updated duration from transcoded file",
+						"path", result.NewPath, "duration", newDuration)
+				}
+			}
+		}
+	}
+
+	// Record metrics: one input file = one success or one failure
+	if hasError {
+		metrics.RecordFailure(m.MediaType)
+	} else {
+		metrics.RecordSuccess(m.MediaType, m.Size, totalNewSize, m.ProcessingTime, int64(m.Duration))
+	}
+
+	return results
+}
+
+// getActualDuration probes a file and returns its actual duration
+func (c *ShrinkCmd) getActualDuration(path string) float64 {
+	cmd := exec.Command("ffprobe",
+		"-v", "quiet",
+		"-print_format", "json",
+		"-show_format",
+		path)
+	output, err := cmd.Output()
+	if err != nil {
+		return 0
+	}
+
+	var result struct {
+		Format struct {
+			Duration string `json:"duration"`
+		} `json:"format"`
+	}
+	if err := json.Unmarshal(output, &result); err != nil {
+		return 0
+	}
+
+	duration, _ := strconv.ParseFloat(result.Format.Duration, 64)
+	return duration
+}
+
+func (c *ShrinkCmd) getTimeout(m ShrinkMedia) time.Duration {
+	switch m.MediaType {
+	case "Video":
+		duration := utils.GetDurationForTimeout(m.Duration, m.Size, m.Ext)
+		if duration > 30 {
+			return time.Duration(duration*c.VideoTimeoutMult) * time.Second
+		}
+		return utils.ParseDurationString(c.VideoTimeout)
+	case "Audio":
 		duration := m.Duration
-		if duration <= 0 {
-			duration = float64(m.Size) / float64(sourceAudioBitrate) * 8
+		if duration > 30 {
+			return time.Duration(duration*c.AudioTimeoutMult) * time.Second
 		}
-
-		futureSize := int64(duration * float64(targetAudioBitrate) / 8)
-		shouldShrinkBuffer := int64(float64(futureSize) * minSavingsAudio)
-
-		m.MediaType = "Audio"
-		m.FutureSize = futureSize
-		m.Savings = m.Size - futureSize
-		m.ProcessingTime = int(math.Ceil(duration / c.TranscodingAudioRate))
-
-		canShrink := m.Size > (futureSize + shouldShrinkBuffer)
-		return canShrink
+		return utils.ParseDurationString(c.AudioTimeout)
+	case "Image":
+		return utils.ParseDurationString(c.ImageTimeout)
+	case "Text":
+		return utils.ParseDurationString(c.TextTimeout)
+	default:
+		return 30 * time.Minute
 	}
-
-	// Video files
-	if (strings.HasPrefix(filetype, "video/") || strings.Contains(filetype, " video")) ||
-		(utils.VideoExtensionMap[ext] && m.VideoCount >= 1) {
-
-		if !ffmpegInstalled {
-			return false
-		}
-
-		// Check if already AV1
-		if strings.ToLower(m.VideoCodecs) == "av1" {
-			slog.Debug("Already AV1", "path", m.Path)
-			return false
-		}
-
-		duration := m.Duration
-		if duration <= 0 {
-			duration = float64(m.Size) / float64(sourceVideoBitrate) * 8
-		}
-
-		futureSize := int64(duration * float64(targetVideoBitrate) / 8)
-		shouldShrinkBuffer := int64(float64(futureSize) * minSavingsVideo)
-
-		m.MediaType = "Video"
-		m.FutureSize = futureSize
-		m.Savings = m.Size - futureSize
-		m.ProcessingTime = int(math.Ceil(duration / c.TranscodingVideoRate))
-
-		canShrink := m.Size > (futureSize + shouldShrinkBuffer)
-		return canShrink
-	}
-
-	// Image files
-	if (strings.HasPrefix(filetype, "image/") || strings.Contains(filetype, " image")) ||
-		(utils.ImageExtensionMap[ext] && m.Duration == 0) {
-
-		if !magickInstalled {
-			return false
-		}
-
-		// Skip existing AVIF
-		if ext == ".avif" {
-			slog.Debug("Already AVIF", "path", m.Path)
-			return false
-		}
-
-		futureSize := targetImageSize
-		shouldShrinkBuffer := int64(float64(futureSize) * minSavingsImage)
-
-		m.MediaType = "Image"
-		m.FutureSize = futureSize
-		m.Savings = m.Size - futureSize
-		m.ProcessingTime = int(c.TranscodingImageTime)
-
-		canShrink := m.Size > (futureSize + shouldShrinkBuffer)
-		return canShrink
-	}
-
-	return false
 }
 
-func (c *ShrinkCmd) shrinkAudio(path string, duration float64, targetBitrate int64) error {
-	outputPath := path + ".tmp.mka"
-	args := []string{
-		"-y",
-		"-i", path,
-		"-c:a", "libopus",
-		"-b:a", fmt.Sprintf("%dk", targetBitrate/1000),
-		"-ar", "48000",
-		"-ac", "2",
-		"-af", "loudnorm=i=-18:tp=-3:lra=17",
-		outputPath,
+func (c *ShrinkCmd) markDeleted(path string) {
+	for _, dbPath := range c.Databases {
+		sqlDB, _, err := db.ConnectWithInit(dbPath)
+		if err == nil {
+			_, _ = sqlDB.Exec("UPDATE media SET time_deleted = ? WHERE path = ?", time.Now().Unix(), path)
+			sqlDB.Close()
+		}
 	}
-
-	cmd := exec.Command("ffmpeg", args...)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		slog.Error("FFmpeg error", "output", string(output))
-		return err
-	}
-
-	// Replace original file
-	os.Rename(path, path+".bak")
-	os.Rename(outputPath, path)
-	os.Remove(path + ".bak")
-
-	return nil
 }
 
-func (c *ShrinkCmd) shrinkVideo(path string, duration float64, targetBitrate int64) error {
-	outputPath := path + ".tmp.mkv"
-	args := []string{
-		"-y",
-		"-i", path,
-		"-c:v", "libsvtav1",
-		"-preset", c.Preset,
-		"-crf", c.CRF,
-		"-pix_fmt", "yuv420p10le",
-		"-svtav1-params", "tune=0:enable-overlays=1",
-		"-vf", fmt.Sprintf("scale=%d:-2", c.MaxVideoWidth),
-		"-c:a", "libopus",
-		"-b:a", "128k",
-		"-ar", "48000",
-		"-ac", "2",
-		"-af", "loudnorm=i=-18:tp=-3:lra=17",
-		outputPath,
+func (c *ShrinkCmd) moveToBroken(path string) {
+	if c.MoveBroken != "" && path != "" {
+		if _, err := os.Stat(path); err == nil {
+			dest := filepath.Join(c.MoveBroken, filepath.Base(path))
+			os.MkdirAll(c.MoveBroken, 0755)
+			os.Rename(path, dest)
+		}
 	}
-
-	cmd := exec.Command("ffmpeg", args...)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		slog.Error("FFmpeg error", "output", string(output))
-		return err
-	}
-
-	// Replace original file
-	os.Rename(path, path+".bak")
-	os.Rename(outputPath, path)
-	os.Remove(path + ".bak")
-
-	return nil
 }
 
-func (c *ShrinkCmd) shrinkImage(path string) error {
-	outputPath := path + ".tmp.avif"
-	args := []string{
-		"convert", path,
-		"-resize", fmt.Sprintf("%dx%d>", c.MaxImageWidth, c.MaxImageHeight),
-		"-quality", "80",
-		outputPath,
+func (c *ShrinkCmd) updateDatabase(oldPath, newPath string, newSize int64, duration float64) {
+	for _, dbPath := range c.Databases {
+		sqlDB, _, err := db.ConnectWithInit(dbPath)
+		if err == nil {
+			_, _ = sqlDB.Exec("DELETE FROM media WHERE path = ?", newPath)
+			if duration > 0 {
+				_, _ = sqlDB.Exec(
+					"UPDATE media SET path = ?, size = ?, duration = ? WHERE path = ?",
+					newPath, newSize, duration, oldPath)
+			} else {
+				_, _ = sqlDB.Exec(
+					"UPDATE media SET path = ?, size = ? WHERE path = ?",
+					newPath, newSize, oldPath)
+			}
+			sqlDB.Close()
+		}
 	}
-
-	cmd := exec.Command("magick", args...)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		slog.Error("ImageMagick error", "output", string(output))
-		return err
-	}
-
-	// Replace original file
-	os.Rename(path, path+".bak")
-	os.Rename(outputPath, path)
-	os.Remove(path + ".bak")
-
-	return nil
 }
 
-func updateHash(db *sql.DB, path, fastHash, sha256 string, isDeduped bool) {
-	query := "UPDATE media SET "
-	updates := []string{}
-	args := []any{}
+// addDatabaseEntry adds a new file entry to the database (for split files or archive contents)
+func (c *ShrinkCmd) addDatabaseEntry(path string, size int64, duration float64) {
+	for _, dbPath := range c.Databases {
+		sqlDB, _, err := db.ConnectWithInit(dbPath)
+		if err == nil {
+			_, _ = sqlDB.Exec("DELETE FROM media WHERE path = ?", path)
+			if duration > 0 {
+				_, _ = sqlDB.Exec(
+					"INSERT INTO media (path, size, duration, time_deleted, is_shrinked) VALUES (?, ?, ?, 0, 0)",
+					path, size, duration)
+			} else {
+				_, _ = sqlDB.Exec(
+					"INSERT INTO media (path, size, time_deleted, is_shrinked) VALUES (?, ?, 0, 0)",
+					path, size)
+			}
+			sqlDB.Close()
+		}
+	}
+}
 
-	if fastHash != "" {
-		updates = append(updates, "fasthash = ?")
-		args = append(args, fastHash)
+func (c *ShrinkCmd) markShrinked(path string) {
+	for _, dbPath := range c.Databases {
+		sqlDB, _, err := db.ConnectWithInit(dbPath)
+		if err == nil {
+			_, _ = sqlDB.Exec("UPDATE media SET is_shrinked = 1 WHERE path = ?", path)
+			sqlDB.Close()
+		}
 	}
-	if sha256 != "" {
-		updates = append(updates, "sha256 = ?")
-		args = append(args, sha256)
+}
+
+func (c *ShrinkCmd) moveTo(path string) {
+	if c.Move != "" && path != "" {
+		dest := filepath.Join(c.Move, filepath.Base(path))
+		os.Rename(path, dest)
 	}
-	if isDeduped {
-		updates = append(updates, "is_deduped = 1")
+}
+
+// InstalledTools tracks which external tools are available
+type InstalledTools struct {
+	FFmpeg      bool
+	ImageMagick bool
+	Calibre     bool
+	Unar        bool
+}
+
+func (c *ShrinkCmd) checkInstalledTools() InstalledTools {
+	tools := InstalledTools{
+		FFmpeg:      utils.CommandExists("ffmpeg"),
+		ImageMagick: utils.CommandExists("magick"),
+		Calibre:     utils.CommandExists("ebook-convert"),
+		Unar:        utils.CommandExists("lsar"),
 	}
 
-	if len(updates) == 0 {
+	if !tools.FFmpeg {
+		slog.Warn("ffmpeg not installed. Video and Audio files will be skipped")
+	}
+	if !tools.ImageMagick {
+		slog.Warn("ImageMagick not installed. Image files will be skipped")
+	}
+	if !tools.Calibre {
+		slog.Warn("Calibre not installed. Text files will be skipped")
+	}
+	if !tools.Unar {
+		slog.Warn("unar not installed. Archives will not be extracted")
+	}
+
+	return tools
+}
+
+// applyTimestamps applies timestamps to a file or folder (recursively for folders)
+func applyTimestamps(path string, atime, mtime time.Time) {
+	// Apply to the path itself
+	os.Chtimes(path, atime, mtime)
+
+	// If it's a directory, walk and apply to all contents
+	info, err := os.Stat(path)
+	if err != nil || !info.IsDir() {
 		return
 	}
 
-	query += strings.Join(updates, ", ") + " WHERE path = ?"
-	args = append(args, path)
-
-	_, err := db.Exec(query, args...)
-	if err != nil {
-		slog.Error("Failed to update hash", "path", path, "error", err)
-	}
-}
-
-func updateShrinkStatus(db *sql.DB, path string, isShrinked bool) {
-	_, err := db.Exec("UPDATE media SET is_shrinked = 1 WHERE path = ?", path)
-	if err != nil {
-		slog.Error("Failed to update shrink status", "path", path, "error", err)
-	}
+	filepath.Walk(path, func(p string, info os.FileInfo, err error) error {
+		if err != nil {
+			return nil
+		}
+		os.Chtimes(p, atime, mtime)
+		return nil
+	})
 }
