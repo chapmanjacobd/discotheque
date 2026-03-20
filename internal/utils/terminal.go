@@ -72,12 +72,6 @@ func GetPathDisplayWidth() int {
 	width := GetTerminalWidth()
 	// Reserve space for table columns (about 70 chars for table)
 	// Use remaining space for path, but cap at reasonable length
-	pathWidth := width - 70
-	if pathWidth < 40 {
-		pathWidth = 40
-	}
-	if pathWidth > 80 {
-		pathWidth = 80
-	}
+	pathWidth := min(max(width-70, 40), 80)
 	return pathWidth
 }

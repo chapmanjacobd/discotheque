@@ -2,20 +2,19 @@ package commands
 
 import (
 	"testing"
-	"time"
 )
 
 func TestMediaTypeStats(t *testing.T) {
 	stats := &MediaTypeStats{
-		Total:          10,
-		Processed:      5,
-		Success:        4,
-		Failed:         1,
-		Skipped:        2,
-		TotalSize:      1000,
-		FutureSize:     600,
-		TotalTime:      100,
-		TotalDuration:  200,
+		Total:         10,
+		Processed:     5,
+		Success:       4,
+		Failed:        1,
+		Skipped:       2,
+		TotalSize:     1000,
+		FutureSize:    600,
+		TotalTime:     100,
+		TotalDuration: 200,
 	}
 
 	if got := stats.SuccessRate(); got != 80.0 {
@@ -88,7 +87,7 @@ func TestShrinkMetricsTiming(t *testing.T) {
 	if m.started.IsZero() {
 		t.Error("started time should be set")
 	}
-	
+
 	m.SetCurrentFile("processing.mp4")
 	if m.currentFile != "processing.mp4" {
 		t.Errorf("Expected currentFile processing.mp4, got %s", m.currentFile)

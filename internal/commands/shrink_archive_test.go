@@ -30,12 +30,13 @@ func TestArchiveProcessor_NestedArchives(t *testing.T) {
 	// outer.zip contains inner.zip
 
 	innerDir := filepath.Join(fixture.TempDir, "inner")
-	os.MkdirAll(innerDir, 0755)
-	imagePath := filepath.Join(innerDir, "image.jpg")
-	// Valid JPEG header
-	jpegHeader := []byte{0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46, 0x00, 0x01, 0x01, 0x01, 0x00, 0x60, 0x00, 0x60, 0x00, 0x00}
-	data := append(jpegHeader, make([]byte, 100*1024)...)
-	os.WriteFile(imagePath, data, 0644) // ~100KB image
+	os.MkdirAll(innerDir, 0o755)
+	imagePath := filepath.Join(innerDir, "image.png")
+
+	// Create a real PNG using magick
+	if err := exec.Command("magick", "-size", "100x100", "xc:white", imagePath).Run(); err != nil {
+		t.Fatalf("Failed to create test image with magick: %v", err)
+	}
 
 	innerZip := filepath.Join(fixture.TempDir, "inner.zip")
 	if err := exec.Command("zip", "-j", innerZip, imagePath).Run(); err != nil {
@@ -67,10 +68,12 @@ func TestArchiveProcessor_NestedArchives(t *testing.T) {
 	}
 
 	t.Run("EstimateSize", func(t *testing.T) {
+		// Mock lsar behavior for the test if it fails to detect media types from extensionless files
+		// but here we gave it image.png, so it should be fine.
 		futureSize, processingTime, hasProcessable := processor.EstimateSizeForArchive(m, cfg)
-		
+
 		t.Logf("FutureSize: %d, ProcessingTime: %d, HasProcessable: %v", futureSize, processingTime, hasProcessable)
-		
+
 		// If it handled nested archives, it should have found the image inside inner.zip
 		if !hasProcessable {
 			t.Errorf("Expected hasProcessable to be true for nested archive containing image")
@@ -87,32 +90,25 @@ func TestArchiveProcessor_NestedArchives(t *testing.T) {
 
 		imageProc := NewImageProcessor()
 		ctx := context.Background()
-		results := processor.ExtractAndProcess(ctx, m, cfg, imageProc)
+		result := processor.ExtractAndProcess(ctx, m, cfg, imageProc)
 
-		if len(results) == 0 {
-			t.Fatalf("ExtractAndProcess returned no results")
+		if !result.Success {
+			t.Fatalf("ExtractAndProcess failed: %v", result.Error)
 		}
 
 		// Check for success
-		hasSuccess := false
-		for _, result := range results {
-			if result.Success {
-				hasSuccess = true
-				t.Logf("Result: Path=%s, NewPath=%s, Success=%v", result.Path, result.NewPath, result.Success)
-			}
-		}
-
-		if !hasSuccess {
-			t.Errorf("Expected at least one successful result")
-		}
+		t.Logf("Result: SourcePath=%s, Outputs=%d, Success=%v", result.SourcePath, len(result.Outputs), result.Success)
 
 		// Check if inner.zip was extracted and image.avif was created
 		// The path should be: fixture.TempDir/outer.zip.extracted/inner.zip.extracted/image.avif
-		avifPath := filepath.Join(results[0].NewPath, "inner.zip.extracted", "image.avif")
+		if len(result.Outputs) == 0 {
+			t.Fatalf("Expected at least one output")
+		}
+		avifPath := filepath.Join(result.Outputs[0].Path, "inner.zip.extracted", "image.avif")
 		if _, err := os.Stat(avifPath); err != nil {
 			t.Errorf("Expected avif file not found at %s: %v", avifPath, err)
 			// Check directory content to see what happened
-			filepath.Walk(results[0].NewPath, func(path string, info os.FileInfo, err error) error {
+			filepath.Walk(result.Outputs[0].Path, func(path string, info os.FileInfo, err error) error {
 				t.Logf("Found file: %s", path)
 				return nil
 			})

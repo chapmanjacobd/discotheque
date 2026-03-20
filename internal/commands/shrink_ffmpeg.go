@@ -11,7 +11,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/chapmanjacobd/discoteca/internal/utils"
 )
@@ -27,10 +26,10 @@ func NewFFmpegProcessor(cfg *ProcessorConfig) *FFmpegProcessor {
 }
 
 // Process executes FFmpeg transcoding for audio/video files
-func (p *FFmpegProcessor) Process(ctx context.Context, m *ShrinkMedia, cfg *ProcessorConfig) []ProcessResult {
+func (p *FFmpegProcessor) Process(ctx context.Context, m *ShrinkMedia, cfg *ProcessorConfig) ProcessResult {
 	// Check if FFmpeg is available
 	if !utils.CommandExists("ffmpeg") {
-		return []ProcessResult{{Path: m.Path, Error: fmt.Errorf("ffmpeg not installed")}}
+		return ProcessResult{SourcePath: m.Path, Error: fmt.Errorf("ffmpeg not installed")}
 	}
 
 	// Probe the file
@@ -38,20 +37,18 @@ func (p *FFmpegProcessor) Process(ctx context.Context, m *ShrinkMedia, cfg *Proc
 	if err != nil {
 		if cfg.DeleteUnplayable {
 			slog.Warn("Deleting unplayable (ffprobe failed)", "path", m.Path)
-			os.Remove(m.Path)
-			return []ProcessResult{{Path: m.Path, TimeDeleted: time.Now().Unix(), IsOriginal: true}}
+			return ProcessResult{SourcePath: m.Path, ToDelete: []string{m.Path}, Success: false, Error: err}
 		}
-		return []ProcessResult{{Path: m.Path, Error: err}}
+		return ProcessResult{SourcePath: m.Path, Error: err}
 	}
 
 	// Check for streams
 	if len(probe.Streams) == 0 {
 		slog.Error("No media streams", "path", m.Path)
 		if cfg.DeleteUnplayable {
-			os.Remove(m.Path)
-			return []ProcessResult{{Path: m.Path, TimeDeleted: time.Now().Unix(), IsOriginal: true}}
+			return ProcessResult{SourcePath: m.Path, ToDelete: []string{m.Path}, Success: false, Error: fmt.Errorf("no media streams")}
 		}
-		return []ProcessResult{{Path: m.Path, Error: fmt.Errorf("no media streams")}}
+		return ProcessResult{SourcePath: m.Path, Error: fmt.Errorf("no media streams")}
 	}
 
 	// Handle animated images (GIF/webp with audio)
@@ -59,10 +56,9 @@ func (p *FFmpegProcessor) Process(ctx context.Context, m *ShrinkMedia, cfg *Proc
 		isAnimation := p.isAnimationFromProbe(probe)
 		if isAnimation == nil {
 			if cfg.DeleteUnplayable {
-				os.Remove(m.Path)
-				return []ProcessResult{{Path: m.Path, TimeDeleted: time.Now().Unix(), IsOriginal: true}}
+				return ProcessResult{SourcePath: m.Path, ToDelete: []string{m.Path}, Success: false, Error: fmt.Errorf("could not determine animation status")}
 			}
-			return []ProcessResult{{Path: m.Path, Error: fmt.Errorf("could not determine animation status")}}
+			return ProcessResult{SourcePath: m.Path, Error: fmt.Errorf("could not determine animation status")}
 		}
 		if !*isAnimation {
 			// Process as static image
@@ -80,32 +76,30 @@ func (p *FFmpegProcessor) Process(ctx context.Context, m *ShrinkMedia, cfg *Proc
 	// Stream validation
 	if videoStream == nil {
 		if cfg.DeleteNoVideo {
-			os.Remove(m.Path)
-			return []ProcessResult{{Path: m.Path, TimeDeleted: time.Now().Unix(), IsOriginal: true}}
+			return ProcessResult{SourcePath: m.Path, ToDelete: []string{m.Path}, Success: false, Error: fmt.Errorf("no video stream")}
 		}
 		if cfg.VideoOnly {
-			return []ProcessResult{{Path: m.Path}}
+			return ProcessResult{SourcePath: m.Path, Success: true}
 		}
 	}
 
 	if audioStream == nil {
 		if cfg.DeleteNoAudio {
-			os.Remove(m.Path)
-			return []ProcessResult{{Path: m.Path, TimeDeleted: time.Now().Unix(), IsOriginal: true}}
+			return ProcessResult{SourcePath: m.Path, ToDelete: []string{m.Path}, Success: false, Error: fmt.Errorf("no audio stream")}
 		}
 		if cfg.AudioOnly {
-			return []ProcessResult{{Path: m.Path}}
+			return ProcessResult{SourcePath: m.Path, Success: true}
 		}
 	}
 
 	// Check if already encoded optimally
 	if videoStream != nil && videoStream.CodecName == "av1" {
 		slog.Info("Already AV1", "path", m.Path)
-		return []ProcessResult{{Path: m.Path, Success: true, IsOriginal: true}}
+		return ProcessResult{SourcePath: m.Path, Success: true, Outputs: []ProcessOutputFile{{Path: m.Path, Size: m.Size}}}
 	}
 	if audioStream != nil && audioStream.CodecName == "opus" && videoStream == nil {
 		slog.Info("Already Opus", "path", m.Path)
-		return []ProcessResult{{Path: m.Path, Success: true, IsOriginal: true}}
+		return ProcessResult{SourcePath: m.Path, Success: true, Outputs: []ProcessOutputFile{{Path: m.Path, Size: m.Size}}}
 	}
 
 	// Determine output suffix
@@ -133,12 +127,12 @@ func (p *FFmpegProcessor) Process(ctx context.Context, m *ShrinkMedia, cfg *Proc
 
 		if isEnvError {
 			// Environment errors should be re-raised (they're not file-specific)
-			return []ProcessResult{{Path: m.Path, Error: fmt.Errorf("ffmpeg environment error: %w", err)}}
+			return ProcessResult{SourcePath: m.Path, Error: fmt.Errorf("ffmpeg environment error: %w", err)}
 		} else if isUnsupported {
 			// Unsupported codec/format - remove transcode attempt and return original
 			os.Remove(outputPath)
 			slog.Info("Unsupported format, keeping original", "path", m.Path)
-			return []ProcessResult{{Path: m.Path}}
+			return ProcessResult{SourcePath: m.Path, Success: true, Outputs: []ProcessOutputFile{{Path: m.Path, Size: m.Size}}}
 		} else if isFileError {
 			// File-specific error - continue processing (may be recoverable)
 			slog.Warn("FFmpeg file error", "output", string(output), "path", m.Path)
@@ -147,10 +141,9 @@ func (p *FFmpegProcessor) Process(ctx context.Context, m *ShrinkMedia, cfg *Proc
 		}
 
 		if p.config.DeleteUnplayable {
-			os.Remove(m.Path)
-			return []ProcessResult{{Path: m.Path, TimeDeleted: time.Now().Unix(), IsOriginal: true}}
+			return ProcessResult{SourcePath: m.Path, ToDelete: []string{m.Path}, Success: false, Error: err}
 		}
-		return []ProcessResult{{Path: m.Path, Error: err}}
+		return ProcessResult{SourcePath: m.Path, Error: err}
 	}
 
 	// Validate transcode (may return multiple results if splitting was used)
@@ -161,7 +154,7 @@ func (p *FFmpegProcessor) Process(ctx context.Context, m *ShrinkMedia, cfg *Proc
 func (p *FFmpegProcessor) isUnsupportedError(errorLog []string) bool {
 	unsupportedPatterns := []string{
 		"not implemented", "unsupported", "no codec", "unknown codec",
-		"encoder not found", "decoder not found", "incompatible",
+		"encoder not found", "decoder not found", "incompatible", "unknown encoder",
 	}
 	for _, line := range errorLog {
 		lineLower := strings.ToLower(line)
@@ -210,8 +203,8 @@ func (p *FFmpegProcessor) isEnvironmentError(errorLog []string) bool {
 
 // buildFFmpegArgs constructs the FFmpeg command arguments
 func (p *FFmpegProcessor) buildFFmpegArgs(inputPath, outputPath string, probe *FFProbeResult,
-	videoStream, audioStream, subtitleStream, albumArtStream *FFProbeStream) []string {
-
+	videoStream, audioStream, subtitleStream, albumArtStream *FFProbeStream,
+) []string {
 	// Build base command
 	logLevel := []string{"-hide_banner", "-loglevel", "warning"}
 	if p.config.VerboseFFmpeg {
@@ -439,25 +432,24 @@ func (p *FFmpegProcessor) buildScaleFilter(stereoMode string, width, height int)
 }
 
 // validateTranscode validates the transcoded output
-// Returns multiple ProcessResult if the output was split into multiple files
-func (p *FFmpegProcessor) validateTranscode(m ShrinkMedia, outputPath string, originalProbe *FFProbeResult) []ProcessResult {
+func (p *FFmpegProcessor) validateTranscode(m ShrinkMedia, outputPath string, originalProbe *FFProbeResult) ProcessResult {
 	// Check if output is a split file pattern (contains %03d)
 	isSplit := strings.Contains(outputPath, "%03d")
 
 	if !isSplit {
 		// Single file output - original logic
 		if _, err := os.Stat(outputPath); os.IsNotExist(err) {
-			return []ProcessResult{{Path: m.Path}}
+			return ProcessResult{SourcePath: m.Path, Success: false}
 		}
 
 		outputStats, err := os.Stat(outputPath)
 		if err != nil {
-			return []ProcessResult{{Path: m.Path}}
+			return ProcessResult{SourcePath: m.Path, Success: false}
 		}
 
 		originalStats, err := os.Stat(m.Path)
 		if err != nil {
-			return []ProcessResult{{Path: m.Path}}
+			return ProcessResult{SourcePath: m.Path, Success: false}
 		}
 
 		deleteTranscode := false
@@ -486,49 +478,47 @@ func (p *FFmpegProcessor) validateTranscode(m ShrinkMedia, outputPath string, or
 
 		if deleteTranscode {
 			if p.config.DeleteUnplayable {
-				os.Remove(m.Path)
-				return []ProcessResult{{Path: m.Path, TimeDeleted: time.Now().Unix(), IsOriginal: true}}
+				return ProcessResult{SourcePath: m.Path, ToDelete: []string{m.Path}, Success: false}
 			}
 			os.Remove(outputPath)
-			return []ProcessResult{{Path: m.Path}}
+			return ProcessResult{SourcePath: m.Path, Success: false}
 		}
 
 		// Don't delete original if extracting audio from video and --no-preserve-video is not set
-		if originalProbe.VideoStreams != nil && len(originalProbe.VideoStreams) > 0 &&
+		if len(originalProbe.VideoStreams) > 0 &&
 			p.config.AudioOnly && !p.config.NoPreserveVideo {
 			deleteLarger = false
 		}
 
+		toDelete := []string{}
 		if deleteLarger {
-			os.Remove(m.Path)
+			toDelete = append(toDelete, m.Path)
 		}
 
-		return []ProcessResult{{
-			Path:      m.Path,
-			NewPath:   outputPath,
-			NewSize:   outputStats.Size(),
-			Success:   true,
-			IsOriginal: true,
-		}}
+		return ProcessResult{
+			SourcePath: m.Path,
+			Outputs:    []ProcessOutputFile{{Path: outputPath, Size: outputStats.Size()}},
+			ToDelete:   toDelete,
+			ToMove:     []string{outputPath},
+			Success:    true,
+		}
 	}
 
 	// Split file output - find all generated files
-	var results []ProcessResult
 	pattern := strings.Replace(outputPath, "%03d", "*", 1)
 	matches, err := filepath.Glob(pattern)
 	if err != nil || len(matches) == 0 {
 		// No split files found - treat as failure
 		if p.config.DeleteUnplayable {
-			os.Remove(m.Path)
-			return []ProcessResult{{Path: m.Path, TimeDeleted: time.Now().Unix(), IsOriginal: true}}
+			return ProcessResult{SourcePath: m.Path, ToDelete: []string{m.Path}, Success: false}
 		}
-		return []ProcessResult{{Path: m.Path, Error: fmt.Errorf("no split files found")}}
+		return ProcessResult{SourcePath: m.Path, Error: fmt.Errorf("no split files found")}
 	}
 
 	// Validate each split file
 	var totalNewSize int64
 	var hasInvalidFile bool
-	var validFiles []string
+	var validFiles []ProcessOutputFile
 
 	for _, match := range matches {
 		stats, err := os.Stat(match)
@@ -537,7 +527,7 @@ func (p *FFmpegProcessor) validateTranscode(m ShrinkMedia, outputPath string, or
 			break
 		}
 		totalNewSize += stats.Size()
-		validFiles = append(validFiles, match)
+		validFiles = append(validFiles, ProcessOutputFile{Path: match, Size: stats.Size()})
 	}
 
 	if hasInvalidFile {
@@ -546,10 +536,9 @@ func (p *FFmpegProcessor) validateTranscode(m ShrinkMedia, outputPath string, or
 			os.Remove(match)
 		}
 		if p.config.DeleteUnplayable {
-			os.Remove(m.Path)
-			return []ProcessResult{{Path: m.Path, TimeDeleted: time.Now().Unix(), IsOriginal: true}}
+			return ProcessResult{SourcePath: m.Path, ToDelete: []string{m.Path}, Success: false}
 		}
-		return []ProcessResult{{Path: m.Path, Error: fmt.Errorf("invalid split file")}}
+		return ProcessResult{SourcePath: m.Path, Error: fmt.Errorf("invalid split file")}
 	}
 
 	// Check total size vs original
@@ -565,34 +554,23 @@ func (p *FFmpegProcessor) validateTranscode(m ShrinkMedia, outputPath string, or
 		deleteLarger = false
 	}
 
+	toDelete := []string{}
 	if deleteLarger {
-		os.Remove(m.Path)
+		toDelete = append(toDelete, m.Path)
 	}
 
-	// Add result for original file (marked as deleted/replaced)
-	results = append(results, ProcessResult{
-		Path:       m.Path,
-		NewPath:    "", // Original is deleted, replaced by split files
+	toMove := []string{}
+	for _, vf := range validFiles {
+		toMove = append(toMove, vf.Path)
+	}
+
+	return ProcessResult{
+		SourcePath: m.Path,
+		Outputs:    validFiles,
+		ToDelete:   toDelete,
+		ToMove:     toMove,
 		Success:    true,
-		IsOriginal: true,
-	})
-
-	// Add result for each split file
-	for _, validFile := range validFiles {
-		stats, err := os.Stat(validFile)
-		if err != nil {
-			continue
-		}
-		results = append(results, ProcessResult{
-			Path:       validFile,
-			NewPath:    validFile,
-			NewSize:    stats.Size(),
-			Success:    true,
-			IsOriginal: false,
-		})
 	}
-
-	return results
 }
 
 // ffprobe probes a media file and returns metadata

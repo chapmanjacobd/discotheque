@@ -37,5 +37,11 @@ CREATE TABLE IF NOT EXISTS media (
 
     -- Metadata
     time_downloaded INTEGER, -- Repurposed as Time First Scanned
-    score REAL
+    score REAL,
+
+    -- Hash and processing status
+    fasthash TEXT,         -- Sample hash for quick deduplication
+    sha256 TEXT,           -- Full SHA256 hash for exact deduplication
+    is_deduped INTEGER DEFAULT 0,  -- Whether file has been deduplicated
+    is_shrinked INTEGER DEFAULT 0  -- Whether file has been shrunk/optimized
 ) STRICT;

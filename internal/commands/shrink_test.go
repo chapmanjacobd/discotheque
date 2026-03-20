@@ -66,7 +66,7 @@ func TestLoadMediaFromDB(t *testing.T) {
 func TestSortByEfficiency(t *testing.T) {
 	c := &ShrinkCmd{}
 	media := []ShrinkMedia{
-		{Path: "low", Savings: 100, ProcessingTime: 100},   // Ratio: 1
+		{Path: "low", Savings: 100, ProcessingTime: 100},  // Ratio: 1
 		{Path: "high", Savings: 1000, ProcessingTime: 10}, // Ratio: 100
 		{Path: "mid", Savings: 500, ProcessingTime: 50},   // Ratio: 10
 	}
@@ -144,7 +144,7 @@ func TestApplyTimestamps(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	filePath := filepath.Join(tmpDir, "file.txt")
-	if err := os.WriteFile(filePath, []byte("test"), 0644); err != nil {
+	if err := os.WriteFile(filePath, []byte("test"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -304,10 +304,10 @@ func TestArchiveProcessorCanProcess(t *testing.T) {
 	p := NewArchiveProcessor()
 
 	tests := []struct {
-		name string
-		ext  string
+		name  string
+		ext   string
 		mtype string
-		want bool
+		want  bool
 	}{
 		{"Zip by extension", ".zip", "application/zip", true},
 		{"Rar by extension", ".rar", "application/x-rar", true},

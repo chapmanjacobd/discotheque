@@ -333,8 +333,8 @@ func (c *ShrinkCmd) filterByTools(media []ShrinkMedia, tools InstalledTools) []S
 }
 
 func (c *ShrinkCmd) analyzeMedia(media []ShrinkMedia, cfg *ProcessorConfig,
-	registry *ProcessorRegistry, metrics *ShrinkMetrics) []ShrinkMedia {
-
+	registry *ProcessorRegistry, metrics *ShrinkMetrics,
+) []ShrinkMedia {
 	var toShrink []ShrinkMedia
 
 	for i := range media {
@@ -431,8 +431,8 @@ func (c *ShrinkCmd) confirm() bool {
 }
 
 func (c *ShrinkCmd) processMedia(media []ShrinkMedia, registry *ProcessorRegistry,
-	cfg *ProcessorConfig, metrics *ShrinkMetrics) {
-
+	cfg *ProcessorConfig, metrics *ShrinkMetrics,
+) {
 	// Create worker pools
 	sems := map[string]chan struct{}{
 		"Video":    make(chan struct{}, c.VideoThreads),
@@ -488,8 +488,8 @@ func (c *ShrinkCmd) processMedia(media []ShrinkMedia, registry *ProcessorRegistr
 }
 
 func (c *ShrinkCmd) processSingle(m ShrinkMedia, registry *ProcessorRegistry,
-	cfg *ProcessorConfig, metrics *ShrinkMetrics) []ProcessResult {
-
+	cfg *ProcessorConfig, metrics *ShrinkMetrics,
+) ProcessResult {
 	// Capture original timestamps before processing
 	var originalAtime, originalMtime time.Time
 	if stat, err := os.Stat(m.Path); err != nil {
@@ -497,7 +497,7 @@ func (c *ShrinkCmd) processSingle(m ShrinkMedia, registry *ProcessorRegistry,
 		slog.Error("File not found", "path", m.Path)
 		metrics.RecordFailure(m.MediaType)
 		c.markDeleted(m.Path)
-		return []ProcessResult{{Path: m.Path, TimeDeleted: time.Now().Unix(), IsOriginal: true}}
+		return ProcessResult{SourcePath: m.Path, Error: err}
 	} else {
 		originalAtime = stat.ModTime()
 		originalMtime = stat.ModTime()
@@ -511,82 +511,87 @@ func (c *ShrinkCmd) processSingle(m ShrinkMedia, registry *ProcessorRegistry,
 	processor := registry.GetProcessor(&m)
 	if processor == nil {
 		metrics.RecordFailure(m.MediaType)
-		return []ProcessResult{{Path: m.Path}}
+		return ProcessResult{SourcePath: m.Path, Error: fmt.Errorf("no processor found")}
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), c.getTimeout(m))
 	defer cancel()
 
-	results := processor.Process(ctx, &m, cfg)
+	result := processor.Process(ctx, &m, cfg)
 
-	// Track overall success/failure for this input file
-	// and total size of new files created
+	if result.Error != nil {
+		slog.Error("Processing failed", "path", m.Path, "error", result.Error)
+		metrics.RecordFailure(m.MediaType)
+		if cfg.MoveBroken != "" {
+			c.moveToBroken(m.Path)
+		}
+	}
+
+	// 1. Handle Deletions
+	for _, path := range result.ToDelete {
+		if path == m.Path {
+			c.markDeleted(path)
+		}
+		if _, err := os.Stat(path); err == nil {
+			os.Remove(path)
+		}
+	}
+
+	// 2. Handle New Files & Database Updates
 	var totalNewSize int64
-	var hasError bool
+	for i, out := range result.Outputs {
+		totalNewSize += out.Size
 
-	for i, result := range results {
-		if result.Error != nil {
-			hasError = true
-			slog.Error("Processing failed", "path", result.Path, "error", result.Error)
+		// Determine if we should update existing record or add new one
+		// We use updateDatabase when the original is replaced by a single output
+		// to preserve metadata like play_count, etc.
+		if len(result.Outputs) == 1 && out.Path != m.Path && result.Success {
+			c.updateDatabase(m.Path, out.Path, out.Size, m.Duration)
+		} else if out.Path != m.Path {
+			c.addDatabaseEntry(out.Path, out.Size, m.Duration)
+		} else {
+			c.markShrinked(out.Path)
 		}
 
-		if result.TimeDeleted > 0 {
-			// File was deleted (broken/unplayable)
-			hasError = true
-			c.markDeleted(result.Path)
-			if cfg.MoveBroken != "" {
-				c.moveToBroken(result.Path)
-			}
-		} else if result.NewPath != "" && result.NewPath != result.Path {
-			// New file created
-			if result.Success {
-				totalNewSize += result.NewSize
-				// Add new file to database (for split files, archives, etc.)
-				c.addDatabaseEntry(result.NewPath, result.NewSize, m.Duration)
-				c.moveTo(result.NewPath)
-			} else {
-				hasError = true
-			}
-		} else if result.Success {
-			// Original file kept or path updated
-			if result.IsOriginal {
-				if result.NewPath != "" && result.NewPath != result.Path {
-					// Path changed (e.g., archive extraction) - update database
-					c.updateDatabase(result.Path, result.NewPath, result.NewSize, m.Duration)
-					c.moveTo(result.NewPath)
-				} else {
-					// Same path - just mark as shrinked
-					c.markShrinked(result.Path)
-					c.moveTo(result.Path)
-				}
-			}
-		}
-
-		// Apply original timestamps to the first successful output
-		if result.NewPath != "" && result.Success && i == 0 {
-			if !originalAtime.IsZero() {
-				applyTimestamps(result.NewPath, originalAtime, originalMtime)
-			}
+		// Apply timestamps to the first output
+		if i == 0 && !originalAtime.IsZero() {
+			applyTimestamps(out.Path, originalAtime, originalMtime)
 
 			// For audio/video, update duration from transcoded file
 			if m.MediaType == "Audio" || m.MediaType == "Video" {
-				if newDuration := c.getActualDuration(result.NewPath); newDuration > 0 {
+				if newDuration := c.getActualDuration(out.Path); newDuration > 0 {
 					m.Duration = newDuration
 					slog.Debug("Updated duration from transcoded file",
-						"path", result.NewPath, "duration", newDuration)
+						"path", out.Path, "duration", newDuration)
 				}
 			}
 		}
 	}
 
-	// Record metrics: one input file = one success or one failure
-	if hasError {
-		metrics.RecordFailure(m.MediaType)
-	} else {
+	// 3. Handle Moves
+	for _, path := range result.ToMove {
+		c.moveTo(path)
+	}
+
+	// Special case: if original file was updated in place and no move was requested
+	if len(result.ToMove) == 0 && result.Success {
+		found := false
+		for _, out := range result.Outputs {
+			if out.Path == m.Path {
+				found = true
+				break
+			}
+		}
+		if found {
+			c.moveTo(m.Path)
+		}
+	}
+
+	if result.Success {
 		metrics.RecordSuccess(m.MediaType, m.Size, totalNewSize, m.ProcessingTime, int64(m.Duration))
 	}
 
-	return results
+	return result
 }
 
 // getActualDuration probes a file and returns its actual duration
@@ -651,7 +656,7 @@ func (c *ShrinkCmd) moveToBroken(path string) {
 	if c.MoveBroken != "" && path != "" {
 		if _, err := os.Stat(path); err == nil {
 			dest := filepath.Join(c.MoveBroken, filepath.Base(path))
-			os.MkdirAll(c.MoveBroken, 0755)
+			os.MkdirAll(c.MoveBroken, 0o755)
 			os.Rename(path, dest)
 		}
 	}

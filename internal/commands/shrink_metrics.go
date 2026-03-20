@@ -3,6 +3,7 @@ package commands
 import (
 	"fmt"
 	"log/slog"
+	"maps"
 	"strings"
 	"sync"
 	"time"
@@ -20,7 +21,7 @@ type MediaTypeStats struct {
 	CompressedSize int64
 	TotalSize      int64
 	FutureSize     int64
-	TotalTime      int // processing time in seconds
+	TotalTime      int   // processing time in seconds
 	TotalDuration  int64 // total media duration in seconds (for speed ratio)
 	CompletedAt    time.Time
 }
@@ -211,11 +212,11 @@ func (m *ShrinkMetrics) PrintProgress() {
 
 	// Move cursor to home, print progress, then clear leftover lines
 	// Errors from slog will overwrite this, but we reprint on next cycle
-	fmt.Print("\033[H")           // Move to home
-	fmt.Print(output)             // Print progress
+	fmt.Print("\033[H") // Move to home
+	fmt.Print(output)   // Print progress
 	// Clear remaining lines from old progress (in case new progress is shorter)
 	for i := lineCount; i < m.linesPrinted; i++ {
-		fmt.Print("\033[K\n")     // Clear line and move down
+		fmt.Print("\033[K\n") // Clear line and move down
 	}
 	// Move cursor back to home for next error to appear below progress
 	fmt.Print("\033[H")
@@ -286,9 +287,7 @@ func (m *ShrinkMetrics) GetAllStats() map[string]*MediaTypeStats {
 	defer m.mu.RUnlock()
 
 	copy := make(map[string]*MediaTypeStats, len(m.types))
-	for k, v := range m.types {
-		copy[k] = v
-	}
+	maps.Copy(copy, m.types)
 	return copy
 }
 

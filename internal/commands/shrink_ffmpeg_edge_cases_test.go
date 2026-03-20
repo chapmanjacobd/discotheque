@@ -1,13 +1,10 @@
 package commands
 
 import (
-	"fmt"
 	"testing"
 )
 
 func TestFFmpegProcessor_OptimalFiles(t *testing.T) {
-	p := &FFmpegProcessor{}
-	
 	tests := []struct {
 		name      string
 		mediaType string
@@ -24,13 +21,6 @@ func TestFFmpegProcessor_OptimalFiles(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			m := &ShrinkMedia{
-				MediaType:   tt.mediaType,
-				VideoCodecs: tt.vCodec,
-				AudioCodecs: tt.aCodec,
-				VideoCount:  tt.vCount,
-			}
-			
 			// Mock probe results that FFmpegProcessor.Process would see
 			vStream := &FFProbeStream{CodecName: tt.vCodec}
 			if tt.vCodec == "" {
@@ -144,7 +134,7 @@ func TestFFmpegProcessor_ErrorCategorization(t *testing.T) {
 func TestFFmpegProcessor_SplitFileValidation(t *testing.T) {
 	// This tests the logic in validateTranscode when %03d is present in outputPath
 	// We'll mock the filesystem for this
-	
+
 	// Create a temporary directory for split file testing
 	// (Note: in a real test we'd use t.TempDir(), but here we're demonstrating the logic)
 }

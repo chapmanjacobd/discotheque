@@ -1705,12 +1705,6 @@ Flags:
         Exclude deleted files from results
   --only-deleted
         Include only deleted files in results
-  --hash-gap
-        Gap between segments (0.0-1.0 as percentage of file size, or absolute bytes if >1)
-  --hash-chunk-size
-        Size of each segment to hash
-  --hash-threads
-        Number of threads to use for hashing a single file
   --valid
         Attempt to process files with valid metadata
   --invalid
@@ -1757,12 +1751,58 @@ Flags:
         Directory to move unsuccessful files
   --delete-unplayable
         Delete unplayable files
-  --only-hash
-        Only calculate hashes, don't shrink
-  --only-dedupe
-        Only mark deduplicated files, don't shrink
-  --force-rehash
-        Force recalculation of hashes
+  --delete-larger
+        Delete larger of transcode or original files
+  --delete-no-video
+        Delete files without video stream
+  --delete-no-audio
+        Delete files without audio stream
+  --always-split
+        Always split audio on silence
+  --split-longer-than
+        Split audio longer than N seconds
+  --min-split-segment
+        Minimum split segment duration in seconds
+  --max-width-buffer
+        Buffer percentage for width upscaling
+  --max-height-buffer
+        Buffer percentage for height upscaling
+  --keyframes
+        Extract keyframes only
+  --no-preserve-video
+        Don't preserve video when audio-only
+  --include-timecode
+        Include timecode streams in output
+  --verbose-f-fmpeg
+        Enable verbose FFmpeg logging
+  --skip-ocr
+        Skip OCR for PDFs that already contain text
+  --force-ocr
+        Force OCR even on PDFs with text
+  --redo-ocr
+        Re-do OCR on PDFs that already have OCR
+  --no-ocr
+        Skip OCR entirely
+  --video-threads
+        Maximum concurrent video transcodes
+  --audio-threads
+        Maximum concurrent audio transcodes
+  --image-threads
+        Maximum concurrent image conversions
+  --text-threads
+        Maximum concurrent text conversions
+  --video-timeout-mult
+        Video timeout multiplier (timeout = duration * multiplier)
+  --audio-timeout-mult
+        Audio timeout multiplier (timeout = duration * multiplier)
+  --video-timeout
+        Video timeout when duration is unknown
+  --audio-timeout
+        Audio timeout when duration is unknown
+  --image-timeout
+        Image timeout
+  --text-timeout
+        Text timeout
   --force-reshrink
         Force reprocessing of already shrinked files
 ```

@@ -10,7 +10,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/chapmanjacobd/discoteca/internal/utils"
 )
@@ -150,7 +149,7 @@ func (p *VideoProcessor) EstimateSize(m *ShrinkMedia, cfg *ProcessorConfig) (int
 	return futureSize, processingTime
 }
 
-func (p *VideoProcessor) Process(ctx context.Context, m *ShrinkMedia, cfg *ProcessorConfig) []ProcessResult {
+func (p *VideoProcessor) Process(ctx context.Context, m *ShrinkMedia, cfg *ProcessorConfig) ProcessResult {
 	return p.ffmpeg.Process(ctx, m, cfg)
 }
 
@@ -185,7 +184,7 @@ func (p *AudioProcessor) EstimateSize(m *ShrinkMedia, cfg *ProcessorConfig) (int
 	return futureSize, processingTime
 }
 
-func (p *AudioProcessor) Process(ctx context.Context, m *ShrinkMedia, cfg *ProcessorConfig) []ProcessResult {
+func (p *AudioProcessor) Process(ctx context.Context, m *ShrinkMedia, cfg *ProcessorConfig) ProcessResult {
 	return p.ffmpeg.Process(ctx, m, cfg)
 }
 
@@ -210,14 +209,13 @@ func (p *ImageProcessor) EstimateSize(m *ShrinkMedia, cfg *ProcessorConfig) (int
 	return cfg.TargetImageSize, int(cfg.TranscodingImageTime)
 }
 
-func (p *ImageProcessor) Process(ctx context.Context, m *ShrinkMedia, cfg *ProcessorConfig) []ProcessResult {
-	result := p.processImage(ctx, m, cfg)
-	return []ProcessResult{result}
+func (p *ImageProcessor) Process(ctx context.Context, m *ShrinkMedia, cfg *ProcessorConfig) ProcessResult {
+	return p.processImage(ctx, m, cfg)
 }
 
 func (p *ImageProcessor) processImage(ctx context.Context, m *ShrinkMedia, cfg *ProcessorConfig) ProcessResult {
 	if !utils.CommandExists("magick") {
-		return ProcessResult{Path: m.Path, Error: fmt.Errorf("ImageMagick not installed")}
+		return ProcessResult{SourcePath: m.Path, Error: fmt.Errorf("ImageMagick not installed")}
 	}
 
 	outputPath := strings.TrimSuffix(m.Path, filepath.Ext(m.Path)) + ".avif"
@@ -238,44 +236,45 @@ func (p *ImageProcessor) processImage(ctx context.Context, m *ShrinkMedia, cfg *
 		isEnvError := isImageMagickEnvironmentError(errorLog)
 
 		if isEnvError {
-			return ProcessResult{Path: m.Path, Error: fmt.Errorf("ImageMagick environment error: %w", err)}
+			return ProcessResult{SourcePath: m.Path, Error: fmt.Errorf("ImageMagick environment error: %w", err)}
 		} else if isUnsupported {
 			os.Remove(outputPath)
 			slog.Info("Unsupported image format, keeping original", "path", m.Path)
-			return ProcessResult{Path: m.Path}
+			return ProcessResult{SourcePath: m.Path, Success: true, Outputs: []ProcessOutputFile{{Path: m.Path, Size: m.Size}}}
 		} else if isFileError {
 			if cfg.DeleteUnplayable {
-				os.Remove(m.Path)
-				return ProcessResult{Path: m.Path, TimeDeleted: time.Now().Unix()}
+				return ProcessResult{SourcePath: m.Path, ToDelete: []string{m.Path}, Success: false, Error: err}
 			}
-			return ProcessResult{Path: m.Path, Error: err}
+			return ProcessResult{SourcePath: m.Path, Error: err}
 		}
 
 		slog.Error("ImageMagick error", "output", string(output), "path", m.Path)
-		return ProcessResult{Path: m.Path, Error: err}
+		return ProcessResult{SourcePath: m.Path, Error: err}
 	}
 
 	outputStats, err := os.Stat(outputPath)
 	if err != nil || outputStats.Size() == 0 {
 		os.Remove(outputPath)
-		return ProcessResult{Path: m.Path, Error: fmt.Errorf("output file empty or missing")}
+		return ProcessResult{SourcePath: m.Path, Error: fmt.Errorf("output file empty or missing")}
 	}
 
 	// Check if we should delete the transcode
 	if cfg.DeleteLarger && outputStats.Size() > m.Size {
 		os.Remove(outputPath)
-		return ProcessResult{Path: m.Path}
+		return ProcessResult{SourcePath: m.Path, Success: true, Outputs: []ProcessOutputFile{{Path: m.Path, Size: m.Size}}}
 	}
 
+	toDelete := []string{}
 	if cfg.DeleteLarger {
-		os.Remove(m.Path)
+		toDelete = append(toDelete, m.Path)
 	}
 
 	return ProcessResult{
-		Path:    m.Path,
-		NewPath: outputPath,
-		NewSize: outputStats.Size(),
-		Success: true,
+		SourcePath: m.Path,
+		Outputs:    []ProcessOutputFile{{Path: outputPath, Size: outputStats.Size()}},
+		ToDelete:   toDelete,
+		ToMove:     []string{outputPath},
+		Success:    true,
 	}
 }
 
@@ -350,15 +349,14 @@ func (p *TextProcessor) EstimateSize(m *ShrinkMedia, cfg *ProcessorConfig) (int6
 	return cfg.TargetImageSize * 50, int(cfg.TranscodingImageTime * 12)
 }
 
-func (p *TextProcessor) Process(ctx context.Context, m *ShrinkMedia, cfg *ProcessorConfig) []ProcessResult {
-	result := p.processText(ctx, m, cfg)
-	return []ProcessResult{result}
+func (p *TextProcessor) Process(ctx context.Context, m *ShrinkMedia, cfg *ProcessorConfig) ProcessResult {
+	return p.processText(ctx, m, cfg)
 }
 
 // processText handles the actual text/ebook processing
 func (p *TextProcessor) processText(ctx context.Context, m *ShrinkMedia, cfg *ProcessorConfig) ProcessResult {
 	if !utils.CommandExists("ebook-convert") {
-		return ProcessResult{Path: m.Path, Error: fmt.Errorf("Calibre not installed")}
+		return ProcessResult{SourcePath: m.Path, Error: fmt.Errorf("calibre not installed")}
 	}
 
 	ext := strings.ToLower(filepath.Ext(m.Path))
@@ -373,8 +371,8 @@ func (p *TextProcessor) processText(ctx context.Context, m *ShrinkMedia, cfg *Pr
 
 	// Step 2: Convert with Calibre to folder format
 	outputDir := filepath.Join(filepath.Dir(m.Path), filepath.Base(m.Path)+".OEB")
-	if err := os.MkdirAll(outputDir, 0755); err != nil {
-		return ProcessResult{Path: m.Path, Error: err}
+	if err := os.MkdirAll(outputDir, 0o755); err != nil {
+		return ProcessResult{SourcePath: m.Path, Error: err}
 	}
 
 	args := []string{
@@ -395,12 +393,12 @@ func (p *TextProcessor) processText(ctx context.Context, m *ShrinkMedia, cfg *Pr
 	if err != nil {
 		slog.Error("Calibre error", "output", string(output), "path", m.Path)
 		os.RemoveAll(outputDir)
-		return ProcessResult{Path: m.Path, Error: err}
+		return ProcessResult{SourcePath: m.Path, Error: err}
 	}
 
 	if !p.folderExists(outputDir) {
 		os.RemoveAll(outputDir)
-		return ProcessResult{Path: m.Path, Error: fmt.Errorf("Calibre output folder missing")}
+		return ProcessResult{SourcePath: m.Path, Error: fmt.Errorf("calibre output folder missing")}
 	}
 
 	// Step 3: Replace CSS with optimized version
@@ -414,28 +412,28 @@ func (p *TextProcessor) processText(ctx context.Context, m *ShrinkMedia, cfg *Pr
 	p.updateImageReferences(outputDir)
 
 	// Step 6: Compare sizes
-	outputSize := p.folderSize(outputDir)
+	outputSize := utils.FolderSize(outputDir)
 	originalStats, err := os.Stat(m.Path)
+	deleteOriginal := false
 	if err == nil {
 		if cfg.DeleteLarger && outputSize > originalStats.Size() {
 			os.RemoveAll(outputDir)
-			return ProcessResult{Path: m.Path}
+			return ProcessResult{SourcePath: m.Path, Success: true, Outputs: []ProcessOutputFile{{Path: m.Path, Size: m.Size}}}
 		}
+		deleteOriginal = cfg.DeleteLarger
+	}
 
-		if cfg.DeleteLarger {
-			os.Remove(m.Path)
-			// Clean up OCR file if created
-			if ext == "pdf" && strings.HasSuffix(m.Path, ".ocr.pdf") {
-				os.Remove(m.Path)
-			}
-		}
+	toDelete := []string{}
+	if deleteOriginal {
+		toDelete = append(toDelete, m.Path)
 	}
 
 	return ProcessResult{
-		Path:    m.Path,
-		NewPath: outputDir,
-		NewSize: outputSize,
-		Success: true,
+		SourcePath: m.Path,
+		Outputs:    []ProcessOutputFile{{Path: outputDir, Size: outputSize}},
+		ToDelete:   toDelete,
+		ToMove:     []string{outputDir},
+		Success:    true,
 	}
 }
 
@@ -595,7 +593,7 @@ p > .calibre3:not(:only-of-type) {
   display: list-item;
 }
 `
-	os.WriteFile(cssPath, []byte(css), 0644)
+	os.WriteFile(cssPath, []byte(css), 0o644)
 }
 
 // findImages finds all image files in the ebook folder
@@ -689,28 +687,13 @@ func (p *TextProcessor) updateReferencesInFile(path string) {
 		}
 	}
 
-	os.WriteFile(path, []byte(text), 0644)
+	os.WriteFile(path, []byte(text), 0o644)
 }
 
 // folderExists checks if a folder exists
 func (p *TextProcessor) folderExists(path string) bool {
 	info, err := os.Stat(path)
 	return err == nil && info.IsDir()
-}
-
-// folderSize calculates total size of a folder
-func (p *TextProcessor) folderSize(dir string) int64 {
-	var size int64
-	filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return nil
-		}
-		if !info.IsDir() {
-			size += info.Size()
-		}
-		return nil
-	})
-	return size
 }
 
 // ArchiveProcessor handles archive file processing
@@ -733,14 +716,11 @@ func (p *ArchiveProcessor) CanProcess(m *ShrinkMedia) bool {
 }
 
 // ExtractAndProcess extracts archive contents and processes images recursively
-// Returns a slice of ProcessResult for the original archive and all processed items inside
 func (p *ArchiveProcessor) ExtractAndProcess(ctx context.Context, m *ShrinkMedia, cfg *ProcessorConfig,
-	imageProc *ImageProcessor) []ProcessResult {
-
-	var results []ProcessResult
-
+	imageProc *ImageProcessor,
+) ProcessResult {
 	if !p.unarInstalled {
-		return []ProcessResult{{Path: m.Path, Error: fmt.Errorf("unar not installed")}}
+		return ProcessResult{SourcePath: m.Path, Error: fmt.Errorf("unar not installed")}
 	}
 
 	// Check for multi-part archives (XAD volumes)
@@ -759,8 +739,8 @@ func (p *ArchiveProcessor) ExtractAndProcess(ctx context.Context, m *ShrinkMedia
 
 	// Extract archive
 	outputDir := filepath.Join(filepath.Dir(m.Path), filepath.Base(m.Path)+".extracted")
-	if err := os.MkdirAll(outputDir, 0755); err != nil {
-		return []ProcessResult{{Path: m.Path, Error: err}}
+	if err := os.MkdirAll(outputDir, 0o755); err != nil {
+		return ProcessResult{SourcePath: m.Path, Error: err}
 	}
 
 	cmd := exec.CommandContext(ctx, "unar", "-o", outputDir, m.Path)
@@ -770,43 +750,38 @@ func (p *ArchiveProcessor) ExtractAndProcess(ctx context.Context, m *ShrinkMedia
 		os.RemoveAll(outputDir)
 
 		if cfg.DeleteUnplayable {
-			os.Remove(m.Path)
+			toDelete := []string{m.Path}
 			for _, part := range partFiles {
 				if part != m.Path {
-					os.Remove(part)
+					toDelete = append(toDelete, part)
 				}
 			}
-			return []ProcessResult{{Path: m.Path, TimeDeleted: time.Now().Unix(), IsOriginal: true}}
+			return ProcessResult{SourcePath: m.Path, ToDelete: toDelete, Success: false, Error: err}
 		} else if cfg.MoveBroken != "" {
-			// Move parts. m.Path will be moved by processSingle if we return TimeDeleted
+			// Move parts logic stays in processor for complex multi-part moves
 			for _, part := range partFiles {
 				if part != m.Path {
 					dest := filepath.Join(cfg.MoveBroken, filepath.Base(part))
-					os.MkdirAll(cfg.MoveBroken, 0755)
+					os.MkdirAll(cfg.MoveBroken, 0o755)
 					os.Rename(part, dest)
 				}
 			}
-			// Signalling failure and movement to broken folder
-			return []ProcessResult{{Path: m.Path, TimeDeleted: time.Now().Unix(), IsOriginal: true}}
+			return ProcessResult{SourcePath: m.Path, ToDelete: []string{m.Path}, Success: false, Error: err}
 		}
-		return []ProcessResult{{Path: m.Path, Error: err}}
+		return ProcessResult{SourcePath: m.Path, Error: err}
 	}
 
-	// For successful extraction, always remove all parts including original archive
+	toDelete := []string{m.Path}
 	for _, part := range partFiles {
 		if part != m.Path {
-			os.Remove(part)
+			toDelete = append(toDelete, part)
 		}
 	}
-	os.Remove(m.Path)
 
-	// Record the original archive as deleted
-	results = append(results, ProcessResult{
-		Path:        m.Path,
-		NewPath:     outputDir,
-		Success:     true,
-		IsOriginal:  true,
-	})
+	var outputs []ProcessOutputFile
+	var toMove []string
+	outputs = append(outputs, ProcessOutputFile{Path: outputDir, Size: utils.FolderSize(outputDir)})
+	toMove = append(toMove, outputDir)
 
 	// Find and process all images recursively
 	filepath.Walk(outputDir, func(path string, info os.FileInfo, err error) error {
@@ -815,36 +790,28 @@ func (p *ArchiveProcessor) ExtractAndProcess(ctx context.Context, m *ShrinkMedia
 		}
 		ext := strings.ToLower(filepath.Ext(path))
 		if shouldConvertToAVIF(ext) {
-			// Create a temporary ShrinkMedia for this image
-			imgMedia := &ShrinkMedia{
-				Path: path,
-				Size: info.Size(),
-				Ext:  ext,
-			}
-			result := imageProc.processImage(ctx, imgMedia, cfg)
-			result.IsOriginal = false
-			results = append(results, result)
+			imgMedia := &ShrinkMedia{Path: path, Size: info.Size(), Ext: ext}
+			res := imageProc.processImage(ctx, imgMedia, cfg)
+			outputs = append(outputs, res.Outputs...)
+			toDelete = append(toDelete, res.ToDelete...)
+			toMove = append(toMove, res.ToMove...)
 		} else if utils.ArchiveExtensionMap[ext] {
-			// Recurse into nested archive
-			nestedMedia := &ShrinkMedia{
-				Path: path,
-				Size: info.Size(),
-				Ext:  ext,
-				Type: "archive/" + strings.TrimPrefix(ext, "."),
-			}
-			nestedResults := p.ExtractAndProcess(ctx, nestedMedia, cfg, imageProc)
-			results = append(results, nestedResults...)
-			// Remove the original nested archive if DeleteLarger is set
-			if cfg.DeleteLarger {
-				os.Remove(path)
-			}
+			nestedMedia := &ShrinkMedia{Path: path, Size: info.Size(), Ext: ext, Type: "archive/" + strings.TrimPrefix(ext, ".")}
+			res := p.ExtractAndProcess(ctx, nestedMedia, cfg, imageProc)
+			outputs = append(outputs, res.Outputs...)
+			toDelete = append(toDelete, res.ToDelete...)
+			toMove = append(toMove, res.ToMove...)
 		}
 		return nil
 	})
 
-	slog.Info("Archive extracted and processed", "path", m.Path, "items", len(results))
-
-	return results
+	return ProcessResult{
+		SourcePath: m.Path,
+		Outputs:    outputs,
+		ToDelete:   toDelete,
+		ToMove:     toMove,
+		Success:    true,
+	}
 }
 
 // EstimateSizeForArchive estimates size using compressed size and inspects archive contents
@@ -881,7 +848,7 @@ func (p *ArchiveProcessor) EstimateSizeForArchive(m *ShrinkMedia, cfg *Processor
 			tempDir, err := os.MkdirTemp("", "disco-estimate-*")
 			if err == nil {
 				defer os.RemoveAll(tempDir)
-				
+
 				// Extract only this file
 				slog.Debug("Extracting nested archive for estimation", "archive", m.Path, "file", content.Path)
 				cmd := exec.Command("unar", "-o", tempDir, "-f", m.Path, content.Path)
@@ -961,7 +928,7 @@ func (p *ArchiveProcessor) EstimateSize(m *ShrinkMedia, cfg *ProcessorConfig) (i
 	return futureSize, processingTime
 }
 
-func (p *ArchiveProcessor) Process(ctx context.Context, m *ShrinkMedia, cfg *ProcessorConfig) []ProcessResult {
+func (p *ArchiveProcessor) Process(ctx context.Context, m *ShrinkMedia, cfg *ProcessorConfig) ProcessResult {
 	// Archives are handled by extracting and processing contents separately
 	imageProc := NewImageProcessor()
 	return p.ExtractAndProcess(ctx, m, cfg, imageProc)
@@ -975,21 +942,20 @@ func (p *ArchiveProcessor) lsar(path string) []ShrinkMedia {
 	}
 
 	var result struct {
-		LsarProperties struct {
-			Files []struct {
-				Filename       string `json:"filename"`
-				Size           int64  `json:"size"`
-				CompressedSize int64  `json:"compressedSize"`
-			} `json:"files"`
-		} `json:"lsarProperties"`
+		LsarContents []struct {
+			Filename       string `json:"XADFileName"`
+			Size           int64  `json:"XADFileSize"`
+			CompressedSize int64  `json:"XADCompressedSize"`
+		} `json:"lsarContents"`
 	}
 
 	if err := json.Unmarshal(output, &result); err != nil {
+		slog.Error("Failed to unmarshal lsar output", "error", err, "path", path)
 		return nil
 	}
 
 	var media []ShrinkMedia
-	for _, f := range result.LsarProperties.Files {
+	for _, f := range result.LsarContents {
 		ext := strings.ToLower(filepath.Ext(f.Filename))
 		mediaType := detectMediaTypeFromExt(ext)
 

@@ -1482,7 +1482,7 @@ p > .calibre3:not(:only-of-type) {
   display: list-item;
 }
 `
-	os.WriteFile(cssPath, []byte(css), 0644)
+	os.WriteFile(cssPath, []byte(css), 0o644)
 }
 
 // SanitizeFilename replaces special characters with underscores for calibre compatibility

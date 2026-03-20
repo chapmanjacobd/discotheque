@@ -143,30 +143,30 @@ var ArchiveExtensions = []string{
 // The int value is the estimated bitrate in bits per second for each format
 var UnreliableDurationFormats = map[string]int{
 	// DVD formats (lower bitrate, ~5-10 Mbps typical)
-	".vob":  5000000, // DVD Video Object
-	".ifo":  5000000, // DVD Information
-	".vro":  5000000, // DVD Recording format
-	
+	".vob": 5000000, // DVD Video Object
+	".ifo": 5000000, // DVD Information
+	".vro": 5000000, // DVD Recording format
+
 	// AVCHD / Camcorder formats (medium bitrate, ~10-20 Mbps typical)
 	".m2t":  15000000, // MPEG-2 Transport Stream
 	".m2ts": 15000000, // Blu-ray MPEG-2 Transport Stream
 	".mts":  15000000, // AVCHD Video
 	".mod":  10000000, // Canon/ JVC camcorder format
 	".tod":  12000000, // JVC camcorder format
-	
+
 	// Older/lossy codecs (variable bitrate, ~2-8 Mbps typical)
-	".divx":  4000000, // DivX codec
-	".xvid":  4000000, // Xvid codec
-	".rm":    2000000, // RealMedia
-	".rmvb":  3000000, // RealMedia Variable Bitrate
-	".wmv":   3000000, // Windows Media Video
-	".asf":   3000000, // Advanced Systems Format
-	
+	".divx": 4000000, // DivX codec
+	".xvid": 4000000, // Xvid codec
+	".rm":   2000000, // RealMedia
+	".rmvb": 3000000, // RealMedia Variable Bitrate
+	".wmv":  3000000, // Windows Media Video
+	".asf":  3000000, // Advanced Systems Format
+
 	// Blu-ray formats (high bitrate, ~20-40 Mbps typical)
 	".avchd": 20000000, // AVCHD container
 	".bdmv":  30000000, // Blu-ray Disc Movie
 	".mpls":  30000000, // Blu-ray Playlist
-	
+
 	// Disc images (use average of contained formats)
 	".iso": 8000000, // Disc image (average estimate)
 }
@@ -185,7 +185,7 @@ func GetEstimatedBitrate(ext string) int {
 
 // Default bitrates for duration estimation (bits per second)
 const (
-	DefaultAudioBitrate = 256000 // 256 kbps
+	DefaultAudioBitrate = 256000  // 256 kbps
 	DefaultVideoBitrate = 1500000 // 1500 kbps
 )
 
@@ -241,13 +241,13 @@ func ShouldOverrideDuration(reportedDuration float64, size int64, ext string) (f
 		// Not an unreliable format, trust reported duration
 		return 0, false
 	}
-	
+
 	estimatedDuration := EstimateDurationFromSizeWithFormat(size, ext)
 	if estimatedDuration <= 120 {
 		// Estimated duration is also low, trust reported duration
 		return 0, false
 	}
-	
+
 	// Override with estimated duration
 	return estimatedDuration, true
 }
