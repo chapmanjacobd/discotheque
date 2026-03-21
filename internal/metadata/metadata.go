@@ -95,7 +95,7 @@ func Extract(ctx context.Context, path string, scanSubtitles bool, extractText b
 		Size:           utils.ToNullInt64(stat.Size()),
 		TimeCreated:    utils.ToNullInt64(stat.ModTime().Unix()),
 		TimeModified:   utils.ToNullInt64(stat.ModTime().Unix()),
-		Type:           utils.ToNullString(mediaType),
+		MediaType:      utils.ToNullString(mediaType),
 		TimeDownloaded: utils.ToNullInt64(time.Now().Unix()),
 	}
 
@@ -402,8 +402,7 @@ func Extract(ctx context.Context, path string, scanSubtitles bool, extractText b
 			mediaType = "audiobook"
 		}
 	}
-	params.Type = utils.ToNullString(mediaType)
-
+	params.MediaType = utils.ToNullString(mediaType)
 	result.Media = params
 	return result, nil
 }

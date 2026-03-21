@@ -172,7 +172,7 @@ test.describe('Filter To Ignore Functionality', () => {
       const newSizeMax = await sizeMaxSlider.getAttribute('max');
 
       // CRITICAL: Duration and size ranges should reflect video-only media
-      // The type filter is ignored when computing duration/size bins (filterToIgnore="type")
+      // The type filter is ignored when computing duration/size bins (filterToIgnore=['"]media_type['"])
       // So duration/size bins show full range of video content
       expect(newDurationMax).toBeTruthy();
       expect(newSizeMax).toBeTruthy();

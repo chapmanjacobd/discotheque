@@ -38,10 +38,10 @@ type ProgressRequest struct {
 }
 
 type LsEntry struct {
-	Path  string `json:"path"`
-	Name  string `json:"name"`
-	IsDir bool   `json:"is_dir"`
-	Type  string `json:"type"`
+	Path      string `json:"path"`
+	Name      string `json:"name"`
+	IsDir     bool   `json:"is_dir"`
+	MediaType string `json:"media_type"`
 }
 
 type FilterBin struct {
@@ -61,8 +61,8 @@ type FilterBinsResponse struct {
 	CreatedPercentiles    []int64 `json:"created_percentiles"`
 	DownloadedPercentiles []int64 `json:"downloaded_percentiles"`
 
-	// Type counts (special case - not a percentile distribution)
-	Type []FilterBin `json:"type"`
+	// Media type counts (special case - not a percentile distribution)
+	MediaType []FilterBin `json:"media_type"`
 }
 
 type PlaylistResponse []string

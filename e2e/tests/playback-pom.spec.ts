@@ -166,7 +166,7 @@ test.describe('Media Playback with POM', () => {
     await mediaPage.goto(server.getBaseUrl());
 
     // Get first video card
-    const mediaCard = mediaPage.page.locator('.media-card[data-type*="video"]').first();
+    const mediaCard = mediaPage.page.locator('.media-card[data-media_type*="video"]').first();
 
     // Rapidly click the same card
     await mediaCard.click();

@@ -30,7 +30,7 @@ SELECT
     m.path, m.path_tokenized, m.title, m.duration, m.size, 
     m.time_created, m.time_modified, m.time_deleted, 
     m.time_first_played, m.time_last_played, m.play_count, m.playhead, 
-    m.type, m.width, m.height, m.fps, 
+    m.media_type, m.width, m.height, m.fps, 
     m.video_codecs, m.audio_codecs, m.subtitle_codecs, 
     m.video_count, m.audio_count, m.subtitle_count, 
     m.album, m.artist, m.genre, m.categories, 
@@ -67,7 +67,7 @@ ORDER BY fts.rank
 			&m.TimeLastPlayed,
 			&m.PlayCount,
 			&m.Playhead,
-			&m.Type,
+			&m.MediaType,
 			&m.Width,
 			&m.Height,
 			&m.Fps,
@@ -155,7 +155,7 @@ type SearchCaptionsRow struct {
 	Time      sql.NullFloat64
 	Text      sql.NullString
 	Title     sql.NullString
-	Type      sql.NullString
+	MediaType sql.NullString
 	Size      sql.NullInt64
 	Duration  sql.NullInt64
 	Rank      float64
@@ -168,7 +168,7 @@ func (q *Queries) SearchCaptions(ctx context.Context, arg SearchCaptionsParams) 
 	}
 
 	query := `
-SELECT c.media_path, c.time, c.text, m.title, m.type, m.size, m.duration
+SELECT c.media_path, c.time, c.text, m.title, m.media_type, m.size, m.duration
 FROM captions c
 JOIN (
     SELECT rowid, rank FROM captions_fts
@@ -178,10 +178,10 @@ JOIN (
 ) fts ON c.rowid = fts.rowid
 JOIN media m ON c.media_path = m.path
 WHERE m.time_deleted = 0
-AND (? = 0 OR m.type = 'video')
-AND (? = 0 OR m.type IN ('audio', 'audiobook'))
-AND (? = 0 OR m.type = 'image')
-AND (? = 0 OR m.type = 'text')
+AND (? = 0 OR m.media_type = 'video')
+AND (? = 0 OR m.media_type IN ('audio', 'audiobook'))
+AND (? = 0 OR m.media_type = 'image')
+AND (? = 0 OR m.media_type = 'text')
 ORDER BY fts.rank
 `
 	videoOnly := 0
@@ -210,7 +210,7 @@ ORDER BY fts.rank
 	var results []SearchCaptionsRow
 	for rows.Next() {
 		var r SearchCaptionsRow
-		err := rows.Scan(&r.MediaPath, &r.Time, &r.Text, &r.Title, &r.Type, &r.Size, &r.Duration)
+		err := rows.Scan(&r.MediaPath, &r.Time, &r.Text, &r.Title, &r.MediaType, &r.Size, &r.Duration)
 		if err != nil {
 			return nil, err
 		}

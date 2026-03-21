@@ -33,7 +33,7 @@ func TestServeCmd_HandleLs(t *testing.T) {
 		t.Fatalf("Failed to initialize DB: %v", err)
 	}
 	for _, p := range paths {
-		_, err := dbConn.Exec("INSERT INTO media (path, type, time_deleted) VALUES (?, ?, 0)", p, "audio/mpeg")
+		_, err := dbConn.Exec("INSERT INTO media (path, media_type, time_deleted) VALUES (?, ?, 0)", p, "audio/mpeg")
 		if err != nil {
 			t.Fatalf("Failed to insert path %s: %v", p, err)
 		}

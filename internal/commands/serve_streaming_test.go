@@ -33,7 +33,7 @@ Test subtitle
 		t.Fatal(err)
 	}
 
-	_, err := sqlDB.Exec(`INSERT INTO media (path, title, type, time_deleted) VALUES (?, 'Test', 'video', 0)`, subPath)
+	_, err := sqlDB.Exec(`INSERT INTO media (path, title, media_type, time_deleted) VALUES (?, 'Test', 'video', 0)`, subPath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -101,7 +101,7 @@ func TestHandleDU(t *testing.T) {
 
 	// Create test media in different directories
 	// Include both Unix-style and Windows-style paths to test cross-platform compatibility
-	_, err = sqlDB.Exec(`INSERT INTO media (path, title, type, size, duration, time_deleted) VALUES
+	_, err = sqlDB.Exec(`INSERT INTO media (path, title, media_type, size, duration, time_deleted) VALUES
 		('/videos/movies/movie1.mp4', 'Movie1', 'video', 1073741824, 7200, 0),
 		('/videos/movies/movie2.mp4', 'Movie2', 'video', 536870912, 3600, 0),
 		('/videos/music/song1.mp4', 'Song1', 'video', 268435456, 300, 0),
@@ -400,7 +400,7 @@ func TestHandleEpisodes(t *testing.T) {
 	db.InitDB(sqlDB)
 
 	// Create test TV show episodes with same parent path
-	_, err := sqlDB.Exec(`INSERT INTO media (path, title, type, time_deleted) VALUES 
+	_, err := sqlDB.Exec(`INSERT INTO media (path, title, media_type, time_deleted) VALUES 
 		('/shows/MyShow/MyShow.S01E01.mp4', 'Episode 1', 'video', 0),
 		('/shows/MyShow/MyShow.S01E02.mp4', 'Episode 2', 'video', 0),
 		('/shows/MyShow/MyShow.S01E03.mp4', 'Episode 3', 'video', 0)`)

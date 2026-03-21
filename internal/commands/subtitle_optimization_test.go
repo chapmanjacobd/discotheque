@@ -47,7 +47,7 @@ func TestHandleSubtitles_SubtitleCountOptimization(t *testing.T) {
 
 	// Insert media with subtitle_count = 0 (no embedded subtitles)
 	_, err = sqlDB.Exec(`
-		INSERT INTO media (path, title, type, subtitle_count, subtitle_codecs, time_deleted)
+		INSERT INTO media (path, title, media_type, subtitle_count, subtitle_codecs, time_deleted)
 		VALUES (?, 'Test Video No Subs', 'video', 0, '', 0)
 	`, videoPath)
 	if err != nil {
@@ -134,7 +134,7 @@ func TestHandleSubtitles_WithEmbeddedSubtitles(t *testing.T) {
 
 	// Insert media with subtitle_count > 0 (has embedded subtitles)
 	_, err = sqlDB.Exec(`
-		INSERT INTO media (path, title, type, subtitle_count, subtitle_codecs, time_deleted)
+		INSERT INTO media (path, title, media_type, subtitle_count, subtitle_codecs, time_deleted)
 		VALUES (?, 'Test Video With Subs', 'video', 2, 'subrip,text', 0)
 	`, videoPath)
 	if err != nil {
@@ -198,7 +198,7 @@ func TestSubtitleCountDatabaseQuery(t *testing.T) {
 
 	for _, f := range files {
 		_, err := sqlDB.Exec(`
-			INSERT INTO media (path, title, type, subtitle_count, time_deleted)
+			INSERT INTO media (path, title, media_type, subtitle_count, time_deleted)
 			VALUES (?, 'Test', 'video', ?, 0)
 		`, f.path, f.subtitleCount)
 		if err != nil {
@@ -261,7 +261,7 @@ Test subtitle line
 
 	// Insert the subtitle file as media
 	_, err = sqlDB.Exec(`
-		INSERT INTO media (path, title, type, time_deleted)
+		INSERT INTO media (path, title, media_type, time_deleted)
 		VALUES (?, 'Test Subtitle', 'subtitle', 0)
 	`, subPath)
 	if err != nil {
@@ -318,7 +318,7 @@ func TestHandleSubtitles_NoFFmpegCallForZeroCount(t *testing.T) {
 
 	// Insert with subtitle_count = 0
 	_, err = sqlDB.Exec(`
-		INSERT INTO media (path, title, type, subtitle_count, time_deleted)
+		INSERT INTO media (path, title, media_type, subtitle_count, time_deleted)
 		VALUES (?, 'Test', 'video', 0, 0)
 	`, videoPath)
 	if err != nil {

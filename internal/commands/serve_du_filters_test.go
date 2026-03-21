@@ -31,7 +31,7 @@ func TestHandleDU_WithFilters(t *testing.T) {
 
 	// Create test media with various types, sizes, and durations for filter testing
 	// Organized under /home directory to test folder navigation
-	_, err = sqlDB.Exec(`INSERT INTO media (path, title, type, size, duration, time_deleted) VALUES
+	_, err = sqlDB.Exec(`INSERT INTO media (path, title, media_type, size, duration, time_deleted) VALUES
 		-- Videos (5 files)
 		('/home/videos/movie1.mp4', 'Movie1', 'video', 500000000, 7200, 0),
 		('/home/videos/movie2.mp4', 'Movie2', 'video', 300000000, 5400, 0),
@@ -82,7 +82,7 @@ func TestHandleDU_WithFilters(t *testing.T) {
 		t.Logf("Folders: %d, Files: %d, Total: %d", resp.FolderCount, resp.FileCount, resp.TotalCount)
 	})
 
-	t.Run("type=video filter returns only video folders", func(t *testing.T) {
+	t.Run("media_type=video filter returns only video folders", func(t *testing.T) {
 		// Get unfiltered results first
 		req1 := httptest.NewRequest("GET", "/api/du?path=&include_counts=true", nil)
 		req1.Header.Set("X-Disco-Token", cmd.APIToken)
@@ -103,8 +103,8 @@ func TestHandleDU_WithFilters(t *testing.T) {
 		}
 		t.Logf("Unfiltered file count in folders: %d", unfilteredFileCount)
 
-		// Apply type=video filter (frontend uses this format)
-		req2 := httptest.NewRequest("GET", "/api/du?path=&type=video", nil)
+		// Apply media_type=video filter (frontend uses this format)
+		req2 := httptest.NewRequest("GET", "/api/du?path=&media_type=video", nil)
 		req2.Header.Set("X-Disco-Token", cmd.APIToken)
 		w2 := httptest.NewRecorder()
 		mux.ServeHTTP(w2, req2)
@@ -118,7 +118,7 @@ func TestHandleDU_WithFilters(t *testing.T) {
 			t.Fatalf("Failed to unmarshal response: %v", err)
 		}
 
-		t.Logf("type=video - Folders: %d, Files: %d, Total: %d", resp2.FolderCount, resp2.FileCount, resp2.TotalCount)
+		t.Logf("media_type=video - Folders: %d, Files: %d, Total: %d", resp2.FolderCount, resp2.FileCount, resp2.TotalCount)
 
 		// Get filtered file count from folders
 		filteredFileCount := 0
@@ -249,8 +249,8 @@ func TestHandleDU_WithFilters(t *testing.T) {
 		}
 
 		// Check that bins have data
-		if len(resp.Counts.Type) == 0 {
-			t.Error("Expected type bins in counts")
+		if len(resp.Counts.MediaType) == 0 {
+			t.Error("Expected media_type bins in counts")
 		}
 
 		if len(resp.Counts.SizePercentiles) == 0 {
@@ -287,8 +287,8 @@ func TestHandleDU_WithFilters(t *testing.T) {
 
 		// Video count in filtered should be same as total video count
 		// but other types should be 0 or not present
-		t.Logf("Unfiltered types: %+v", resp1.Counts.Type)
-		t.Logf("Filtered types: %+v", resp2.Counts.Type)
+		t.Logf("Unfiltered types: %+v", resp1.Counts.MediaType)
+		t.Logf("Filtered types: %+v", resp2.Counts.MediaType)
 	})
 
 	t.Run("filters persist when navigating to subfolder", func(t *testing.T) {
@@ -563,7 +563,7 @@ func TestHandleDU_WithFilters_WindowsPaths(t *testing.T) {
 
 	// Create test media with mixed path separators (simulating Windows and Unix paths)
 	// This tests that the DU endpoint normalizes paths correctly regardless of separator style
-	_, err = sqlDB.Exec(`INSERT INTO media (path, title, type, size, duration, time_deleted) VALUES
+	_, err = sqlDB.Exec(`INSERT INTO media (path, title, media_type, size, duration, time_deleted) VALUES
 		-- Unix-style paths (5 videos)
 		('/media/videos/movie1.mp4', 'Movie1', 'video', 500000000, 7200, 0),
 		('/media/videos/movie2.mp4', 'Movie2', 'video', 300000000, 5400, 0),
@@ -613,7 +613,7 @@ func TestHandleDU_WithFilters_WindowsPaths(t *testing.T) {
 		t.Logf("Folders: %d, Files: %d, Total: %d", resp.FolderCount, resp.FileCount, resp.TotalCount)
 	})
 
-	t.Run("type=video filter returns only video folders", func(t *testing.T) {
+	t.Run("media_type=video filter returns only video folders", func(t *testing.T) {
 		// Get unfiltered results first
 		req1 := httptest.NewRequest("GET", "/api/du?include_counts=true", nil)
 		req1.Header.Set("X-Disco-Token", cmd.APIToken)
@@ -634,8 +634,8 @@ func TestHandleDU_WithFilters_WindowsPaths(t *testing.T) {
 		}
 		t.Logf("Unfiltered file count in folders: %d", unfilteredFileCount)
 
-		// Apply type=video filter
-		req2 := httptest.NewRequest("GET", "/api/du?type=video", nil)
+		// Apply media_type=video filter
+		req2 := httptest.NewRequest("GET", "/api/du?media_type=video", nil)
 		req2.Header.Set("X-Disco-Token", cmd.APIToken)
 		w2 := httptest.NewRecorder()
 		mux.ServeHTTP(w2, req2)
@@ -649,7 +649,7 @@ func TestHandleDU_WithFilters_WindowsPaths(t *testing.T) {
 			t.Fatalf("Failed to unmarshal response: %v", err)
 		}
 
-		t.Logf("type=video - Total: %d", resp2.TotalCount)
+		t.Logf("media_type=video - Total: %d", resp2.TotalCount)
 
 		// Get filtered file count from folders
 		filteredFileCount := 0
@@ -765,7 +765,7 @@ func TestHandleDU_MixedUnixWindowsPaths(t *testing.T) {
 	_, err = db.Exec(`CREATE TABLE media (
 		path TEXT PRIMARY KEY,
 		title TEXT,
-		type TEXT,
+		media_type TEXT,
 		size INTEGER,
 		duration INTEGER,
 		time_deleted INTEGER DEFAULT 0,
@@ -795,7 +795,7 @@ func TestHandleDU_MixedUnixWindowsPaths(t *testing.T) {
 
 	// Insert mixed Unix and Windows paths
 	// Unix paths (Linux/Mac style)
-	_, err = db.Exec(`INSERT INTO media (path, title, type, size, duration, time_deleted) VALUES
+	_, err = db.Exec(`INSERT INTO media (path, title, media_type, size, duration, time_deleted) VALUES
 		('/home/user/videos/movie1.mp4', 'Movie1', 'video', 500000000, 7200, 0),
 		('/home/user/videos/movie2.mkv', 'Movie2', 'video', 800000000, 9000, 0),
 		('/home/user/music/album/song1.mp3', 'Song1', 'audio', 5000000, 240, 0),
@@ -808,7 +808,7 @@ func TestHandleDU_MixedUnixWindowsPaths(t *testing.T) {
 	}
 
 	// Windows paths (both backslash and forward slash styles)
-	_, err = db.Exec(`INSERT INTO media (path, title, type, size, duration, time_deleted) VALUES
+	_, err = db.Exec(`INSERT INTO media (path, title, media_type, size, duration, time_deleted) VALUES
 		('C:\Users\John\Videos\clip1.mp4', 'Clip1', 'video', 200000000, 1800, 0),
 		('C:\Users\John\Videos\clip2.mov', 'Clip2', 'video', 250000000, 2100, 0),
 		('C:\Users\John\Music\track1.flac', 'Track1', 'audio', 30000000, 420, 0),
@@ -989,22 +989,22 @@ func TestHandleDU_MixedUnixWindowsPaths(t *testing.T) {
 			t.Fatal("Expected counts to be populated")
 		}
 
-		t.Logf("Type counts: %v", resp.Counts.Type)
+		t.Logf("MediaType counts: %v", resp.Counts.MediaType)
 
 		// Should have video, audio, and text types
 		typeMap := make(map[string]int64)
-		for _, t := range resp.Counts.Type {
+		for _, t := range resp.Counts.MediaType {
 			typeMap[t.Label] = t.Value
 		}
 
 		if typeMap["video"] == 0 {
-			t.Error("Expected video type count > 0")
+			t.Error("Expected video media_type count > 0")
 		}
 		if typeMap["audio"] == 0 {
-			t.Error("Expected audio type count > 0")
+			t.Error("Expected audio media_type count > 0")
 		}
 		if typeMap["text"] == 0 {
-			t.Error("Expected text type count > 0")
+			t.Error("Expected text media_type count > 0")
 		}
 
 		t.Logf("Video: %d, Audio: %d, Text: %d",

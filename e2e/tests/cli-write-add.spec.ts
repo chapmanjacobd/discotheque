@@ -12,7 +12,7 @@ test.describe('CLI: Add Command', () => {
     const queryResult = await cli.runJson<any[]>(['print', testDbPath, '--search', 'test_video', '--json']);
     expect(queryResult.length).toBe(1);
     expect(queryResult[0].path).toBe(videoPath);
-    expect(queryResult[0].type).toBe('video');
+    expect(queryResult[0].media_type).toBe('video');
   });
 
   test('adds multiple files from directory', async ({ cli, tempDir, testDbPath, createValidVideo, createValidAudio }) => {
@@ -39,7 +39,7 @@ test.describe('CLI: Add Command', () => {
     const queryResult = await cli.runJson<any[]>(['print', testDbPath, '--all', '--json']);
     expect(queryResult.length).toBe(1);
     expect(queryResult[0].path).toContain('video.mp4');
-    expect(queryResult[0].type).toBe('video');
+    expect(queryResult[0].media_type).toBe('video');
   });
 
   test('adds files with audio-only filter', async ({ cli, tempDir, testDbPath, createValidVideo, createValidAudio }) => {
@@ -51,7 +51,7 @@ test.describe('CLI: Add Command', () => {
     const queryResult = await cli.runJson<any[]>(['print', testDbPath, '--all', '--json']);
     expect(queryResult.length).toBe(1);
     expect(queryResult[0].path).toContain('audio.mp3');
-    expect(queryResult[0].type).toBe('audio');
+    expect(queryResult[0].media_type).toBe('audio');
   });
 
   test('adds files with image-only filter', async ({ cli, tempDir, testDbPath, createValidImage }) => {
@@ -62,7 +62,7 @@ test.describe('CLI: Add Command', () => {
 
     const queryResult = await cli.runJson<any[]>(['print', testDbPath, '--all', '--json']);
     expect(queryResult.length).toBeGreaterThanOrEqual(2);
-    expect(queryResult.every(m => m.type === 'image')).toBe(true);
+    expect(queryResult.every(m => m.media_type === 'image')).toBe(true);
   });
 
   test('adds files with text-only filter', async ({ cli, tempDir, testDbPath, createValidDocument }) => {
@@ -73,7 +73,7 @@ test.describe('CLI: Add Command', () => {
 
     const queryResult = await cli.runJson<any[]>(['print', testDbPath, '--all', '--json']);
     expect(queryResult.length).toBeGreaterThanOrEqual(2);
-    expect(queryResult.every(m => m.type === 'text')).toBe(true);
+    expect(queryResult.every(m => m.media_type === 'text')).toBe(true);
   });
 
   test('adds files with extension filter', async ({ cli, tempDir, testDbPath, createValidVideo, createValidAudio }) => {
@@ -183,7 +183,7 @@ test.describe('CLI: Add Command', () => {
 
     const queryResult = await cli.runJson<any[]>(['print', testDbPath, '--all', '--json']);
     expect(queryResult.length).toBe(1);
-    expect(queryResult[0].type).toBe('video');
+    expect(queryResult[0].media_type).toBe('video');
   });
 
   test('adds files with verbose output', async ({ cli, testDbPath, createValidVideo }) => {

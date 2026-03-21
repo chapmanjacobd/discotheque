@@ -13,8 +13,8 @@ CREATE TABLE IF NOT EXISTS media (
     play_count INTEGER DEFAULT 0,
     playhead INTEGER DEFAULT 0,
 
-    -- Media type info
-    type TEXT,
+    -- Media media_type info
+    media_type TEXT,
     width INTEGER,
     height INTEGER,
     fps REAL,

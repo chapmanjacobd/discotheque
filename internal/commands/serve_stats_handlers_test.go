@@ -21,7 +21,7 @@ func TestHandleCategories(t *testing.T) {
 
 	sqlDB, _ := sql.Open("sqlite3", dbPath)
 	db.InitDB(sqlDB)
-	_, err := sqlDB.Exec(`INSERT INTO media (path, title, type, categories, time_deleted) VALUES 
+	_, err := sqlDB.Exec(`INSERT INTO media (path, title, media_type, categories, time_deleted) VALUES 
 		(?, 'Test1', 'video', 'comedy;action', 0),
 		(?, 'Test2', 'video', 'comedy', 0),
 		(?, 'Test3', 'video', '', 0)`,
@@ -76,7 +76,7 @@ func TestHandleGenres(t *testing.T) {
 
 	sqlDB, _ := sql.Open("sqlite3", dbPath)
 	db.InitDB(sqlDB)
-	_, err := sqlDB.Exec(`INSERT INTO media (path, title, type, genre, time_deleted) VALUES 
+	_, err := sqlDB.Exec(`INSERT INTO media (path, title, media_type, genre, time_deleted) VALUES 
 		(?, 'Test1', 'video', 'Action', 0),
 		(?, 'Test2', 'video', 'Action', 0),
 		(?, 'Test3', 'video', 'Comedy', 0)`,
@@ -131,7 +131,7 @@ func TestHandleRatings(t *testing.T) {
 
 	sqlDB, _ := sql.Open("sqlite3", dbPath)
 	db.InitDB(sqlDB)
-	_, err := sqlDB.Exec(`INSERT INTO media (path, title, type, score, time_deleted) VALUES 
+	_, err := sqlDB.Exec(`INSERT INTO media (path, title, media_type, score, time_deleted) VALUES 
 		(?, 'Test1', 'video', 5.0, 0),
 		(?, 'Test2', 'video', 5.0, 0),
 		(?, 'Test3', 'video', 3.0, 0)`,

@@ -37,7 +37,7 @@ func TestComplexFilteringAndAggregation(t *testing.T) {
 	}
 
 	for _, f := range files {
-		sqlDB.Exec("INSERT INTO media (path, size, duration, type) VALUES (?, ?, ?, ?)",
+		sqlDB.Exec("INSERT INTO media (path, size, duration, media_type) VALUES (?, ?, ?, ?)",
 			f.path, f.size, f.duration, strings.TrimPrefix(f.ext, "."))
 	}
 

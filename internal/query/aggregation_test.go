@@ -39,9 +39,9 @@ func TestAggregateMimeTypes(t *testing.T) {
 	video := "video/mp4"
 	audio := "audio/mpeg"
 	media := []models.MediaWithDB{
-		{Media: models.Media{Path: "v1.mp4", Type: &video}},
-		{Media: models.Media{Path: "v2.mp4", Type: &video}},
-		{Media: models.Media{Path: "a1.mp3", Type: &audio}},
+		{Media: models.Media{Path: "v1.mp4", MediaType: &video}},
+		{Media: models.Media{Path: "v2.mp4", MediaType: &video}},
+		{Media: models.Media{Path: "a1.mp3", MediaType: &audio}},
 	}
 
 	got := AggregateMimeTypes(media)
@@ -160,7 +160,7 @@ func TestAggregateMediaAllModes(t *testing.T) {
 	size100 := int64(100)
 	video := "video/mp4"
 	media := []models.MediaWithDB{
-		{Media: models.Media{Path: "test.mp4", Size: &size100, Type: &video}},
+		{Media: models.Media{Path: "test.mp4", Size: &size100, MediaType: &video}},
 	}
 
 	// Extensions

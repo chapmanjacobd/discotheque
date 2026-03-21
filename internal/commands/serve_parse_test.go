@@ -179,7 +179,7 @@ func TestServeCmd_ParseFlags(t *testing.T) {
 			validate: func(t *testing.T, c *ServeCmd, r *http.Request) {
 				flags := c.parseFlags(r)
 				if !flags.VideoOnly || !flags.AudioOnly || !flags.ImageOnly || !flags.TextOnly {
-					t.Error("Expected type filters to be true")
+					t.Error("Expected media_type filters to be true")
 				}
 				if flags.Watched == nil || !*flags.Watched {
 					t.Error("Expected Watched to be true")

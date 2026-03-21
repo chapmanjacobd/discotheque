@@ -76,7 +76,7 @@ func TestGetTranscodeStrategy(t *testing.T) {
 			Path:        "video.mp4",
 			VideoCodecs: &vCodec,
 			AudioCodecs: &aCodec,
-			Type:        &mime,
+			MediaType:   &mime,
 		}
 		strategy := GetTranscodeStrategy(m)
 		if strategy.NeedsTranscode {
@@ -92,7 +92,7 @@ func TestGetTranscodeStrategy(t *testing.T) {
 			Path:        "video.mkv",
 			VideoCodecs: &vCodec,
 			AudioCodecs: &aCodec,
-			Type:        &mime,
+			MediaType:   &mime,
 		}
 		strategy := GetTranscodeStrategy(m)
 		if !strategy.NeedsTranscode {

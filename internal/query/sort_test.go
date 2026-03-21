@@ -176,7 +176,7 @@ func TestIsNumericField(t *testing.T) {
 		{"size", true},
 		{"path", false},
 		{"title", false},
-		{"type", false},
+		{"media_type", false},
 	}
 
 	for _, tt := range tests {
@@ -237,9 +237,9 @@ func TestGetSortValueString(t *testing.T) {
 
 	m := models.MediaWithDB{
 		Media: models.Media{
-			Path:  path,
-			Title: &title,
-			Type:  &mtype,
+			Path:      path,
+			Title:     &title,
+			MediaType: &mtype,
 		},
 	}
 
@@ -249,7 +249,7 @@ func TestGetSortValueString(t *testing.T) {
 	}{
 		{"path", path},
 		{"title", title},
-		{"type", mtype},
+		{"media_type", mtype},
 		{"parent", filepath.FromSlash("/path/to")},
 		{"stem", "file"},
 		{"extension", ".mp4"},

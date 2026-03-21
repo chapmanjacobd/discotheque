@@ -352,7 +352,7 @@ func (c *ServeCmd) getCaptionsWithContext(ctx context.Context, queries *database
 						Time:      c.Time,
 						Text:      c.Text,
 						Title:     sql.NullString{},
-						Type:      sql.NullString{},
+						MediaType: sql.NullString{},
 						Size:      sql.NullInt64{},
 						Duration:  sql.NullInt64{},
 					})
@@ -376,7 +376,7 @@ func (c *ServeCmd) getCaptionsWithContext(ctx context.Context, queries *database
 						Time:      c.Time,
 						Text:      c.Text,
 						Title:     sql.NullString{},
-						Type:      sql.NullString{},
+						MediaType: sql.NullString{},
 						Size:      sql.NullInt64{},
 						Duration:  sql.NullInt64{},
 					})

@@ -6,7 +6,7 @@ import (
 )
 
 // mediaColumns is the standard column list for media queries
-const mediaColumns = "path, path_tokenized, title, duration, size, time_created, time_modified, time_deleted, time_first_played, time_last_played, play_count, playhead, type, width, height, fps, video_codecs, audio_codecs, subtitle_codecs, video_count, audio_count, subtitle_count, album, artist, genre, categories, description, language, time_downloaded, score"
+const mediaColumns = "path, path_tokenized, title, duration, size, time_created, time_modified, time_deleted, time_first_played, time_last_played, play_count, playhead, media_type, width, height, fps, video_codecs, audio_codecs, subtitle_codecs, video_count, audio_count, subtitle_count, album, artist, genre, categories, description, language, time_downloaded, score"
 
 // GetMedia retrieves all non-deleted media
 func (q *Queries) GetMedia(ctx context.Context, limit int64) ([]Media, error) {
@@ -33,7 +33,7 @@ func (q *Queries) GetMedia(ctx context.Context, limit int64) ([]Media, error) {
 			&i.TimeLastPlayed,
 			&i.PlayCount,
 			&i.Playhead,
-			&i.Type,
+			&i.MediaType,
 			&i.Width,
 			&i.Height,
 			&i.Fps,
@@ -72,7 +72,7 @@ type GetMediaByTypeParams struct {
 
 // GetMediaByType retrieves media filtered by type
 func (q *Queries) GetMediaByType(ctx context.Context, arg GetMediaByTypeParams) ([]Media, error) {
-	const query = `SELECT ` + mediaColumns + ` FROM media WHERE time_deleted = 0 AND ((? AND type = 'video') OR (? AND (type = 'audio' OR type = 'audiobook')) OR (? AND type = 'image')) ORDER BY path LIMIT ?`
+	const query = `SELECT ` + mediaColumns + ` FROM media WHERE time_deleted = 0 AND ((? AND media_type = 'video') OR (? AND (media_type = 'audio' OR media_type = 'audiobook')) OR (? AND media_type = 'image')) ORDER BY path LIMIT ?`
 	rows, err := q.db.QueryContext(ctx, query, arg.VideoOnly, arg.AudioOnly, arg.ImageOnly, arg.Limit)
 	if err != nil {
 		return nil, err
@@ -95,7 +95,7 @@ func (q *Queries) GetMediaByType(ctx context.Context, arg GetMediaByTypeParams) 
 			&i.TimeLastPlayed,
 			&i.PlayCount,
 			&i.Playhead,
-			&i.Type,
+			&i.MediaType,
 			&i.Width,
 			&i.Height,
 			&i.Fps,
@@ -156,7 +156,7 @@ func (q *Queries) GetMediaBySize(ctx context.Context, arg GetMediaBySizeParams) 
 			&i.TimeLastPlayed,
 			&i.PlayCount,
 			&i.Playhead,
-			&i.Type,
+			&i.MediaType,
 			&i.Width,
 			&i.Height,
 			&i.Fps,
@@ -217,7 +217,7 @@ func (q *Queries) GetMediaByDuration(ctx context.Context, arg GetMediaByDuration
 			&i.TimeLastPlayed,
 			&i.PlayCount,
 			&i.Playhead,
-			&i.Type,
+			&i.MediaType,
 			&i.Width,
 			&i.Height,
 			&i.Fps,
@@ -277,7 +277,7 @@ func (q *Queries) GetMediaByPath(ctx context.Context, arg GetMediaByPathParams) 
 			&i.TimeLastPlayed,
 			&i.PlayCount,
 			&i.Playhead,
-			&i.Type,
+			&i.MediaType,
 			&i.Width,
 			&i.Height,
 			&i.Fps,
@@ -338,7 +338,7 @@ func (q *Queries) GetMediaByPathPrefix(ctx context.Context, arg GetMediaByPathPr
 			&i.TimeLastPlayed,
 			&i.PlayCount,
 			&i.Playhead,
-			&i.Type,
+			&i.MediaType,
 			&i.Width,
 			&i.Height,
 			&i.Fps,
@@ -384,7 +384,7 @@ func (q *Queries) GetMediaByPathExact(ctx context.Context, path string) (Media, 
 		&i.TimeLastPlayed,
 		&i.PlayCount,
 		&i.Playhead,
-		&i.Type,
+		&i.MediaType,
 		&i.Width,
 		&i.Height,
 		&i.Fps,
@@ -465,7 +465,7 @@ func (q *Queries) GetWatchedMedia(ctx context.Context, limit int64) ([]Media, er
 			&i.TimeLastPlayed,
 			&i.PlayCount,
 			&i.Playhead,
-			&i.Type,
+			&i.MediaType,
 			&i.Width,
 			&i.Height,
 			&i.Fps,
@@ -519,7 +519,7 @@ func (q *Queries) GetUnwatchedMedia(ctx context.Context, limit int64) ([]Media, 
 			&i.TimeLastPlayed,
 			&i.PlayCount,
 			&i.Playhead,
-			&i.Type,
+			&i.MediaType,
 			&i.Width,
 			&i.Height,
 			&i.Fps,
@@ -573,7 +573,7 @@ func (q *Queries) GetUnfinishedMedia(ctx context.Context, limit int64) ([]Media,
 			&i.TimeLastPlayed,
 			&i.PlayCount,
 			&i.Playhead,
-			&i.Type,
+			&i.MediaType,
 			&i.Width,
 			&i.Height,
 			&i.Fps,
@@ -634,7 +634,7 @@ func (q *Queries) GetMediaByPlayCount(ctx context.Context, arg GetMediaByPlayCou
 			&i.TimeLastPlayed,
 			&i.PlayCount,
 			&i.Playhead,
-			&i.Type,
+			&i.MediaType,
 			&i.Width,
 			&i.Height,
 			&i.Fps,
@@ -688,7 +688,7 @@ func (q *Queries) GetRandomMedia(ctx context.Context, limit int64) ([]Media, err
 			&i.TimeLastPlayed,
 			&i.PlayCount,
 			&i.Playhead,
-			&i.Type,
+			&i.MediaType,
 			&i.Width,
 			&i.Height,
 			&i.Fps,
@@ -749,7 +749,7 @@ func (q *Queries) GetSiblingMedia(ctx context.Context, arg GetSiblingMediaParams
 			&i.TimeLastPlayed,
 			&i.PlayCount,
 			&i.Playhead,
-			&i.Type,
+			&i.MediaType,
 			&i.Width,
 			&i.Height,
 			&i.Fps,
@@ -1009,7 +1009,7 @@ type UpsertMediaParams struct {
 	Size           sql.NullInt64
 	TimeCreated    sql.NullInt64
 	TimeModified   sql.NullInt64
-	Type           sql.NullString
+	MediaType      sql.NullString
 	Width          sql.NullInt64
 	Height         sql.NullInt64
 	Fps            sql.NullFloat64
@@ -1031,7 +1031,7 @@ type UpsertMediaParams struct {
 
 // UpsertMedia inserts or updates a media item
 func (q *Queries) UpsertMedia(ctx context.Context, arg UpsertMediaParams) error {
-	const query = `INSERT INTO media (path, path_tokenized, title, duration, size, time_created, time_modified, type, width, height, fps, video_codecs, audio_codecs, subtitle_codecs, video_count, audio_count, subtitle_count, album, artist, genre, categories, description, language, time_downloaded, score) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(path) DO UPDATE SET path_tokenized = excluded.path_tokenized, title = excluded.title, duration = excluded.duration, size = excluded.size, time_modified = excluded.time_modified, type = excluded.type, width = excluded.width, height = excluded.height, fps = excluded.fps, video_codecs = excluded.video_codecs, audio_codecs = excluded.audio_codecs, subtitle_codecs = excluded.subtitle_codecs, video_count = excluded.video_count, audio_count = excluded.audio_count, subtitle_count = excluded.subtitle_count, album = excluded.album, artist = excluded.artist, genre = excluded.genre, categories = excluded.categories, description = excluded.description, language = excluded.language, time_downloaded = COALESCE(media.time_downloaded, excluded.time_downloaded), score = excluded.score`
+	const query = `INSERT INTO media (path, path_tokenized, title, duration, size, time_created, time_modified, media_type, width, height, fps, video_codecs, audio_codecs, subtitle_codecs, video_count, audio_count, subtitle_count, album, artist, genre, categories, description, language, time_downloaded, score) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(path) DO UPDATE SET path_tokenized = excluded.path_tokenized, title = excluded.title, duration = excluded.duration, size = excluded.size, time_modified = excluded.time_modified, media_type = excluded.media_type, width = excluded.width, height = excluded.height, fps = excluded.fps, video_codecs = excluded.video_codecs, audio_codecs = excluded.audio_codecs, subtitle_codecs = excluded.subtitle_codecs, video_count = excluded.video_count, audio_count = excluded.audio_count, subtitle_count = excluded.subtitle_count, album = excluded.album, artist = excluded.artist, genre = excluded.genre, categories = excluded.categories, description = excluded.description, language = excluded.language, time_downloaded = COALESCE(media.time_downloaded, excluded.time_downloaded), score = excluded.score`
 	_, err := q.db.ExecContext(ctx, query,
 		arg.Path,
 		arg.PathTokenized,
@@ -1040,7 +1040,7 @@ func (q *Queries) UpsertMedia(ctx context.Context, arg UpsertMediaParams) error 
 		arg.Size,
 		arg.TimeCreated,
 		arg.TimeModified,
-		arg.Type,
+		arg.MediaType,
 		arg.Width,
 		arg.Height,
 		arg.Fps,
@@ -1157,7 +1157,7 @@ type GetPlaylistItemsRow struct {
 
 // GetPlaylistItems retrieves all items in a playlist
 func (q *Queries) GetPlaylistItems(ctx context.Context, playlistID int64) ([]GetPlaylistItemsRow, error) {
-	const query = `SELECT m.path, m.path_tokenized, m.title, m.duration, m.size, m.time_created, m.time_modified, m.time_deleted, m.time_first_played, m.time_last_played, m.play_count, m.playhead, m.type, m.width, m.height, m.fps, m.video_codecs, m.audio_codecs, m.subtitle_codecs, m.video_count, m.audio_count, m.subtitle_count, m.album, m.artist, m.genre, m.categories, m.description, m.language, m.time_downloaded, m.score, pi.track_number, pi.time_added FROM media m JOIN playlist_items pi ON m.path = pi.media_path WHERE pi.playlist_id = ? AND m.time_deleted = 0 ORDER BY pi.track_number, pi.time_added, m.path`
+	const query = `SELECT m.path, m.path_tokenized, m.title, m.duration, m.size, m.time_created, m.time_modified, m.time_deleted, m.time_first_played, m.time_last_played, m.play_count, m.playhead, m.media_type, m.width, m.height, m.fps, m.video_codecs, m.audio_codecs, m.subtitle_codecs, m.video_count, m.audio_count, m.subtitle_count, m.album, m.artist, m.genre, m.categories, m.description, m.language, m.time_downloaded, m.score, pi.track_number, pi.time_added FROM media m JOIN playlist_items pi ON m.path = pi.media_path WHERE pi.playlist_id = ? AND m.time_deleted = 0 ORDER BY pi.track_number, pi.time_added, m.path`
 	rows, err := q.db.QueryContext(ctx, query, playlistID)
 	if err != nil {
 		return nil, err
@@ -1180,7 +1180,7 @@ func (q *Queries) GetPlaylistItems(ctx context.Context, playlistID int64) ([]Get
 			&i.TimeLastPlayed,
 			&i.PlayCount,
 			&i.Playhead,
-			&i.Type,
+			&i.MediaType,
 			&i.Width,
 			&i.Height,
 			&i.Fps,
@@ -1280,7 +1280,7 @@ func (q *Queries) GetCaptionsForMedia(ctx context.Context, mediaPath string) ([]
 
 // GetAllCaptions retrieves random captions
 func (q *Queries) GetAllCaptions(ctx context.Context, limit int64) ([]GetAllCaptionsRow, error) {
-	const query = `SELECT c.media_path, c.time, c.text, m.title, m.type, m.size, m.duration FROM captions c JOIN media m ON c.media_path = m.path WHERE m.time_deleted = 0 AND c.text IS NOT NULL AND c.text != '' ORDER BY RANDOM() LIMIT ?`
+	const query = `SELECT c.media_path, c.time, c.text, m.title, m.media_type, m.size, m.duration FROM captions c JOIN media m ON c.media_path = m.path WHERE m.time_deleted = 0 AND c.text IS NOT NULL AND c.text != '' ORDER BY RANDOM() LIMIT ?`
 	rows, err := q.db.QueryContext(ctx, query, limit)
 	if err != nil {
 		return nil, err
@@ -1290,7 +1290,7 @@ func (q *Queries) GetAllCaptions(ctx context.Context, limit int64) ([]GetAllCapt
 	var items []GetAllCaptionsRow
 	for rows.Next() {
 		var i GetAllCaptionsRow
-		if err := rows.Scan(&i.MediaPath, &i.Time, &i.Text, &i.Title, &i.Type, &i.Size, &i.Duration); err != nil {
+		if err := rows.Scan(&i.MediaPath, &i.Time, &i.Text, &i.Title, &i.MediaType, &i.Size, &i.Duration); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -1312,7 +1312,7 @@ type GetAllCaptionsOrderedParams struct {
 
 // GetAllCaptionsOrdered retrieves captions ordered by media path and time
 func (q *Queries) GetAllCaptionsOrdered(ctx context.Context, arg GetAllCaptionsOrderedParams) ([]GetAllCaptionsOrderedRow, error) {
-	const query = `SELECT c.media_path, c.time, c.text, m.title, m.type, m.size, m.duration FROM captions c JOIN media m ON c.media_path = m.path WHERE m.time_deleted = 0 AND c.text IS NOT NULL AND c.text != '' AND ((CAST(? AS INT) = 0 AND CAST(? AS INT) = 0 AND CAST(? AS INT) = 0 AND CAST(? AS INT) = 0) OR (CAST(? AS INT) = 1 AND m.type = 'video') OR (CAST(? AS INT) = 1 AND m.type IN ('audio', 'audiobook')) OR (CAST(? AS INT) = 1 AND m.type = 'image') OR (CAST(? AS INT) = 1 AND m.type = 'text')) ORDER BY c.media_path, c.time LIMIT ?`
+	const query = `SELECT c.media_path, c.time, c.text, m.title, m.media_type, m.size, m.duration FROM captions c JOIN media m ON c.media_path = m.path WHERE m.time_deleted = 0 AND c.text IS NOT NULL AND c.text != '' AND ((CAST(? AS INT) = 0 AND CAST(? AS INT) = 0 AND CAST(? AS INT) = 0 AND CAST(? AS INT) = 0) OR (CAST(? AS INT) = 1 AND m.media_type = 'video') OR (CAST(? AS INT) = 1 AND m.media_type IN ('audio', 'audiobook')) OR (CAST(? AS INT) = 1 AND m.media_type = 'image') OR (CAST(? AS INT) = 1 AND m.media_type = 'text')) ORDER BY c.media_path, c.time LIMIT ?`
 	rows, err := q.db.QueryContext(ctx, query,
 		arg.VideoOnly,
 		arg.AudioOnly,
@@ -1332,7 +1332,7 @@ func (q *Queries) GetAllCaptionsOrdered(ctx context.Context, arg GetAllCaptionsO
 	var items []GetAllCaptionsOrderedRow
 	for rows.Next() {
 		var i GetAllCaptionsOrderedRow
-		if err := rows.Scan(&i.MediaPath, &i.Time, &i.Text, &i.Title, &i.Type, &i.Size, &i.Duration); err != nil {
+		if err := rows.Scan(&i.MediaPath, &i.Time, &i.Text, &i.Title, &i.MediaType, &i.Size, &i.Duration); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -1370,7 +1370,7 @@ func (q *Queries) GetStats(ctx context.Context) (GetStatsRow, error) {
 
 // GetStatsByTypeRow is a row from GetStatsByType
 type GetStatsByTypeRow struct {
-	Type          sql.NullString
+	MediaType     sql.NullString
 	Count         int64
 	TotalSize     sql.NullInt64
 	TotalDuration sql.NullInt64
@@ -1378,7 +1378,7 @@ type GetStatsByTypeRow struct {
 
 // GetStatsByType retrieves stats grouped by type
 func (q *Queries) GetStatsByType(ctx context.Context) ([]GetStatsByTypeRow, error) {
-	const query = `SELECT type, COUNT(*) as count, SUM(size) as total_size, SUM(duration) as total_duration FROM media WHERE time_deleted = 0 GROUP BY type`
+	const query = `SELECT media_type, COUNT(*) as count, SUM(size) as total_size, SUM(duration) as total_duration FROM media WHERE time_deleted = 0 GROUP BY media_type`
 	rows, err := q.db.QueryContext(ctx, query)
 	if err != nil {
 		return nil, err
@@ -1388,7 +1388,7 @@ func (q *Queries) GetStatsByType(ctx context.Context) ([]GetStatsByTypeRow, erro
 	var items []GetStatsByTypeRow
 	for rows.Next() {
 		var i GetStatsByTypeRow
-		if err := rows.Scan(&i.Type, &i.Count, &i.TotalSize, &i.TotalDuration); err != nil {
+		if err := rows.Scan(&i.MediaType, &i.Count, &i.TotalSize, &i.TotalDuration); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

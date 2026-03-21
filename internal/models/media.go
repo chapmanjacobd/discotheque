@@ -22,7 +22,7 @@ type Media struct {
 	TimeLastPlayed  *int64   `json:"time_last_played,omitempty"`
 	PlayCount       *int64   `json:"play_count,omitempty"`
 	Playhead        *int64   `json:"playhead,omitempty"`
-	Type            *string  `json:"type,omitempty"`
+	MediaType       *string  `json:"media_type,omitempty"`
 	Width           *int64   `json:"width,omitempty"`
 	Height          *int64   `json:"height,omitempty"`
 	Fps             *float64 `json:"fps,omitempty"`
@@ -190,7 +190,7 @@ func FromDB(m db.Media) Media {
 		TimeLastPlayed:  NullInt64Ptr(m.TimeLastPlayed),
 		PlayCount:       NullInt64Ptr(m.PlayCount),
 		Playhead:        NullInt64Ptr(m.Playhead),
-		Type:            NullStringPtr(m.Type),
+		MediaType:       NullStringPtr(m.MediaType),
 		Width:           NullInt64Ptr(m.Width),
 		Height:          NullInt64Ptr(m.Height),
 		Fps:             NullFloat64Ptr(m.Fps),
@@ -227,7 +227,7 @@ func ToDBUpsert(m Media) db.UpsertMediaParams {
 		Size:           ToNullInt64(m.Size),
 		TimeCreated:    ToNullInt64(m.TimeCreated),
 		TimeModified:   ToNullInt64(m.TimeModified),
-		Type:           ToNullString(m.Type),
+		MediaType:      ToNullString(m.MediaType),
 		Width:          ToNullInt64(m.Width),
 		Height:         ToNullInt64(m.Height),
 		Fps:            ToNullFloat64(m.Fps),

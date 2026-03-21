@@ -75,7 +75,7 @@ test.describe('Delete Shortcut', () => {
     expect(initialCount).toBeGreaterThanOrEqual(2);
 
     // Find a document card in the main view using POM
-    const docCard = mediaPage.page.locator('.media-card[data-type*="document"], .media-card[data-type="text"]').first();
+    const docCard = mediaPage.page.locator('.media-card[data-media_type*="document"], .media-card[data-media_type="text"]').first();
 
     // Click to open document modal using POM
     await docCard.click();

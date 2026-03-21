@@ -242,7 +242,7 @@ test.describe('Keyboard Shortcuts Edge Cases', () => {
       await viewerPage.closeDocumentModal();
 
       // Open different document using POM
-      const docCard2 = mediaPage.page.locator('.media-card[data-type*="text"]').nth(1);
+      const docCard2 = mediaPage.page.locator('.media-card[data-media_type*="text"]').nth(1);
       if (await docCard2.count() > 0) {
         await docCard2.click();
         await viewerPage.waitForDocumentModal();

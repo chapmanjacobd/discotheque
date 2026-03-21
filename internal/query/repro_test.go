@@ -22,11 +22,11 @@ func TestMediaTypeAndEpisodicConstraint(t *testing.T) {
 		t.Fatalf("Failed to init test DB: %v", err)
 	}
 	// Directory 1: 1 video, 1 image
-	dbConn.Exec("INSERT INTO media (path, type) VALUES ('/dir1/v1.mp4', 'video')")
-	dbConn.Exec("INSERT INTO media (path, type) VALUES ('/dir1/i1.jpg', 'image')")
+	dbConn.Exec("INSERT INTO media (path, media_type) VALUES ('/dir1/v1.mp4', 'video')")
+	dbConn.Exec("INSERT INTO media (path, media_type) VALUES ('/dir1/i1.jpg', 'image')")
 	// Directory 2: 2 videos
-	dbConn.Exec("INSERT INTO media (path, type) VALUES ('/dir2/v2.mp4', 'video')")
-	dbConn.Exec("INSERT INTO media (path, type) VALUES ('/dir2/v3.mp4', 'video')")
+	dbConn.Exec("INSERT INTO media (path, media_type) VALUES ('/dir2/v2.mp4', 'video')")
+	dbConn.Exec("INSERT INTO media (path, media_type) VALUES ('/dir2/v3.mp4', 'video')")
 	dbConn.Close()
 
 	ctx := context.Background()

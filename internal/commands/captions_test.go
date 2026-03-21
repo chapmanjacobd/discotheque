@@ -34,7 +34,7 @@ func TestHandleDU_CaptionsView(t *testing.T) {
 		CREATE TABLE media (
 			path TEXT PRIMARY KEY,
 			title TEXT,
-			type TEXT,
+			media_type TEXT,
 			size INTEGER,
 			duration INTEGER,
 			time_deleted INTEGER DEFAULT 0
@@ -52,7 +52,7 @@ func TestHandleDU_CaptionsView(t *testing.T) {
 
 	// Insert test media
 	_, err = db.Exec(`
-		INSERT INTO media (path, title, type, size, duration) VALUES
+		INSERT INTO media (path, title, media_type, size, duration) VALUES
 			(?, 'Test Video 1', 'video/mp4', 1024, 120),
 			(?, 'Test Video 2', 'video/mp4', 2048, 180),
 			(?, 'Test Video 3', 'video/mp4', 512, 90)`,
@@ -196,7 +196,7 @@ func TestHandleDU_CaptionsView_EmptyDatabase(t *testing.T) {
 		CREATE TABLE media (
 			path TEXT PRIMARY KEY,
 			title TEXT,
-			type TEXT,
+			media_type TEXT,
 			size INTEGER,
 			duration INTEGER,
 			time_deleted INTEGER DEFAULT 0
@@ -263,9 +263,9 @@ func TestHandleDU_CaptionsView_MultipleDatabases(t *testing.T) {
 		t.Fatalf("Failed to open db1: %v", err)
 	}
 	_, err = db1.Exec(`
-		CREATE TABLE media (path TEXT PRIMARY KEY, title TEXT, type TEXT, size INTEGER, duration INTEGER, time_deleted INTEGER DEFAULT 0);
+		CREATE TABLE media (path TEXT PRIMARY KEY, title TEXT, media_type TEXT, size INTEGER, duration INTEGER, time_deleted INTEGER DEFAULT 0);
 		CREATE TABLE captions (rowid INTEGER PRIMARY KEY AUTOINCREMENT, media_path TEXT, time REAL, text TEXT);
-		INSERT INTO media (path, title, type, size, duration) VALUES (?, 'DB1 Video', 'video/mp4', 1024, 120);
+		INSERT INTO media (path, title, media_type, size, duration) VALUES (?, 'DB1 Video', 'video/mp4', 1024, 120);
 		INSERT INTO captions (media_path, time, text) VALUES (?, 10.0, 'Caption from DB1');
 	`, filepath.FromSlash("/db1/video1.mp4"), filepath.FromSlash("/db1/video1.mp4"))
 	if err != nil {
@@ -279,9 +279,9 @@ func TestHandleDU_CaptionsView_MultipleDatabases(t *testing.T) {
 		t.Fatalf("Failed to open db2: %v", err)
 	}
 	_, err = db2.Exec(`
-		CREATE TABLE media (path TEXT PRIMARY KEY, title TEXT, type TEXT, size INTEGER, duration INTEGER, time_deleted INTEGER DEFAULT 0);
+		CREATE TABLE media (path TEXT PRIMARY KEY, title TEXT, media_type TEXT, size INTEGER, duration INTEGER, time_deleted INTEGER DEFAULT 0);
 		CREATE TABLE captions (rowid INTEGER PRIMARY KEY AUTOINCREMENT, media_path TEXT, time REAL, text TEXT);
-		INSERT INTO media (path, title, type, size, duration) VALUES (?, 'DB2 Video', 'video/mp4', 2048, 180);
+		INSERT INTO media (path, title, media_type, size, duration) VALUES (?, 'DB2 Video', 'video/mp4', 2048, 180);
 		INSERT INTO captions (media_path, time, text) VALUES (?, 20.0, 'Caption from DB2');
 	`, filepath.FromSlash("/db2/video1.mp4"), filepath.FromSlash("/db2/video1.mp4"))
 	if err != nil {

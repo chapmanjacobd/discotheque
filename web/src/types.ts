@@ -1,7 +1,7 @@
 export interface MediaItem {
     path: string;
     name: string;
-    type: string;
+    media_type: string;
     is_dir: boolean;
     size?: number;
     duration?: number;
@@ -39,8 +39,8 @@ export interface FilterBins {
     created_percentiles: number[];
     downloaded_percentiles: number[];
 
-    // Type counts (special case - not a percentile distribution)
-    type: FilterBin[];
+    // MediaType counts (special case - not a percentile distribution)
+    media_type: FilterBin[];
 }
 
 export interface PlaybackState {
@@ -73,7 +73,7 @@ export interface State {
     currentPage: number;
     totalCount: number;
     filters: {
-        types: string[];
+        media_types: string[];
         search: string;
         categories: string[];
         genre: string;

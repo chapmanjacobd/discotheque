@@ -137,7 +137,7 @@ export class MediaPage extends BasePage {
    * Open first media item matching type
    */
   async openFirstMediaByType(type: 'video' | 'audio' | 'image' | 'text'): Promise<void> {
-    const card = this.page.locator(`.media-card[data-type*="${type}"]`).first();
+    const card = this.page.locator(`.media-card[data-media_type*="${type}"]`).first();
     await this._clickCard(card);
   }
 
@@ -157,7 +157,7 @@ export class MediaPage extends BasePage {
     timeout: number = 500
   ): Promise<void> {
     const searchType = type === 'document' ? 'text' : type;
-    const card = this.page.locator(`.media-card[data-type*="${searchType}"]`).nth(index);
+    const card = this.page.locator(`.media-card[data-media_type*="${searchType}"]`).nth(index);
     await this._clickCard(card);
     if (timeout > 0) await this.waitForTimeout(timeout);
   }
@@ -166,7 +166,7 @@ export class MediaPage extends BasePage {
    * Click first video or audio (fallback)
    */
   async clickFirstVideoOrAudio(): Promise<void> {
-    const videoCard = this.page.locator('.media-card[data-type*="video"]').first();
+    const videoCard = this.page.locator('.media-card[data-media_type*="video"]').first();
     if (await videoCard.count() > 0) {
       await this.clickFirstMediaByType('video');
     } else {
@@ -178,7 +178,7 @@ export class MediaPage extends BasePage {
    * Click first image or video (fallback)
    */
   async clickFirstImageOrVideo(): Promise<void> {
-    const imageCard = this.page.locator('.media-card[data-type*="image"]').first();
+    const imageCard = this.page.locator('.media-card[data-media_type*="image"]').first();
     if (await imageCard.count() > 0) {
       await this.clickFirstMediaByType('image');
     } else {
@@ -346,7 +346,7 @@ export class MediaPage extends BasePage {
    */
   getMediaCardsByType(type: 'video' | 'audio' | 'image' | 'text' | 'document'): Locator {
     const searchType = type === 'document' ? 'text' : type;
-    return this.page.locator(`.media-card[data-type*="${searchType}"]`);
+    return this.page.locator(`.media-card[data-media_type*="${searchType}"]`);
   }
 
   /**
@@ -354,7 +354,7 @@ export class MediaPage extends BasePage {
    */
   getMediaCardByText(type: 'video' | 'audio' | 'image' | 'text' | 'document', textPattern: string | RegExp): Locator {
     const searchType = type === 'document' ? 'text' : type;
-    const cards = this.page.locator(`.media-card[data-type*="${searchType}"]`);
+    const cards = this.page.locator(`.media-card[data-media_type*="${searchType}"]`);
     // Use filter for both string and RegExp to get the card element, not child elements
     return cards.filter({ hasText: textPattern });
   }
@@ -370,7 +370,7 @@ export class MediaPage extends BasePage {
    * Get first media card by type
    */
   getFirstMediaCardByType(type: 'video' | 'audio' | 'image' | 'text'): Locator {
-    return this.page.locator(`.media-card[data-type*="${type}"]`).first();
+    return this.page.locator(`.media-card[data-media_type*="${type}"]`).first();
   }
 
   /**
@@ -384,14 +384,14 @@ export class MediaPage extends BasePage {
    * Get media card type
    */
   async getMediaCardType(index: number): Promise<string> {
-    return await this.getMediaCard(index).getAttribute('data-type') || '';
+    return await this.getMediaCard(index).getAttribute('data-media_type') || '';
   }
 
   /**
    * Get all media card types
    */
   async getAllMediaCardTypes(): Promise<string[]> {
-    return await this.mediaCards.evaluateAll(els => els.map(el => el.getAttribute('data-type') || ''));
+    return await this.mediaCards.evaluateAll(els => els.map(el => el.getAttribute('data-media_type') || ''));
   }
 
   /**
@@ -493,7 +493,7 @@ export class MediaPage extends BasePage {
     timeout: number = 500
   ): Promise<void> {
     const searchType = type === 'document' ? 'text' : type;
-    const cards = this.page.locator(`.media-card[data-type*="${searchType}"]`);
+    const cards = this.page.locator(`.media-card[data-media_type*="${searchType}"]`);
     const count = await cards.count();
 
     for (let i = 0; i < count; i++) {

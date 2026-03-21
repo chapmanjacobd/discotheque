@@ -43,7 +43,7 @@ func hasActiveFilters(flags models.GlobalFlags) bool {
 	return false
 }
 
-// hasBasicFilters checks if only basic SQL-level filters are active (size, duration, type, etc.)
+// hasBasicFilters checks if only basic SQL-level filters are active (size, duration, media_type, etc.)
 // These can be applied directly in SQL without folder backfiltering
 func hasBasicFilters(flags models.GlobalFlags) bool {
 	if flags.VideoOnly || flags.AudioOnly || flags.ImageOnly || flags.TextOnly {
@@ -259,7 +259,7 @@ func FetchDUDirectFiles(ctx context.Context, dbPaths []string, pathPrefix string
 				       time_deleted, time_first_played, time_last_played, play_count,
 				       playhead, album, artist, genre, categories, description,
 				       language, time_downloaded, score, video_codecs, audio_codecs,
-				       subtitle_codecs, width, height, type
+				       subtitle_codecs, width, height, media_type
 				FROM media
 				WHERE COALESCE(time_deleted, 0) = 0
 				  AND instr(replace(path, '\\', '/'), '/') = 0
@@ -283,7 +283,7 @@ func FetchDUDirectFiles(ctx context.Context, dbPaths []string, pathPrefix string
 				       time_deleted, time_first_played, time_last_played, play_count,
 				       playhead, album, artist, genre, categories, description,
 				       language, time_downloaded, score, video_codecs, audio_codecs,
-				       subtitle_codecs, width, height, type
+				       subtitle_codecs, width, height, media_type
 				FROM media
 				WHERE COALESCE(time_deleted, 0) = 0
 				  AND replace(path, '\\', '/') LIKE ? || '/%'
@@ -402,8 +402,8 @@ func AggregateMimeTypes(media []models.MediaWithDB, fastMode ...bool) []models.F
 	groups := make(map[string]*models.FolderStats)
 	for _, m := range media {
 		mime := "unknown"
-		if m.Type != nil {
-			mime = *m.Type
+		if m.MediaType != nil {
+			mime = *m.MediaType
 		}
 		if _, ok := groups[mime]; !ok {
 			groups[mime] = &models.FolderStats{Path: mime}
@@ -724,7 +724,7 @@ func getMatchingParentDirs(ctx context.Context, dbPath string, pathPrefix string
 		)
 	}
 
-	// Add basic filters (size, duration, type, etc.) - but NOT FileCounts/FolderCounts
+	// Add basic filters (size, duration, media_type, etc.) - but NOT FileCounts/FolderCounts
 	basicFlags := flags
 	basicFlags.FileCounts = ""
 	basicFlags.FolderCounts = ""
@@ -1160,7 +1160,7 @@ func FetchDUDirectFilesWithFilters(ctx context.Context, dbPaths []string, pathPr
 				       time_deleted, time_first_played, time_last_played, play_count,
 				       playhead, album, artist, genre, categories, description,
 				       language, time_downloaded, score, video_codecs, audio_codecs,
-				       subtitle_codecs, width, height, type
+				       subtitle_codecs, width, height, media_type
 				FROM media
 				WHERE COALESCE(time_deleted, 0) = 0
 				  AND instr(replace(path, '\\', '/'), '/') = 0
@@ -1180,7 +1180,7 @@ func FetchDUDirectFilesWithFilters(ctx context.Context, dbPaths []string, pathPr
 				       time_deleted, time_first_played, time_last_played, play_count,
 				       playhead, album, artist, genre, categories, description,
 				       language, time_downloaded, score, video_codecs, audio_codecs,
-				       subtitle_codecs, width, height, type
+				       subtitle_codecs, width, height, media_type
 				FROM media
 				WHERE COALESCE(time_deleted, 0) = 0
 				  AND replace(path, '\\', '/') LIKE ? || '/%'

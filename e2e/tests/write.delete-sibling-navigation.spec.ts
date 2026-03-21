@@ -75,7 +75,7 @@ test.describe('Delete Shortcut - Sibling Navigation', () => {
     await mediaPage.goto(server.getBaseUrl());
 
     // Find first document card using POM
-    const firstDoc = mediaPage.page.locator('.media-card[data-type*="document"], .media-card[data-type="text"]').first();
+    const firstDoc = mediaPage.page.locator('.media-card[data-media_type*="document"], .media-card[data-media_type="text"]').first();
     expect(await firstDoc.count()).toBeGreaterThan(0);
 
     const firstFileName = await firstDoc.getAttribute('data-path');
@@ -131,7 +131,7 @@ test.describe('Delete Shortcut - Sibling Navigation', () => {
     await mediaPage.goto(server.getBaseUrl());
 
     // Open first document using POM
-    const firstDoc = mediaPage.page.locator('.media-card[data-type*="document"], .media-card[data-type="text"]').first();
+    const firstDoc = mediaPage.page.locator('.media-card[data-media_type*="document"], .media-card[data-media_type="text"]').first();
     await firstDoc.click();
     await viewerPage.waitForDocumentModal();
 

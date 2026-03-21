@@ -60,8 +60,8 @@ type item struct {
 
 func (i item) Title() string {
 	icon := "❓"
-	if i.media.Type != nil {
-		switch *i.media.Type {
+	if i.media.MediaType != nil {
+		switch *i.media.MediaType {
 		case "audio":
 			icon = "🎵"
 		case "video":
@@ -175,10 +175,10 @@ func NewModel(media []models.MediaWithDB, databases []string, flags models.Globa
 	sidebarItems := []list.Item{
 		sidebarItem{title: "🏠 All Media", filter: func(m models.MediaWithDB) bool { return true }},
 		sidebarItem{title: "🕒 History", filter: func(m models.MediaWithDB) bool { return m.TimeLastPlayed != nil && *m.TimeLastPlayed > 0 }},
-		sidebarItem{title: "🎵 Audio", filter: func(m models.MediaWithDB) bool { return m.Type != nil && *m.Type == "audio" }},
-		sidebarItem{title: "🎬 Video", filter: func(m models.MediaWithDB) bool { return m.Type != nil && *m.Type == "video" }},
-		sidebarItem{title: "🖼️ Image", filter: func(m models.MediaWithDB) bool { return m.Type != nil && *m.Type == "image" }},
-		sidebarItem{title: "📄 Text", filter: func(m models.MediaWithDB) bool { return m.Type != nil && *m.Type == "text" }},
+		sidebarItem{title: "🎵 Audio", filter: func(m models.MediaWithDB) bool { return m.MediaType != nil && *m.MediaType == "audio" }},
+		sidebarItem{title: "🎬 Video", filter: func(m models.MediaWithDB) bool { return m.MediaType != nil && *m.MediaType == "video" }},
+		sidebarItem{title: "🖼️ Image", filter: func(m models.MediaWithDB) bool { return m.MediaType != nil && *m.MediaType == "image" }},
+		sidebarItem{title: "📄 Text", filter: func(m models.MediaWithDB) bool { return m.MediaType != nil && *m.MediaType == "text" }},
 		sidebarItem{title: "⭐ 5 Stars", filter: func(m models.MediaWithDB) bool { return m.Score != nil && *m.Score >= 5 }},
 		sidebarItem{title: "⭐ 4+ Stars", filter: func(m models.MediaWithDB) bool { return m.Score != nil && *m.Score >= 4 }},
 		sidebarItem{title: "⭐ 3+ Stars", filter: func(m models.MediaWithDB) bool { return m.Score != nil && *m.Score >= 3 }},
@@ -476,8 +476,8 @@ func (m *Model) renderDetails() string {
 	if media.Title != nil {
 		addField("Title", *media.Title)
 	}
-	if media.Type != nil {
-		addField("Type", *media.Type)
+	if media.MediaType != nil {
+		addField("Type", *media.MediaType)
 	}
 	if media.Duration != nil {
 		addField("Duration", utils.FormatDuration(int(*media.Duration)))

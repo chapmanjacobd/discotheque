@@ -224,8 +224,8 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 // Determine filter type based on current media
                 let type = '';
-                if (state.playback.item && state.playback.item.type) {
-                    const currentType = state.playback.item.type;
+                if (state.playback.item && state.playback.item.media_type) {
+                    const currentType = state.playback.item.media_type;
                     if (currentType.startsWith('video')) type = 'video';
                     else if (currentType.startsWith('audio')) type = 'audio';
                     else if (currentType.startsWith('image')) type = 'image';
@@ -233,7 +233,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 const params = new URLSearchParams();
-                if (type) params.append('type', String(type));
+                if (type) params.append('media_type', String(type));
 
                 const resp = await fetchAPI(`/api/random-clip?${params.toString()}`);
                 if (!resp.ok) {
@@ -296,7 +296,7 @@ document.addEventListener('DOMContentLoaded', () => {
         settingDefaultVideoRate.onchange = (e) => {
             state.defaultVideoRate = parseFloat((e.target as HTMLInputElement).value);
             localStorage.setItem('disco-default-video-rate', String(state.defaultVideoRate.toString()));
-            if (state.playback.item && state.playback.item.type.includes('video')) {
+            if (state.playback.item && state.playback.item.media_type.includes('video')) {
                 setPlaybackRate(state.defaultVideoRate);
             }
         };
@@ -307,7 +307,7 @@ document.addEventListener('DOMContentLoaded', () => {
         settingDefaultAudioRate.onchange = (e) => {
             state.defaultAudioRate = parseFloat((e.target as HTMLInputElement).value);
             localStorage.setItem('disco-default-audio-rate', String(state.defaultAudioRate.toString()));
-            if (state.playback.item && state.playback.item.type.includes('audio')) {
+            if (state.playback.item && state.playback.item.media_type.includes('audio')) {
                 setPlaybackRate(state.defaultAudioRate);
             }
         };
@@ -398,7 +398,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 created_percentiles: data.created_percentiles || [],
                 downloaded_percentiles: data.downloaded_percentiles || [],
                 // Type counts (special case)
-                type: data.type || []
+                media_type: data.media_type || []
             };
 
             updateSlidersFromAbsolute('episodes', 'episodes');
@@ -427,7 +427,7 @@ document.addEventListener('DOMContentLoaded', () => {
         ];
 
         const newHtml = types.map(t => `
-            <button class="category-btn ${state.filters.types.includes(t.id) ? 'active' : ''}" data-type="${t.id}">
+            <button class="category-btn ${state.filters.media_types.includes(t.id) ? 'active' : ''}" data-media_type="${t.id}">
                 ${t.icon} ${t.label}
             </button>
         `).join('');
@@ -436,13 +436,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
         container.querySelectorAll('button').forEach(btn => {
             (btn as any).onclick = () => {
-                const type = (btn as any).dataset.type;
-                if (state.filters.types.includes(type)) {
-                    state.filters.types = [];
+                const type = (btn as any).dataset.media_type;
+                if (state.filters.media_types.includes(type)) {
+                    state.filters.media_types = [];
                 } else {
-                    state.filters.types = [type];
+                    state.filters.media_types = [type];
                 }
-                localStorage.setItem('disco-types', String(JSON.stringify(state.filters.types)));
+                localStorage.setItem('disco-types', String(JSON.stringify(state.filters.media_types)));
                 updateNavActiveStates();
                 performSearch();
             };
@@ -467,7 +467,7 @@ document.addEventListener('DOMContentLoaded', () => {
         state.filters.modified = [];
         state.filters.created = [];
         state.filters.downloaded = [];
-        state.filters.types = [];
+        state.filters.media_types = [];
         state.filters.search = '';
         state.filters.unplayed = false;
         state.filters.unfinished = false;
@@ -499,7 +499,7 @@ document.addEventListener('DOMContentLoaded', () => {
         state.filters.modified = [];
         state.filters.created = [];
         state.filters.downloaded = [];
-        state.filters.types = [];
+        state.filters.media_types = [];
         state.filters.unplayed = false;
         state.filters.unfinished = false;
         state.filters.completed = false;
@@ -707,7 +707,7 @@ document.addEventListener('DOMContentLoaded', () => {
      * @param {boolean} skipSync - Whether to skip syncUrl
      */
     function openActivePlayer(item, isNewSession = false, skipSync = false, queueIndex = -1, keepFullscreen = false) {
-        const type = item.type || "";
+        const type = item.media_type || "";
         const isDocument = type === 'text' || type.includes('pdf') || type.includes('epub') || type.includes('mobi');
 
         // Close any existing player before opening new one
@@ -759,7 +759,7 @@ document.addEventListener('DOMContentLoaded', () => {
         state.filters.created.forEach(b => params.append('created', String(getBinQueryParam(b))));
         state.filters.downloaded.forEach(b => params.append('downloaded', String(getBinQueryParam(b))));
 
-        state.filters.types.forEach(t => params.append('type', String(t)));
+        state.filters.media_types.forEach(t => params.append('media_type', String(t)));
 
         // Add database filter (send included DBs, not excluded)
         if (state.databases && state.databases.length > 0) {
@@ -830,7 +830,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Media Type filters apply across all modes except DU, trash, and playlist
         if (state.page !== 'du' && state.page !== 'trash' && state.page !== 'playlist') {
-            state.filters.types.forEach(t => params.append('type', String(t)));
+            state.filters.media_types.forEach(t => params.append('media_type', String(t)));
         }
 
         if (state.currentPage > 1) {
@@ -985,10 +985,10 @@ document.addEventListener('DOMContentLoaded', () => {
             state.filters.durations = params.getAll('duration').map(parseFilterBin);
         } else {
             state.page = 'search';
-            state.filters.types = params.getAll('type');
-            if (state.filters.types.length === 0) {
+            state.filters.media_types = params.getAll('media_type');
+            if (state.filters.media_types.length === 0) {
                 // Default fallback if not in URL
-                state.filters.types = JSON.parse(localStorage.getItem('disco-types') || '[]');
+                state.filters.media_types = JSON.parse(localStorage.getItem('disco-types') || '[]');
             }
             state.filters.categories = params.getAll('category');
             state.filters.genre = params.get('genre') || '';
@@ -1172,7 +1172,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             return `
                 <div class="suggestion-item" data-path="${item.path}" data-is-dir="${item.is_dir}" data-name="${item.name}" data-index="${idx}">
-                    <div class="suggestion-icon">${item.is_dir ? '📁' : getIcon(item.type)}</div>
+                    <div class="suggestion-icon">${item.is_dir ? '📁' : getIcon(item.media_type)}</div>
                     <div class="suggestion-info">
                         <div class="suggestion-name">${displayName}</div>
                         <div class="suggestion-path" title="${item.path}">${displayPath}</div>
@@ -1760,7 +1760,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     created_percentiles: response.counts.created_percentiles || [],
                     downloaded_percentiles: response.counts.downloaded_percentiles || [],
                     // Type counts (special case)
-                    type: response.counts.type || []
+                    media_type: response.counts.media_type || []
                 };
 
                 updateSlidersFromAbsolute('episodes', 'episodes');
@@ -1974,13 +1974,13 @@ document.addEventListener('DOMContentLoaded', () => {
             const tr = document.createElement('tr');
 
             // Check if this is a direct file (has type field, no count field)
-            const isDirectFile = item.type !== undefined && item.count === undefined;
+            const isDirectFile = item.media_type !== undefined && item.count === undefined;
 
             if (isDirectFile) {
                 // Direct file row
                 const mediaItem = item;
                 const name = mediaItem.title || mediaItem.path.split('/').pop();
-                const type = mediaItem.type || 'unknown';
+                const type = mediaItem.media_type || 'unknown';
                 const size = formatSize(mediaItem.size);
                 const duration = formatDuration(mediaItem.duration);
 
@@ -1997,7 +1997,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 item.files.forEach(mediaItem => {
                     const fileTr = document.createElement('tr');
                     const name = mediaItem.title || mediaItem.path.split('/').pop();
-                    const type = mediaItem.type || 'unknown';
+                    const type = mediaItem.media_type || 'unknown';
                     const size = formatSize(mediaItem.size);
                     const duration = formatDuration(mediaItem.duration);
 
@@ -2090,7 +2090,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const mediaItem = item;
                 card.className = 'media-card is-file';
                 (card as HTMLElement).dataset.path = mediaItem.path;
-                (card as HTMLElement).dataset.type = mediaItem.type || '';
+                (card as HTMLElement).dataset.media_type = mediaItem.media_type || '';
                 if (mediaItem.is_dir) (card as HTMLElement).dataset.isDir = 'true';
                 (card as HTMLElement).onclick = () => playMedia(mediaItem);
 
@@ -2098,7 +2098,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const thumbUrl = `/api/thumbnail?path=${encodeURIComponent(mediaItem.path)}`;
                 const size = formatSize(mediaItem.size);
                 const duration = formatDuration(mediaItem.duration);
-                const icon = getIcon(mediaItem.type);
+                const icon = getIcon(mediaItem.media_type);
                 const filename = mediaItem.path.split('/').pop() || mediaItem.path;
                 const plays = getPlayCount(mediaItem);
 
@@ -2114,7 +2114,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 card.innerHTML = `
                     <div class="media-thumb">
-                        <img data-src="${thumbUrl}" loading="lazy" onload="this.classList.add('loaded')" onerror="const canvas=document.createElement('canvas');canvas.width=320;canvas.height=240;const dataUrl=generateClientThumbnail(canvas,'${filename.replace(/'/g, "\\'")}','${mediaItem.type || ''}');this.src=dataUrl;this.classList.add('loaded');this.onerror=null">
+                        <img data-src="${thumbUrl}" loading="lazy" onload="this.classList.add('loaded')" onerror="const canvas=document.createElement('canvas');canvas.width=320;canvas.height=240;const dataUrl=generateClientThumbnail(canvas,'${filename.replace(/'/g, "\\'")}','${mediaItem.media_type || ''}');this.src=dataUrl;this.classList.add('loaded');this.onerror=null">
                         <div style="display:none; width:100%; height:100%; align-items:center; justify-content:center; background:var(--sidebar-bg); font-size:3rem;">${icon}</div>
                         <span class="media-duration">${duration}</span>
                         <div class="media-actions">
@@ -2388,7 +2388,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const card = document.createElement('div');
                 card.className = 'media-card';
                 (card as HTMLElement).dataset.path = item.path;
-                (card as HTMLElement).dataset.type = item.type || '';
+                (card as HTMLElement).dataset.media_type = item.media_type || '';
                 if (item.is_dir) (card as HTMLElement).dataset.isDir = 'true';
                 (card as HTMLElement).onclick = () => playMedia(item);
 
@@ -3438,7 +3438,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!!state.readOnly) return state.playback.pendingUpdate;
 
         // Server sync logic
-        if (item.type.includes('audio') && duration < 420) return state.playback.pendingUpdate; // 7 minutes
+        if (item.media_type.includes('audio') && duration < 420) return state.playback.pendingUpdate; // 7 minutes
 
         const sessionTime = (now - state.playback.startTime) / 1000;
 
@@ -3490,7 +3490,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Expiration rule: for audio files less than 7 mins (420s) long
         // forget progress if it has been more than 15 minutes (900s) since it was last played.
-        if (item.type && item.type.includes('audio') && item.duration < 420) {
+        if (item.media_type && item.media_type.includes('audio') && item.duration < 420) {
             const now = Date.now();
             if ((now - last) > 15 * 60 * 1000) {
                 return 0;
@@ -4341,7 +4341,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 queueItem.classList.add('playing');
             }
 
-            const type = item.type || '';
+            const type = item.media_type || '';
             let icon = '📄';
             if (type.includes('video')) icon = '🎬';
             else if (type.includes('audio')) icon = '🎵';
@@ -4589,7 +4589,7 @@ document.addEventListener('DOMContentLoaded', () => {
             state.imageAutoplay = localStorage.getItem('disco-image-autoplay') === 'true';
         }
 
-        const type = item.type || "";
+        const type = item.media_type || "";
 
         // Reset playback rate to default for new media if not currently playing something
         if (!state.playback.item) {
@@ -5714,7 +5714,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const card = document.createElement('div');
         card.className = 'media-card';
         (card as HTMLElement).dataset.path = item.path;
-        (card as HTMLElement).dataset.type = item.type || '';
+        (card as HTMLElement).dataset.media_type = item.media_type || '';
         if (item.is_dir) (card as HTMLElement).dataset.isDir = 'true';
         (card as any)._item = item;
         card.draggable = true;
@@ -5807,8 +5807,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         let thumbHtml = `
-            <img data-src="${thumbUrl}" loading="lazy" onload="this.classList.add('loaded'); const icon = this.nextElementSibling; if (icon && icon.tagName === 'I') icon.style.display = 'none'; this.closest('.media-thumb').classList.remove('skeleton')" onerror="this.style.display='none'; const icon = this.nextElementSibling; if (icon && icon.tagName === 'I') { icon.style.display = 'block'; icon.innerHTML = '${getIcon(item.type)}'; } this.closest('.media-thumb').classList.remove('skeleton')">
-            <i style="display: none">${getIcon(item.type)}</i>
+            <img data-src="${thumbUrl}" loading="lazy" onload="this.classList.add('loaded'); const icon = this.nextElementSibling; if (icon && icon.tagName === 'I') icon.style.display = 'none'; this.closest('.media-thumb').classList.remove('skeleton')" onerror="this.style.display='none'; const icon = this.nextElementSibling; if (icon && icon.tagName === 'I') { icon.style.display = 'block'; icon.innerHTML = '${getIcon(item.media_type)}'; } this.closest('.media-thumb').classList.remove('skeleton')">
+            <i style="display: none">${getIcon(item.media_type)}</i>
         `;
 
         if (item.is_dir) {
@@ -6015,7 +6015,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     `No results for "${state.filters.search}". Try adjusting your search or filters.` :
                     'Try adjusting your filters or add some media to your library.'}
                     </p>
-                    ${state.filters.types.length > 0 || state.filters.categories.length > 0 || state.filters.sizes.length > 0 || state.filters.durations.length > 0 ? `
+                    ${state.filters.media_types.length > 0 || state.filters.categories.length > 0 || state.filters.sizes.length > 0 || state.filters.durations.length > 0 ? `
                         <button class="category-btn" onclick="window.disco.resetFilters()" style="margin-top: 1.5rem;">
                             Clear all filters
                         </button>
@@ -6321,7 +6321,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <th data-sort="size">Size ${sortIcon('size')}</th>
             <th data-sort="duration">Duration ${sortIcon('duration')}</th>
             <th data-sort="progress">Progress ${sortIcon('progress')}</th>
-            <th data-sort="type">Type ${sortIcon('type')}</th>
+            <th data-sort="media_type">Type ${sortIcon('media_type')}</th>
             ${isTrash ? `<th data-sort="time_deleted">Deleted ${sortIcon('time_deleted')}</th>` : `<th data-sort="play_count">Plays ${sortIcon('play_count')}</th>`}
         `;
 
@@ -6448,7 +6448,7 @@ document.addEventListener('DOMContentLoaded', () => {
             let cells = `
                 <td>
                     <div class="table-cell-title" title="${item.path}">
-                        <span class="table-icon">${getIcon(item.type)}</span>
+                        <span class="table-icon">${getIcon(item.media_type)}</span>
                         <div style="display: flex; flex-direction: column;">
                             <span class="media-title-span">${title}</span>
 
@@ -6458,7 +6458,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <td>${formatSize(item.size)}</td>
                 <td>${formatDuration(item.duration)}</td>
                 <td>${progressHtml}</td>
-                <td>${item.type || ''}</td>
+                <td>${item.media_type || ''}</td>
                 <td>${isTrash ? formatRelativeDate(item.time_deleted) : (getPlayCount(item) || '')}</td>
             `;
 
@@ -8048,7 +8048,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Update Media Type buttons
         document.querySelectorAll('#media-type-list .category-btn').forEach(btn => {
-            const isActive = state.filters.types.includes((btn as any).dataset.type);
+            const isActive = state.filters.media_types.includes((btn as any).dataset.media_type);
             btn.classList.toggle('active', isActive);
         });
 
@@ -8077,7 +8077,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Note: Bin buttons removed - sliders now use percentile-based ranges
 
-        if (allMediaBtn) allMediaBtn.classList.toggle('active', state.page === 'search' && state.filters.categories.length === 0 && state.filters.genre === '' && state.filters.languages.length === 0 && state.filters.ratings.length === 0 && !state.filters.playlist && !state.filters.unplayed && !state.filters.unfinished && !state.filters.completed && state.filters.sizes.length === 0 && state.filters.durations.length === 0 && state.filters.episodes.length === 0 && state.filters.types.length === 0);
+        if (allMediaBtn) allMediaBtn.classList.toggle('active', state.page === 'search' && state.filters.categories.length === 0 && state.filters.genre === '' && state.filters.languages.length === 0 && state.filters.ratings.length === 0 && !state.filters.playlist && !state.filters.unplayed && !state.filters.unfinished && !state.filters.completed && state.filters.sizes.length === 0 && state.filters.durations.length === 0 && state.filters.episodes.length === 0 && state.filters.media_types.length === 0);
         if (trashBtn) trashBtn.classList.toggle('active', state.page === 'trash');
         if (duBtn) duBtn.classList.toggle('active', state.page === 'du');
         if (captionsBtn) captionsBtn.classList.toggle('active', state.page === 'captions');
@@ -8105,7 +8105,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const genre = (btn as any).dataset.genre;
             const lang = (btn as any).dataset.lang;
             const rating = (btn as any).dataset.rating;
-            const type = (btn as any).dataset.type;
+            const type = (btn as any).dataset.media_type;
             // For playlists, we check both the button itself and if it's a wrapper for a drop zone
             const playlist = (btn as any).dataset.title || (btn.querySelector('.playlist-name') as HTMLElement)?.dataset.title;
 
@@ -8115,7 +8115,7 @@ document.addEventListener('DOMContentLoaded', () => {
             else if (lang !== undefined) isActive = state.page === 'search' && state.filters.languages.includes(lang);
             else if (rating !== undefined) isActive = state.page === 'search' && state.filters.ratings.includes(rating);
             else if (playlist !== undefined) isActive = state.page === 'playlist' && state.filters.playlist === playlist;
-            else if (type !== undefined) isActive = state.page === 'search' && state.filters.types.length === 1 && state.filters.types[0] === type;
+            else if (type !== undefined) isActive = state.page === 'search' && state.filters.media_types.length === 1 && state.filters.media_types[0] === type;
 
             btn.classList.toggle('active', isActive);
         });
@@ -8397,7 +8397,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     valA = a.path.split('.').pop().toLowerCase();
                     valB = b.path.split('.').pop().toLowerCase();
                     break;
-                case 'type':
+                case 'media_type':
                     valA = a.type || '';
                     valB = b.type || '';
                     break;

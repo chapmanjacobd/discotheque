@@ -82,11 +82,11 @@ func (c *FilesInfoCmd) Run(ctx *kong.Context) error {
 			}
 			allMedia = append(allMedia, models.MediaWithDB{
 				Media: models.Media{
-					Path:     meta.Media.Path,
-					Title:    models.NullStringPtr(meta.Media.Title),
-					Type:     models.NullStringPtr(meta.Media.Type),
-					Size:     models.NullInt64Ptr(meta.Media.Size),
-					Duration: models.NullInt64Ptr(meta.Media.Duration),
+					Path:      meta.Media.Path,
+					Title:     models.NullStringPtr(meta.Media.Title),
+					MediaType: models.NullStringPtr(meta.Media.MediaType),
+					Size:      models.NullInt64Ptr(meta.Media.Size),
+					Duration:  models.NullInt64Ptr(meta.Media.Duration),
 				},
 			})
 			return nil
@@ -106,8 +106,8 @@ func (c *FilesInfoCmd) Run(ctx *kong.Context) error {
 		if m.Title != nil {
 			fmt.Printf("  Title: %s\n", *m.Title)
 		}
-		if m.Type != nil {
-			fmt.Printf("  Type: %s\n", *m.Type)
+		if m.MediaType != nil {
+			fmt.Printf("  MediaType: %s\n", *m.MediaType)
 		}
 		if m.Size != nil {
 			fmt.Printf("  Size: %d\n", *m.Size)

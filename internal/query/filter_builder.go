@@ -49,16 +49,16 @@ func (fb *FilterBuilder) BuildWhereClauses() ([]string, []any) {
 	// Content type filters (indexed column - should come before expensive searches)
 	var typeClauses []string
 	if fb.flags.VideoOnly {
-		typeClauses = append(typeClauses, fmt.Sprintf("%s = 'video'", fb.col("type")))
+		typeClauses = append(typeClauses, fmt.Sprintf("%s = 'video'", fb.col("media_type")))
 	}
 	if fb.flags.AudioOnly {
-		typeClauses = append(typeClauses, fmt.Sprintf("%s = 'audio'", fb.col("type")), fmt.Sprintf("%s = 'audiobook'", fb.col("type")))
+		typeClauses = append(typeClauses, fmt.Sprintf("%s = 'audio'", fb.col("media_type")), fmt.Sprintf("%s = 'audiobook'", fb.col("media_type")))
 	}
 	if fb.flags.ImageOnly {
-		typeClauses = append(typeClauses, fmt.Sprintf("%s = 'image'", fb.col("type")))
+		typeClauses = append(typeClauses, fmt.Sprintf("%s = 'image'", fb.col("media_type")))
 	}
 	if fb.flags.TextOnly {
-		typeClauses = append(typeClauses, fmt.Sprintf("%s = 'text'", fb.col("type")))
+		typeClauses = append(typeClauses, fmt.Sprintf("%s = 'text'", fb.col("media_type")))
 	}
 	if len(typeClauses) > 0 {
 		whereClauses = append(whereClauses, "("+strings.Join(typeClauses, " OR ")+")")
@@ -516,7 +516,7 @@ func (fb *FilterBuilder) OverrideSort(s string) string {
 	s = strings.ReplaceAll(s, "play_count", fmt.Sprintf("(COALESCE(%s, 0) = 0), %s", fb.col("play_count"), fb.col("play_count")))
 	s = strings.ReplaceAll(s, "time_last_played", fmt.Sprintf("(COALESCE(%s, 0) = 0), %s", fb.col("time_last_played"), fb.col("time_last_played")))
 
-	s = strings.ReplaceAll(s, "type", fmt.Sprintf("LOWER(%s)", fb.col("type")))
+	s = strings.ReplaceAll(s, "media_type", fmt.Sprintf("LOWER(%s)", fb.col("media_type")))
 	s = strings.ReplaceAll(s, "random()", "RANDOM()")
 	s = strings.ReplaceAll(s, "random", "RANDOM()")
 	s = strings.ReplaceAll(s, "default", fmt.Sprintf("%s, %s DESC, %s, %s DESC, %s DESC, %s IS NOT NULL DESC, %s", fb.col("play_count"), fb.col("playhead"), fb.col("time_last_played"), fb.col("duration"), fb.col("size"), fb.col("title"), fb.col("path")))
@@ -655,7 +655,7 @@ func (fb *FilterBuilder) CreateInMemoryFilter() func(models.MediaWithDB) bool {
 		// Mimetype filters
 		if len(fb.flags.MimeType) > 0 {
 			match := false
-			if m.Type != nil && utils.IsMimeMatch(fb.flags.MimeType, *m.Type) {
+			if m.MediaType != nil && utils.IsMimeMatch(fb.flags.MimeType, *m.MediaType) {
 				match = true
 			}
 			if !match {
@@ -663,7 +663,7 @@ func (fb *FilterBuilder) CreateInMemoryFilter() func(models.MediaWithDB) bool {
 			}
 		}
 		if len(fb.flags.NoMimeType) > 0 {
-			if m.Type != nil && utils.IsMimeMatch(fb.flags.NoMimeType, *m.Type) {
+			if m.MediaType != nil && utils.IsMimeMatch(fb.flags.NoMimeType, *m.MediaType) {
 				return false
 			}
 		}
@@ -846,9 +846,9 @@ func (sb *SortBuilder) SortBasic(media []models.MediaWithDB) {
 			return utils.Int64Value(media[i].TimeDeleted) < utils.Int64Value(media[j].TimeDeleted)
 		case "time_downloaded", "time_scanned":
 			return utils.Int64Value(media[i].TimeDownloaded) < utils.Int64Value(media[j].TimeDownloaded)
-		case "type":
-			iNil := media[i].Type == nil || *media[i].Type == ""
-			jNil := media[j].Type == nil || *media[j].Type == ""
+		case "media_type":
+			iNil := media[i].MediaType == nil || *media[i].MediaType == ""
+			jNil := media[j].MediaType == nil || *media[j].MediaType == ""
 			if iNil && jNil {
 				return false
 			}
@@ -858,7 +858,7 @@ func (sb *SortBuilder) SortBasic(media []models.MediaWithDB) {
 			if jNil {
 				return reverse
 			}
-			return utils.StringValue(media[i].Type) < utils.StringValue(media[j].Type)
+			return utils.StringValue(media[i].MediaType) < utils.StringValue(media[j].MediaType)
 		case "extension":
 			return strings.ToLower(filepath.Ext(media[i].Path)) < strings.ToLower(filepath.Ext(media[j].Path))
 		default:
@@ -1139,8 +1139,8 @@ func getSortValueString(m models.MediaWithDB, field string) string {
 		return m.Parent() + " " + m.Stem()
 	case "pts":
 		return m.Parent() + " " + utils.StringValue(m.Title) + " " + m.Stem()
-	case "type":
-		return utils.StringValue(m.Type)
+	case "media_type":
+		return utils.StringValue(m.MediaType)
 	case "genre":
 		return utils.StringValue(m.Genre)
 	case "artist":
@@ -1561,7 +1561,7 @@ func ExpandRelatedMedia(ctx context.Context, sqlDB *sql.DB, media *[]models.Medi
 					TimeDownloaded: models.NullInt64Ptr(row.TimeDownloaded),
 					TimeLastPlayed: models.NullInt64Ptr(row.TimeLastPlayed),
 					Score:          models.NullFloat64Ptr(row.Score),
-					Type:           models.NullStringPtr(row.Type),
+					MediaType:      models.NullStringPtr(row.MediaType),
 				},
 				DB: row.DB,
 			})
@@ -1651,7 +1651,7 @@ type relatedMediaRow struct {
 	TimeDownloaded sql.NullInt64
 	TimeLastPlayed sql.NullInt64
 	Score          sql.NullFloat64
-	Type           sql.NullString
+	MediaType      sql.NullString
 	DB             string
 	Rank           float64
 }
@@ -1666,7 +1666,7 @@ func queryRelatedMediaWithRank(ctx context.Context, sqlDB *sql.DB, ftsTable, exc
 			m.video_count, m.audio_count, m.subtitle_count,
 			m.play_count, m.playhead,
 			m.time_created, m.time_modified, m.time_downloaded, m.time_last_played,
-			m.score, m.type,
+			m.score, m.media_type,
 			bm25(%s) as rank
 		FROM %s, media m
 		WHERE m.rowid = %s.rowid
@@ -1690,7 +1690,7 @@ func queryRelatedMediaWithRank(ctx context.Context, sqlDB *sql.DB, ftsTable, exc
 			&r.VideoCount, &r.AudioCount, &r.SubtitleCount,
 			&r.PlayCount, &r.Playhead,
 			&r.TimeCreated, &r.TimeModified, &r.TimeDownloaded, &r.TimeLastPlayed,
-			&r.Score, &r.Type, &r.Rank,
+			&r.Score, &r.MediaType, &r.Rank,
 		)
 		if err != nil {
 			return nil, err
@@ -1785,8 +1785,8 @@ func ScanMedia(rows *sql.Rows, dbPath string) ([]models.MediaWithDB, error) {
 				m.Width = sql.NullInt64{Int64: utils.GetInt64(val), Valid: true}
 			case "height":
 				m.Height = sql.NullInt64{Int64: utils.GetInt64(val), Valid: true}
-			case "type":
-				m.Type = sql.NullString{String: utils.GetString(val), Valid: true}
+			case "media_type":
+				m.MediaType = sql.NullString{String: utils.GetString(val), Valid: true}
 			}
 		}
 
@@ -2029,13 +2029,13 @@ func (qe *QueryExecutor) MediaQueryCount(ctx context.Context, dbs []string) (int
 
 func (qe *QueryExecutor) GroupByParent(allMedia []models.MediaWithDB, flags models.GlobalFlags) []models.MediaWithDB {
 	type GroupedMedia struct {
-		ParentPath         string  `json:"parent_path"`
-		EpisodeCount       int64   `json:"episode_count"`
-		TotalSize          int64   `json:"total_size"`
-		TotalDuration      int64   `json:"total_duration"`
-		LatestEpisodeTime  *string `json:"latest_episode_time,omitempty"`
-		RepresentativePath string  `json:"representative_path"`
-		RepresentativeType *string `json:"representative_type,omitempty"`
+		ParentPath              string  `json:"parent_path"`
+		EpisodeCount            int64   `json:"episode_count"`
+		TotalSize               int64   `json:"total_size"`
+		TotalDuration           int64   `json:"total_duration"`
+		LatestEpisodeTime       *string `json:"latest_episode_time,omitempty"`
+		RepresentativePath      string  `json:"representative_path"`
+		RepresentativeMediaType *string `json:"media_type,omitempty"`
 	}
 
 	groups := make(map[string]*GroupedMedia)
@@ -2043,12 +2043,12 @@ func (qe *QueryExecutor) GroupByParent(allMedia []models.MediaWithDB, flags mode
 		parent := m.Parent()
 		if _, ok := groups[parent]; !ok {
 			groups[parent] = &GroupedMedia{
-				ParentPath:         parent,
-				EpisodeCount:       0,
-				TotalSize:          0,
-				TotalDuration:      0,
-				RepresentativePath: m.Path,
-				RepresentativeType: m.Type,
+				ParentPath:              parent,
+				EpisodeCount:            0,
+				TotalSize:               0,
+				TotalDuration:           0,
+				RepresentativePath:      m.Path,
+				RepresentativeMediaType: m.MediaType,
 			}
 		}
 		g := groups[parent]
@@ -2068,11 +2068,11 @@ func (qe *QueryExecutor) GroupByParent(allMedia []models.MediaWithDB, flags mode
 	for _, g := range groups {
 		m := models.MediaWithDB{
 			Media: models.Media{
-				Path:     g.RepresentativePath,
-				Type:     g.RepresentativeType,
-				Size:     &g.TotalSize,
-				Duration: &g.TotalDuration,
-				Title:    &g.ParentPath,
+				Path:      g.RepresentativePath,
+				MediaType: g.RepresentativeMediaType,
+				Size:      &g.TotalSize,
+				Duration:  &g.TotalDuration,
+				Title:     &g.ParentPath,
 			},
 			DB:            allMedia[0].DB,
 			EpisodeCount:  g.EpisodeCount,

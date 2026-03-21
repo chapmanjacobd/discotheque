@@ -25,7 +25,7 @@ test.describe('Keyboard Shortcuts', () => {
 
       // Click second video/audio card to have a previous item, then close player using POM
       // Get all video/audio cards and click the second one
-      const videoCards = mediaPage.page.locator('.media-card[data-type*="video"], .media-card[data-type*="audio"]');
+      const videoCards = mediaPage.page.locator('.media-card[data-media_type*="video"], .media-card[data-media_type*="audio"]');
       const count = await videoCards.count();
       expect(count).toBeGreaterThan(0); // Fail if no video/audio media available
 

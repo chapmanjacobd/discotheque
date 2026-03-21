@@ -33,7 +33,7 @@ func TestExpandRelatedMedia_WithSearchTerms(t *testing.T) {
 		path_tokenized TEXT,
 		title TEXT,
 		description TEXT,
-		type TEXT,
+		media_type TEXT,
 		time_deleted INTEGER DEFAULT 0,
 		size INTEGER,
 		duration INTEGER,
@@ -91,7 +91,7 @@ func TestExpandRelatedMedia_WithSearchTerms(t *testing.T) {
 
 	for _, td := range testData {
 		_, err := sqlDB.Exec(`
-			INSERT INTO media (path, path_tokenized, title, description, type)
+			INSERT INTO media (path, path_tokenized, title, description, media_type)
 			VALUES (?, ?, ?, ?, 'video')
 		`, td.path, td.path, td.title, td.desc)
 		if err != nil {
@@ -183,7 +183,7 @@ func TestExpandRelatedMedia_WithPhrases(t *testing.T) {
 		path_tokenized TEXT,
 		title TEXT,
 		description TEXT,
-		type TEXT,
+		media_type TEXT,
 		time_deleted INTEGER DEFAULT 0,
 		size INTEGER,
 		duration INTEGER,
@@ -240,7 +240,7 @@ func TestExpandRelatedMedia_WithPhrases(t *testing.T) {
 
 	for _, td := range testData {
 		_, err := sqlDB.Exec(`
-			INSERT INTO media (path, path_tokenized, title, description, type)
+			INSERT INTO media (path, path_tokenized, title, description, media_type)
 			VALUES (?, ?, ?, ?, 'video')
 		`, td.path, td.path, td.title, td.desc)
 		if err != nil {
@@ -326,7 +326,7 @@ func TestExpandRelatedMedia_NoSearchTerms(t *testing.T) {
 		path_tokenized TEXT,
 		title TEXT,
 		description TEXT,
-		type TEXT,
+		media_type TEXT,
 		time_deleted INTEGER DEFAULT 0,
 		size INTEGER,
 		duration INTEGER,
@@ -362,7 +362,7 @@ func TestExpandRelatedMedia_NoSearchTerms(t *testing.T) {
 
 	// Insert test media
 	_, err = sqlDB.Exec(`
-		INSERT INTO media (path, path_tokenized, title, description, type)
+		INSERT INTO media (path, path_tokenized, title, description, media_type)
 		VALUES (?, ?, ?, ?, 'video')
 	`, "/videos/test.mp4", "/videos/test.mp4", "Test Video", "A test")
 	if err != nil {

@@ -41,7 +41,7 @@ type Media struct {
 	TimeLastPlayed  sql.NullInt64   `json:"time_last_played"`
 	PlayCount       sql.NullInt64   `json:"play_count"`
 	Playhead        sql.NullInt64   `json:"playhead"`
-	Type            sql.NullString  `json:"type"`
+	MediaType       sql.NullString  `json:"media_type"`
 	Width           sql.NullInt64   `json:"width"`
 	Height          sql.NullInt64   `json:"height"`
 	Fps             sql.NullFloat64 `json:"fps"`
@@ -90,7 +90,7 @@ type GetAllCaptionsRow struct {
 	Time      sql.NullFloat64 `json:"time"`
 	Text      sql.NullString  `json:"text"`
 	Title     sql.NullString  `json:"title"`
-	Type      sql.NullString  `json:"type"`
+	MediaType sql.NullString  `json:"media_type"`
 	Size      sql.NullInt64   `json:"size"`
 	Duration  sql.NullInt64   `json:"duration"`
 }
@@ -100,7 +100,7 @@ type GetAllCaptionsOrderedRow struct {
 	Time      sql.NullFloat64 `json:"time"`
 	Text      sql.NullString  `json:"text"`
 	Title     sql.NullString  `json:"title"`
-	Type      sql.NullString  `json:"type"`
+	MediaType sql.NullString  `json:"media_type"`
 	Size      sql.NullInt64   `json:"size"`
 	Duration  sql.NullInt64   `json:"duration"`
 }

@@ -19,14 +19,14 @@ func TestSearchCaptionsCmd_Run(t *testing.T) {
 
 	// Skip if FTS5 is not available
 	var name string
-	err := sqlDB.QueryRow("SELECT name FROM sqlite_master WHERE type='table' AND name='captions_fts'").Scan(&name)
+	err := sqlDB.QueryRow("SELECT name FROM sqlite_master WHERE media_type='table' AND name='captions_fts'").Scan(&name)
 	if err != nil {
 		t.Skip("FTS5 not available, skipping search captions tests")
 	}
 
 	// Insert test media with different types
 	_, err = sqlDB.Exec(`
-		INSERT INTO media (path, title, type, time_deleted)
+		INSERT INTO media (path, title, media_type, time_deleted)
 		VALUES
 		('/path/video1.mp4', 'Video 1', 'video', 0),
 		('/path/video2.mp4', 'Video 2', 'video', 0),

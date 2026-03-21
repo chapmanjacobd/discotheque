@@ -184,20 +184,20 @@ func (c *ServeCmd) handleRandomClip(w http.ResponseWriter, r *http.Request) {
 
 	// Filter for video/audio only
 	var playable []models.MediaWithDB
-	targetType := r.URL.Query().Get("type")
+	targetMediaType := r.URL.Query().Get("type")
 
 	for _, m := range allMedia {
-		if m.Type == nil {
+		if m.MediaType == nil {
 			continue
 		}
 
-		if targetType != "" {
-			if strings.HasPrefix(*m.Type, targetType) {
+		if targetMediaType != "" {
+			if strings.HasPrefix(*m.MediaType, targetMediaType) {
 				playable = append(playable, m)
 			}
 		} else {
 			// Default behavior: video or audio
-			if strings.HasPrefix(*m.Type, "video") || strings.HasPrefix(*m.Type, "audio") || *m.Type == "audiobook" {
+			if strings.HasPrefix(*m.MediaType, "video") || strings.HasPrefix(*m.MediaType, "audio") || *m.MediaType == "audiobook" {
 				playable = append(playable, m)
 			}
 		}
@@ -250,7 +250,7 @@ func (c *ServeCmd) handleRandomClip(w http.ResponseWriter, r *http.Request) {
 			cleared.Path = item.Path
 		}
 		if fieldSet["type"] {
-			cleared.Type = item.Type
+			cleared.MediaType = item.MediaType
 		}
 		if fieldSet["duration"] {
 			cleared.Duration = item.Duration
@@ -717,9 +717,9 @@ func (c *ServeCmd) handleOPDS(w http.ResponseWriter, r *http.Request) {
 			author = *m.Artist
 		}
 
-		mimeType := "application/octet-stream"
-		if m.Type != nil {
-			mimeType = *m.Type
+		mimeMediaType := "application/octet-stream"
+		if m.MediaType != nil {
+			mimeMediaType = *m.MediaType
 		}
 
 		fmt.Fprintf(w, `
@@ -737,7 +737,7 @@ func (c *ServeCmd) handleOPDS(w http.ResponseWriter, r *http.Request) {
 			utils.EscapeXML(author),
 			utils.EscapeXML(m.Path),
 			scheme, host, strings.ReplaceAll(url.QueryEscape(m.Path), "+", "%20"),
-			mimeType,
+			mimeMediaType,
 		)
 	}
 
@@ -899,7 +899,7 @@ func (c *ServeCmd) handlePlaylistItems(w http.ResponseWriter, r *http.Request) {
 						TimeLastPlayed:  item.TimeLastPlayed,
 						PlayCount:       item.PlayCount,
 						Playhead:        item.Playhead,
-						Type:            item.Type,
+						MediaType:       item.MediaType,
 						Width:           item.Width,
 						Height:          item.Height,
 						Fps:             item.Fps,

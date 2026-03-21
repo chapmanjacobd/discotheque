@@ -84,7 +84,7 @@ func (c *DiskUsageCmd) Run(ctx *kong.Context) error {
 				Media: models.Media{
 					Path:         meta.Media.Path,
 					Title:        models.NullStringPtr(meta.Media.Title),
-					Type:         models.NullStringPtr(meta.Media.Type),
+					MediaType:    models.NullStringPtr(meta.Media.MediaType),
 					Size:         models.NullInt64Ptr(meta.Media.Size),
 					Duration:     models.NullInt64Ptr(meta.Media.Duration),
 					TimeCreated:  models.NullInt64Ptr(meta.Media.TimeCreated),

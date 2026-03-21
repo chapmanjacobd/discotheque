@@ -27,8 +27,8 @@ func TestExtract_BasicInfo(t *testing.T) {
 		t.Errorf("Expected path %s, got %s", f.Name(), meta.Media.Path)
 	}
 
-	if !meta.Media.Type.Valid || meta.Media.Type.String != "text" {
-		t.Errorf("Expected type text, got %v", meta.Media.Type)
+	if !meta.Media.MediaType.Valid || meta.Media.MediaType.String != "text" {
+		t.Errorf("Expected type text, got %v", meta.Media.MediaType)
 	}
 }
 
@@ -50,7 +50,7 @@ func TestExtract_MimeTypes(t *testing.T) {
 
 		// We don't care if ffprobe fails, we want to see the mime-based detection in basicInfo or fallback
 		meta, _ := Extract(context.Background(), name, false, false, false, "", false, "")
-		if meta != nil && meta.Media.Type.String != tt.expected {
+		if meta != nil && meta.Media.MediaType.String != tt.expected {
 			// Note: DetectMimeType might depend on extension if content is empty
 		}
 	}
@@ -174,8 +174,8 @@ func TestExtract_ComicArchive_OCR(t *testing.T) {
 		t.Fatalf("Extract failed: %v", err)
 	}
 
-	if meta.Media.Type.String != "text" {
-		t.Errorf("Expected type text for CBZ, got %s", meta.Media.Type.String)
+	if meta.Media.MediaType.String != "text" {
+		t.Errorf("Expected type text for CBZ, got %s", meta.Media.MediaType.String)
 	}
 
 	// With OCR disabled, no captions should be extracted
@@ -404,8 +404,8 @@ func TestExtract_Audio_SpeechRecognition(t *testing.T) {
 		t.Fatalf("Extract failed: %v", err)
 	}
 
-	if meta.Media.Type.String != "audio" {
-		t.Errorf("Expected type audio for WAV, got %s", meta.Media.Type.String)
+	if meta.Media.MediaType.String != "audio" {
+		t.Errorf("Expected type audio for WAV, got %s", meta.Media.MediaType.String)
 	}
 
 	// With speech recognition disabled, no captions should be extracted
@@ -446,8 +446,8 @@ func TestExtract_Audio_SpeechRecognition_Enabled(t *testing.T) {
 	}
 
 	// Should still return metadata even if speech recognition fails
-	if meta.Media.Type.String != "audio" {
-		t.Errorf("Expected type audio for WAV, got %s", meta.Media.Type.String)
+	if meta.Media.MediaType.String != "audio" {
+		t.Errorf("Expected type audio for WAV, got %s", meta.Media.MediaType.String)
 	}
 
 	// Captions may be empty if vosk is not installed (expected behavior)
@@ -532,8 +532,8 @@ func TestExtract_Video_SpeechRecognition(t *testing.T) {
 		t.Fatalf("Extract failed: %v", err)
 	}
 
-	if meta.Media.Type.String != "video" {
-		t.Errorf("Expected type video for MP4, got %s", meta.Media.Type.String)
+	if meta.Media.MediaType.String != "video" {
+		t.Errorf("Expected type video for MP4, got %s", meta.Media.MediaType.String)
 	}
 
 	// Captions may be empty if speech recognition fails (expected without actual audio)
@@ -573,8 +573,8 @@ func TestExtract_Image_MediaType(t *testing.T) {
 		t.Fatalf("Extract failed: %v", err)
 	}
 
-	if meta.Media.Type.String != "image" {
-		t.Errorf("Expected type image for PNG, got %s", meta.Media.Type.String)
+	if meta.Media.MediaType.String != "image" {
+		t.Errorf("Expected type image for PNG, got %s", meta.Media.MediaType.String)
 	}
 
 	// No captions should be extracted without OCR
@@ -612,8 +612,8 @@ func TestExtract_Image_WithoutOCR_NoTesseract(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Extract failed (OCR=false, extractText=false): %v", err)
 	}
-	if meta1.Media.Type.String != "image" {
-		t.Errorf("Expected type image, got %s", meta1.Media.Type.String)
+	if meta1.Media.MediaType.String != "image" {
+		t.Errorf("Expected type image, got %s", meta1.Media.MediaType.String)
 	}
 	if len(meta1.Captions) != 0 {
 		t.Errorf("Expected 0 captions (OCR=false, extractText=false), got %d", len(meta1.Captions))
@@ -625,8 +625,8 @@ func TestExtract_Image_WithoutOCR_NoTesseract(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Extract failed (OCR=false, extractText=true): %v", err)
 	}
-	if meta2.Media.Type.String != "image" {
-		t.Errorf("Expected type image, got %s", meta2.Media.Type.String)
+	if meta2.Media.MediaType.String != "image" {
+		t.Errorf("Expected type image, got %s", meta2.Media.MediaType.String)
 	}
 	if len(meta2.Captions) != 0 {
 		t.Errorf("Expected 0 captions with extractText=true but OCR=false (images don't use extractText), got %d", len(meta2.Captions))
@@ -759,8 +759,8 @@ func TestExtract_Image_WithOCR_Tesseract(t *testing.T) {
 		t.Fatalf("Extract failed (OCR=true): %v", err)
 	}
 
-	if meta.Media.Type.String != "image" {
-		t.Errorf("Expected type image, got %s", meta.Media.Type.String)
+	if meta.Media.MediaType.String != "image" {
+		t.Errorf("Expected type image, got %s", meta.Media.MediaType.String)
 	}
 
 	// Captions may be empty if tesseract fails (expected with mock image data)

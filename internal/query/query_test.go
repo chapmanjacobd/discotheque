@@ -59,7 +59,7 @@ func TestFilterBuilder_Build(t *testing.T) {
 				QueryFlags:       models.QueryFlags{Limit: 100},
 				DeletedFlags:     models.DeletedFlags{HideDeleted: true},
 			},
-			"SELECT * FROM media WHERE COALESCE(time_deleted, 0) = 0 AND (type = 'video') ORDER BY path ASC LIMIT 100",
+			"SELECT * FROM media WHERE COALESCE(time_deleted, 0) = 0 AND (media_type = 'video') ORDER BY path ASC LIMIT 100",
 		},
 		{
 			"Reverse Sort",
@@ -117,7 +117,7 @@ func TestFilterBuilder_Build(t *testing.T) {
 				QueryFlags:       models.QueryFlags{Limit: 10},
 				DeletedFlags:     models.DeletedFlags{HideDeleted: true},
 			},
-			"SELECT media.* FROM media JOIN media_fts ON media.rowid = media_fts.rowid WHERE COALESCE(media.time_deleted, 0) = 0 AND (media.type = 'video') AND media.size >= ? AND media_fts MATCH ? LIMIT 10",
+			"SELECT media.* FROM media JOIN media_fts ON media.rowid = media_fts.rowid WHERE COALESCE(media.time_deleted, 0) = 0 AND (media.media_type = 'video') AND media.size >= ? AND media_fts MATCH ? LIMIT 10",
 		},
 		{
 			"Only Deleted",
@@ -215,7 +215,7 @@ func TestFilterBuilder_Build(t *testing.T) {
 				QueryFlags:       models.QueryFlags{Limit: 10},
 				DeletedFlags:     models.DeletedFlags{HideDeleted: true},
 			},
-			"SELECT * FROM media WHERE COALESCE(time_deleted, 0) = 0 AND (type = 'audio' OR type = 'audiobook') LIMIT 10",
+			"SELECT * FROM media WHERE COALESCE(time_deleted, 0) = 0 AND (media_type = 'audio' OR media_type = 'audiobook') LIMIT 10",
 		},
 		{
 			"Text Only",
@@ -224,7 +224,7 @@ func TestFilterBuilder_Build(t *testing.T) {
 				QueryFlags:       models.QueryFlags{Limit: 10},
 				DeletedFlags:     models.DeletedFlags{HideDeleted: true},
 			},
-			"SELECT * FROM media WHERE COALESCE(time_deleted, 0) = 0 AND (type = 'text') LIMIT 10",
+			"SELECT * FROM media WHERE COALESCE(time_deleted, 0) = 0 AND (media_type = 'text') LIMIT 10",
 		},
 		{
 			"Image Only",
@@ -233,7 +233,7 @@ func TestFilterBuilder_Build(t *testing.T) {
 				QueryFlags:       models.QueryFlags{Limit: 10},
 				DeletedFlags:     models.DeletedFlags{HideDeleted: true},
 			},
-			"SELECT * FROM media WHERE COALESCE(time_deleted, 0) = 0 AND (type = 'image') LIMIT 10",
+			"SELECT * FROM media WHERE COALESCE(time_deleted, 0) = 0 AND (media_type = 'image') LIMIT 10",
 		},
 		{
 			"Path-like Search (absolute)",
@@ -406,7 +406,7 @@ func TestQueryDatabase(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	insert := `INSERT INTO media (path, title, duration, size, type) VALUES (?, ?, ?, ?, ?)`
+	insert := `INSERT INTO media (path, title, duration, size, media_type) VALUES (?, ?, ?, ?, ?)`
 	dbConn.Exec(insert, filepath.FromSlash("/test/movie.mp4"), "Test Movie", 7200, 1000000, "video")
 	dbConn.Close()
 

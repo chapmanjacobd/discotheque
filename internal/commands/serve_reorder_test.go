@@ -28,7 +28,7 @@ func TestServeReorder_Playlist(t *testing.T) {
 
 	for i := 1; i <= 3; i++ {
 		path := filepath.FromSlash(fmt.Sprintf("/media%d.mp4", i))
-		sqlDB.Exec(`INSERT INTO media (path, type, time_deleted) VALUES (?, 'video', 0)`, path)
+		sqlDB.Exec(`INSERT INTO media (path, media_type, time_deleted) VALUES (?, 'video', 0)`, path)
 		sqlDB.Exec(`INSERT INTO playlist_items (playlist_id, media_path, track_number) VALUES (?, ?, ?)`, pid, path, i)
 	}
 	sqlDB.Close()

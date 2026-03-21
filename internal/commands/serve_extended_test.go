@@ -19,8 +19,8 @@ func TestServeExtended_Filters(t *testing.T) {
 	sqlDB, _ := sql.Open("sqlite3", dbPath)
 	db.InitDB(sqlDB)
 	// Add diverse test data
-	sqlDB.Exec(`INSERT INTO media (path, type, size, time_deleted) VALUES ('/v1.mp4', 'video', 100, 0)`)
-	sqlDB.Exec(`INSERT INTO media (path, type, size, time_deleted) VALUES ('/a1.mp3', 'audio', 200, 0)`)
+	sqlDB.Exec(`INSERT INTO media (path, media_type, size, time_deleted) VALUES ('/v1.mp4', 'video', 100, 0)`)
+	sqlDB.Exec(`INSERT INTO media (path, media_type, size, time_deleted) VALUES ('/a1.mp3', 'audio', 200, 0)`)
 	sqlDB.Close()
 
 	cmd := &ServeCmd{
@@ -41,7 +41,7 @@ func TestServeExtended_Filters(t *testing.T) {
 	var bins map[string]any
 	json.NewDecoder(w.Body).Decode(&bins)
 
-	if bins["type"] == nil {
-		t.Error("Expected type bins to be present")
+	if bins["media_type"] == nil {
+		t.Error("Expected media_type bins to be present")
 	}
 }

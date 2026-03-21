@@ -141,6 +141,8 @@ export const test = base.extend<{
     //   }
     // });
 
+    if (process.env.DEBUG) {
+
     page.on('requestfailed', request => {
       const errorText = request.failure()?.errorText;
       if (errorText && !['net::ERR_ABORTED', 'net::ERR_INCOMPLETE_CHUNKED_ENCODING'].includes(errorText)) {
@@ -157,6 +159,8 @@ export const test = base.extend<{
     page.on('pageerror', err => {
       console.error(`page.error:`, err.message);
     });
+
+    }
 
     await use(server);
 

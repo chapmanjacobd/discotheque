@@ -321,7 +321,7 @@ test.describe('Race Conditions - Progress Updates & Pagination', () => {
 
     // Check active filter using POM
     const activeBtn = mediaPage.page.locator('#media-type-list .category-btn.active');
-    const activeType = await activeBtn.getAttribute('data-type');
+    const activeType = await activeBtn.getAttribute('data-media_type');
     console.log(`Final active filter: ${activeType}`);
 
     // Should be video (last selection)

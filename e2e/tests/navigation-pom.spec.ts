@@ -93,9 +93,9 @@ test.describe('Page Navigation with POM', () => {
   test('media cards have correct data attributes', async ({ mediaPage, server }) => {
     await mediaPage.goto(server.getBaseUrl());
 
-    // First card should have data-type attribute
+    // First card should have data-media_type attribute
     const firstCard = mediaPage.getMediaCard(0);
-    await expect(firstCard).toHaveAttribute('data-type');
+    await expect(firstCard).toHaveAttribute('data-media_type');
   });
 
   test('sidebar can be toggled on mobile', async ({ mediaPage, sidebarPage, server }) => {

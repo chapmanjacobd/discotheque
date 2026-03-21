@@ -119,8 +119,8 @@ func GetTranscodeStrategy(m models.Media) TranscodeStrategy {
 	}
 
 	mime := ""
-	if m.Type != nil && *m.Type != "" {
-		mime = *m.Type
+	if m.MediaType != nil && *m.MediaType != "" {
+		mime = *m.MediaType
 	} else {
 		mime = DetectMimeType(m.Path)
 	}

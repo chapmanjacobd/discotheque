@@ -335,6 +335,7 @@ func (c *DedupeCmd) getFSDuplicates(dbPath string, flags models.GlobalFlags) ([]
 		if err := rows.Scan(&size, &count); err != nil {
 			return nil, err
 		}
+		slog.Debug("Found potential duplicates by size", "size", size, "count", count)
 
 		gRows, err := sqlDB.Query("SELECT path, fasthash, sha256 FROM media WHERE size = ? AND COALESCE(time_deleted, 0) = 0", size)
 		if err != nil {

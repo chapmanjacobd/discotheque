@@ -33,7 +33,7 @@ func TestHandleCategorizeSuggest(t *testing.T) {
 			path TEXT PRIMARY KEY,
 			path_tokenized TEXT,
 			title TEXT,
-			type TEXT,
+			media_type TEXT,
 			size INTEGER,
 			duration INTEGER,
 			time_deleted INTEGER DEFAULT 0,
@@ -89,7 +89,7 @@ func TestHandleCategorizeSuggest(t *testing.T) {
 	// Insert test media without categories (uncategorized)
 	// Include repeated words to test frequency counting
 	_, err = db.Exec(`
-		INSERT INTO media (path, title, type, size, duration) VALUES
+		INSERT INTO media (path, title, media_type, size, duration) VALUES
 			('/videos/rock_concert.mp4', 'Rock Concert', 'video/mp4', 1024, 120),
 			('/videos/jazz_performance.mp4', 'Jazz Performance', 'video/mp4', 2048, 180),
 			('/videos/rock_live.mp4', 'Rock Live', 'video/mp4', 512, 90),
@@ -194,7 +194,7 @@ func TestHandleCategorizeSuggest(t *testing.T) {
 				path TEXT PRIMARY KEY,
 				path_tokenized TEXT,
 				title TEXT,
-				type TEXT,
+				media_type TEXT,
 				size INTEGER,
 				duration INTEGER,
 				time_deleted INTEGER DEFAULT 0,

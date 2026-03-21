@@ -174,7 +174,7 @@ func createTestDB(pattern string) (string, error) {
 	for i := 1; i <= 5; i++ {
 		path := "/" + dbName + "/item" + string(rune('0'+i))
 		_, err := dbConn.Exec(
-			"INSERT INTO media (path, title, type, size, duration) VALUES (?, ?, ?, ?, ?)",
+			"INSERT INTO media (path, title, media_type, size, duration) VALUES (?, ?, ?, ?, ?)",
 			path, "Item "+string(rune('0'+i)), "video", 1000*i, 100*i,
 		)
 		if err != nil {

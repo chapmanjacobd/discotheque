@@ -141,7 +141,7 @@ test.describe('Progress Synchronization', () => {
     await mediaPage.goto(server.getBaseUrl());
 
     // Get first two videos using POM
-    const videoCards = mediaPage.page.locator('.media-card[data-type*="video"]');
+    const videoCards = mediaPage.page.locator('.media-card[data-media_type*="video"]');
     const count = await videoCards.count();
     expect(count).toBeGreaterThanOrEqual(2);
 

@@ -1,35 +1,4 @@
-
-### 5. **Advanced Audio Processing** (Medium Priority)
-- Silence detection for splitting long audio
-- Channel detection (mono vs stereo handling)
-- Sample rate conversion logic
-- Bitrate-based quality decisions
-
-### 6. **Transcode Validation** (High Priority)
-- Validate output file after transcoding
-- Compare duration (5% threshold)
-- Delete larger of original vs transcode
-- Preserve original timestamps on output
-
-### 7. **Continue-From Functionality** (Low Priority)
-- Skip media until specific path is seen
-- Useful for resuming interrupted operations
-
-### 8. **Better Summary Output** (Low Priority)
-- Group summary by media type + extension
-- Show compressed vs extracted sizes for archives
-- Show total processing time estimate
-
----
-
-**Recommended Implementation Order:**
-1. Transcode validation (#6) - Critical for data safety
-2. Valid/Invalid modes (#3) - Important for handling broken files
-3. Archive handling (#1) - Significant space savings
-4. Text processing (#2) - Additional format support
-5. Advanced video/audio (#4, #5) - Edge cases
-6. Continue-from + Summary (#7, #8) - Quality of life
-
+rename type column to media_type
 
 print less during tests except for assertions
 

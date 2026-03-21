@@ -105,7 +105,7 @@ func TestDatabaseFiltering_FilterBins(t *testing.T) {
 	sqlDB := fixture.GetDB()
 	db.InitDB(sqlDB)
 	_, err := sqlDB.Exec(`
-		INSERT INTO media (path, size, duration, type, time_deleted)
+		INSERT INTO media (path, size, duration, media_type, time_deleted)
 		VALUES ('/test/video.mp4', 1000000, 120, 'video', 0)
 	`)
 	if err != nil {

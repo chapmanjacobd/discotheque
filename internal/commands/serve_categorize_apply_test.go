@@ -32,7 +32,7 @@ func TestHandleCategorizeApply(t *testing.T) {
 			path TEXT PRIMARY KEY,
 			path_tokenized TEXT,
 			title TEXT,
-			type TEXT,
+			media_type TEXT,
 			size INTEGER,
 			duration INTEGER,
 			time_deleted INTEGER DEFAULT 0,
@@ -87,7 +87,7 @@ func TestHandleCategorizeApply(t *testing.T) {
 
 	// Insert test media
 	_, err = db.Exec(`
-		INSERT INTO media (path, title, type, size, duration) VALUES
+		INSERT INTO media (path, title, media_type, size, duration) VALUES
 			('/videos/rock_concert.mp4', 'Rock Concert', 'video/mp4', 1024, 120),
 			('/videos/jazz_performance.mp4', 'Jazz Performance', 'video/mp4', 2048, 180),
 			('/videos/uncategorized.mp4', 'Random Video', 'video/mp4', 512, 90);
@@ -204,7 +204,7 @@ func TestHandleCategorizeApply(t *testing.T) {
 				path TEXT PRIMARY KEY,
 				path_tokenized TEXT,
 				title TEXT,
-				type TEXT,
+				media_type TEXT,
 				size INTEGER,
 				duration INTEGER,
 				time_deleted INTEGER DEFAULT 0,
@@ -248,7 +248,7 @@ func TestHandleCategorizeApply(t *testing.T) {
 				longitude REAL
 			);
 			CREATE TABLE custom_keywords (category TEXT, keyword TEXT, UNIQUE(category, keyword));
-			INSERT INTO media (path, title, type, size, duration) VALUES ('/videos/abc123.mp4', 'XYZ', 'video/mp4', 1024, 120);
+			INSERT INTO media (path, title, media_type, size, duration) VALUES ('/videos/abc123.mp4', 'XYZ', 'video/mp4', 1024, 120);
 		`)
 		if err != nil {
 			t.Fatalf("Failed to setup db: %v", err)

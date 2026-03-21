@@ -23,7 +23,7 @@ func TestServeAPI_Query(t *testing.T) {
 	db.InitDB(sqlDB)
 
 	// Add test data
-	_, err = sqlDB.Exec(`INSERT INTO media (path, title, type, size, time_deleted) VALUES ('/tmp/test.mp4', 'Test Video', 'video', 1024, 0)`)
+	_, err = sqlDB.Exec(`INSERT INTO media (path, title, media_type, size, time_deleted) VALUES ('/tmp/test.mp4', 'Test Video', 'video', 1024, 0)`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -73,7 +73,7 @@ func TestServeAPI_Metadata(t *testing.T) {
 
 	sqlDB, _ := sql.Open("sqlite3", dbPath)
 	db.InitDB(sqlDB)
-	sqlDB.Exec(`INSERT INTO media (path, title, type, time_deleted) VALUES ('/tmp/meta.mp4', 'Meta Video', 'video', 0)`)
+	sqlDB.Exec(`INSERT INTO media (path, title, media_type, time_deleted) VALUES ('/tmp/meta.mp4', 'Meta Video', 'video', 0)`)
 	sqlDB.Close()
 
 	cmd := &ServeCmd{

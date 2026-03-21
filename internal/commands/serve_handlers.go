@@ -94,7 +94,7 @@ func (c *ServeCmd) handleQuery(w http.ResponseWriter, r *http.Request) {
 							Time:      r.Time,
 							Text:      r.Text,
 							Title:     r.Title,
-							Type:      r.Type,
+							MediaType: r.MediaType,
 							Size:      r.Size,
 							Duration:  r.Duration,
 							Rank:      0, // No ranking for non-search queries
@@ -114,11 +114,11 @@ func (c *ServeCmd) handleQuery(w http.ResponseWriter, r *http.Request) {
 						if _, ok := aggregated[path]; !ok {
 							aggregated[path] = &models.MediaWithDB{
 								Media: models.Media{
-									Path:     path,
-									Type:     models.NullStringPtr(row.Type),
-									Title:    models.NullStringPtr(row.Title),
-									Size:     models.NullInt64Ptr(row.Size),
-									Duration: models.NullInt64Ptr(row.Duration),
+									Path:      path,
+									MediaType: models.NullStringPtr(row.MediaType),
+									Title:     models.NullStringPtr(row.Title),
+									Size:      models.NullInt64Ptr(row.Size),
+									Duration:  models.NullInt64Ptr(row.Duration),
 								},
 								DB: dbPath,
 							}
@@ -146,11 +146,11 @@ func (c *ServeCmd) handleQuery(w http.ResponseWriter, r *http.Request) {
 						stat := aggregated[path]
 						m := models.MediaWithDB{
 							Media: models.Media{
-								Path:     path,
-								Type:     models.NullStringPtr(row.Type),
-								Title:    models.NullStringPtr(row.Title),
-								Size:     models.NullInt64Ptr(row.Size),
-								Duration: models.NullInt64Ptr(row.Duration),
+								Path:      path,
+								MediaType: models.NullStringPtr(row.MediaType),
+								Title:     models.NullStringPtr(row.Title),
+								Size:      models.NullInt64Ptr(row.Size),
+								Duration:  models.NullInt64Ptr(row.Duration),
 							},
 							DB:              dbPath,
 							CaptionText:     row.Text.String,
@@ -165,9 +165,9 @@ func (c *ServeCmd) handleQuery(w http.ResponseWriter, r *http.Request) {
 					for _, row := range rows {
 						m := models.MediaWithDB{
 							Media: models.Media{
-								Path:  row.MediaPath,
-								Type:  models.NullStringPtr(row.Type),
-								Title: models.NullStringPtr(row.Title),
+								Path:      row.MediaPath,
+								MediaType: models.NullStringPtr(row.MediaType),
+								Title:     models.NullStringPtr(row.Title),
 							},
 							DB:          dbPath,
 							CaptionText: row.Text.String,
@@ -681,13 +681,13 @@ func (c *ServeCmd) handleLs(w http.ResponseWriter, r *http.Request) {
 			if isPartial {
 				if searchDir == "" {
 					rows, err = sqlDB.QueryContext(r.Context(), `
-						SELECT path, type FROM media
+						SELECT path, media_type FROM media
 						WHERE time_deleted = 0
 						  AND path LIKE '%' || ? || '%'
 						LIMIT 500`, searchBase)
 				} else {
 					rows, err = sqlDB.QueryContext(r.Context(), `
-						SELECT path, type FROM media
+						SELECT path, media_type FROM media
 						WHERE time_deleted = 0
 						  AND path LIKE '%' || ? || '%' || ? || '%'
 						LIMIT 500`, searchDir, searchBase)
@@ -695,13 +695,13 @@ func (c *ServeCmd) handleLs(w http.ResponseWriter, r *http.Request) {
 			} else {
 				if searchBase == "" {
 					rows, err = sqlDB.QueryContext(r.Context(), `
-						SELECT path, type FROM media
+						SELECT path, media_type FROM media
 						WHERE time_deleted = 0
 						  AND path LIKE ? || '%'
 						LIMIT 500`, searchDir)
 				} else {
 					rows, err = sqlDB.QueryContext(r.Context(), `
-						SELECT path, type FROM media
+						SELECT path, media_type FROM media
 						WHERE time_deleted = 0
 						  AND path LIKE ? || '%'
 						  AND path LIKE '%' || ? || '%'
@@ -733,7 +733,7 @@ func (c *ServeCmd) handleLs(w http.ResponseWriter, r *http.Request) {
 								entryPath = current + seg
 								counts[entryPath]++
 								if _, ok := resultsMap[entryPath]; !ok {
-									resultsMap[entryPath] = LsEntry{Name: entryName, Path: entryPath, IsDir: false, Type: t.String}
+									resultsMap[entryPath] = LsEntry{Name: entryName, Path: entryPath, IsDir: false, MediaType: t.String}
 								}
 								break
 							}
@@ -745,7 +745,6 @@ func (c *ServeCmd) handleLs(w http.ResponseWriter, r *http.Request) {
 						}
 						continue
 					}
-
 					var entryName string
 					var entryPath string
 					var isDir bool
@@ -826,10 +825,10 @@ func (c *ServeCmd) handleLs(w http.ResponseWriter, r *http.Request) {
 						}
 					} else {
 						resultsMap[entryPath] = LsEntry{
-							Name:  entryName,
-							Path:  entryPath,
-							IsDir: isDir,
-							Type:  t.String,
+							Name:      entryName,
+							Path:      entryPath,
+							IsDir:     isDir,
+							MediaType: t.String,
 						}
 					}
 				}

@@ -58,7 +58,7 @@ func (c *ServeCmd) computeFilterBinsData(ctx context.Context, flags models.Globa
 		tempFlags.Duration = nil
 	} else if filterToIgnore == "episodes" {
 		tempFlags.FileCounts = ""
-	} else if filterToIgnore == "type" {
+	} else if filterToIgnore == "media_type" {
 		tempFlags.VideoOnly = false
 		tempFlags.AudioOnly = false
 		tempFlags.ImageOnly = false
@@ -75,7 +75,7 @@ func (c *ServeCmd) computeFilterBinsData(ctx context.Context, flags models.Globa
 	}
 
 	fb := query.NewFilterBuilder(tempFlags)
-	sqlQuery, args := fb.BuildSelect("path, size, duration, type, time_modified, time_created, time_downloaded")
+	sqlQuery, args := fb.BuildSelect("path, size, duration, media_type, time_modified, time_created, time_downloaded")
 
 	var wg sync.WaitGroup
 	for _, dbPath := range dbs {
@@ -346,8 +346,8 @@ func (c *ServeCmd) handleFilterBins(w http.ResponseWriter, r *http.Request) {
 	_, _, resp.DownloadedPercentiles = buildTimeBins(dlData.downloaded)
 
 	// Get type data - keep as bins (special case, not percentile-based)
-	typeData := c.computeFilterBinsData(r.Context(), flags, "type", dbs)
-	resp.Type = buildTypeBins(typeData.typeCounts)
+	typeData := c.computeFilterBinsData(r.Context(), flags, "media_type", dbs)
+	resp.MediaType = buildTypeBins(typeData.typeCounts)
 
 	// Log query info for debugging
 	slog.Info("FilterBins computed",
@@ -398,8 +398,8 @@ func (c *ServeCmd) calculateFilterCountsOptimized(ctx context.Context, flags mod
 	dlData := c.computeFilterBinsDataOptimized(ctx, flags, "downloaded", dbs)
 	_, _, resp.DownloadedPercentiles = buildTimeBins(dlData.downloaded)
 
-	typeData := c.computeFilterBinsDataOptimized(ctx, flags, "type", dbs)
-	resp.Type = buildTypeBins(typeData.typeCounts)
+	typeData := c.computeFilterBinsDataOptimized(ctx, flags, "media_type", dbs)
+	resp.MediaType = buildTypeBins(typeData.typeCounts)
 
 	return resp
 }
@@ -433,7 +433,7 @@ func (c *ServeCmd) computeFilterBinsDataOptimized(ctx context.Context, flags mod
 		tempFlags.Duration = nil
 	} else if filterToIgnore == "episodes" {
 		tempFlags.FileCounts = ""
-	} else if filterToIgnore == "type" {
+	} else if filterToIgnore == "media_type" {
 		tempFlags.VideoOnly = false
 		tempFlags.AudioOnly = false
 		tempFlags.ImageOnly = false
@@ -522,10 +522,10 @@ func (c *ServeCmd) computeFilterBinsDataOptimized(ctx context.Context, flags mod
 
 				// 2. Get type counts
 				typeCountQuery := `
-					SELECT COALESCE(NULLIF(type, ''), 'unknown') as t, COUNT(*) as cnt
+					SELECT COALESCE(NULLIF(media_type, ''), 'unknown') as t, COUNT(*) as cnt
 					FROM media
 					WHERE COALESCE(time_deleted, 0) = 0
-					GROUP BY type
+					GROUP BY media_type
 				`
 				rows, err := sqlDB.QueryContext(ctx, typeCountQuery)
 				if err == nil {

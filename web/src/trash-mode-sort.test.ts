@@ -194,7 +194,7 @@ describe('Trash Mode Sort State', () => {
         // Simulate resetFilters() behavior (without actually calling it)
         // resetFilters should NOT reset sort preferences
         state.filters.categories = [];
-        state.filters.types = [];
+        state.filters.media_types = [];
         state.filters.unplayed = false;
         // ... but sort should be preserved
         

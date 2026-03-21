@@ -150,7 +150,7 @@ test.describe('Large Result Sets Scrolling', () => {
     await expect(firstCard).toBeVisible();
 
     // Card should have required attributes using POM
-    await expect(firstCard).toHaveAttribute('data-type');
+    await expect(firstCard).toHaveAttribute('data-media_type');
   });
 
   test('media cards have images after scrolling', async ({ mediaPage, server }) => {

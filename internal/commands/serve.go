@@ -45,11 +45,11 @@ func init() {
 
 // LsEntry represents a directory listing entry
 type LsEntry struct {
-	Name  string `json:"name"`
-	Path  string `json:"path"`
-	IsDir bool   `json:"is_dir"`
-	Type  string `json:"type,omitempty"`
-	Local bool   `json:"local"`
+	Name      string `json:"name"`
+	Path      string `json:"path"`
+	IsDir     bool   `json:"is_dir"`
+	MediaType string `json:"media_type,omitempty"`
+	Local     bool   `json:"local"`
 }
 
 // ServeCmd is the HTTP server command
@@ -632,7 +632,11 @@ func (c *ServeCmd) parseFlags(r *http.Request) models.GlobalFlags {
 		flags.All = true
 	}
 
-	for _, t := range q["type"] {
+	mediaTypes := q["media_type"]
+	if len(mediaTypes) == 0 {
+		mediaTypes = q["type"]
+	}
+	for _, t := range mediaTypes {
 		switch t {
 		case "video":
 			flags.VideoOnly = true

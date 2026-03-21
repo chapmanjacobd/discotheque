@@ -7,6 +7,43 @@ import (
 	"strings"
 )
 
+func renameMediaTypeColumn(db *sql.DB) error {
+	rows, err := db.Query("PRAGMA table_info(media)")
+	if err != nil {
+		if strings.Contains(err.Error(), "no such table") {
+			return nil
+		}
+		return err
+	}
+	defer rows.Close()
+
+	hasType := false
+	hasMediaType := false
+	for rows.Next() {
+		var cid int
+		var name, dtype string
+		var notnull, pk int
+		var dfltValue any
+		if err := rows.Scan(&cid, &name, &dtype, &notnull, &dfltValue, &pk); err != nil {
+			return err
+		}
+		if strings.EqualFold(name, "type") {
+			hasType = true
+		}
+		if strings.EqualFold(name, "media_type") {
+			hasMediaType = true
+		}
+	}
+	rows.Close()
+
+	if hasType && !hasMediaType {
+		if _, err := db.Exec("ALTER TABLE media RENAME COLUMN type TO media_type"); err != nil {
+			return fmt.Errorf("failed to rename column type to media_type: %w", err)
+		}
+	}
+	return nil
+}
+
 // Migrate runs schema migrations on an existing database
 func Migrate(db *sql.DB) error {
 	// 0. Check SQLite version for STRICT support (3.37.0+)
@@ -15,6 +52,11 @@ func Migrate(db *sql.DB) error {
 		return err
 	}
 	hasStrict := isVersionGreaterOrEqual(version, "3.37.0")
+
+	// 0.1 Rename 'type' to 'media_type' if needed
+	if err := renameMediaTypeColumn(db); err != nil {
+		return err
+	}
 
 	// 1. Column migrations (Add new ones first)
 	if err := migrateColumns(db); err != nil {
@@ -523,7 +565,7 @@ func cleanupMediaTable(db *sql.DB, hasStrict bool) error {
             time_last_played INTEGER DEFAULT 0,
             play_count INTEGER DEFAULT 0,
             playhead INTEGER DEFAULT 0,
-            type TEXT,
+            media_type TEXT,
             width INTEGER,
             height INTEGER,
             fps REAL,
@@ -545,13 +587,13 @@ func cleanupMediaTable(db *sql.DB, hasStrict bool) error {
 		fmt.Sprintf(`INSERT INTO media_dg_tmp (
             %s title, duration, size, time_created, time_modified,
             time_deleted, time_first_played, time_last_played, play_count, playhead,
-            type, width, height, fps, video_codecs, audio_codecs, subtitle_codecs,
+            media_type, width, height, fps, video_codecs, audio_codecs, subtitle_codecs,
             video_count, audio_count, subtitle_count, album, artist, genre,
             categories, description, language, time_downloaded, score
         ) SELECT
             %s title, duration, size, time_created, time_modified,
             time_deleted, time_first_played, time_last_played, play_count, playhead,
-            type, width, height, fps, video_codecs, audio_codecs, subtitle_codecs,
+            media_type, width, height, fps, video_codecs, audio_codecs, subtitle_codecs,
             video_count, audio_count, subtitle_count, album, artist, genre,
             categories, description, language, time_downloaded, score
         FROM media`, colsNames, colsNames),
@@ -837,7 +879,7 @@ func migrateIndexes(db *sql.DB) error {
 	indexes := []string{
 		// Core indexes
 		"CREATE INDEX IF NOT EXISTS idx_path ON media(path)",
-		"CREATE INDEX IF NOT EXISTS idx_type ON media(type)",
+		"CREATE INDEX IF NOT EXISTS idx_media_type ON media(media_type)",
 		"CREATE INDEX IF NOT EXISTS idx_genre ON media(genre)",
 		"CREATE INDEX IF NOT EXISTS idx_artist ON media(artist)",
 		"CREATE INDEX IF NOT EXISTS idx_album ON media(album)",
@@ -849,12 +891,12 @@ func migrateIndexes(db *sql.DB) error {
 		"CREATE INDEX IF NOT EXISTS idx_size ON media(size)",
 		"CREATE INDEX IF NOT EXISTS idx_duration ON media(duration)",
 		// Composite indexes for common filtered queries
-		"CREATE INDEX IF NOT EXISTS idx_media_deleted_type ON media(time_deleted, type)",
+		"CREATE INDEX IF NOT EXISTS idx_media_deleted_type ON media(time_deleted, media_type)",
 		"CREATE INDEX IF NOT EXISTS idx_media_deleted_size ON media(time_deleted, size)",
 		"CREATE INDEX IF NOT EXISTS idx_media_deleted_duration ON media(time_deleted, duration)",
 		"CREATE INDEX IF NOT EXISTS idx_media_deleted_path ON media(time_deleted, path)",
 		// Partial index for active media (most common query pattern)
-		"CREATE INDEX IF NOT EXISTS idx_media_active ON media(path, type) WHERE time_deleted = 0",
+		"CREATE INDEX IF NOT EXISTS idx_media_active ON media(path, media_type) WHERE time_deleted = 0",
 		// Indexes for filter bins calculation (optimize include_counts)
 		"CREATE INDEX IF NOT EXISTS idx_media_active_size ON media(size) WHERE time_deleted = 0 AND size > 0",
 		"CREATE INDEX IF NOT EXISTS idx_media_active_duration ON media(duration) WHERE time_deleted = 0 AND duration > 0",

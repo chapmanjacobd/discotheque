@@ -21,7 +21,7 @@ func TestHandleRate(t *testing.T) {
 
 	sqlDB, _ := sql.Open("sqlite3", dbPath)
 	db.InitDB(sqlDB)
-	_, err := sqlDB.Exec(`INSERT INTO media (path, title, type, score, time_deleted) VALUES 
+	_, err := sqlDB.Exec(`INSERT INTO media (path, title, media_type, score, time_deleted) VALUES 
 		(?, 'Test1', 'video', 0, 0)`, filepath.FromSlash("/tmp/test1.mp4"))
 	if err != nil {
 		t.Fatal(err)
@@ -96,7 +96,7 @@ func TestHandleDelete(t *testing.T) {
 
 	sqlDB, _ := sql.Open("sqlite3", dbPath)
 	db.InitDB(sqlDB)
-	_, err := sqlDB.Exec(`INSERT INTO media (path, title, type, time_deleted) VALUES 
+	_, err := sqlDB.Exec(`INSERT INTO media (path, title, media_type, time_deleted) VALUES 
 		(?, 'Test1', 'video', 0)`, filepath.FromSlash("/tmp/test1.mp4"))
 	if err != nil {
 		t.Fatal(err)
@@ -184,7 +184,7 @@ func TestHandleProgress(t *testing.T) {
 
 	sqlDB, _ := sql.Open("sqlite3", dbPath)
 	db.InitDB(sqlDB)
-	_, err := sqlDB.Exec(`INSERT INTO media (path, title, type, playhead, play_count, time_deleted) VALUES 
+	_, err := sqlDB.Exec(`INSERT INTO media (path, title, media_type, playhead, play_count, time_deleted) VALUES 
 		(?, 'Test1', 'video', 0, 0, 0)`, filepath.FromSlash("/tmp/test1.mp4"))
 	if err != nil {
 		t.Fatal(err)

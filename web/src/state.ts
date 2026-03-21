@@ -20,7 +20,7 @@ export const state: State = {
     currentPage: 1,
     totalCount: 0,
     filters: {
-        types: getJSONLocalStorageItem('disco-types', []),
+        media_types: getJSONLocalStorageItem('disco-types', []),
         search: '',
         categories: getJSONLocalStorageItem('disco-filter-categories', []),
         genre: '',
@@ -96,7 +96,7 @@ export const state: State = {
         modified_percentiles: [],
         created_percentiles: [],
         downloaded_percentiles: [],
-        type: []
+        media_type: []
     },
     playlists: [],
     newCategories: [],

@@ -34,11 +34,11 @@ func setupTestDB(b *testing.B, count int) (*sql.DB, string) {
 	ctx := context.Background()
 	for i := range count {
 		err := queries.UpsertMedia(ctx, db.UpsertMediaParams{
-			Path:     fmt.Sprintf("/media/video_%d.mp4", i),
-			Title:    sql.NullString{String: fmt.Sprintf("Sample Video Title %d", i), Valid: true},
-			Type:     sql.NullString{String: "video", Valid: true},
-			Size:     sql.NullInt64{Int64: int64(1000000 * (i % 100)), Valid: true},
-			Duration: sql.NullInt64{Int64: int64(i % 3600), Valid: true},
+			Path:      fmt.Sprintf("/media/video_%d.mp4", i),
+			Title:     sql.NullString{String: fmt.Sprintf("Sample Video Title %d", i), Valid: true},
+			MediaType: sql.NullString{String: "video", Valid: true},
+			Size:      sql.NullInt64{Int64: int64(1000000 * (i % 100)), Valid: true},
+			Duration:  sql.NullInt64{Int64: int64(i % 3600), Valid: true},
 		})
 		if err != nil {
 			b.Fatalf("Insert failed: %v", err)
@@ -104,9 +104,9 @@ func BenchmarkAddMedia(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		// Simulate adding media
 		err := queries.UpsertMedia(ctx, db.UpsertMediaParams{
-			Path:  filepath.Join(mediaDir, fmt.Sprintf("video_%d.mp4", i%10)),
-			Title: sql.NullString{String: fmt.Sprintf("Video %d", i%10), Valid: true},
-			Type:  sql.NullString{String: "video", Valid: true},
+			Path:      filepath.Join(mediaDir, fmt.Sprintf("video_%d.mp4", i%10)),
+			Title:     sql.NullString{String: fmt.Sprintf("Video %d", i%10), Valid: true},
+			MediaType: sql.NullString{String: "video", Valid: true},
 		})
 		if err != nil {
 			b.Fatalf("Insert failed: %v", err)
@@ -172,9 +172,9 @@ func BenchmarkHistoryQueries(b *testing.B) {
 	// Insert sample data with history
 	for i := range 500 {
 		err := queries.UpsertMedia(ctx, db.UpsertMediaParams{
-			Path:  fmt.Sprintf("/media/video_%d.mp4", i),
-			Title: sql.NullString{String: fmt.Sprintf("Video %d", i), Valid: true},
-			Type:  sql.NullString{String: "video", Valid: true},
+			Path:      fmt.Sprintf("/media/video_%d.mp4", i),
+			Title:     sql.NullString{String: fmt.Sprintf("Video %d", i), Valid: true},
+			MediaType: sql.NullString{String: "video", Valid: true},
 		})
 		if err != nil {
 			b.Fatalf("Insert failed: %v", err)

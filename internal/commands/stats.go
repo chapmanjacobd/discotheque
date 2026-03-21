@@ -104,11 +104,11 @@ func (c *StatsCmd) Run(ctx *kong.Context) error {
 		fmt.Printf("  Unwatched Files:  %d\n", stats.UnwatchedCount)
 
 		if len(typeStats) > 0 {
-			fmt.Println("\n  Breakdown by Type:")
+			fmt.Println("\n  Breakdown by MediaType:")
 			for _, ts := range typeStats {
 				t := "unknown"
-				if ts.Type.Valid {
-					t = ts.Type.String
+				if ts.MediaType.Valid {
+					t = ts.MediaType.String
 				}
 				fmt.Printf("    %-10s: %d files, %s, %s\n",
 					t, ts.Count,
