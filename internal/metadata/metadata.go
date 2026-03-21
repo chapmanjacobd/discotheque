@@ -79,6 +79,8 @@ func Extract(ctx context.Context, path string, scanSubtitles bool, extractText b
 	// Check extension first for formats that are archive-based but treated as documents
 	if ext == ".cbz" || ext == ".cbr" || ext == ".epub" || ext == ".pdf" || ext == ".zim" || ext == ".djvu" {
 		mediaType = "text"
+	} else if utils.ArchiveExtensionMap[ext] {
+		mediaType = "archive"
 	} else if strings.HasPrefix(mimeStr, "image/") {
 		mediaType = "image"
 	} else if strings.HasPrefix(mimeStr, "text/") || mimeStr == "application/pdf" || mimeStr == "application/epub+zip" || mimeStr == "application/x-zim" {
@@ -103,7 +105,7 @@ func Extract(ctx context.Context, path string, scanSubtitles bool, extractText b
 		Media: params,
 	}
 
-	if mediaType == "text" && utils.TextExtensionMap[strings.ToLower(filepath.Ext(path))] {
+	if (mediaType == "text" || mediaType == "archive") && (utils.TextExtensionMap[ext] || utils.ArchiveExtensionMap[ext]) {
 		if params.Duration.Int64 == 0 {
 			// Fast word count for duration estimation on ingest
 			wordCount, err := utils.QuickWordCount(path, stat.Size())
@@ -127,10 +129,10 @@ func Extract(ctx context.Context, path string, scanSubtitles bool, extractText b
 				result.Captions = captions
 			}
 		} else if extractText {
-			// Extract full text from document if requested (non-comic documents)
+			// Extract full text from document or archive if requested
 			captions, err := extractDocumentText(path)
 			if err != nil {
-				slog.Warn("Document text extraction failed", "path", path, "error", err)
+				slog.Warn("Text extraction failed", "path", path, "error", err)
 			} else {
 				result.Captions = captions
 			}

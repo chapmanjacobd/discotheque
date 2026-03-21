@@ -70,6 +70,8 @@ func (i item) Title() string {
 			icon = "📄"
 		case "image":
 			icon = "🖼️"
+		case "archive":
+			icon = "📦"
 		}
 	}
 
@@ -179,6 +181,7 @@ func NewModel(media []models.MediaWithDB, databases []string, flags models.Globa
 		sidebarItem{title: "🎬 Video", filter: func(m models.MediaWithDB) bool { return m.MediaType != nil && *m.MediaType == "video" }},
 		sidebarItem{title: "🖼️ Image", filter: func(m models.MediaWithDB) bool { return m.MediaType != nil && *m.MediaType == "image" }},
 		sidebarItem{title: "📄 Text", filter: func(m models.MediaWithDB) bool { return m.MediaType != nil && *m.MediaType == "text" }},
+		sidebarItem{title: "📦 Archive", filter: func(m models.MediaWithDB) bool { return m.MediaType != nil && *m.MediaType == "archive" }},
 		sidebarItem{title: "⭐ 5 Stars", filter: func(m models.MediaWithDB) bool { return m.Score != nil && *m.Score >= 5 }},
 		sidebarItem{title: "⭐ 4+ Stars", filter: func(m models.MediaWithDB) bool { return m.Score != nil && *m.Score >= 4 }},
 		sidebarItem{title: "⭐ 3+ Stars", filter: func(m models.MediaWithDB) bool { return m.Score != nil && *m.Score >= 3 }},

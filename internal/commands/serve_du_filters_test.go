@@ -48,7 +48,10 @@ func TestHandleDU_WithFilters(t *testing.T) {
 		('/home/images/photo3.png', 'Photo3', 'image', 3000000, 0, 0),
 		-- Text/document files (2 files)
 		('/home/documents/doc1.txt', 'Doc1', 'text', 50000, 0, 0),
-		('/home/documents/doc2.pdf', 'Doc2', 'text', 100000, 0, 0)`)
+		('/home/documents/doc2.pdf', 'Doc2', 'text', 100000, 0, 0),
+		-- Archive files (2 files)
+		('/home/archives/test.zip', 'Test Zip', 'archive', 2000000, 0, 0),
+		('/home/archives/data.tar.gz', 'Data Tar', 'archive', 5000000, 0, 0)`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -78,7 +81,7 @@ func TestHandleDU_WithFilters(t *testing.T) {
 		}
 
 		// Total count should reflect filtered results
-		// Test DB has 5 videos out of 13 total media
+		// Test DB has 5 videos out of 15 total media
 		t.Logf("Folders: %d, Files: %d, Total: %d", resp.FolderCount, resp.FileCount, resp.TotalCount)
 	})
 
@@ -127,7 +130,7 @@ func TestHandleDU_WithFilters(t *testing.T) {
 		}
 		t.Logf("Filtered file count in folders: %d", filteredFileCount)
 
-		// File count within folders should be less (5 videos out of 13 total)
+		// File count within folders should be less (5 videos out of 15 total)
 		if filteredFileCount >= unfilteredFileCount {
 			t.Errorf("Expected filtered file count (%d) to be less than unfiltered (%d)", filteredFileCount, unfilteredFileCount)
 		}
@@ -170,6 +173,27 @@ func TestHandleDU_WithFilters(t *testing.T) {
 		}
 
 		t.Logf("Folders: %d, Files: %d, Total: %d", resp.FolderCount, resp.FileCount, resp.TotalCount)
+	})
+
+	t.Run("archive-only filter returns only archive folders", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/api/du?path=&archive=true", nil)
+		req.Header.Set("X-Disco-Token", cmd.APIToken)
+		w := httptest.NewRecorder()
+		mux.ServeHTTP(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Errorf("Expected 200, got %d - Body: %s", w.Code, w.Body.String())
+		}
+
+		var resp models.DUResponse
+		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("Failed to unmarshal response: %v", err)
+		}
+
+		if resp.TotalCount == 0 {
+			t.Error("Expected archive results")
+		}
+		t.Logf("Archive - Folders: %d, Files: %d, Total: %d", resp.FolderCount, resp.FileCount, resp.TotalCount)
 	})
 
 	t.Run("size filter returns only media matching size range", func(t *testing.T) {
@@ -816,7 +840,8 @@ func TestHandleDU_MixedUnixWindowsPaths(t *testing.T) {
 		('C:\Users\John\Documents\notes.txt', 'Notes', 'text', 5000, 0, 0),
 		('D:/Media/TV/series1.mkv', 'Series1', 'video', 400000000, 2700, 0),
 		('D:/Media/TV/series2.mkv', 'Series2', 'video', 450000000, 2800, 0),
-		('\\Server\Share\movies\film.mp4', 'Film', 'video', 1200000000, 10800, 0)`)
+		('\\Server\Share\movies\film.mp4', 'Film', 'video', 1200000000, 10800, 0),
+		('/home/user/archives/backup.zip', 'Backup', 'archive', 10000000, 0, 0)`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1006,8 +1031,11 @@ func TestHandleDU_MixedUnixWindowsPaths(t *testing.T) {
 		if typeMap["text"] == 0 {
 			t.Error("Expected text media_type count > 0")
 		}
+		if typeMap["archive"] == 0 {
+			t.Error("Expected archive media_type count > 0")
+		}
 
-		t.Logf("Video: %d, Audio: %d, Text: %d",
-			typeMap["video"], typeMap["audio"], typeMap["text"])
+		t.Logf("Video: %d, Audio: %d, Text: %d, Archive: %d",
+			typeMap["video"], typeMap["audio"], typeMap["text"], typeMap["archive"])
 	})
 }

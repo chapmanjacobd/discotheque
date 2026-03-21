@@ -152,7 +152,7 @@ export class SidebarPage extends BasePage {
   /**
    * Set media type filter
    */
-  async setMediaTypeFilter(type: 'video' | 'audio' | 'text' | 'image'): Promise<void> {
+  async setMediaTypeFilter(type: 'video' | 'audio' | 'text' | 'image' | 'archive'): Promise<void> {
     await this.openSidebar();
     const typeBtn = this.page.locator(`button[data-media_type="${type}"]`);
     await typeBtn.waitFor({ state: 'visible' });

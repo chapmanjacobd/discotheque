@@ -85,6 +85,7 @@ export function getIcon(type: string | undefined): string {
     if (type.includes('audio')) return '🎵';
     if (type.includes('image')) return '🖼️';
     if (type.includes('epub') || type.includes('pdf') || type.includes('mobi')) return '📚';
+    if (type.includes('archive')) return '📦';
     return '📄';
 }
 
@@ -106,6 +107,7 @@ export function generateClientThumbnail(canvas: HTMLCanvasElement, filename: str
         'image': '#10b981',
         'epub': '#f59e0b',
         'pdf': '#ef4444',
+        'archive': '#f97316',
         'default': '#3b82f6'
     };
 

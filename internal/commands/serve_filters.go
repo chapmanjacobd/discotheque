@@ -63,6 +63,7 @@ func (c *ServeCmd) computeFilterBinsData(ctx context.Context, flags models.Globa
 		tempFlags.AudioOnly = false
 		tempFlags.ImageOnly = false
 		tempFlags.TextOnly = false
+		tempFlags.ArchiveOnly = false
 	} else if filterToIgnore == "modified" {
 		tempFlags.ModifiedAfter = ""
 		tempFlags.ModifiedBefore = ""
@@ -438,6 +439,7 @@ func (c *ServeCmd) computeFilterBinsDataOptimized(ctx context.Context, flags mod
 		tempFlags.AudioOnly = false
 		tempFlags.ImageOnly = false
 		tempFlags.TextOnly = false
+		tempFlags.ArchiveOnly = false
 	} else if filterToIgnore == "modified" {
 		tempFlags.ModifiedAfter = ""
 		tempFlags.ModifiedBefore = ""

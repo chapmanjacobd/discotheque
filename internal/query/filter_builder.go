@@ -60,6 +60,9 @@ func (fb *FilterBuilder) BuildWhereClauses() ([]string, []any) {
 	if fb.flags.TextOnly {
 		typeClauses = append(typeClauses, fmt.Sprintf("%s = 'text'", fb.col("media_type")))
 	}
+	if fb.flags.ArchiveOnly {
+		typeClauses = append(typeClauses, fmt.Sprintf("%s = 'archive'", fb.col("media_type")))
+	}
 	if len(typeClauses) > 0 {
 		whereClauses = append(whereClauses, "("+strings.Join(typeClauses, " OR ")+")")
 	}

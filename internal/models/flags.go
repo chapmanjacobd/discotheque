@@ -66,6 +66,7 @@ type MediaFilterFlags struct {
 	AudioOnly       bool     `help:"Only audio files" group:"MediaFilter"`
 	ImageOnly       bool     `help:"Only image files" group:"MediaFilter"`
 	TextOnly        bool     `help:"Only text/ebook files" group:"MediaFilter"`
+	ArchiveOnly     bool     `help:"Only archive files" group:"MediaFilter"`
 	Portrait        bool     `help:"Only portrait orientation files" group:"MediaFilter"`
 	ScanSubtitles   bool     `help:"Scan for external subtitles during import" group:"MediaFilter"`
 	OnlineMediaOnly bool     `help:"Exclude local media" group:"MediaFilter"`

@@ -646,6 +646,8 @@ func (c *ServeCmd) parseFlags(r *http.Request) models.GlobalFlags {
 			flags.ImageOnly = true
 		case "text":
 			flags.TextOnly = true
+		case "archive":
+			flags.ArchiveOnly = true
 		}
 	}
 
@@ -660,6 +662,9 @@ func (c *ServeCmd) parseFlags(r *http.Request) models.GlobalFlags {
 	}
 	if text := q.Get("text"); text == "true" {
 		flags.TextOnly = true
+	}
+	if archive := q.Get("archive"); archive == "true" {
+		flags.ArchiveOnly = true
 	}
 	if q.Get("captions") == "true" || q.Get("view") == "captions" {
 		flags.WithCaptions = true

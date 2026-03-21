@@ -635,6 +635,54 @@ func TestExtract_Image_WithoutOCR_NoTesseract(t *testing.T) {
 	t.Log("Confirmed: images are not passed through tesseract without --OCR flag")
 }
 
+func TestExtract_Archive(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "archive-test-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	// Create mock files to include in ZIP
+	files := []string{
+		filepath.Join(tmpDir, "readme_first_this_is_a_very_long_filename_to_exceed_min_chunk_size.txt"),
+		filepath.Join(tmpDir, "another_long_filename_to_ensure_we_have_enough_content_for_indexing.txt"),
+		filepath.Join(tmpDir, "third_file_just_in_case_we_need_even_more_text_to_be_sure.txt"),
+	}
+	for _, f := range files {
+		os.WriteFile(f, []byte("this is a test archive content"), 0o644)
+	}
+
+	// Create ZIP file
+	zipPath := filepath.Join(tmpDir, "test.zip")
+	createZip(t, zipPath, files)
+
+	// Test extraction
+	meta, err := Extract(context.Background(), zipPath, false, true, false, "", false, "")
+	if err != nil {
+		t.Fatalf("Extract failed: %v", err)
+	}
+
+	if meta.Media.MediaType.String != "archive" {
+		t.Errorf("Expected type archive for ZIP, got %s", meta.Media.MediaType.String)
+	}
+
+	// Archives should have their contents extracted as text if extractText=true
+	if len(meta.Captions) == 0 {
+		t.Errorf("Expected at least one caption (file list) for archive")
+	}
+
+	found := false
+	for _, c := range meta.Captions {
+		if strings.Contains(c.Text.String, "readme_first") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("Expected readme_first in archive captions, got %v", meta.Captions)
+	}
+}
+
 func TestConvertImageForOCR(t *testing.T) {
 	// Test that convertImageForOCR handles different formats correctly
 	tmpDir, err := os.MkdirTemp("", "ocr-convert-test-*")

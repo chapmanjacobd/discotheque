@@ -423,7 +423,8 @@ document.addEventListener('DOMContentLoaded', () => {
             { id: 'video', label: 'Video', icon: '🎬' },
             { id: 'audio', label: 'Audio', icon: '🎵' },
             { id: 'text', label: 'Text', icon: '📖' },
-            { id: 'image', label: 'Image', icon: '🖼️' }
+            { id: 'image', label: 'Image', icon: '🖼️' },
+            { id: 'archive', label: 'Archive', icon: '📦' }
         ];
 
         const newHtml = types.map(t => `
