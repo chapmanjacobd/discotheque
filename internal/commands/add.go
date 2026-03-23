@@ -11,6 +11,8 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"sync/atomic"
+	"time"
 
 	"github.com/alecthomas/kong"
 	"github.com/chapmanjacobd/discoteca/internal/db"
@@ -239,35 +241,101 @@ func (c *AddCmd) Run(ctx *kong.Context) error {
 			continue
 		}
 
-		slog.Info("Extracting metadata", "count", len(toProbe), "parallelism", c.Parallel)
+		slog.Info("Extracting metadata", "count", len(toProbe), "initial_parallelism", c.Parallel)
 
 		// Parallel extraction
-		jobs := make(chan string, c.Parallel*2)
+		jobs := make(chan string, len(toProbe))
+		for _, f := range toProbe {
+			jobs <- f
+		}
+		close(jobs)
+
 		results := make(chan *metadata.MediaMetadata, 500) // Match batchSize to avoid blocking
 		var wg sync.WaitGroup
 
-		for i := 0; i < c.Parallel; i++ {
+		var completedJobs int64
+		var activeWorkers int32
+		targetConcurrency := int32(c.Parallel)
+		if targetConcurrency <= 0 {
+			targetConcurrency = int32(runtime.NumCPU() * 4)
+		}
+
+		startWorker := func() {
 			wg.Go(func() {
-				for path := range jobs {
+				atomic.AddInt32(&activeWorkers, 1)
+				defer atomic.AddInt32(&activeWorkers, -1)
+				for {
+					if atomic.LoadInt32(&activeWorkers) > atomic.LoadInt32(&targetConcurrency) {
+						return // Scale down
+					}
+					path, ok := <-jobs
+					if !ok {
+						return
+					}
 					res, err := metadata.Extract(context.Background(), path, flags.ScanSubtitles, c.ExtractText, c.OCR, c.OCREngine, c.SpeechRecognition, c.SpeechRecognitionEngine)
 					if err != nil {
 						slog.Error("Metadata extraction failed", "path", path, "error", err)
-						continue
+					} else if res != nil {
+						results <- res
 					}
-					results <- res
+					atomic.AddInt64(&completedJobs, 1)
 				}
 			})
 		}
 
+		for i := int32(0); i < targetConcurrency; i++ {
+			startWorker()
+		}
+
+		monitorDone := make(chan struct{})
 		go func() {
-			for _, f := range toProbe {
-				jobs <- f
+			ticker := time.NewTicker(500 * time.Millisecond)
+			defer ticker.Stop()
+
+			var lastCompleted int64
+			var lastThroughput int64
+			direction := int32(1)
+
+			for {
+				select {
+				case <-ticker.C:
+					completed := atomic.LoadInt64(&completedJobs)
+					throughput := completed - lastCompleted
+					lastCompleted = completed
+
+					current := atomic.LoadInt32(&targetConcurrency)
+
+					if throughput < lastThroughput {
+						direction = -direction // Reverse direction if throughput drops
+					} else if throughput == lastThroughput && throughput > 0 {
+						direction = 1 // Gently push up if stable
+					}
+
+					newTarget := current + (direction * 2) // Step by 2
+					if newTarget < 1 {
+						newTarget = 1
+					}
+					if newTarget > 1000 {
+						newTarget = 1000
+					}
+
+					atomic.StoreInt32(&targetConcurrency, newTarget)
+
+					active := atomic.LoadInt32(&activeWorkers)
+					for active < newTarget {
+						startWorker()
+						active++
+					}
+					lastThroughput = throughput
+				case <-monitorDone:
+					return
+				}
 			}
-			close(jobs)
 		}()
 
 		go func() {
 			wg.Wait()
+			close(monitorDone)
 			close(results)
 		}()
 
