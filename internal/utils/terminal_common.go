@@ -2,12 +2,36 @@ package utils
 
 import (
 	"os"
-	"os/signal"
+	"path/filepath"
 	"sync"
-	"syscall"
 
 	"golang.org/x/term"
 )
+
+// commandExistsCache caches the result of command existence checks
+var commandExistsCache sync.Map
+
+// getExecutableDir returns the directory containing the current executable
+var getExecutableDir = sync.OnceValue(func() string {
+	exe, err := os.Executable()
+	if err != nil {
+		return ""
+	}
+	return filepath.Dir(exe)
+})
+
+// CommandExists checks if a command is available in PATH or common installation paths
+// Results are cached to avoid repeated syscalls
+func CommandExists(cmd string) bool {
+	if cached, ok := commandExistsCache.Load(cmd); ok {
+		return cached.(bool)
+	}
+
+	path := GetCommandPath(cmd)
+	exists := path != ""
+	commandExistsCache.Store(cmd, exists)
+	return exists
+}
 
 // TerminalWidth tracks the current terminal width and updates on resize
 type TerminalWidth struct {
@@ -18,7 +42,7 @@ type TerminalWidth struct {
 
 var terminalWidth TerminalWidth
 
-// GetWidth returns the current terminal width
+// GetTerminalWidth returns the current terminal width
 func GetTerminalWidth() int {
 	terminalWidth.initOnce.Do(func() {
 		terminalWidth.updateWidth()
@@ -27,17 +51,6 @@ func GetTerminalWidth() int {
 	terminalWidth.mu.RLock()
 	defer terminalWidth.mu.RUnlock()
 	return terminalWidth.width
-}
-
-// watchResize listens for terminal resize events
-func (t *TerminalWidth) watchResize() {
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGWINCH)
-	go func() {
-		for range sigChan {
-			t.updateWidth()
-		}
-	}()
 }
 
 // updateWidth gets the current terminal width
@@ -49,6 +62,12 @@ func (t *TerminalWidth) updateWidth() {
 	t.mu.Lock()
 	t.width = w
 	t.mu.Unlock()
+}
+
+// GetClearLineSequence returns the escape sequence to clear/overwrite a line.
+// We use \x1b[K (Erase from cursor to end of line) which is standard for overwriting.
+func GetClearLineSequence() string {
+	return "\033[K"
 }
 
 // TruncateMiddle truncates a string in the middle with ellipsis
