@@ -243,7 +243,7 @@ func (c *AddCmd) Run(ctx *kong.Context) error {
 
 		// Parallel extraction
 		jobs := make(chan string, c.Parallel*2)
-		results := make(chan *metadata.MediaMetadata, c.Parallel*2)
+		results := make(chan *metadata.MediaMetadata, 500) // Match batchSize to avoid blocking
 		var wg sync.WaitGroup
 
 		for i := 0; i < c.Parallel; i++ {
@@ -272,13 +272,22 @@ func (c *AddCmd) Run(ctx *kong.Context) error {
 		}()
 
 		count := 0
-		batchSize := 100
+		batchSize := 500
 		var currentBatch []*metadata.MediaMetadata
 
 		flush := func() error {
 			if len(currentBatch) == 0 {
 				return nil
 			}
+
+			var mediaBatch []db.UpsertMediaParams
+			var captionsBatch []db.InsertCaptionParams
+
+			for _, res := range currentBatch {
+				mediaBatch = append(mediaBatch, res.Media)
+				captionsBatch = append(captionsBatch, res.Captions...)
+			}
+
 			tx, err := sqlDB.BeginTx(context.Background(), nil)
 			if err != nil {
 				return err
@@ -286,16 +295,13 @@ func (c *AddCmd) Run(ctx *kong.Context) error {
 			defer tx.Rollback()
 
 			qtx := queries.WithTx(tx)
-			for _, res := range currentBatch {
-				if err := qtx.UpsertMedia(context.Background(), res.Media); err != nil {
-					slog.Error("Database upsert failed", "path", res.Media.Path, "error", err)
-				}
-				for _, cap := range res.Captions {
-					if err := qtx.InsertCaption(context.Background(), cap); err != nil {
-						slog.Error("Caption insertion failed", "path", res.Media.Path, "error", err)
-					}
-				}
+			if err := qtx.BulkUpsertMedia(context.Background(), mediaBatch); err != nil {
+				return fmt.Errorf("bulk upsert media failed: %w", err)
 			}
+			if err := qtx.BulkInsertCaptions(context.Background(), captionsBatch); err != nil {
+				return fmt.Errorf("bulk insert captions failed: %w", err)
+			}
+
 			if err := tx.Commit(); err != nil {
 				return err
 			}
