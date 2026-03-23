@@ -65,38 +65,34 @@ func MatchesAny(path string, patterns []string) bool {
 	return false
 }
 
+var cleanStringReplacer = strings.NewReplacer(
+	"\\", " ",
+	"/", " ",
+	"(", " ",
+	"-.", ".",
+	" - ", " ",
+	"- ", " ",
+	" -", " ",
+	" _ ", "_",
+	" _", "_",
+	"_ ", "_",
+)
+
 func CleanString(s string) string {
 	s = RemoveTextInsideBrackets(s)
 	s = html.UnescapeString(s)
-	s = strings.ReplaceAll(s, "\x7f", "")
-	s = strings.ReplaceAll(s, "&", "")
-	s = strings.ReplaceAll(s, "%", "")
-	s = strings.ReplaceAll(s, "*", "")
-	s = strings.ReplaceAll(s, "$", "")
-	s = strings.ReplaceAll(s, "#", "")
-	s = strings.ReplaceAll(s, "!", "")
-	s = strings.ReplaceAll(s, "?", "")
-	s = strings.ReplaceAll(s, "|", "")
-	s = strings.ReplaceAll(s, "^", "")
-	s = strings.ReplaceAll(s, "'", "")
-	s = strings.ReplaceAll(s, "\"", "")
-	s = strings.ReplaceAll(s, ")", "")
-	s = strings.ReplaceAll(s, ":", "")
-	s = strings.ReplaceAll(s, ">", "")
-	s = strings.ReplaceAll(s, "<", "")
-	s = strings.ReplaceAll(s, "\\", " ")
-	s = strings.ReplaceAll(s, "/", " ")
 
+	// Drop unwanted characters efficiently
+	s = strings.Map(func(r rune) rune {
+		switch r {
+		case '\x7f', '&', '%', '*', '$', '#', '!', '?', '|', '^', '\'', '"', ')', ':', '>', '<':
+			return -1
+		}
+		return r
+	}, s)
+
+	s = cleanStringReplacer.Replace(s)
 	s = RemoveConsecutives(s, []string{"."})
-	s = strings.ReplaceAll(s, "(", " ")
-	s = strings.ReplaceAll(s, "-.", ".")
-	s = strings.ReplaceAll(s, " - ", " ")
-	s = strings.ReplaceAll(s, "- ", " ")
-	s = strings.ReplaceAll(s, " -", " ")
-	s = strings.ReplaceAll(s, " _ ", "_")
-	s = strings.ReplaceAll(s, " _", "_")
-	s = strings.ReplaceAll(s, "_ ", "_")
-
 	s = RemoveConsecutiveWhitespace(s)
 
 	return s
@@ -119,16 +115,16 @@ func RemoveTextInsideBrackets(s string) string {
 	return result.String()
 }
 
+var tokenRe = regexp.MustCompile(`[/\\.\[\]\-\+(){}_&]`)
+
 func PathToSentence(path string) string {
 	s := filepath.Base(path)
-	re := regexp.MustCompile(`[/\\.\[\]\-\+(){}_&]`)
-	s = re.ReplaceAllString(s, " ")
+	s = tokenRe.ReplaceAllString(s, " ")
 	return CleanString(s)
 }
 
 func PathToTokenized(path string) string {
-	re := regexp.MustCompile(`[/\\.\[\]\-\+(){}_&]`)
-	s := re.ReplaceAllString(path, " ")
+	s := tokenRe.ReplaceAllString(path, " ")
 	return CleanString(s)
 }
 

@@ -23,6 +23,8 @@ func CountWordsFast(b []byte) int {
 	return bytes.Count(b, []byte{' '}) + bytes.Count(b, []byte{'\n'}) + bytes.Count(b, []byte{'\t'}) + 1
 }
 
+var htmlTagRe = regexp.MustCompile(`<[^>]*>`)
+
 // QuickWordCount extracts text and counts words for duration estimation.
 // Optimized for speed over accuracy - suitable for ingest-time processing.
 // Returns word count and error.
@@ -84,7 +86,7 @@ func QuickWordCount(path string, size int64) (int, error) {
 		}
 
 		// Quick HTML tag removal
-		text := regexp.MustCompile(`<[^>]*>`).ReplaceAll(content, []byte{' '})
+		text := htmlTagRe.ReplaceAll(content, []byte{' '})
 		count := CountWordsFast(text)
 		// For short HTML files, use size-based estimate
 		if count < 300 {
@@ -127,7 +129,7 @@ func QuickWordCount(path string, size int64) (int, error) {
 					continue
 				}
 				// Strip HTML tags
-				text := regexp.MustCompile(`<[^>]*>`).ReplaceAll(content, []byte{' '})
+				text := htmlTagRe.ReplaceAll(content, []byte{' '})
 				wordCount += CountWordsFast(text)
 			}
 		}

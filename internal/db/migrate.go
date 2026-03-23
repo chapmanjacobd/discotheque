@@ -330,44 +330,43 @@ func convertCaptionsMediaID(db *sql.DB) error {
 	return tx.Commit()
 }
 
+var (
+	tokenRe             = regexp.MustCompile(`[/\\.\[\]\-\+(){}_&]`)
+	cleanStringReplacer = strings.NewReplacer(
+		"\\", " ",
+		"/", " ",
+		"(", " ",
+		"-.", ".",
+		" - ", " ",
+		"- ", " ",
+		" -", " ",
+		" _ ", "_",
+		" _", "_",
+		"_ ", "_",
+	)
+)
+
 // pathToTokenized converts a file path to FTS-friendly format
 func pathToTokenized(path string) string {
-	re := regexp.MustCompile(`[/\\.\[\]\-\+(){}_&]`)
-	s := re.ReplaceAllString(path, " ")
+	s := tokenRe.ReplaceAllString(path, " ")
 	return cleanString(s)
 }
 
 // cleanString removes brackets, special chars, and normalizes whitespace
 func cleanString(s string) string {
 	s = removeTextInsideBrackets(s)
-	s = strings.ReplaceAll(s, "\x7f", "")
-	s = strings.ReplaceAll(s, "&", "")
-	s = strings.ReplaceAll(s, "%", "")
-	s = strings.ReplaceAll(s, "$", "")
-	s = strings.ReplaceAll(s, "#", "")
-	s = strings.ReplaceAll(s, "!", "")
-	s = strings.ReplaceAll(s, "?", "")
-	s = strings.ReplaceAll(s, "|", "")
-	s = strings.ReplaceAll(s, "^", "")
-	s = strings.ReplaceAll(s, "'", "")
-	s = strings.ReplaceAll(s, "\"", "")
-	s = strings.ReplaceAll(s, ")", "")
-	s = strings.ReplaceAll(s, ":", "")
-	s = strings.ReplaceAll(s, ">", "")
-	s = strings.ReplaceAll(s, "<", "")
-	s = strings.ReplaceAll(s, "\\", " ")
-	s = strings.ReplaceAll(s, "/", " ")
 
+	// Drop unwanted characters efficiently
+	s = strings.Map(func(r rune) rune {
+		switch r {
+		case '\x7f', '&', '%', '*', '$', '#', '!', '?', '|', '^', '\'', '"', ')', ':', '>', '<':
+			return -1
+		}
+		return r
+	}, s)
+
+	s = cleanStringReplacer.Replace(s)
 	s = removeConsecutives(s, []string{"."})
-	s = strings.ReplaceAll(s, "(", " ")
-	s = strings.ReplaceAll(s, "-.", ".")
-	s = strings.ReplaceAll(s, " - ", " ")
-	s = strings.ReplaceAll(s, "- ", " ")
-	s = strings.ReplaceAll(s, " -", " ")
-	s = strings.ReplaceAll(s, " _ ", "_")
-	s = strings.ReplaceAll(s, " _", "_")
-	s = strings.ReplaceAll(s, "_ ", "_")
-
 	s = removeConsecutiveWhitespace(s)
 
 	return s

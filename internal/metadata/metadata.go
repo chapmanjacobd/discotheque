@@ -435,6 +435,8 @@ func parseFPS(s string) float64 {
 	return num / den
 }
 
+var timeRegex = regexp.MustCompile(`(\d{2}:)?\d{2}:\d{2}[.,]\d{3}`)
+
 func parseSubtitleFile(subPath, mediaPath string) ([]db.InsertCaptionParams, error) {
 	f, err := os.Open(subPath)
 	if err != nil {
@@ -443,7 +445,6 @@ func parseSubtitleFile(subPath, mediaPath string) ([]db.InsertCaptionParams, err
 	defer f.Close()
 
 	var captions []db.InsertCaptionParams
-	timeRegex := regexp.MustCompile(`(\d{2}:)?\d{2}:\d{2}[.,]\d{3}`)
 	scanner := bufio.NewScanner(f)
 
 	for scanner.Scan() {
@@ -584,10 +585,11 @@ func chunkDocumentText(text string) []string {
 	return chunks
 }
 
+var htmlTagRe = regexp.MustCompile(`<[^>]*>`)
+
 func cleanCaptionText(s string) string {
 	// Strip HTML tags like <v ...> or <i>
-	re := regexp.MustCompile(`<[^>]*>`)
-	s = re.ReplaceAllString(s, "")
+	s = htmlTagRe.ReplaceAllString(s, "")
 	// Strip SRT-style formatting if any
 	s = strings.TrimSpace(s)
 

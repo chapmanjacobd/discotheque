@@ -86,7 +86,7 @@ var ImageExtensions = []string{
 	"gpr", "hdp", "wdp", "jxr", "iiq", "insp", "jpeg", "jpg", "jpe", "mef", "mie", "mos", "mrw", "nef", "nrw", "orf",
 	"ori", "pef", "psd", "psb", "psdt", "raf", "raw", "rw2", "rwl", "sr2", "srw", "thm", "tiff", "tif", "x3f", "flif",
 	"icc", "icm", "avif", "heic", "heif", "hif", "jp2", "jpf", "jpm", "jpx", "j2c", "jpc", "3fr", "btf", "dcr", "k25",
-	"kdc", "miff", "mif", "rwz", "srf", "xcf", "bpg", "doc", "dot", "fla", "fpx", "max", "ppt", "pps", "pot", "vsd", "xls",
+	"kdc", "miff", "mif", "rwz", "srf", "xcf", "bpg", "dot", "fla", "fpx", "max", "pps", "pot", "vsd",
 	"xlt", "pict", "pct", "360", "dvb", "f4a", "f4b", "f4p", "lrv", "bmp", "bmp2", "bmp3", "jng", "mng", "emf", "wmf",
 	"m4p", "qt", "mqv", "qtif", "qti", "qif", "cr3", "crm", "jxl", "crw", "ciff", "ind", "indd", "indt",
 	"nksc", "vrd", "xmp", "la", "ofr", "pac", "riff", "rif", "webp", "wv", "djvu", "djv", "dvr-ms",
@@ -95,7 +95,7 @@ var ImageExtensions = []string{
 }
 
 var TextExtensions = []string{
-	"txt", "epub", "mobi", "pdf", "azw", "azw3", "fb2", "djvu", "zim",
+	"txt", "epub", "mobi", "pdf", "azw", "azw3", "fb2", "djvu", "zim", "xls", "doc", "ppt",
 }
 
 var ComicExtensions = []string{
