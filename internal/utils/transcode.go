@@ -123,6 +123,14 @@ func GetTranscodeStrategy(m models.Media) TranscodeStrategy {
 		mediaType = *m.MediaType
 	}
 
+	// Use container format from ffprobe if available, otherwise fall back to extension
+	container := ""
+	if m.ContainerFormat != nil && *m.ContainerFormat != "" {
+		container = *m.ContainerFormat
+	} else {
+		container = strings.TrimPrefix(strings.ToLower(filepath.Ext(m.Path)), ".")
+	}
+
 	if mediaType == "image" {
 		return TranscodeStrategy{NeedsTranscode: false}
 	}
@@ -141,15 +149,15 @@ func GetTranscodeStrategy(m models.Media) TranscodeStrategy {
 			targetMime = "video/webm"
 		}
 
-		// Check if container already matches the target mime type
+		// Check if container already matches the target mime type using ffprobe format_name
 		containerMatches := false
 		if targetMime == "video/mp4" {
-			// Most browsers support H264/AAC in MKV or MOV as well, but we'll be slightly conservative
-			if ext == ".mp4" || ext == ".m4v" || ext == ".mov" || ext == ".mkv" {
+			// Most browsers support H264/AAC in MKV, MOV, MP4, M4V
+			if container == "mp4" || container == "m4v" || container == "mov" || container == "mkv" || container == "matroska" {
 				containerMatches = true
 			}
 		} else if targetMime == "video/webm" {
-			if ext == ".webm" || ext == ".mkv" {
+			if container == "webm" || container == "mkv" || container == "matroska" {
 				containerMatches = true
 			}
 		}
@@ -165,7 +173,8 @@ func GetTranscodeStrategy(m models.Media) TranscodeStrategy {
 			strategy = TranscodeStrategy{NeedsTranscode: false}
 		}
 	} else if mediaType == "audio" {
-		if !isSupportedAudioCodec(aCodecs) || (ext != ".mp3" && ext != ".m4a" && ext != ".ogg" && ext != ".flac" && ext != ".wav" && ext != ".opus") {
+		// Audio container validation using ffprobe format_name
+		if !isSupportedAudioCodec(aCodecs) || (container != "mp3" && container != "mp4" && container != "m4a" && container != "ogg" && container != "flac" && container != "wav" && container != "opus" && container != "webm") {
 			strategy = TranscodeStrategy{
 				NeedsTranscode: true,
 				AudioCopy:      isSupportedAudioCodec(aCodecs),

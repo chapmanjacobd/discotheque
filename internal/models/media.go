@@ -45,7 +45,8 @@ type Media struct {
 	Sha256    *string `json:"sha256,omitempty"`
 	IsDeduped *int64  `json:"is_deduped,omitempty"`
 
-	TrackNumber *int64 `json:"track_number,omitempty"`
+	TrackNumber     *int64  `json:"track_number,omitempty"`
+	ContainerFormat *string `json:"container_format,omitempty"` // From ffprobe format_name
 }
 
 type Playlist struct {

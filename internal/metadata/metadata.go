@@ -35,8 +35,9 @@ type Chapter struct {
 }
 
 type MediaMetadata struct {
-	Media    db.UpsertMediaParams
-	Captions []db.InsertCaptionParams
+	Media           db.UpsertMediaParams
+	Captions        []db.InsertCaptionParams
+	ContainerFormat *string // From ffprobe format_name, used for transcoding decisions
 }
 
 type Stream struct {
@@ -56,11 +57,12 @@ type Stream struct {
 }
 
 type Format struct {
-	Filename string            `json:"filename"`
-	Duration string            `json:"duration"`
-	Size     string            `json:"size"`
-	BitRate  string            `json:"bit_rate"`
-	Tags     map[string]string `json:"tags"`
+	Filename   string            `json:"filename"`
+	Duration   string            `json:"duration"`
+	Size       string            `json:"size"`
+	BitRate    string            `json:"bit_rate"`
+	FormatName string            `json:"format_name"`
+	Tags       map[string]string `json:"tags"`
 }
 
 func Extract(ctx context.Context, path string, scanSubtitles bool, extractText bool, ocr bool, ocrEngine string, speechRec bool, speechRecEngine string) (*MediaMetadata, error) {
@@ -199,6 +201,12 @@ func Extract(ctx context.Context, path string, scanSubtitles bool, extractText b
 	if len(output) > 0 {
 		var data FFProbeOutput
 		if err := json.Unmarshal(output, &data); err == nil {
+			// Format info - including container format from ffprobe
+			if data.Format.FormatName != "" {
+				// Store the actual container format detected by ffprobe
+				result.ContainerFormat = &data.Format.FormatName
+			}
+
 			// Format info
 			if d, err := strconv.ParseFloat(data.Format.Duration, 64); err == nil {
 				duration = int64(d)

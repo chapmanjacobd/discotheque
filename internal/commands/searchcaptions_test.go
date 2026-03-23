@@ -19,7 +19,7 @@ func TestSearchCaptionsCmd_Run(t *testing.T) {
 
 	// Skip if FTS5 is not available
 	var name string
-	err := sqlDB.QueryRow("SELECT name FROM sqlite_master WHERE media_type='table' AND name='captions_fts'").Scan(&name)
+	err := sqlDB.QueryRow("SELECT name FROM sqlite_master WHERE type='table' AND name='captions_fts'").Scan(&name)
 	if err != nil {
 		t.Skip("FTS5 not available, skipping search captions tests")
 	}
