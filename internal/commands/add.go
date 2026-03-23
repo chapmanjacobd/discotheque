@@ -107,6 +107,7 @@ func (c *AddCmd) Run(ctx *kong.Context) error {
 			deleted: m.TimeDeleted.Int64 > 0,
 		}
 	}
+	existingMedia = nil // Allow GC
 	if dbExists {
 		slog.Info("Loaded metadata cache from database", "count", len(metaCache))
 	}
@@ -246,9 +247,7 @@ func (c *AddCmd) Run(ctx *kong.Context) error {
 		var wg sync.WaitGroup
 
 		for i := 0; i < c.Parallel; i++ {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+			wg.Go(func() {
 				for path := range jobs {
 					res, err := metadata.Extract(context.Background(), path, flags.ScanSubtitles, c.ExtractText, c.OCR, c.OCREngine, c.SpeechRecognition, c.SpeechRecognitionEngine)
 					if err != nil {
@@ -257,7 +256,7 @@ func (c *AddCmd) Run(ctx *kong.Context) error {
 					}
 					results <- res
 				}
-			}()
+			})
 		}
 
 		go func() {
@@ -311,6 +310,9 @@ func (c *AddCmd) Run(ctx *kong.Context) error {
 				if err := flush(); err != nil {
 					slog.Error("Failed to commit batch", "error", err)
 				}
+				for i := range currentBatch {
+					currentBatch[i] = nil
+				}
 				currentBatch = currentBatch[:0]
 			}
 
@@ -323,6 +325,10 @@ func (c *AddCmd) Run(ctx *kong.Context) error {
 		if err := flush(); err != nil {
 			slog.Error("Failed to commit final batch", "error", err)
 		}
+		for i := range currentBatch {
+			currentBatch[i] = nil
+		}
+		currentBatch = currentBatch[:0]
 		fmt.Println()
 	}
 

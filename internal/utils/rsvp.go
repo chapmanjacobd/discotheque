@@ -33,12 +33,29 @@ func QuickWordCount(path string, size int64) (int, error) {
 
 	switch ext {
 	case ".txt", ".md", ".log", ".ini", ".conf", ".cfg", ".text":
-		// Plain text: read and count spaces
-		content, err := os.ReadFile(path)
+		// Plain text: stream and count spaces
+		f, err := os.Open(path)
 		if err != nil {
 			return 0, err
 		}
-		count := CountWordsFast(content)
+		defer f.Close()
+
+		count := 0
+		buf := make([]byte, 32*1024)
+		for {
+			n, err := f.Read(buf)
+			if n > 0 {
+				count += bytes.Count(buf[:n], []byte{' '}) + bytes.Count(buf[:n], []byte{'\n'}) + bytes.Count(buf[:n], []byte{'\t'})
+			}
+			if err == io.EOF {
+				break
+			}
+			if err != nil {
+				return 0, err
+			}
+		}
+		count++ // Add 1 for the last word
+
 		// For very short files, use size-based estimate if it's higher
 		if count < 300 {
 			estimated := EstimateWordCountFromSize(path, size)
@@ -49,11 +66,23 @@ func QuickWordCount(path string, size int64) (int, error) {
 		return count, nil
 
 	case ".html", ".htm":
-		// HTML: strip tags and count
-		content, err := os.ReadFile(path)
+		// HTML: strip tags and count - still needs care for large files
+		// For now, let's limit the read size for HTML to 10MB to avoid OOM
+		maxSize := int64(10 * 1024 * 1024)
+		readSize := min(size, maxSize)
+
+		f, err := os.Open(path)
 		if err != nil {
 			return 0, err
 		}
+		defer f.Close()
+
+		content := make([]byte, readSize)
+		_, err = io.ReadFull(f, content)
+		if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
+			return 0, err
+		}
+
 		// Quick HTML tag removal
 		text := regexp.MustCompile(`<[^>]*>`).ReplaceAll(content, []byte{' '})
 		count := CountWordsFast(text)
@@ -91,7 +120,8 @@ func QuickWordCount(path string, size int64) (int, error) {
 				if err != nil {
 					continue
 				}
-				content, err := io.ReadAll(rc)
+				// Use readAllLimited to avoid memory exhaustion from huge files inside zip
+				content, err := readAllLimited(rc, 10*1024*1024)
 				rc.Close()
 				if err != nil {
 					continue
@@ -207,130 +237,113 @@ func EstimateWordCountFromSize(path string, size int64) int {
 	return estimatedWords
 }
 
+// readAllLimited reads from an io.Reader up to a specified limit.
+func readAllLimited(r io.Reader, limit int64) ([]byte, error) {
+	// Use a limited reader to cap memory usage
+	lr := io.LimitReader(r, limit)
+	return io.ReadAll(lr)
+}
+
 // ExtractText extracts plain text from a given file path.
-// Supports a wide range of text and document formats.
-// Uses lightweight tools first (pdftotext, native zip), with calibre as fallback.
 func ExtractText(path string) (string, error) {
+	stat, err := os.Stat(path)
+	if err != nil {
+		return "", err
+	}
+	// Limit text reading to 10MB to avoid memory exhaustion
+	const maxTextSize = int64(10 * 1024 * 1024)
+	readSize := min(stat.Size(), maxTextSize)
+
+	readFileLimited := func(path string) (string, error) {
+		f, err := os.Open(path)
+		if err != nil {
+			return "", err
+		}
+		defer f.Close()
+		content := make([]byte, readSize)
+		n, err := io.ReadFull(f, content)
+		if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
+			return "", err
+		}
+		return string(content[:n]), nil
+	}
+
 	ext := strings.ToLower(filepath.Ext(path))
 	switch ext {
 	// ===== Plain text formats - read directly =====
 	case ".txt", ".md", ".markdown", ".rst", ".asciidoc", ".adoc", ".tex", ".latex":
 		// Markdown, reStructuredText, AsciiDoc, LaTeX
-		content, err := os.ReadFile(path)
-		if err != nil {
-			return "", err
-		}
-		return string(content), nil
+		return readFileLimited(path)
 
 	case ".log", ".ini", ".conf", ".cfg", ".env", ".properties":
 		// Config and log files
-		content, err := os.ReadFile(path)
-		if err != nil {
-			return "", err
-		}
-		return string(content), nil
+		return readFileLimited(path)
 
 	case ".csv", ".tsv":
 		// CSV/TSV - read directly (structured but searchable as text)
-		content, err := os.ReadFile(path)
-		if err != nil {
-			return "", err
-		}
-		return string(content), nil
+		return readFileLimited(path)
 
 	case ".json", ".jsonl", ".jsonld":
 		// JSON - read directly (searchable as text)
-		content, err := os.ReadFile(path)
-		if err != nil {
-			return "", err
-		}
-		return string(content), nil
+		return readFileLimited(path)
 
 	case ".xml", ".svg", ".xhtml", ".xsl", ".xsd", ".plist":
 		// XML family - read and optionally strip tags for cleaner search
-		content, err := os.ReadFile(path)
+		content, err := readFileLimited(path)
 		if err != nil {
 			return "", err
 		}
 		// For SVG and XHTML, strip tags; for others keep as-is
 		if ext == ".svg" || ext == ".xhtml" {
-			return stripHTMLTags(string(content)), nil
+			return stripHTMLTags(content), nil
 		}
-		return string(content), nil
+		return content, nil
 
 	case ".yaml", ".yml", ".toml":
 		// YAML and TOML config files
-		content, err := os.ReadFile(path)
-		if err != nil {
-			return "", err
-		}
-		return string(content), nil
+		return readFileLimited(path)
 
 	case ".srt", ".vtt", ".ass", ".ssa", ".sub":
 		// Subtitle formats - strip timing markers for cleaner search
-		content, err := os.ReadFile(path)
+		content, err := readFileLimited(path)
 		if err != nil {
 			return "", err
 		}
-		return stripSubtitleTimings(string(content)), nil
+		return stripSubtitleTimings(content), nil
 
 	// ===== Source code formats =====
 	case ".py", ".js", ".ts", ".jsx", ".tsx", ".mjs", ".cjs":
 		// JavaScript/TypeScript family
-		content, err := os.ReadFile(path)
-		if err != nil {
-			return "", err
-		}
-		return string(content), nil
+		return readFileLimited(path)
 
 	case ".go", ".rs", ".c", ".cc", ".cpp", ".cxx", ".h", ".hpp", ".hxx":
 		// C family and Rust
-		content, err := os.ReadFile(path)
-		if err != nil {
-			return "", err
-		}
-		return string(content), nil
+		return readFileLimited(path)
 
 	case ".java", ".kt", ".kts", ".scala", ".sc":
 		// JVM languages
-		content, err := os.ReadFile(path)
-		if err != nil {
-			return "", err
-		}
-		return string(content), nil
+		return readFileLimited(path)
 
 	case ".rb", ".php", ".sh", ".bash", ".zsh", ".fish", ".ps1", ".bat", ".cmd":
 		// Scripting languages
-		content, err := os.ReadFile(path)
-		if err != nil {
-			return "", err
-		}
-		return string(content), nil
+		return readFileLimited(path)
 
 	case ".sql", ".graphql", ".gql":
 		// Query languages
-		content, err := os.ReadFile(path)
-		if err != nil {
-			return "", err
-		}
-		return string(content), nil
+		return readFileLimited(path)
 
 	case ".swift", ".m", ".mm":
 		// Apple languages
-		content, err := os.ReadFile(path)
-		if err != nil {
-			return "", err
-		}
-		return string(content), nil
+		return readFileLimited(path)
 
 	// ===== HTML - strip tags =====
 	case ".html", ".htm", ".mhtml", ".mht":
 		// HTML - read and strip tags
-		content, err := os.ReadFile(path)
+		content, err := readFileLimited(path)
 		if err != nil {
 			return "", err
 		}
-		return stripHTMLTags(string(content)), nil
+		return stripHTMLTags(content), nil
 
 	// ===== RTF - use unrtf if available =====
 	case ".rtf":
@@ -594,7 +607,8 @@ func extractTextFromEPUB(path string) (string, error) {
 		if err != nil {
 			continue
 		}
-		content, err := io.ReadAll(rc)
+		// Limit each file extraction to 10MB
+		content, err := readAllLimited(rc, 10*1024*1024)
 		rc.Close()
 		if err != nil {
 			continue
@@ -636,7 +650,7 @@ func extractTextFromOpenDocument(path string) (string, error) {
 	}
 	defer rc.Close()
 
-	content, err := io.ReadAll(rc)
+	content, err := readAllLimited(rc, 10*1024*1024)
 	if err != nil {
 		return "", err
 	}
@@ -673,7 +687,7 @@ func extractTextFromDOCX(path string) (string, error) {
 	}
 	defer rc.Close()
 
-	content, err := io.ReadAll(rc)
+	content, err := readAllLimited(rc, 10*1024*1024)
 	if err != nil {
 		return "", err
 	}
@@ -714,7 +728,7 @@ func extractTextFromXLSX(path string) (string, error) {
 		if err != nil {
 			continue
 		}
-		content, err := io.ReadAll(rc)
+		content, err := readAllLimited(rc, 10*1024*1024)
 		rc.Close()
 		if err != nil {
 			continue
@@ -761,7 +775,7 @@ func extractTextFromPPTX(path string) (string, error) {
 		if err != nil {
 			continue
 		}
-		content, err := io.ReadAll(rc)
+		content, err := readAllLimited(rc, 10*1024*1024)
 		rc.Close()
 		if err != nil {
 			continue

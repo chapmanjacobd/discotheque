@@ -2,6 +2,7 @@ package metadata
 
 import (
 	"archive/zip"
+	"bufio"
 	"context"
 	"database/sql"
 	"encoding/json"
@@ -435,19 +436,18 @@ func parseFPS(s string) float64 {
 }
 
 func parseSubtitleFile(subPath, mediaPath string) ([]db.InsertCaptionParams, error) {
-	data, err := os.ReadFile(subPath)
+	f, err := os.Open(subPath)
 	if err != nil {
 		return nil, err
 	}
-
-	content := string(data)
-	lines := strings.Split(content, "\n")
+	defer f.Close()
 
 	var captions []db.InsertCaptionParams
 	timeRegex := regexp.MustCompile(`(\d{2}:)?\d{2}:\d{2}[.,]\d{3}`)
+	scanner := bufio.NewScanner(f)
 
-	for i := 0; i < len(lines); i++ {
-		line := strings.TrimSpace(lines[i])
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
 		if line == "" {
 			continue
 		}
@@ -456,21 +456,19 @@ func parseSubtitleFile(subPath, mediaPath string) ([]db.InsertCaptionParams, err
 			if len(matches) > 0 {
 				startTime := utils.FromTimestampSeconds(strings.ReplaceAll(matches[0], ",", "."))
 
-				// Skip captions that start before 10 seconds (typically intro sequences or malformed early captions)
+				// Skip captions that start before 10 seconds
 				if startTime < 10.0 {
 					continue
 				}
 
 				// Text can span multiple lines until empty line
 				var textLines []string
-				for j := i + 1; j < len(lines); j++ {
-					textLine := strings.TrimSpace(lines[j])
+				for scanner.Scan() {
+					textLine := strings.TrimSpace(scanner.Text())
 					if textLine == "" {
-						i = j
 						break
 					}
 					textLines = append(textLines, textLine)
-					i = j
 				}
 
 				if len(textLines) > 0 {
@@ -487,7 +485,7 @@ func parseSubtitleFile(subPath, mediaPath string) ([]db.InsertCaptionParams, err
 		}
 	}
 
-	return captions, nil
+	return captions, scanner.Err()
 }
 
 // extractDocumentText extracts full text from a document and returns it as captions.

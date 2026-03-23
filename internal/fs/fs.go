@@ -30,7 +30,8 @@ func FindMedia(root string, filter map[string]bool) (map[string]os.FileInfo, err
 func FindMediaChan(root string, filter map[string]bool, ch chan<- struct {
 	Path string
 	Info os.FileInfo
-}) error {
+},
+) error {
 	allowed := filter
 	if allowed == nil {
 		allowed = utils.MediaExtensionMap
@@ -58,4 +59,3 @@ func FindMediaChan(root string, filter map[string]bool, ch chan<- struct {
 		return nil
 	})
 }
-

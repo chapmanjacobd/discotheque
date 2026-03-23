@@ -74,7 +74,7 @@ func (c *OptimizeCmd) BulkMarkOptimizedExtensions(ctx *kong.Context, sqlDB *sql.
 	defer rows.Close()
 
 	var updates []struct {
-		path string
+		path  string
 		mtype string
 	}
 	for rows.Next() {
@@ -95,7 +95,10 @@ func (c *OptimizeCmd) BulkMarkOptimizedExtensions(ctx *kong.Context, sqlDB *sql.
 		}
 
 		if mtype != "" {
-			updates = append(updates, struct{path string; mtype string}{path, mtype})
+			updates = append(updates, struct {
+				path  string
+				mtype string
+			}{path, mtype})
 		}
 	}
 	rows.Close()
