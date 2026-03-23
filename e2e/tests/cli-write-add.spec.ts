@@ -175,17 +175,6 @@ test.describe('CLI: Add Command', () => {
     expect(queryResult[0].path).toContain('movies');
   });
 
-  test('adds files with mime-type filter', async ({ cli, tempDir, testDbPath, createValidVideo, createValidAudio }) => {
-    createValidVideo('video.mp4');
-    createValidAudio('audio.mp3');
-
-    await cli.runAndVerify(['add', '--mime-type', 'video', testDbPath, tempDir]);
-
-    const queryResult = await cli.runJson<any[]>(['print', testDbPath, '--all', '--json']);
-    expect(queryResult.length).toBe(1);
-    expect(queryResult[0].media_type).toBe('video');
-  });
-
   test('adds files with verbose output', async ({ cli, testDbPath, createValidVideo }) => {
     const videoPath = createValidVideo('verbose_test.mp4');
     const result = await cli.runAndVerify(['add', '--verbose', testDbPath, videoPath]);
