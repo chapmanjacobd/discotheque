@@ -131,8 +131,8 @@ describe('Queue Management', () => {
 
     it('should advance correctly through duplicate items in queue', async () => {
         state.enableQueue = true;
-        const item = { path: 'duplicate.mp4', duration: 10, type: 'video/mp4' };
-        state.playback.queue = [item, item, { path: 'third.mp4', duration: 10, type: 'video/mp4' }];
+        const item = { path: 'duplicate.mp4', duration: 10, media_type: 'video/mp4' };
+        state.playback.queue = [item, item, { path: 'third.mp4', duration: 10, media_type: 'video/mp4' }];
         
         // Play first item (explicitly passing index 0)
         window.disco.openActivePlayer(state.playback.queue[0], true, false, 0);

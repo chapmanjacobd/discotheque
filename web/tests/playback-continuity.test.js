@@ -18,8 +18,8 @@ describe('Playback Continuity', () => {
     });
 
     it('should maintain fullscreen when playing next sibling', async () => {
-        const item1 = { path: 'video1.mp4', type: 'video/mp4' };
-        const item2 = { path: 'video2.mp4', type: 'video/mp4' };
+        const item1 = { path: 'video1.mp4', media_type: 'video/mp4' };
+        const item2 = { path: 'video2.mp4', media_type: 'video/mp4' };
         window.disco.currentMedia = [item1, item2];
 
         // 1. Play first item

@@ -9,7 +9,7 @@ describe('Progress Resuming', () => {
     it('resumes from item.playhead when read-only is FALSE and local storage is empty', async () => {
         const item = {
             path: 'video1.mp4',
-            type: 'video/mp4',
+            media_type: 'video/mp4',
             playhead: 42,
             duration: 100
         };
@@ -27,7 +27,7 @@ describe('Progress Resuming', () => {
     it('resumes from item.playhead when read-only is TRUE and local storage is empty', async () => {
         const item = {
             path: 'video1.mp4',
-            type: 'video/mp4',
+            media_type: 'video/mp4',
             playhead: 42,
             duration: 100
         };
@@ -46,7 +46,7 @@ describe('Progress Resuming', () => {
     it('prefers local storage over item.playhead', async () => {
         const item = {
             path: 'video1.mp4',
-            type: 'video/mp4',
+            media_type: 'video/mp4',
             playhead: 42,
             duration: 100
         };
@@ -65,7 +65,7 @@ describe('Progress Resuming', () => {
     it('resumes audio from item.playhead when read-only is TRUE', async () => {
         const item = {
             path: 'audio1.mp3',
-            type: 'audio/mpeg',
+            media_type: 'audio/mpeg',
             playhead: 30,
             duration: 300
         };
@@ -82,7 +82,7 @@ describe('Progress Resuming', () => {
     it('expires local audio progress after 15 minutes if duration < 7 mins', async () => {
         const item = {
             path: 'audio1.mp3',
-            type: 'audio/mpeg',
+            media_type: 'audio/mpeg',
             duration: 300 // 5 mins
         };
 
@@ -100,7 +100,7 @@ describe('Progress Resuming', () => {
     it('does NOT expire local audio progress if duration > 7 mins', async () => {
         const item = {
             path: 'long-audio.mp3',
-            type: 'audio/mpeg',
+            media_type: 'audio/mpeg',
             duration: 600 // 10 mins
         };
 
@@ -118,7 +118,7 @@ describe('Progress Resuming', () => {
     it('skips server sync if sessionTime < 90s and not complete', async () => {
         const item = {
             path: 'video1.mp4',
-            type: 'video/mp4',
+            media_type: 'video/mp4',
             duration: 600
         };
 
@@ -138,7 +138,7 @@ describe('Progress Resuming', () => {
     it('syncs to server if sessionTime > 90s', async () => {
         const item = {
             path: 'video1.mp4',
-            type: 'video/mp4',
+            media_type: 'video/mp4',
             duration: 600
         };
 
@@ -217,7 +217,7 @@ describe('Progress Resuming', () => {
     it('syncs to server if isComplete is true even if sessionTime < 90s', async () => {
         const item = {
             path: 'video1.mp4',
-            type: 'video/mp4',
+            media_type: 'video/mp4',
             duration: 600
         };
 
@@ -238,7 +238,7 @@ describe('Progress Resuming', () => {
     });
 
     it('throttles local storage updates to once per second', async () => {
-        const item = { path: 'video1.mp4', type: 'video/mp4' };
+        const item = { path: 'video1.mp4', media_type: 'video/mp4' };
         localStorage.clear();
         
         // Use fake timers to control time
@@ -264,7 +264,7 @@ describe('Progress Resuming', () => {
     });
 
     it('syncs to server at 30s intervals after initial 90s', async () => {
-        const item = { path: 'video1.mp4', type: 'video/mp4', duration: 1000 };
+        const item = { path: 'video1.mp4', media_type: 'video/mp4', duration: 1000 };
         
         // Mock startTime to be 100s ago
         window.disco.state.playback.startTime = Date.now() - 100000;

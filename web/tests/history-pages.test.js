@@ -10,23 +10,23 @@ describe('History Pages Client-side Data and Filters', () => {
         const item1 = { path: 'video1.mp4', playhead: 10, duration: 100, play_count: 0 };
         const item2 = { path: 'video2.mp4', playhead: 0, duration: 100, play_count: 0 };
         const item3 = { path: 'audio1.mp3', playhead: 0, duration: 100, play_count: 0 };
-        
+
         global.fetch = vi.fn().mockImplementation(async (url) => {
             if (url.includes('/api/query')) {
                 if (url.includes('paths=')) {
                     const urlObj = new URL('http://localhost' + url);
                     const paths = urlObj.searchParams.get('paths').split(',');
-                    const types = urlObj.searchParams.getAll('type');
-                    
+                    const mediaTypes = urlObj.searchParams.getAll('media_type');
+
                     const items = [];
-                    if (paths.includes('video2.mp4') && (!types.length || types.includes('video'))) items.push(item2);
-                    if (paths.includes('audio1.mp3') && (!types.length || types.includes('audio'))) items.push(item3);
+                    if (paths.includes('video2.mp4') && (!mediaTypes.length || mediaTypes.includes('video'))) items.push(item2);
+                    if (paths.includes('audio1.mp3') && (!mediaTypes.length || mediaTypes.includes('audio'))) items.push(item3);
                     return { ok: true, status: 200, json: async () => items };
                 } else if (url.includes('unfinished=true')) {
                     const urlObj = new URL('http://localhost' + url);
-                    const types = urlObj.searchParams.getAll('type');
-                    
-                    if (types.length > 0 && !types.includes('video')) {
+                    const mediaTypes = urlObj.searchParams.getAll('media_type');
+
+                    if (mediaTypes.length > 0 && !mediaTypes.includes('video')) {
                         return { ok: true, status: 200, headers: { get: () => '0' }, json: async () => [] };
                     }
                     return {
@@ -47,7 +47,7 @@ describe('History Pages Client-side Data and Filters', () => {
         }));
 
         // Select 'video' type filter
-        window.disco.state.filters.types = ['video'];
+        window.disco.state.filters.media_types = ['video'];
 
         const inProgressBtn = document.getElementById('history-in-progress-btn');
         inProgressBtn.click();
@@ -66,23 +66,23 @@ describe('History Pages Client-side Data and Filters', () => {
         const item1 = { path: 'video1.mp4', play_count: 1, duration: 100 };
         const item2 = { path: 'video2.mp4', play_count: 0, duration: 100 };
         const item3 = { path: 'audio1.mp3', play_count: 0, duration: 100 };
-        
+
         global.fetch = vi.fn().mockImplementation(async (url) => {
             if (url.includes('/api/query')) {
                 if (url.includes('paths=')) {
                     const urlObj = new URL('http://localhost' + url);
                     const paths = urlObj.searchParams.get('paths').split(',');
-                    const types = urlObj.searchParams.getAll('type');
-                    
+                    const mediaTypes = urlObj.searchParams.getAll('media_type');
+
                     const items = [];
-                    if (paths.includes('video2.mp4') && (!types.length || types.includes('video'))) items.push(item2);
-                    if (paths.includes('audio1.mp3') && (!types.length || types.includes('audio'))) items.push(item3);
+                    if (paths.includes('video2.mp4') && (!mediaTypes.length || mediaTypes.includes('video'))) items.push(item2);
+                    if (paths.includes('audio1.mp3') && (!mediaTypes.length || mediaTypes.includes('audio'))) items.push(item3);
                     return { ok: true, status: 200, json: async () => items };
                 } else if (url.includes('completed=true')) {
                     const urlObj = new URL('http://localhost' + url);
-                    const types = urlObj.searchParams.getAll('type');
-                    
-                    if (types.length > 0 && !types.includes('video')) {
+                    const mediaTypes = urlObj.searchParams.getAll('media_type');
+
+                    if (mediaTypes.length > 0 && !mediaTypes.includes('video')) {
                         return { ok: true, status: 200, headers: { get: () => '0' }, json: async () => [] };
                     }
                     return {
@@ -101,7 +101,7 @@ describe('History Pages Client-side Data and Filters', () => {
             'video2.mp4': { pos: 100, last: Date.now() },
             'audio1.mp3': { pos: 100, last: Date.now() }
         }));
-        
+
         // Add local play count for item2 and item3
         localStorage.setItem('disco-play-counts', JSON.stringify({
             'video2.mp4': 1,
@@ -109,7 +109,7 @@ describe('History Pages Client-side Data and Filters', () => {
         }));
 
         // Select 'audio' type filter
-        window.disco.state.filters.types = ['audio'];
+        window.disco.state.filters.media_types = ['audio'];
 
         const completedBtn = document.getElementById('history-completed-btn');
         completedBtn.click();
@@ -162,7 +162,7 @@ describe('History Pages Client-side Data and Filters', () => {
                 return Promise.resolve({
                     ok: true,
                     json: () => Promise.resolve([
-                        { path: '/local/video.mp4', title: 'Local Video', type: 'video/mp4' }
+                        { path: '/local/video.mp4', title: 'Local Video', media_type: 'video/mp4' }
                     ])
                 });
             }

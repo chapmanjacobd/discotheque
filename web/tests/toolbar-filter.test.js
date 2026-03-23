@@ -8,7 +8,7 @@ describe('Sidebar Media Options Filtering', () => {
     });
 
     it('filters media by type on All Media page', async () => {
-        const audioBtn = document.querySelector('#media-type-list .category-btn[data-type="audio"]');
+        const audioBtn = document.querySelector('#media-type-list .category-btn[data-media_type="audio"]');
 
         // Initial state: nothing selected (means everything)
         // Select audio
@@ -16,10 +16,10 @@ describe('Sidebar Media Options Filtering', () => {
 
         await vi.waitFor(() => {
             const calls = global.fetch.mock.calls;
-            // Verify type=audio is in the URL
+            // Verify media_type=audio is in the URL
             const hasAudioQuery = calls.some(call =>
                 call[0].includes('/api/query') &&
-                call[0].includes('type=audio') &&
+                call[0].includes('media_type=audio') &&
                 call[0].includes('include_counts=true')
             );
             expect(hasAudioQuery).toBe(true);
@@ -35,7 +35,7 @@ describe('Sidebar Media Options Filtering', () => {
         });
 
         // Now toggle audio on
-        const audioBtn = document.querySelector('#media-type-list .category-btn[data-type="audio"]');
+        const audioBtn = document.querySelector('#media-type-list .category-btn[data-media_type="audio"]');
         audioBtn.click();
 
         await vi.waitFor(() => {
@@ -43,7 +43,7 @@ describe('Sidebar Media Options Filtering', () => {
             const hasCompletedAudioQuery = calls.some(call =>
                 call[0].includes('/api/query') &&
                 call[0].includes('completed=true') &&
-                call[0].includes('type=audio') &&
+                call[0].includes('media_type=audio') &&
                 call[0].includes('include_counts=true')
             );
             expect(hasCompletedAudioQuery).toBe(true);
@@ -53,20 +53,20 @@ describe('Sidebar Media Options Filtering', () => {
     it('shows everything when all media types are unselected', async () => {
         // Wait for buttons to be rendered
         await vi.waitFor(() => {
-            const buttons = document.querySelectorAll('#media-type-list .category-btn[data-type]');
+            const buttons = document.querySelectorAll('#media-type-list .category-btn[data-media_type]');
             expect(buttons.length).toBeGreaterThan(0);
         }, { timeout: 3000 });
 
         // Toggle some type on
-        const videoBtn = document.querySelector('#media-type-list .category-btn[data-type="video"]');
+        const videoBtn = document.querySelector('#media-type-list .category-btn[data-media_type="video"]');
         videoBtn.click();
-        
-        // Verify type=video is in the URL
+
+        // Verify media_type=video is in the URL
         await vi.waitFor(() => {
             const calls = global.fetch.mock.calls;
             const hasVideoQuery = calls.some(call =>
                 call[0].includes('/api/query') &&
-                call[0].includes('type=video')
+                call[0].includes('media_type=video')
             );
             expect(hasVideoQuery).toBe(true);
         }, { timeout: 3000 });
@@ -76,10 +76,10 @@ describe('Sidebar Media Options Filtering', () => {
 
         await vi.waitFor(() => {
             const calls = global.fetch.mock.calls;
-            // If all are unselected, type parameter should NOT be in the URL
+            // If all are unselected, media_type parameter should NOT be in the URL
             const hasCleanQuery = calls.some(call =>
                 call[0].includes('/api/query') &&
-                !call[0].includes('type=')
+                !call[0].includes('media_type=')
             );
             expect(hasCleanQuery).toBe(true);
         }, { timeout: 3000 });
@@ -98,7 +98,7 @@ describe('Sidebar Media Options Filtering', () => {
         // Wait for buttons to be rendered
         let audioBtn;
         await vi.waitFor(() => {
-            audioBtn = document.querySelector('#media-type-list .category-btn[data-type="audio"]');
+            audioBtn = document.querySelector('#media-type-list .category-btn[data-media_type="audio"]');
             expect(audioBtn).not.toBeNull();
         });
 

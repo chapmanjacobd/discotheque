@@ -53,7 +53,7 @@ describe('History Navigation (Mobile/Fullscreen)', () => {
 
     it('updates URL with playing param on mobile when opening player', async () => {
         global.innerWidth = 375;
-        const testItem = { path: 'test-video.mp4', type: 'video/mp4' };
+        const testItem = { path: 'test-video.mp4', media_type: 'video/mp4' };
         
         window.disco.openActivePlayer(testItem);
         

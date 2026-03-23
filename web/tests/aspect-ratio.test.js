@@ -117,7 +117,7 @@ describe('Aspect Ratio Cycling', () => {
             // Force audio by mocking type
             window.disco.state.playback.item = {
                 path: 'audio1.mp3',
-                type: 'audio/mpeg'
+                media_type: 'audio/mpeg'
             };
             const audio = document.querySelector('audio');
             if (audio) {

@@ -28,7 +28,7 @@ describe('Fullscreen Maintenance', () => {
 
     it('starts next media in fullscreen if current was fullscreen when deleted', async () => {
         // 1. Setup mock media
-        const item1 = { path: 'video1.mp4', type: 'video/mp4' };
+        const item1 = { path: 'video1.mp4', media_type: 'video/mp4' };
 
         // 2. Open first item
         await window.disco.openInPiP(item1, true);
@@ -40,7 +40,7 @@ describe('Fullscreen Maintenance', () => {
         expect(currentFullscreenElement).toBe(video1);
 
         // 4. Open second item (simulating what playSibling does)
-        const item2 = { path: 'video2.mp4', type: 'video/mp4' };
+        const item2 = { path: 'video2.mp4', media_type: 'video/mp4' };
         await window.disco.openInPiP(item2, false);
 
         // 5. Verify a video element exists and fullscreen was requested

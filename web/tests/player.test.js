@@ -23,7 +23,7 @@ describe('Player Logic', () => {
     });
 
     it('falls back to direct stream if native HLS fails', async () => {
-        const item = { path: 'movie.m3u8', type: 'video/mp4', transcode: true };
+        const item = { path: 'movie.m3u8', media_type: 'video/mp4', transcode: true };
         
         // Mock native HLS support
         const canPlayTypeSpy = vi.spyOn(HTMLMediaElement.prototype, 'canPlayType').mockReturnValue('probably');
@@ -41,7 +41,7 @@ describe('Player Logic', () => {
     });
 
     it('falls back to direct stream if hls.js fails', async () => {
-        const item = { path: 'movie.m3u8', type: 'video/mp4', transcode: true };
+        const item = { path: 'movie.m3u8', media_type: 'video/mp4', transcode: true };
         
         // Mock native HLS NOT supported, but hls.js IS supported
         vi.spyOn(HTMLMediaElement.prototype, 'canPlayType').mockReturnValue('');
@@ -56,7 +56,7 @@ describe('Player Logic', () => {
         
         // Trigger fatal HLS error
         if (fatalErrorHandler) {
-            fatalErrorHandler('hlsError', { fatal: true, type: 'networkError' });
+            fatalErrorHandler('hlsError', { fatal: true, media_type: 'networkError' });
         }
         
         // Should fall back to direct stream
@@ -64,7 +64,7 @@ describe('Player Logic', () => {
     });
 
     it('prefers local storage over server playhead for resuming', async () => {
-        const item = { path: 'video.mp4', type: 'video/mp4', playhead: 100, duration: 1000 };
+        const item = { path: 'video.mp4', media_type: 'video/mp4', playhead: 100, duration: 1000 };
         
         localStorage.setItem('disco-progress', JSON.stringify({
             'video.mp4': { pos: 500, last: Date.now() }
@@ -77,7 +77,7 @@ describe('Player Logic', () => {
     });
 
     it('resumes from server playhead if local storage is empty', async () => {
-        const item = { path: 'video.mp4', type: 'video/mp4', playhead: 300, duration: 1000 };
+        const item = { path: 'video.mp4', media_type: 'video/mp4', playhead: 300, duration: 1000 };
         localStorage.clear();
         
         await window.disco.openInPiP(item);

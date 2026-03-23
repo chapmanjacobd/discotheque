@@ -16,7 +16,7 @@ describe('Pagination Limit', () => {
         window.disco.state.filters.all = false;
 
         // Mock current media (last item of page 1)
-        const item = { path: 'file10.mp4', type: 'video/mp4' };
+        const item = { path: 'file10.mp4', media_type: 'video/mp4' };
         window.disco.currentMedia = [
             { path: 'file1.mp4' }, { path: 'file2.mp4' }, { path: 'file3.mp4' },
             { path: 'file4.mp4' }, { path: 'file5.mp4' }, { path: 'file6.mp4' },
@@ -45,7 +45,7 @@ describe('Pagination Limit', () => {
         window.disco.state.filters.all = false;
 
         // Mock current media (last item of page 1)
-        const item = { path: 'file10.mp4', type: 'video/mp4' };
+        const item = { path: 'file10.mp4', media_type: 'video/mp4' };
         window.disco.currentMedia = [
             { path: 'file1.mp4' }, { path: 'file2.mp4' }, { path: 'file3.mp4' },
             { path: 'file4.mp4' }, { path: 'file5.mp4' }, { path: 'file6.mp4' },

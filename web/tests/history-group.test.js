@@ -18,7 +18,7 @@ describe('History Group View', () => {
                 return Promise.resolve({
                     ok: true,
                     json: () => Promise.resolve([
-                        { path: '/folder1', files: [{ path: '/folder1/v1.mp4', title: 'v1', type: 'video/mp4', playhead: 10 }], count: 1 }
+                        { path: '/folder1', files: [{ path: '/folder1/v1.mp4', title: 'v1', media_type: 'video/mp4', playhead: 10 }], count: 1 }
                     ])
                 });
             }
@@ -64,7 +64,7 @@ describe('History Group View', () => {
                 return Promise.resolve({
                     ok: true,
                     json: () => Promise.resolve([
-                        { path: '/local/video.mp4', title: 'Local Video', type: 'video/mp4' }
+                        { path: '/local/video.mp4', title: 'Local Video', media_type: 'video/mp4' }
                     ])
                 });
             }

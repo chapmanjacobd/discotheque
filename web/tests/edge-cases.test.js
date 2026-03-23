@@ -114,7 +114,7 @@ describe('Broken Media Handling', () => {
 
         const item = {
             path: 'video1.mp4',
-            type: 'video/mp4',
+            media_type: 'video/mp4',
             playhead: 0,
             duration: 100
         };

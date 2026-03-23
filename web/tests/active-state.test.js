@@ -8,7 +8,7 @@ describe('Sidebar Active States', () => {
     });
 
     it('updates sidebar button active states when switching to text view', async () => {
-        const textBtn = document.querySelector('#media-type-list .category-btn[data-type="text"]');
+        const textBtn = document.querySelector('#media-type-list .category-btn[data-media_type="text"]');
         expect(textBtn).not.toBeNull();
 
         // Click Text button
@@ -20,8 +20,8 @@ describe('Sidebar Active States', () => {
             expect(hasQueryCall).toBe(true);
         });
 
-        // Let's simulate a URL change to type=text
-        window.location.hash = '#type=text';
+        // Let's simulate a URL change to media_type=text
+        window.location.hash = '#media_type=text';
         window.dispatchEvent(new HashChangeEvent('hashchange'));
 
         await vi.waitFor(() => {
@@ -37,10 +37,10 @@ describe('Sidebar Active States', () => {
 
         await vi.waitFor(() => {
             expect(allMediaBtn.classList.contains('active')).toBe(true);
-            expect(window.disco.state.filters.types.length).toBe(0);
+            expect(window.disco.state.filters.media_types.length).toBe(0);
         });
 
-        const videoBtn = document.querySelector('#media-type-list .category-btn[data-type="video"]');
+        const videoBtn = document.querySelector('#media-type-list .category-btn[data-media_type="video"]');
 
         // Select video, All Media should deactivate
         videoBtn.click();

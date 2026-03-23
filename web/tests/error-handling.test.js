@@ -13,8 +13,8 @@ describe('Error Handling', () => {
 
     it('auto-skips to next item on media error if autoplay is enabled', async () => {
         // Use items from mocks.json or default mock in test-helper.js
-        const item1 = { path: 'video1.mp4', type: 'video/mp4' };
-        const item2 = { path: 'audio1.mp3', type: 'audio/mpeg' };
+        const item1 = { path: 'video1.mp4', media_type: 'video/mp4' };
+        const item2 = { path: 'audio1.mp3', media_type: 'audio/mpeg' };
 
         window.disco.state.autoplay = true;
         // currentMedia is already populated by setupTestEnvironment via performSearch/fetchDatabases etc.
@@ -46,7 +46,7 @@ describe('Error Handling', () => {
         window.disco.state.autoplay = true;
         window.disco.state.playback.consecutiveErrors = 30;
         
-        const item = { path: 'v30.mp4', type: 'video/mp4' };
+        const item = { path: 'v30.mp4', media_type: 'video/mp4' };
         window.disco.state.playback.item = item;
 
         // Simulate 31st error
@@ -57,7 +57,7 @@ describe('Error Handling', () => {
     });
 
     it('resets consecutiveErrors counter when progress is made', async () => {
-        const item = { path: 'v1.mp4', type: 'video/mp4' };
+        const item = { path: 'v1.mp4', media_type: 'video/mp4' };
         window.disco.state.playback.consecutiveErrors = 50;
 
         await window.disco.updateProgress(item, 5, 100);

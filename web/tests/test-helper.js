@@ -36,15 +36,15 @@ export async function setupTestEnvironment(initialLocalStorage) {
                 let items;
                 if (url.includes('captions=true')) {
                     items = mocks.media_with_captions || [
-                        { path: 'video1.mp4', type: 'video/mp4', size: 1024, duration: 60, db: 'test.db', caption_text: 'sample caption', caption_time: 10.5 },
+                        { path: 'video1.mp4', media_type: 'video/mp4', size: 1024, duration: 60, db: 'test.db', caption_text: 'sample caption', caption_time: 10.5 },
                     ];
-                } else if (url.includes('type=')) {
-                    // Filter by type if specified
-                    const typeMatch = url.match(/type=([^&]+)/);
+                } else if (url.includes('media_type=')) {
+                    // Filter by media_type if specified
+                    const typeMatch = url.match(/media_type=([^&]+)/);
                     if (typeMatch) {
                         const filterType = decodeURIComponent(typeMatch[1]);
                         // Match partial types (e.g., "video" matches "video/mp4")
-                        items = (mocks.media || []).filter(m => m.type && m.type.includes(filterType));
+                        items = (mocks.media || []).filter(m => m.media_type && m.media_type.includes(filterType));
                         if (items.length === 0) {
                             // Return empty array if no matches
                             items = [];
@@ -54,8 +54,8 @@ export async function setupTestEnvironment(initialLocalStorage) {
                     }
                 } else {
                     items = mocks.media || [
-                        { path: 'video1.mp4', type: 'video/mp4', size: 1024, duration: 60, db: 'test.db' },
-                        { path: 'audio1.mp3', type: 'audio/mpeg', size: 512, duration: 120, db: 'test.db' }
+                        { path: 'video1.mp4', media_type: 'video/mp4', size: 1024, duration: 60, db: 'test.db' },
+                        { path: 'audio1.mp3', media_type: 'audio/mpeg', size: 512, duration: 120, db: 'test.db' }
                     ];
                 }
                 data = {
@@ -72,14 +72,14 @@ export async function setupTestEnvironment(initialLocalStorage) {
                 };
             } else if (url.includes('captions=true')) {
                 data = mocks.media_with_captions || [
-                    { path: 'video1.mp4', type: 'video/mp4', size: 1024, duration: 60, db: 'test.db', caption_text: 'sample caption', caption_time: 10.5 },
-                    { path: 'video2.mp4', type: 'video/mp4', size: 2048, duration: 120, db: 'test.db', caption_text: 'another caption', caption_time: 20.0 },
-                    { path: 'video3.mp4', type: 'video/mp4', size: 512, duration: 30, db: 'test.db', caption_text: 'third caption', caption_time: 5.0 }
+                    { path: 'video1.mp4', media_type: 'video/mp4', size: 1024, duration: 60, db: 'test.db', caption_text: 'sample caption', caption_time: 10.5 },
+                    { path: 'video2.mp4', media_type: 'video/mp4', size: 2048, duration: 120, db: 'test.db', caption_text: 'another caption', caption_time: 20.0 },
+                    { path: 'video3.mp4', media_type: 'video/mp4', size: 512, duration: 30, db: 'test.db', caption_text: 'third caption', caption_time: 5.0 }
                 ];
             } else {
                 data = mocks.media || [
-                    { path: 'video1.mp4', type: 'video/mp4', size: 1024, duration: 60, db: 'test.db', caption_text: 'sample caption', caption_time: 10.5 },
-                    { path: 'audio1.mp3', type: 'audio/mpeg', size: 512, duration: 120, db: 'test.db', caption_text: 'another caption', caption_time: 20.0 }
+                    { path: 'video1.mp4', media_type: 'video/mp4', size: 1024, duration: 60, db: 'test.db', caption_text: 'sample caption', caption_time: 10.5 },
+                    { path: 'audio1.mp3', media_type: 'audio/mpeg', size: 512, duration: 120, db: 'test.db', caption_text: 'another caption', caption_time: 20.0 }
                 ];
             }
         } else if (url.includes('/api/filter-bins')) {

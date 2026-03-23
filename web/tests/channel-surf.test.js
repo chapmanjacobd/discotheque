@@ -20,7 +20,7 @@ describe('Random Media', () => {
                         path: '/path/to/video.mp4',
                         start: 10,
                         end: 25,
-                        type: 'video/mp4'
+                        media_type: 'video/mp4'
                     })
                 });
             }
@@ -55,18 +55,18 @@ describe('Random Media', () => {
         const state = window.disco.state;
 
         // Set current media to an image
-        state.playback.item = { path: '/path/to/image.jpg', type: 'image/jpeg' };
+        state.playback.item = { path: '/path/to/image.jpg', media_type: 'image/jpeg' };
 
         const originalFetch = global.fetch;
         global.fetch = vi.fn().mockImplementation((url) => {
             if (url.includes('/api/random-clip')) {
-                // Check if type=image is in the URL
-                expect(url).toContain('type=image');
+                // Check if media_type=image is in the URL
+                expect(url).toContain('media_type=image');
                 return Promise.resolve({
                     ok: true,
                     json: () => Promise.resolve({
                         path: '/path/to/another-image.jpg',
-                        type: 'image/jpeg'
+                        media_type: 'image/jpeg'
                     })
                 });
             }
@@ -77,7 +77,7 @@ describe('Random Media', () => {
 
         await vi.waitFor(() => {
             expect(global.fetch).toHaveBeenCalledWith(
-                expect.stringContaining('type=image'),
+                expect.stringContaining('media_type=image'),
                 expect.objectContaining({
                     headers: expect.objectContaining({
                         'X-Disco-Token': 'mock-test-token'
@@ -93,7 +93,7 @@ describe('Random Media', () => {
         const state = window.disco.state;
 
         // Set current media to video
-        state.playback.item = { path: '/path/to/video.mp4', type: 'video/mp4' };
+        state.playback.item = { path: '/path/to/video.mp4', media_type: 'video/mp4' };
 
         global.fetch = vi.fn().mockImplementation((url) => {
             if (url.includes('/api/random-clip')) {

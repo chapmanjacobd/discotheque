@@ -28,7 +28,7 @@ describe('Document Fullscreen', () => {
     });
 
     it('toggles fullscreen when the button is clicked', async () => {
-        const item = { path: 'test.txt', type: 'text/plain' };
+        const item = { path: 'test.txt', media_type: 'text/plain' };
 
         // 1. Open document viewer
         window.disco.openInDocumentViewer(item);
@@ -57,7 +57,7 @@ describe('Document Fullscreen', () => {
     });
 
     it('toggles fullscreen when "f" key is pressed', async () => {
-        const item = { path: 'test.txt', type: 'text/plain' };
+        const item = { path: 'test.txt', media_type: 'text/plain' };
         window.disco.openInDocumentViewer(item);
 
         const modal = document.getElementById('document-modal');

@@ -9,9 +9,9 @@ describe('Image Slideshow', () => {
     it('continues slideshow to the next image after delay', async () => {
         // Setup: Multiple images in the media list
         const images = [
-            { path: 'images/photo1.png', type: 'image/png', db: 'test.db' },
-            { path: 'images/photo2.png', type: 'image/png', db: 'test.db' },
-            { path: 'images/photo3.png', type: 'image/png', db: 'test.db' },
+            { path: 'images/photo1.png', media_type: 'image/png', db: 'test.db' },
+            { path: 'images/photo2.png', media_type: 'image/png', db: 'test.db' },
+            { path: 'images/photo3.png', media_type: 'image/png', db: 'test.db' },
         ];
 
         // Mock the API to return our images
@@ -94,8 +94,8 @@ describe('Image Slideshow', () => {
 
     it('stops slideshow when user interacts', async () => {
         const images = [
-            { path: 'images/photo1.png', type: 'image/png', db: 'test.db' },
-            { path: 'images/photo2.png', type: 'image/png', db: 'test.db' },
+            { path: 'images/photo1.png', media_type: 'image/png', db: 'test.db' },
+            { path: 'images/photo2.png', media_type: 'image/png', db: 'test.db' },
         ];
 
         localStorage.setItem('disco-image-autoplay', 'true');

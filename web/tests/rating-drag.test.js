@@ -7,7 +7,7 @@ describe('Rating Drag and Drop', () => {
     });
 
     it('rates media when dropped onto a rating button', async () => {
-        const item = { path: 'video1.mp4', type: 'video/mp4' };
+        const item = { path: 'video1.mp4', media_type: 'video/mp4' };
         window.disco.state.draggedItem = item;
 
         // Find a rating button (e.g., 5 stars)

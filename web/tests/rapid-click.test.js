@@ -10,7 +10,7 @@ describe('Rapid Playback Clicks', () => {
     });
 
     it('should handle rapid clicks on the same item without unplayable error', async () => {
-        const item = { path: 'video.mkv', type: 'video/x-matroska' };
+        const item = { path: 'video.mkv', media_type: 'video/x-matroska' };
         
         // Mock showToast to see if unplayable error is shown
         const showToastSpy = vi.spyOn(window.disco, 'showToast');

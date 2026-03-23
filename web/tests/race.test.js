@@ -9,13 +9,13 @@ describe('Race condition between progress update and search', () => {
     it('awaits progress update before performing search on item end', async () => {
         const item1 = {
             path: 'video1.mp4',
-            type: 'video/mp4',
+            media_type: 'video/mp4',
             duration: 600,
             playhead: 0
         };
         const item2 = {
             path: 'video2.mp4',
-            type: 'video/mp4',
+            media_type: 'video/mp4',
             duration: 600,
             playhead: 0
         };
