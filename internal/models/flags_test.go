@@ -52,13 +52,18 @@ func TestMergeFlags_AfterApply(t *testing.T) {
 }
 
 func TestSetupLogging(t *testing.T) {
-	SetupLogging(true)
+	SetupLogging(2)
 	if LogLevel.Level() != slog.LevelDebug {
 		t.Errorf("Expected debug level, got %v", LogLevel.Level())
 	}
 
-	SetupLogging(false)
+	SetupLogging(1)
 	if LogLevel.Level() != slog.LevelInfo {
 		t.Errorf("Expected info level, got %v", LogLevel.Level())
+	}
+
+	SetupLogging(0)
+	if LogLevel.Level() != slog.LevelWarn {
+		t.Errorf("Expected warn level, got %v", LogLevel.Level())
 	}
 }

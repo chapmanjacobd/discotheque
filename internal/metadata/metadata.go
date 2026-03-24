@@ -140,7 +140,7 @@ func Extract(ctx context.Context, path string, scanSubtitles bool, extractText b
 				}
 			}
 		}
-		
+
 		return result, nil
 	}
 

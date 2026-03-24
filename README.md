@@ -124,7 +124,7 @@ $ disco add --help
 
 Flags:
   -v, --verbose
-        Enable verbose logging
+        Enable verbose logging (-v for info, -vv for debug)
   --simulate
         Dry run; don't actually do anything
   -y, --no-confirm
@@ -234,7 +234,7 @@ $ disco check --help
 
 Flags:
   -v, --verbose
-        Enable verbose logging
+        Enable verbose logging (-v for info, -vv for debug)
   --simulate
         Dry run; don't actually do anything
   -y, --no-confirm
@@ -300,7 +300,7 @@ $ disco print --help
 
 Flags:
   -v, --verbose
-        Enable verbose logging
+        Enable verbose logging (-v for info, -vv for debug)
   --simulate
         Dry run; don't actually do anything
   -y, --no-confirm
@@ -509,7 +509,7 @@ $ disco search --help
 
 Flags:
   -v, --verbose
-        Enable verbose logging
+        Enable verbose logging (-v for info, -vv for debug)
   --simulate
         Dry run; don't actually do anything
   -y, --no-confirm
@@ -667,7 +667,7 @@ $ disco search-captions --help
 
 Flags:
   -v, --verbose
-        Enable verbose logging
+        Enable verbose logging (-v for info, -vv for debug)
   --simulate
         Dry run; don't actually do anything
   -y, --no-confirm
@@ -775,7 +775,7 @@ $ disco playlists --help
 
 Flags:
   -v, --verbose
-        Enable verbose logging
+        Enable verbose logging (-v for info, -vv for debug)
   --simulate
         Dry run; don't actually do anything
   -y, --no-confirm
@@ -807,7 +807,7 @@ $ disco search-db --help
 
 Flags:
   -v, --verbose
-        Enable verbose logging
+        Enable verbose logging (-v for info, -vv for debug)
   --simulate
         Dry run; don't actually do anything
   -y, --no-confirm
@@ -967,7 +967,7 @@ $ disco media-check --help
 
 Flags:
   -v, --verbose
-        Enable verbose logging
+        Enable verbose logging (-v for info, -vv for debug)
   --simulate
         Dry run; don't actually do anything
   -y, --no-confirm
@@ -1081,7 +1081,7 @@ $ disco files-info --help
 
 Flags:
   -v, --verbose
-        Enable verbose logging
+        Enable verbose logging (-v for info, -vv for debug)
   --simulate
         Dry run; don't actually do anything
   -y, --no-confirm
@@ -1206,7 +1206,7 @@ $ disco disk-usage --help
 
 Flags:
   -v, --verbose
-        Enable verbose logging
+        Enable verbose logging (-v for info, -vv for debug)
   --simulate
         Dry run; don't actually do anything
   -y, --no-confirm
@@ -1382,7 +1382,7 @@ $ disco dedupe --help
 
 Flags:
   -v, --verbose
-        Enable verbose logging
+        Enable verbose logging (-v for info, -vv for debug)
   --simulate
         Dry run; don't actually do anything
   -y, --no-confirm
@@ -1550,7 +1550,7 @@ $ disco big-dirs --help
 
 Flags:
   -v, --verbose
-        Enable verbose logging
+        Enable verbose logging (-v for info, -vv for debug)
   --simulate
         Dry run; don't actually do anything
   -y, --no-confirm
@@ -1718,7 +1718,7 @@ $ disco categorize --help
 
 Flags:
   -v, --verbose
-        Enable verbose logging
+        Enable verbose logging (-v for info, -vv for debug)
   --simulate
         Dry run; don't actually do anything
   -y, --no-confirm
@@ -1872,7 +1872,7 @@ $ disco similar-files --help
 
 Flags:
   -v, --verbose
-        Enable verbose logging
+        Enable verbose logging (-v for info, -vv for debug)
   --simulate
         Dry run; don't actually do anything
   -y, --no-confirm
@@ -2044,7 +2044,7 @@ $ disco similar-folders --help
 
 Flags:
   -v, --verbose
-        Enable verbose logging
+        Enable verbose logging (-v for info, -vv for debug)
   --simulate
         Dry run; don't actually do anything
   -y, --no-confirm
@@ -2224,7 +2224,7 @@ $ disco watch --help
 
 Flags:
   -v, --verbose
-        Enable verbose logging
+        Enable verbose logging (-v for info, -vv for debug)
   --simulate
         Dry run; don't actually do anything
   -y, --no-confirm
@@ -2489,7 +2489,7 @@ $ disco listen --help
 
 Flags:
   -v, --verbose
-        Enable verbose logging
+        Enable verbose logging (-v for info, -vv for debug)
   --simulate
         Dry run; don't actually do anything
   -y, --no-confirm
@@ -2747,7 +2747,7 @@ $ disco stats --help
 
 Flags:
   -v, --verbose
-        Enable verbose logging
+        Enable verbose logging (-v for info, -vv for debug)
   --simulate
         Dry run; don't actually do anything
   -y, --no-confirm
@@ -2886,7 +2886,7 @@ $ disco history --help
 
 Flags:
   -v, --verbose
-        Enable verbose logging
+        Enable verbose logging (-v for info, -vv for debug)
   --simulate
         Dry run; don't actually do anything
   -y, --no-confirm
@@ -3048,7 +3048,7 @@ $ disco history-add --help
 
 Flags:
   -v, --verbose
-        Enable verbose logging
+        Enable verbose logging (-v for info, -vv for debug)
   --simulate
         Dry run; don't actually do anything
   -y, --no-confirm
@@ -3072,7 +3072,7 @@ $ disco mpv-watchlater --help
 
 Flags:
   -v, --verbose
-        Enable verbose logging
+        Enable verbose logging (-v for info, -vv for debug)
   --simulate
         Dry run; don't actually do anything
   -y, --no-confirm
@@ -3201,7 +3201,7 @@ $ disco serve --help
 
 Flags:
   -v, --verbose
-        Enable verbose logging
+        Enable verbose logging (-v for info, -vv for debug)
   --simulate
         Dry run; don't actually do anything
   -y, --no-confirm
@@ -3463,7 +3463,7 @@ $ disco optimize --help
 
 Flags:
   -v, --verbose
-        Enable verbose logging
+        Enable verbose logging (-v for info, -vv for debug)
   --simulate
         Dry run; don't actually do anything
   -y, --no-confirm
@@ -3485,7 +3485,7 @@ $ disco repair --help
 
 Flags:
   -v, --verbose
-        Enable verbose logging
+        Enable verbose logging (-v for info, -vv for debug)
   --simulate
         Dry run; don't actually do anything
   -y, --no-confirm
@@ -3507,7 +3507,7 @@ $ disco tui --help
 
 Flags:
   -v, --verbose
-        Enable verbose logging
+        Enable verbose logging (-v for info, -vv for debug)
   --simulate
         Dry run; don't actually do anything
   -y, --no-confirm
@@ -3665,7 +3665,7 @@ $ disco readme --help
 
 Flags:
   -v, --verbose
-        Enable verbose logging
+        Enable verbose logging (-v for info, -vv for debug)
   --simulate
         Dry run; don't actually do anything
   -y, --no-confirm
@@ -4043,7 +4043,7 @@ $ disco regex-sort --help
 
 Flags:
   -v, --verbose
-        Enable verbose logging
+        Enable verbose logging (-v for info, -vv for debug)
   --simulate
         Dry run; don't actually do anything
   -y, --no-confirm
@@ -4095,7 +4095,7 @@ $ disco cluster-sort --help
 
 Flags:
   -v, --verbose
-        Enable verbose logging
+        Enable verbose logging (-v for info, -vv for debug)
   --simulate
         Dry run; don't actually do anything
   -y, --no-confirm
@@ -4171,7 +4171,7 @@ $ disco sample-hash --help
 
 Flags:
   -v, --verbose
-        Enable verbose logging
+        Enable verbose logging (-v for info, -vv for debug)
   --simulate
         Dry run; don't actually do anything
   -y, --no-confirm
@@ -4209,7 +4209,7 @@ $ disco open --help
 
 Flags:
   -v, --verbose
-        Enable verbose logging
+        Enable verbose logging (-v for info, -vv for debug)
   --simulate
         Dry run; don't actually do anything
   -y, --no-confirm
@@ -4337,7 +4337,7 @@ $ disco browse --help
 
 Flags:
   -v, --verbose
-        Enable verbose logging
+        Enable verbose logging (-v for info, -vv for debug)
   --simulate
         Dry run; don't actually do anything
   -y, --no-confirm
@@ -4451,7 +4451,7 @@ Flags:
   --cast-device
         Chromecast device name
   -v, --verbose
-        Enable verbose logging
+        Enable verbose logging (-v for info, -vv for debug)
 ```
 
 </details>
@@ -4471,7 +4471,7 @@ Flags:
   --cast-device
         Chromecast device name
   -v, --verbose
-        Enable verbose logging
+        Enable verbose logging (-v for info, -vv for debug)
 ```
 
 </details>
@@ -4491,7 +4491,7 @@ Flags:
   --cast-device
         Chromecast device name
   -v, --verbose
-        Enable verbose logging
+        Enable verbose logging (-v for info, -vv for debug)
 ```
 
 </details>
@@ -4511,7 +4511,7 @@ Flags:
   --cast-device
         Chromecast device name
   -v, --verbose
-        Enable verbose logging
+        Enable verbose logging (-v for info, -vv for debug)
 ```
 
 </details>
@@ -4531,7 +4531,7 @@ Flags:
   --cast-device
         Chromecast device name
   -v, --verbose
-        Enable verbose logging
+        Enable verbose logging (-v for info, -vv for debug)
 ```
 
 </details>
@@ -4547,7 +4547,7 @@ $ disco merge-dbs --help
 
 Flags:
   -v, --verbose
-        Enable verbose logging
+        Enable verbose logging (-v for info, -vv for debug)
   --simulate
         Dry run; don't actually do anything
   -y, --no-confirm

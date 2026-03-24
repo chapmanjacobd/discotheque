@@ -15,16 +15,12 @@ func (q *Queries) BulkUpsertMedia(ctx context.Context, items []UpsertMediaParams
 	}
 
 	const columnsCount = 28
-	maxBatchSize := SqliteParamLimit / columnsCount
-	if maxBatchSize > 500 {
-		maxBatchSize = 500 // Keep it reasonable for memory
-	}
+	maxBatchSize := min(SqliteParamLimit/columnsCount,
+		// Keep it reasonable for memory
+		500)
 
 	for i := 0; i < len(items); i += maxBatchSize {
-		end := i + maxBatchSize
-		if end > len(items) {
-			end = len(items)
-		}
+		end := min(i+maxBatchSize, len(items))
 		batch := items[i:end]
 
 		if err := q.bulkUpsertMediaBatch(ctx, batch); err != nil {
@@ -104,16 +100,12 @@ func (q *Queries) BulkInsertCaptions(ctx context.Context, items []InsertCaptionP
 	}
 
 	const columnsCount = 3
-	maxBatchSize := SqliteParamLimit / columnsCount
-	if maxBatchSize > 5000 {
-		maxBatchSize = 5000 // Keep it reasonable
-	}
+	maxBatchSize := min(SqliteParamLimit/columnsCount,
+		// Keep it reasonable
+		5000)
 
 	for i := 0; i < len(items); i += maxBatchSize {
-		end := i + maxBatchSize
-		if end > len(items) {
-			end = len(items)
-		}
+		end := min(i+maxBatchSize, len(items))
 		batch := items[i:end]
 
 		if err := q.bulkInsertCaptionsBatch(ctx, batch); err != nil {

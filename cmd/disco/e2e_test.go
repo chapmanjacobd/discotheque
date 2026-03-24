@@ -291,7 +291,7 @@ Another caption here.
 
 	// 2. Run AddCmd with ScanSubtitles enabled
 	addCmd := &commands.AddCmd{
-		CoreFlags: models.CoreFlags{Verbose: true},
+		CoreFlags: models.CoreFlags{Verbose: 1},
 		MediaFilterFlags: models.MediaFilterFlags{
 			ScanSubtitles: true,
 		},

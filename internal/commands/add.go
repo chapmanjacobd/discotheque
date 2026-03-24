@@ -311,10 +311,9 @@ func (c *AddCmd) Run(ctx *kong.Context) error {
 						direction = 1 // Gently push up if stable
 					}
 
-					newTarget := current + (direction * 2) // Step by 2
-					if newTarget < 1 {
-						newTarget = 1
-					}
+					newTarget := max(
+						// Step by 2
+						current+(direction*2), 1)
 					if newTarget > 1000 {
 						newTarget = 1000
 					}
@@ -392,7 +391,7 @@ func (c *AddCmd) Run(ctx *kong.Context) error {
 
 			count++
 			if count%10 == 0 || count == len(toProbe) {
-				if c.Verbose {
+				if c.Verbose > 0 {
 					fmt.Printf("\rProcessed %d/%d files (%d workers)\033[K", count, len(toProbe), atomic.LoadInt32(&activeWorkers))
 				} else {
 					fmt.Printf("\rProcessed %d/%d files\033[K", count, len(toProbe))

@@ -10,7 +10,7 @@ import (
 // CoreFlags are essential flags shared across most binaries/commands
 type CoreFlags struct {
 	// Common options
-	Verbose   bool   `short:"v" help:"Enable verbose logging"`
+	Verbose   int    `short:"v" type:"counter" help:"Enable verbose logging (-v for info, -vv for debug)" env:"DISCO_VERBOSE"`
 	Simulate  bool   `help:"Dry run; don't actually do anything"`
 	DryRun    bool   `kong:"-"` // Alias for Simulate
 	NoConfirm bool   `short:"y" help:"Don't ask for confirmation"`
@@ -287,7 +287,7 @@ type GlobalFlags struct {
 type ControlFlags struct {
 	MpvSocket  string `help:"Mpv socket path" group:"Playback"`
 	CastDevice string `alias:"cast-to" help:"Chromecast device name" group:"Playback"`
-	Verbose    bool   `short:"v" help:"Enable verbose logging"`
+	Verbose    int    `short:"v" type:"counter" help:"Enable verbose logging (-v for info, -vv for debug)" env:"DISCO_VERBOSE"`
 }
 
 func (c *CoreFlags) AfterApply() error {
@@ -320,12 +320,15 @@ func (m *MergeFlags) AfterApply() error {
 
 var LogLevel = &slog.LevelVar{}
 
-func SetupLogging(verbose bool) {
-	if verbose {
+func SetupLogging(verbosity int) {
+	if verbosity >= 2 {
 		LogLevel.Set(slog.LevelDebug)
 		db.SetDebugMode(true)
-	} else {
+	} else if verbosity == 1 {
 		LogLevel.Set(slog.LevelInfo)
+	} else {
+		// Default to Warn (hides Info and Debug, shows Warn and Error)
+		LogLevel.Set(slog.LevelWarn)
 	}
 }
 

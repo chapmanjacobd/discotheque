@@ -9,7 +9,7 @@ import (
 )
 
 type VersionCmd struct {
-	Verbose bool `short:"v" help:"Show verbose output including dependencies"`
+	Verbose int `short:"v" type:"counter" help:"Show verbose output including dependencies" env:"DISCO_VERBOSE"`
 }
 
 func (c *VersionCmd) Run() error {
@@ -65,7 +65,7 @@ func (c *VersionCmd) Run() error {
 		}
 	}
 
-	if c.Verbose && ok {
+	if c.Verbose > 0 && ok {
 		fmt.Println("\nDeps:")
 		for _, dep := range bi.Deps {
 			fmt.Printf("\t%s@%s (%s)\n", dep.Path, dep.Version, dep.Sum)

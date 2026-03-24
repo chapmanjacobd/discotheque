@@ -158,7 +158,7 @@ func (c *CategorizeCmd) applyCategories(media []models.MediaWithDB, compiled map
 				}
 			}
 
-			if c.Verbose {
+			if c.Verbose > 0 {
 				fmt.Printf("Categorized: %s -> %s\n", m.Path, newCategories)
 			}
 			categorizedCount++
