@@ -4,8 +4,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-
-	"github.com/chapmanjacobd/discoteca/internal/utils"
 )
 
 func FindMedia(root string, filter map[string]bool) (map[string]os.FileInfo, error) {
@@ -32,11 +30,6 @@ type FindMediaResult struct {
 }
 
 func FindMediaChan(root string, filter map[string]bool, ch chan<- FindMediaResult) error {
-	allowed := filter
-	if allowed == nil {
-		allowed = utils.MediaExtensionMap
-	}
-
 	var filesCount, dirsCount int
 
 	return filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
@@ -48,15 +41,24 @@ func FindMediaChan(root string, filter map[string]bool, ch chan<- FindMediaResul
 			return nil
 		}
 
-		ext := strings.ToLower(filepath.Ext(path))
-		if allowed[ext] {
-			info, err := d.Info()
-			if err != nil {
-				return nil // Skip files we can't access
+		// Skip symlinks
+		// if d.Type()&os.ModeSymlink != 0 {
+		//	return nil
+		// }
+
+		if filter != nil {
+			ext := strings.ToLower(filepath.Ext(path))
+			if !filter[ext] {
+				return nil
 			}
-			filesCount++
-			ch <- FindMediaResult{Path: path, Info: info, FilesCount: filesCount, DirsCount: dirsCount}
 		}
+
+		info, err := d.Info()
+		if err != nil {
+			return nil // Skip files we can't access
+		}
+		filesCount++
+		ch <- FindMediaResult{Path: path, Info: info, FilesCount: filesCount, DirsCount: dirsCount}
 		return nil
 	})
 }

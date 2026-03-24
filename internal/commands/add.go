@@ -151,13 +151,20 @@ func (c *AddCmd) Run(ctx *kong.Context) error {
 		})
 
 		var filter map[string]bool
-		if c.VideoOnly || c.AudioOnly {
+		if c.VideoOnly || c.AudioOnly || c.ImageOnly || c.TextOnly {
 			filter = make(map[string]bool)
 			if c.VideoOnly {
 				maps.Copy(filter, utils.VideoExtensionMap)
 			}
 			if c.AudioOnly {
 				maps.Copy(filter, utils.AudioExtensionMap)
+			}
+			if c.ImageOnly {
+				maps.Copy(filter, utils.ImageExtensionMap)
+			}
+			if c.TextOnly {
+				maps.Copy(filter, utils.TextExtensionMap)
+				maps.Copy(filter, utils.ComicExtensionMap)
 			}
 		}
 
