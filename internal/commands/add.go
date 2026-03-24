@@ -289,7 +289,7 @@ func (c *AddCmd) Run(ctx *kong.Context) error {
 
 		monitorDone := make(chan struct{})
 		go func() {
-			ticker := time.NewTicker(500 * time.Millisecond)
+			ticker := time.NewTicker(4500 * time.Millisecond)
 			defer ticker.Stop()
 
 			var lastCompleted int64
@@ -392,7 +392,11 @@ func (c *AddCmd) Run(ctx *kong.Context) error {
 
 			count++
 			if count%10 == 0 || count == len(toProbe) {
-				fmt.Printf("\rProcessed %d/%d files", count, len(toProbe))
+				if c.Verbose {
+					fmt.Printf("\rProcessed %d/%d files (%d workers)\033[K", count, len(toProbe), atomic.LoadInt32(&activeWorkers))
+				} else {
+					fmt.Printf("\rProcessed %d/%d files\033[K", count, len(toProbe))
+				}
 			}
 		}
 		// Final flush
