@@ -73,17 +73,8 @@ type ffprobeCorruptionOutput struct {
 }
 
 func DecodeFullScan(ctx context.Context, path string) (float64, error) {
-	// ffprobe -show_entries stream=r_frame_rate,nb_read_frames,duration -select_streams v -count_frames -of json -v 0 path
-	args := []string{
-		"-show_entries", "stream=r_frame_rate,nb_read_frames,duration:format=duration",
-		"-select_streams", "v",
-		"-count_frames",
-		"-of", "json",
-		"-v", "0",
-		path,
-	}
+	cmd := utils.FFProbeCountFrames(ctx, path)
 
-	cmd := exec.CommandContext(ctx, "ffprobe", args...)
 	output, err := cmd.Output()
 	if err != nil {
 		return 0.5, err

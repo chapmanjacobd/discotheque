@@ -171,16 +171,9 @@ func Extract(ctx context.Context, path string, scanSubtitles bool, extractText b
 	}
 
 	var duration int64
-	cmd := exec.CommandContext(ctx, "ffprobe",
-		"-v", "error",
-		"-hide_banner",
-		"-show_format",
-		"-show_streams",
-		"-show_chapters",
-		"-of", "json",
+	cmd := utils.FFProbe(ctx, path,
 		"-analyze_duration", "100000", // 0.1s
 		"-probesize", "500000", // 500KB
-		path,
 	)
 
 	var vCodecs, aCodecs, sCodecs []string
@@ -189,15 +182,7 @@ func Extract(ctx context.Context, path string, scanSubtitles bool, extractText b
 	output, err := cmd.Output()
 	if err != nil {
 		// Fallback without optimizations for corrupted or unusual files
-		cmdFallback := exec.CommandContext(ctx, "ffprobe",
-			"-v", "error",
-			"-hide_banner",
-			"-show_format",
-			"-show_streams",
-			"-show_chapters",
-			"-of", "json",
-			path,
-		)
+		cmdFallback := utils.FFProbe(ctx, path)
 		output, _ = cmdFallback.Output()
 	}
 
