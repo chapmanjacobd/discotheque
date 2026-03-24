@@ -186,8 +186,8 @@ func (c *AddCmd) Run(ctx *kong.Context) error {
 			totalDirs = res.DirsCount
 
 			// Print progress counter during scanning
-			if res,DirsCount% 100 == 0 || res.FilesCount%100 == 0 || res.FilesCount == 1 {
-				fmt.Printf("\rScanning %s: %d files, %d directories found\033[K",absRoot, res.FilesCount, res.DirsCount)
+			if res.DirsCount%100 == 0 || res.FilesCount%100 == 0 || res.FilesCount == 1 {
+				fmt.Printf("\rScanning %s: %d files, %d directories found\033[K", absRoot, res.FilesCount, res.DirsCount)
 			}
 
 			// Apply PathFilterFlags
