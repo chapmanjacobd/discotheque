@@ -268,3 +268,57 @@ func TestCommonPathFull(t *testing.T) {
 		t.Errorf("CommonPathFull expected %q, got %q", expected, got)
 	}
 }
+
+func TestGetMountPoint(t *testing.T) {
+	paths := []string{t.TempDir(), ".", "/", "/tmp"}
+	for _, p := range paths {
+		// Skip if directory doesn't exist
+		if _, err := os.Stat(p); os.IsNotExist(err) {
+			continue
+		}
+
+		mp, err := GetMountPoint(p)
+		if err != nil {
+			t.Errorf("failed to get mount point for %s: %v", p, err)
+			continue
+		}
+		if mp == "" {
+			t.Errorf("expected non-empty mount point for %s", p)
+		}
+	}
+}
+
+func TestFolderSize(t *testing.T) {
+	tempDir := t.TempDir()
+	os.WriteFile(filepath.Join(tempDir, "f1.txt"), make([]byte, 1000), 0o644)
+	os.WriteFile(filepath.Join(tempDir, "f2.txt"), make([]byte, 2000), 0o644)
+
+	size := FolderSize(tempDir)
+	if size < 3000 {
+		t.Errorf("expected size at least 3000, got %d", size)
+	}
+}
+
+func TestMoveFile(t *testing.T) {
+	tempDir := t.TempDir()
+	src := filepath.Join(tempDir, "src.txt")
+	dst := filepath.Join(tempDir, "dst.txt")
+	content := "move test"
+	os.WriteFile(src, []byte(content), 0o644)
+
+	if err := MoveFile(src, dst); err != nil {
+		t.Fatalf("MoveFile failed: %v", err)
+	}
+
+	if _, err := os.Stat(src); !os.IsNotExist(err) {
+		t.Errorf("expected source file to be removed")
+	}
+
+	got, err := os.ReadFile(dst)
+	if err != nil {
+		t.Fatalf("failed to read destination: %v", err)
+	}
+	if string(got) != content {
+		t.Errorf("expected content %q, got %q", content, string(got))
+	}
+}

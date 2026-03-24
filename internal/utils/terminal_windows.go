@@ -56,4 +56,4 @@ func GetCommandPath(name string) string {
 }
 
 // watchResize is a no-op on Windows
-func (t *TerminalWidth) watchResize() {}
+func (t *TerminalSize) watchResize() {}

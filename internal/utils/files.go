@@ -255,6 +255,126 @@ func GetContentTypeFromExt(ext string) string {
 	}
 }
 
+// GetMountPoint returns the mount point for a given path
+func GetMountPoint(path string) (string, error) {
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		return "", err
+	}
+
+	// For Windows, use VolumeName
+	if vol := filepath.VolumeName(absPath); vol != "" {
+		// On Windows, VolumeName returns "C:" or "\\server\share"
+		// Ensure it has a trailing separator for consistency
+		if !strings.HasSuffix(vol, string(filepath.Separator)) {
+			vol += string(filepath.Separator)
+		}
+		return vol, nil
+	}
+
+	info, err := os.Stat(absPath)
+	if err != nil {
+		return "", err
+	}
+
+	dev, ok := GetDeviceID(info)
+	if !ok {
+		// If we can't get device ID, just return root for Unix-like
+		return string(filepath.Separator), nil
+	}
+
+	dir := absPath
+	if !info.IsDir() {
+		dir = filepath.Dir(absPath)
+		info, err = os.Stat(dir)
+		if err != nil {
+			return "", err
+		}
+		if d, ok := GetDeviceID(info); ok {
+			dev = d
+		}
+	}
+
+	for {
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return dir, nil
+		}
+
+		parentInfo, err := os.Stat(parent)
+		if err != nil {
+			return "", err
+		}
+
+		if parentDev, ok := GetDeviceID(parentInfo); ok {
+			if parentDev != dev {
+				return dir, nil
+			}
+		} else {
+			return dir, nil
+		}
+
+		dir = parent
+	}
+}
+
+// MoveFile moves a file from source to destination, handling cross-filesystem moves
+func MoveFile(src, dst string) error {
+	// Capture source timestamps before any operations
+	info, err := os.Stat(src)
+	if err != nil {
+		return err
+	}
+	atime := GetAccessTime(info)
+	mtime := info.ModTime()
+
+	// Try Rename first (fast on same filesystem)
+	err = os.Rename(src, dst)
+	if err == nil {
+		return nil
+	}
+
+	// Ensure destination directory exists and retry rename
+	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+		return err
+	}
+	err = os.Rename(src, dst)
+	if err == nil {
+		return nil
+	}
+
+	// If rename fails (e.g. cross-filesystem), try copying
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+
+	out, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	if _, err = io.Copy(out, in); err != nil {
+		return err
+	}
+
+	// Sync to ensure data is written before deleting source
+	if err := out.Sync(); err != nil {
+		return err
+	}
+
+	// Close files before deleting source
+	in.Close()
+	out.Close()
+
+	// Restore timestamps on destination
+	os.Chtimes(dst, atime, mtime)
+
+	return os.Remove(src)
+}
+
 // Rename renames a file, respecting simulation mode
 func Rename(flags models.GlobalFlags, src, dst string) error {
 	if flags.Simulate {

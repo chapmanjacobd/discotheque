@@ -28,12 +28,12 @@ func GetCommandPath(name string) string {
 }
 
 // watchResize listens for terminal resize events
-func (t *TerminalWidth) watchResize() {
+func (t *TerminalSize) watchResize() {
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGWINCH)
 	go func() {
 		for range sigChan {
-			t.updateWidth()
+			t.updateSize()
 		}
 	}()
 }
