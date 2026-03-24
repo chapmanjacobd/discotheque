@@ -187,7 +187,7 @@ func (c *AddCmd) Run(ctx *kong.Context) error {
 			totalDirs = res.DirsCount
 
 			// Print progress counter during scanning
-			if res.FilesCount%100 == 0 || res.FilesCount == 1 {
+			if res,DirsCount% 100 == 0 || res.FilesCount%100 == 0 || res.FilesCount == 1 {
 				fmt.Printf("\rScanning: %d files, %d directories found\033[K", res.FilesCount, res.DirsCount)
 			}
 
