@@ -268,6 +268,8 @@ func (c *AddCmd) Run(ctx *kong.Context) error {
 
 		var completedJobs int64
 		var activeWorkers int32
+		var totalWorkerSamples int64
+		var workerSum int64
 		targetConcurrency := int32(c.Parallel)
 		if targetConcurrency <= 0 {
 			targetConcurrency = int32(runtime.NumCPU() * 4)
@@ -337,6 +339,9 @@ func (c *AddCmd) Run(ctx *kong.Context) error {
 						startWorker()
 						active++
 					}
+					// Track worker statistics
+					atomic.AddInt64(&workerSum, int64(active))
+					atomic.AddInt64(&totalWorkerSamples, 1)
 					lastThroughput = throughput
 				case <-monitorDone:
 					return
@@ -404,7 +409,13 @@ func (c *AddCmd) Run(ctx *kong.Context) error {
 			count++
 			if count%10 == 0 || count == len(toProbe) {
 				if c.Verbose > 0 {
-					fmt.Printf("\rProcessed %d/%d files (%d workers)\033[K", count, len(toProbe), atomic.LoadInt32(&activeWorkers))
+					workers := atomic.LoadInt32(&activeWorkers)
+					if workers == 0 && totalWorkerSamples > 0 {
+						avgWorkers := float64(workerSum) / float64(totalWorkerSamples)
+						fmt.Printf("\rProcessed %d/%d files (avg: %.1f workers)\033[K", count, len(toProbe), avgWorkers)
+					} else {
+						fmt.Printf("\rProcessed %d/%d files (%d workers)\033[K", count, len(toProbe), workers)
+					}
 				} else {
 					fmt.Printf("\rProcessed %d/%d files\033[K", count, len(toProbe))
 				}
