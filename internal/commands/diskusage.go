@@ -76,7 +76,10 @@ func (c *DiskUsageCmd) Run(ctx *kong.Context) error {
 			}
 
 			// Use path as-is
-			meta, err := metadata.Extract(context.Background(), path, flags.ScanSubtitles, false, false, "", false, "")
+			meta, err := metadata.Extract(context.Background(), path, metadata.ExtractOptions{
+				ScanSubtitles: flags.ScanSubtitles,
+				ProbeImages:   c.ProbeImages,
+			})
 			if err != nil {
 				return nil
 			}

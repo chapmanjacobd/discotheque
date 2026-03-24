@@ -66,7 +66,18 @@ type Format struct {
 	Tags       map[string]string `json:"tags"`
 }
 
-func Extract(ctx context.Context, path string, scanSubtitles bool, extractText bool, ocr bool, ocrEngine string, speechRec bool, speechRecEngine string) (*MediaMetadata, error) {
+// ExtractOptions contains options for metadata extraction
+type ExtractOptions struct {
+	ScanSubtitles     bool
+	ExtractText       bool
+	OCR               bool
+	OCREngine         string
+	SpeechRecognition bool
+	SpeechRecEngine   string
+	ProbeImages       bool
+}
+
+func Extract(ctx context.Context, path string, opts ExtractOptions) (*MediaMetadata, error) {
 	stat, err := os.Stat(path)
 	if err != nil {
 		return nil, err
@@ -107,7 +118,7 @@ func Extract(ctx context.Context, path string, scanSubtitles bool, extractText b
 
 	// Handle text files (including comics)
 	if mediaType == "text" {
-		if scanSubtitles || extractText {
+		if opts.ScanSubtitles || opts.ExtractText {
 			if params.Duration.Int64 == 0 {
 				// Fast word count for duration estimation on ingest
 				wordCount, err := utils.QuickWordCount(path, stat.Size())
@@ -123,14 +134,14 @@ func Extract(ctx context.Context, path string, scanSubtitles bool, extractText b
 			result.Media = params
 
 			// Extract text from comic archives (CBZ/CBR) using OCR if requested
-			if utils.ComicExtensionMap[ext] && ocr {
-				captions, err := extractImageTextFromComicArchive(path, ocrEngine)
+			if utils.ComicExtensionMap[ext] && opts.OCR {
+				captions, err := extractImageTextFromComicArchive(path, opts.OCREngine)
 				if err != nil {
 					slog.Warn("Comic archive OCR extraction failed", "path", path, "error", err)
 				} else {
 					result.Captions = captions
 				}
-			} else if extractText && !utils.ComicExtensionMap[ext] {
+			} else if opts.ExtractText && !utils.ComicExtensionMap[ext] {
 				// Extract full text from document if requested (non-comic documents)
 				captions, err := extractDocumentText(path)
 				if err != nil {
@@ -145,8 +156,8 @@ func Extract(ctx context.Context, path string, scanSubtitles bool, extractText b
 	}
 
 	// Extract text from images using OCR if requested
-	if mediaType == "image" && ocr {
-		captions, err := extractImageText(path, ocrEngine)
+	if mediaType == "image" && opts.OCR {
+		captions, err := extractImageText(path, opts.OCREngine)
 		if err != nil {
 			slog.Warn("Image OCR extraction failed", "path", path, "error", err)
 		} else {
@@ -155,8 +166,8 @@ func Extract(ctx context.Context, path string, scanSubtitles bool, extractText b
 	}
 
 	// Extract speech from audio/video files if requested
-	if speechRec && (mediaType == "audio" || mediaType == "video") {
-		captions, err := extractSpeechToText(path, speechRecEngine)
+	if opts.SpeechRecognition && (mediaType == "audio" || mediaType == "video") {
+		captions, err := extractSpeechToText(path, opts.SpeechRecEngine)
 		if err != nil {
 			slog.Warn("Speech recognition failed", "path", path, "error", err)
 		} else {
@@ -165,7 +176,14 @@ func Extract(ctx context.Context, path string, scanSubtitles bool, extractText b
 	}
 
 	// Skip ffprobe for non-media files (only run on video, audio, image)
+	// Skip ffprobe for images unless --probe-images is set
 	if mediaType != "video" && mediaType != "audio" && mediaType != "image" {
+		result.Media = params
+		return result, nil
+	}
+
+	// Skip ffprobe for images unless explicitly requested
+	if mediaType == "image" && !opts.ProbeImages {
 		result.Media = params
 		return result, nil
 	}
@@ -363,7 +381,7 @@ func Extract(ctx context.Context, path string, scanSubtitles bool, extractText b
 	params.AudioCodecs = utils.ToNullString(utils.Combine(aCodecs))
 
 	// External Subtitles
-	if scanSubtitles {
+	if opts.ScanSubtitles {
 		externalSubs := utils.GetExternalSubtitles(path)
 		for _, sub := range externalSubs {
 			sCount++

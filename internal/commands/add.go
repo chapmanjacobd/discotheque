@@ -287,7 +287,15 @@ func (c *AddCmd) Run(ctx *kong.Context) error {
 					if !ok {
 						return
 					}
-					res, err := metadata.Extract(context.Background(), path, flags.ScanSubtitles, c.ExtractText, c.OCR, c.OCREngine, c.SpeechRecognition, c.SpeechRecognitionEngine)
+					res, err := metadata.Extract(context.Background(), path, metadata.ExtractOptions{
+						ScanSubtitles:     flags.ScanSubtitles,
+						ExtractText:       c.ExtractText,
+						OCR:               c.OCR,
+						OCREngine:         c.OCREngine,
+						SpeechRecognition: c.SpeechRecognition,
+						SpeechRecEngine:   c.SpeechRecognitionEngine,
+						ProbeImages:       c.ProbeImages,
+					})
 					if err != nil {
 						slog.Error("Metadata extraction failed", "path", path, "error", err)
 					} else if res != nil {

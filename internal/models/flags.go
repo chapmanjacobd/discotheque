@@ -70,6 +70,7 @@ type MediaFilterFlags struct {
 	ScanSubtitles   bool     `help:"Scan for external subtitles during import" group:"MediaFilter"`
 	OnlineMediaOnly bool     `help:"Exclude local media" group:"MediaFilter"`
 	LocalMediaOnly  bool     `help:"Exclude online media" group:"MediaFilter"`
+	ProbeImages     bool     `help:"Run ffprobe on image files (default: skip)" group:"MediaFilter"`
 }
 
 type TimeFilterFlags struct {
