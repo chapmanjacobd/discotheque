@@ -17,9 +17,10 @@ RUN dnf install -y \
     https://download1.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-rawhide.noarch.rpm
 
 # Install build dependencies and codec libraries
-RUN dnf install -y \
+# Using --skip-unavailable for packages that may not exist in Rawhide
+RUN dnf install -y --skip-unavailable \
     # Build tools
-    git wget curl make cmake autoconf automake libtool \
+    git wget make cmake autoconf automake libtool \
     gcc gcc-c++ \
     yasm nasm \
     golang \
@@ -31,9 +32,7 @@ RUN dnf install -y \
     x264-devel \
     x265-devel \
     libvpx-devel \
-    dav1d-devel \
     svt-av1-devel \
-    aom-devel \
     openjpeg-devel \
     libtheora-devel \
     # Audio codecs
@@ -53,7 +52,6 @@ RUN dnf install -y \
     gnutls-devel \
     openssl-devel \
     libssh-devel \
-    libsrt-devel \
     # Other dependencies
     alsa-lib-devel \
     libxcb-devel \
@@ -64,11 +62,9 @@ RUN dnf install -y \
     bzip2-devel \
     xz-devel \
     lz4-devel \
-    zstd-devel \
     # Additional codecs (RPM Fusion)
     fdk-aac-devel \
     libmodplug-devel \
-    libmfx-devel \
     vulkan-loader-devel \
     vulkan-headers \
     && dnf clean all
@@ -88,15 +84,12 @@ RUN cd /tmp && \
         --enable-libx264 \
         --enable-libx265 \
         --enable-libvpx \
-        --enable-libdav1d \
         --enable-libsvtav1 \
-        --enable-libaom \
         --enable-libopenjpeg \
         --enable-libtheora \
         --enable-libmp3lame \
         --enable-libopus \
         --enable-libvorbis \
-        --enable-libflac \
         --enable-libsndfile \
         --enable-libspeex \
         --enable-libass \
@@ -107,7 +100,6 @@ RUN cd /tmp && \
         --enable-gnutls \
         --enable-openssl \
         --enable-libssh \
-        --enable-libsrt \
         --enable-alsa \
         --enable-libxcb \
         --enable-libx11 \
@@ -118,8 +110,6 @@ RUN cd /tmp && \
         --enable-zlib \
         --enable-bzlib \
         --enable-lzma \
-        --enable-libzmq \
-        --enable-libzvbi \
         --enable-chromaprint \
         --extra-cflags="-fPIC -O3 -march=x86-64 -mtune=generic" \
         --extra-ldflags="-static -L/usr/local/lib -L/usr/lib64" \

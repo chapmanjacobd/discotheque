@@ -17,29 +17,38 @@ The astiav backend provides:
 
 ## Quick Start
 
-### Build with astiav backend
+### Option 1: Use pre-built FFmpeg from packages (recommended)
 
+**Alpine Linux (edge)** - Smallest image, musl libc:
 ```bash
+make astiav-image-alpine
+make astiav-build-alpine
+```
+
+**Arch Linux** - Latest FFmpeg version:
+```bash
+make astiav-image-arch
+make astiav-build-arch
+```
+
+**Fedora Rawhide** - FFmpeg 8.0 from RPM Fusion:
+```bash
+make astiav-image
 make astiav-build
 ```
 
-This creates a container image with FFmpeg 8.0 from RPM Fusion (Fedora Rawhide) and builds the binary: `disco-astiav`
-
-### Test astiav backend
+### Option 2: Build FFmpeg from source (for static linking)
 
 ```bash
-make astiav-test
+make astiav-build-static
 ```
 
-Runs the probe backend tests in the container.
+This builds FFmpeg 8.0 from source with `--enable-static --disable-shared`, then builds discoteca with static linking. 
 
-### Interactive development
-
-```bash
-make astiav-shell
-```
-
-Opens an interactive shell in the container with FFmpeg 8.0 dev libraries ready.
+**Note:** 
+- Build time: ~15-25 minutes
+- Binary size: ~100-150MB
+- Result: Fully standalone binary with no external dependencies
 
 ## Usage
 
@@ -66,15 +75,18 @@ export LD_LIBRARY_PATH=/path/to/ffmpeg8/lib:$LD_LIBRARY_PATH
 | `make astiav-quicktest` | Quick single-test validation |
 | `make astiav-build-native` | Native build (requires FFmpeg 8.0 on host) |
 
-## Container Details
+## Container Options
 
-The container uses:
-- **Base:** Fedora Rawhide
-- **FFmpeg source:** RPM Fusion (free repository)
-- **FFmpeg version:** 8.0.1 (latest from Rawhide)
-- **Libraries:** libavdevice, libavformat, libavcodec, libavutil, etc.
+| Container | Base | FFmpeg Source | Size | Best For |
+|-----------|------|---------------|------|----------|
+| `disco-astiav:latest` | Fedora Rawhide | RPM Fusion (8.0) | ~2GB | Development, testing |
+| `disco-astiav:alpine` | Alpine edge | apk packages | ~900MB | Smallest image |
+| `disco-astiav:arch` | Arch Linux | pacman packages | ~1.5GB | Latest features |
+| Static build | Fedora Rawhide | Built from source | ~100MB binary | Deployment, portability |
 
-See `Containerfile.astiav` for the full container definition.
+See `Containerfile.astiav*` for full container definitions.
+
+**Note on static linking:** Most Linux distributions don't ship static FFmpeg libraries due to security concerns (static binaries can't be easily patched). For a truly standalone binary, use `make astiav-build-static` which builds FFmpeg from source.
 
 ## Performance Comparison
 

@@ -155,11 +155,23 @@ screenshots: build
 
 # Build astiav container image (Fedora Rawhide + RPM Fusion + FFmpeg 8.0)
 astiav-image:
-	@echo "Building astiav container image with FFmpeg 8.0..."
+	@echo "Building astiav container image with FFmpeg 8.0 (Fedora Rawhide)..."
 	podman build -f Containerfile.astiav -t disco-astiav:latest .
 	@echo "Image built: disco-astiav:latest"
 
-# Build with astiav backend using Podman container
+# Build astiav container using Alpine Linux (musl libc, better for static linking)
+astiav-image-alpine:
+	@echo "Building astiav container image with Alpine Linux (edge)..."
+	podman build -f Containerfile.astiav-alpine -t disco-astiav:alpine .
+	@echo "Image built: disco-astiav:alpine"
+
+# Build astiav container using Arch Linux (latest FFmpeg packages)
+astiav-image-arch:
+	@echo "Building astiav container image with Arch Linux..."
+	podman build -f Containerfile.astiav-arch -t disco-astiav:arch .
+	@echo "Image built: disco-astiav:arch"
+
+# Build with astiav backend using Podman container (Fedora)
 astiav-build: astiav-image
 	@echo "Building with astiav backend in Podman container..."
 	podman run --rm --security-opt label=disable \
@@ -173,8 +185,37 @@ astiav-build: astiav-image
 			echo "Built: $(BINARY_NAME)-astiav"'
 	@echo "Binary created: $(BINARY_NAME)-astiav"
 
+# Build with astiav backend using Alpine container (may support static linking)
+astiav-build-alpine: astiav-image-alpine
+	@echo "Building with astiav backend in Alpine container..."
+	podman run --rm --security-opt label=disable \
+		-v $(PWD):/src:z \
+		-w /src \
+		disco-astiav:alpine \
+		sh -c '\
+			ffmpeg -version | head -1 && \
+			CGO_CFLAGS="-I/usr/include" CGO_LDFLAGS="-L/usr/lib -L/lib" \
+				go build -tags "fts5 astiav" -o /src/disco-astiav-alpine /src/cmd/disco && \
+			echo "Built: disco-astiav-alpine" && \
+			ldd /src/disco-astiav-alpine || echo "(statically linked or musl)"'
+	@echo "Binary created: disco-astiav-alpine"
+
+# Build with astiav backend using Arch container (latest FFmpeg)
+astiav-build-arch: astiav-image-arch
+	@echo "Building with astiav backend in Arch container..."
+	podman run --rm --security-opt label=disable \
+		-v $(PWD):/src:z \
+		-w /src \
+		disco-astiav:arch \
+		sh -c '\
+			ffmpeg -version | head -1 && \
+			CGO_CFLAGS="-I/usr/include/ffmpeg" CGO_LDFLAGS="-L/usr/lib" \
+				go build -tags "fts5 astiav" -o /src/disco-astiav-arch /src/cmd/disco && \
+			echo "Built: disco-astiav-arch" && \
+			ldd /src/disco-astiav-arch || echo "(statically linked)"'
+	@echo "Binary created: disco-astiav-arch"
+
 # Build with astiav backend using static linking (larger binary, no dependencies)
-# Requires FFmpeg built with --enable-static --disable-shared
 astiav-build-static: astiav-image
 	@echo "Building with astiav backend (static linking)..."
 	@echo "Note: This creates a large (~100-150MB) standalone binary"
