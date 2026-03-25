@@ -394,25 +394,46 @@ func (c *AddCmd) Run(ctx *kong.Context) error {
 					captionsBatch = append(captionsBatch, res.Captions...)
 				}
 
-				tx, err := sqlDB.BeginTx(context.Background(), nil)
-				if err != nil {
-					return err
-				}
-				defer tx.Rollback()
+				// Retry logic for "database is locked" errors
+				const maxRetries = 10
+				var lastErr error
+				for attempt := 0; attempt < maxRetries; attempt++ {
+					if attempt > 0 {
+						// Exponential backoff: 100ms, 200ms, 400ms, 800ms, 1.6s, 3.2s, 6.4s, 12.8s, 25.6s
+						backoff := time.Duration(100*(1<<attempt)) * time.Millisecond
+						if backoff > 30*time.Second {
+							backoff = 30 * time.Second
+						}
+						time.Sleep(backoff)
+					}
 
-				qtx := queries.WithTx(tx)
-				if err := qtx.BulkUpsertMedia(context.Background(), mediaBatch); err != nil {
-					return fmt.Errorf("bulk upsert media failed: %w", err)
-				}
-				if err := qtx.BulkInsertCaptions(context.Background(), captionsBatch); err != nil {
-					return fmt.Errorf("bulk insert captions failed: %w", err)
+					tx, err := sqlDB.BeginTx(context.Background(), nil)
+					if err != nil {
+						lastErr = err
+						continue
+					}
+
+					qtx := queries.WithTx(tx)
+					if err := qtx.BulkUpsertMedia(context.Background(), mediaBatch); err != nil {
+						tx.Rollback()
+						lastErr = fmt.Errorf("bulk upsert media failed: %w", err)
+						continue
+					}
+					if err := qtx.BulkInsertCaptions(context.Background(), captionsBatch); err != nil {
+						tx.Rollback()
+						lastErr = fmt.Errorf("bulk insert captions failed: %w", err)
+						continue
+					}
+
+					if err := tx.Commit(); err != nil {
+						lastErr = err
+						continue
+					}
+
+					return nil
 				}
 
-				if err := tx.Commit(); err != nil {
-					return err
-				}
-
-				return nil
+				return fmt.Errorf("commit failed after %d retries: %w", maxRetries, lastErr)
 			}
 
 			for res := range results {
