@@ -263,7 +263,8 @@ func (c *AddCmd) Run(ctx *kong.Context) error {
 		}
 		close(jobs)
 
-		results := make(chan *metadata.MediaMetadata, 500) // Match batchSize to avoid blocking
+		// Larger buffer to decouple extraction from DB writes
+		results := make(chan *metadata.MediaMetadata, 2000)
 		var wg sync.WaitGroup
 
 		var completedJobs int64
@@ -357,86 +358,95 @@ func (c *AddCmd) Run(ctx *kong.Context) error {
 			}
 		}()
 
+		// Separate goroutine for database writes to avoid blocking extraction workers
+		dbWriteDone := make(chan struct{})
+		go func() {
+			defer close(dbWriteDone)
+			count := 0
+			batchSize := 500
+			var currentBatch []*metadata.MediaMetadata
+
+			flush := func() error {
+				if len(currentBatch) == 0 {
+					return nil
+				}
+
+				var mediaBatch []db.UpsertMediaParams
+				var captionsBatch []db.InsertCaptionParams
+
+				for _, res := range currentBatch {
+					mediaBatch = append(mediaBatch, res.Media)
+					captionsBatch = append(captionsBatch, res.Captions...)
+				}
+
+				tx, err := sqlDB.BeginTx(context.Background(), nil)
+				if err != nil {
+					return err
+				}
+				defer tx.Rollback()
+
+				qtx := queries.WithTx(tx)
+				if err := qtx.BulkUpsertMedia(context.Background(), mediaBatch); err != nil {
+					return fmt.Errorf("bulk upsert media failed: %w", err)
+				}
+				if err := qtx.BulkInsertCaptions(context.Background(), captionsBatch); err != nil {
+					return fmt.Errorf("bulk insert captions failed: %w", err)
+				}
+
+				if err := tx.Commit(); err != nil {
+					return err
+				}
+
+				return nil
+			}
+
+			for res := range results {
+				currentBatch = append(currentBatch, res)
+
+				if len(currentBatch) >= batchSize {
+					if err := flush(); err != nil {
+						slog.Error("Failed to commit batch", "error", err)
+					}
+					for i := range currentBatch {
+						currentBatch[i] = nil
+					}
+					currentBatch = currentBatch[:0]
+				}
+
+				count++
+				if count%10 == 0 || count == len(toProbe) {
+					if c.Verbose > 0 {
+						workers := atomic.LoadInt32(&activeWorkers)
+						if workers == 0 && totalWorkerSamples > 0 {
+							avgWorkers := float64(workerSum) / float64(totalWorkerSamples)
+							fmt.Printf("\rProcessed %d/%d files (avg: %.1f workers)%s", count, len(toProbe), avgWorkers, utils.ClearSeq)
+						} else {
+							fmt.Printf("\rProcessed %d/%d files (%d workers)%s", count, len(toProbe), workers, utils.ClearSeq)
+						}
+					} else {
+						fmt.Printf("\rProcessed %d/%d files%s", count, len(toProbe), utils.ClearSeq)
+					}
+				}
+			}
+			// Final flush
+			if err := flush(); err != nil {
+				slog.Error("Failed to commit final batch", "error", err)
+			}
+			for i := range currentBatch {
+				currentBatch[i] = nil
+			}
+			currentBatch = currentBatch[:0]
+		}()
+
+		// Wait for extraction to complete
 		go func() {
 			wg.Wait()
 			close(monitorDone)
 			close(results)
 		}()
 
-		count := 0
-		batchSize := 500
-		var currentBatch []*metadata.MediaMetadata
-
-		flush := func() error {
-			if len(currentBatch) == 0 {
-				return nil
-			}
-
-			var mediaBatch []db.UpsertMediaParams
-			var captionsBatch []db.InsertCaptionParams
-
-			for _, res := range currentBatch {
-				mediaBatch = append(mediaBatch, res.Media)
-				captionsBatch = append(captionsBatch, res.Captions...)
-			}
-
-			tx, err := sqlDB.BeginTx(context.Background(), nil)
-			if err != nil {
-				return err
-			}
-			defer tx.Rollback()
-
-			qtx := queries.WithTx(tx)
-			if err := qtx.BulkUpsertMedia(context.Background(), mediaBatch); err != nil {
-				return fmt.Errorf("bulk upsert media failed: %w", err)
-			}
-			if err := qtx.BulkInsertCaptions(context.Background(), captionsBatch); err != nil {
-				return fmt.Errorf("bulk insert captions failed: %w", err)
-			}
-
-			if err := tx.Commit(); err != nil {
-				return err
-			}
-
-			return nil
-		}
-
-		for res := range results {
-			currentBatch = append(currentBatch, res)
-
-			if len(currentBatch) >= batchSize {
-				if err := flush(); err != nil {
-					slog.Error("Failed to commit batch", "error", err)
-				}
-				for i := range currentBatch {
-					currentBatch[i] = nil
-				}
-				currentBatch = currentBatch[:0]
-			}
-
-			count++
-			if count%10 == 0 || count == len(toProbe) {
-				if c.Verbose > 0 {
-					workers := atomic.LoadInt32(&activeWorkers)
-					if workers == 0 && totalWorkerSamples > 0 {
-						avgWorkers := float64(workerSum) / float64(totalWorkerSamples)
-						fmt.Printf("\rProcessed %d/%d files (avg: %.1f workers)%s", count, len(toProbe), avgWorkers, utils.ClearSeq)
-					} else {
-						fmt.Printf("\rProcessed %d/%d files (%d workers)%s", count, len(toProbe), workers, utils.ClearSeq)
-					}
-				} else {
-					fmt.Printf("\rProcessed %d/%d files%s", count, len(toProbe), utils.ClearSeq)
-				}
-			}
-		}
-		// Final flush
-		if err := flush(); err != nil {
-			slog.Error("Failed to commit final batch", "error", err)
-		}
-		for i := range currentBatch {
-			currentBatch[i] = nil
-		}
-		currentBatch = currentBatch[:0]
+		// Wait for DB writes to complete
+		<-dbWriteDone
 		fmt.Println()
 	}
 
