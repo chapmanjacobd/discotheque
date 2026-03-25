@@ -84,6 +84,7 @@ RUN cd /tmp && \
         --enable-gpl \
         --enable-nonfree \
         --enable-version3 \
+        --pkg-config-flags="--static" \
         --enable-libx264 \
         --enable-libx265 \
         --enable-libvpx \
@@ -122,7 +123,7 @@ RUN cd /tmp && \
         --enable-chromaprint \
         --extra-cflags="-fPIC -O3 -march=x86-64 -mtune=generic" \
         --extra-ldflags="-static -L/usr/local/lib -L/usr/lib64" \
-        --extra-libs="-lpthread -lm" && \
+        --extra-libs="-lpthread -lm -ldl" && \
     make -j$(nproc) && \
     make install && \
     cd / && \

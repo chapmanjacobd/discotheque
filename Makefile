@@ -177,21 +177,23 @@ astiav-build: astiav-image
 # Requires FFmpeg built with --enable-static --disable-shared
 astiav-build-static: astiav-image
 	@echo "Building with astiav backend (static linking)..."
-	@echo "Note: This creates a large (~100MB) standalone binary"
+	@echo "Note: This creates a large (~100-150MB) standalone binary"
 	podman run --rm --security-opt label=disable \
 		-v $(PWD):/src:z \
 		-w /src \
 		disco-astiav:latest \
 		sh -c '\
 			/usr/local/bin/ffmpeg -version | head -1 && \
-			CGO_CFLAGS="-I/usr/local/include" \
-			CGO_LDFLAGS="-L/usr/local/lib -static" \
+			export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig && \
+			CGO_CFLAGS="$$(pkg-config --cflags --static libavformat libavcodec libavutil)" \
+			CGO_LDFLAGS="$$(pkg-config --libs --static libavformat libavcodec libavutil)" \
 			go build -tags "fts5 astiav" \
 				-ldflags "-extldflags '-static' -s -w" \
 				-o /src/$(BINARY_NAME)-astiav-static /src/cmd/disco && \
 			echo "Built: $(BINARY_NAME)-astiav-static" && \
 			ls -lh /src/$(BINARY_NAME)-astiav-static && \
-			file /src/$(BINARY_NAME)-astiav-static'
+			file /src/$(BINARY_NAME)-astiav-static && \
+			ldd /src/$(BINARY_NAME)-astiav-static || echo "(static binary - no dynamic libs)"'
 	@echo "Static binary created: $(BINARY_NAME)-astiav-static"
 	@echo "Test with: podman run --rm -v $(PWD):/src:z -w /src disco-astiav:latest ./$(BINARY_NAME)-astiav-static --help"
 
