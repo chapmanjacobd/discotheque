@@ -21,17 +21,19 @@ export const test = base.extend<{
     await use(cli);
   },
 
-  // Temporary directory for test files
+  // Temporary directory for test files (unique per test)
   tempDir: async ({}, use) => {
     const dir = createTempDir();
     await use(dir);
     cleanupTempDir(dir);
   },
 
-  // Test database path (created in temp dir)
-  testDbPath: async ({ tempDir }, use) => {
-    const dbPath = path.join(tempDir, 'test.db');
+  // Test database path (created in separate temp dir to avoid scanning it)
+  testDbPath: async ({}, use) => {
+    const dbDir = createTempDir();
+    const dbPath = path.join(dbDir, 'test.db');
     await use(dbPath);
+    cleanupTempDir(dbDir);
   },
 
   // Helper to create a valid video file by copying from fixtures
@@ -82,7 +84,7 @@ export const test = base.extend<{
       const ext = path.extname(name).toLowerCase();
       let fixtureName = 'test-document.pdf';
       if (ext === '.epub') fixtureName = 'test-book.epub';
-      
+
       const fixturePath = path.join(__dirname, 'fixtures/media/documents', fixtureName);
       const targetPath = path.join(tempDir, name);
       if (!fs.existsSync(fixturePath)) {
