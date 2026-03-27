@@ -353,8 +353,7 @@ func (c *AddCmd) Run(ctx *kong.Context) error {
 					newTarget := min(
 						// Step by 2
 						max(
-
-							current+(direction*2), 1), 1000)
+							current+(direction*2), 1), 300)
 
 					atomic.StoreInt32(&targetConcurrency, newTarget)
 
