@@ -262,6 +262,9 @@ func (c *AddCmd) Run(ctx *kong.Context) error {
 			continue
 		}
 
+		// Sort files: non-media first, then text, then images, then video, then audio
+		toProbe = sortFilesByType(toProbe)
+
 		if c.Simulate {
 			fmt.Printf("Simulated: would process %d new files\n", len(toProbe))
 			continue
@@ -511,4 +514,39 @@ func (c *AddCmd) Run(ctx *kong.Context) error {
 	}
 
 	return nil
+}
+
+// sortFilesByType sorts files by type: non-media first, then text, then images, then video, then audio
+func sortFilesByType(paths []string) []string {
+	nonMedia := make([]string, 0)
+	textFiles := make([]string, 0)
+	imageFiles := make([]string, 0)
+	videoFiles := make([]string, 0)
+	audioFiles := make([]string, 0)
+
+	for _, path := range paths {
+		ext := strings.ToLower(filepath.Ext(path))
+		switch {
+		case utils.TextExtensionMap[ext] || utils.ComicExtensionMap[ext]:
+			textFiles = append(textFiles, path)
+		case utils.ImageExtensionMap[ext]:
+			imageFiles = append(imageFiles, path)
+		case utils.VideoExtensionMap[ext]:
+			videoFiles = append(videoFiles, path)
+		case utils.AudioExtensionMap[ext]:
+			audioFiles = append(audioFiles, path)
+		default:
+			nonMedia = append(nonMedia, path)
+		}
+	}
+
+	// Concatenate in order: non-media, text, images, video, audio
+	result := make([]string, 0, len(paths))
+	result = append(result, nonMedia...)
+	result = append(result, textFiles...)
+	result = append(result, imageFiles...)
+	result = append(result, videoFiles...)
+	result = append(result, audioFiles...)
+
+	return result
 }
