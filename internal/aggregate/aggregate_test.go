@@ -24,14 +24,22 @@ func TestIsSameGroup(t *testing.T) {
 
 	m0 := models.MediaWithDB{Media: models.Media{Size: &s100, Duration: &d5}}
 
-	if !IsSameGroup(flags, m0, models.MediaWithDB{Media: models.Media{Size: &s96, Duration: &d5}}) {
-		t.Error("Expected same group for 4% size diff")
+	tests := []struct {
+		name     string
+		other    models.MediaWithDB
+		expected bool
+	}{
+		{"4% size diff", models.MediaWithDB{Media: models.Media{Size: &s96, Duration: &d5}}, true},
+		{"10% size diff", models.MediaWithDB{Media: models.Media{Size: &s110, Duration: &d5}}, false},
+		{"large duration diff", models.MediaWithDB{Media: models.Media{Size: &s100, Duration: &d10}}, false},
 	}
-	if IsSameGroup(flags, m0, models.MediaWithDB{Media: models.Media{Size: &s110, Duration: &d5}}) {
-		t.Error("Expected different group for 10% size diff")
-	}
-	if IsSameGroup(flags, m0, models.MediaWithDB{Media: models.Media{Size: &s100, Duration: &d10}}) {
-		t.Error("Expected different group for large duration diff")
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := IsSameGroup(flags, m0, tt.other); got != tt.expected {
+				t.Errorf("IsSameGroup() = %v, want %v", got, tt.expected)
+			}
+		})
 	}
 }
 
@@ -45,11 +53,21 @@ func TestIsSameFolderGroup(t *testing.T) {
 
 	f0 := models.FolderStats{ExistsCount: 100}
 
-	if !IsSameFolderGroup(flags, f0, models.FolderStats{ExistsCount: 96}) {
-		t.Error("Expected same folder group for 4% count diff")
+	tests := []struct {
+		name     string
+		other    models.FolderStats
+		expected bool
+	}{
+		{"4% count diff", models.FolderStats{ExistsCount: 96}, true},
+		{"10% count diff", models.FolderStats{ExistsCount: 110}, false},
 	}
-	if IsSameFolderGroup(flags, f0, models.FolderStats{ExistsCount: 110}) {
-		t.Error("Expected different folder group for 10% count diff")
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := IsSameFolderGroup(flags, f0, tt.other); got != tt.expected {
+				t.Errorf("IsSameFolderGroup() = %v, want %v", got, tt.expected)
+			}
+		})
 	}
 }
 
@@ -133,14 +151,29 @@ func TestByFolder(t *testing.T) {
 }
 
 func TestSortFolders_Aggregate(t *testing.T) {
-	folders := []FolderStats{
-		{Path: "b", Count: 2},
-		{Path: "a", Count: 1},
+	tests := []struct {
+		name     string
+		sortBy   string
+		reverse  bool
+		expected string
+	}{
+		{"by path asc", "path", false, "a"},
+		{"by path desc", "path", true, "b"},
+		{"by count asc", "count", false, "a"},
+		{"by count desc", "count", true, "b"},
 	}
 
-	SortFolders(folders, "path", false)
-	if folders[0].Path != "a" {
-		t.Errorf("SortFolders by path failed")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			folders := []FolderStats{
+				{Path: "b", Count: 2},
+				{Path: "a", Count: 1},
+			}
+			SortFolders(folders, tt.sortBy, tt.reverse)
+			if folders[0].Path != tt.expected {
+				t.Errorf("SortFolders(%s, %v) = %s, want %s", tt.sortBy, tt.reverse, folders[0].Path, tt.expected)
+			}
+		})
 	}
 }
 

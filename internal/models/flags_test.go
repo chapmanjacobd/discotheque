@@ -6,64 +6,112 @@ import (
 )
 
 func TestCoreFlags_AfterApply(t *testing.T) {
-	flags := CoreFlags{
-		Simulate:  true,
-		NoConfirm: true,
+	tests := []struct {
+		name       string
+		flags      CoreFlags
+		wantDryRun bool
+		wantYes    bool
+	}{
+		{
+			"Simulate and NoConfirm",
+			CoreFlags{Simulate: true, NoConfirm: true},
+			true,
+			true,
+		},
 	}
-	err := flags.AfterApply()
-	if err != nil {
-		t.Fatalf("AfterApply failed: %v", err)
-	}
-	if !flags.DryRun {
-		t.Error("Expected DryRun to be true when Simulate is true")
-	}
-	if !flags.Yes {
-		t.Error("Expected Yes to be true when NoConfirm is true")
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			flags := tt.flags
+			err := flags.AfterApply()
+			if err != nil {
+				t.Fatalf("AfterApply failed: %v", err)
+			}
+			if flags.DryRun != tt.wantDryRun {
+				t.Errorf("DryRun = %v, want %v", flags.DryRun, tt.wantDryRun)
+			}
+			if flags.Yes != tt.wantYes {
+				t.Errorf("Yes = %v, want %v", flags.Yes, tt.wantYes)
+			}
+		})
 	}
 }
 
 func TestMediaFilterFlags_AfterApply(t *testing.T) {
-	flags := MediaFilterFlags{
-		Ext: []string{"mp4", ".mkv"},
+	tests := []struct {
+		name     string
+		flags    MediaFilterFlags
+		wantExt0 string
+		wantExt1 string
+	}{
+		{
+			"Ext normalization",
+			MediaFilterFlags{Ext: []string{"mp4", ".mkv"}},
+			".mp4",
+			".mkv",
+		},
 	}
-	err := flags.AfterApply()
-	if err != nil {
-		t.Fatalf("AfterApply failed: %v", err)
-	}
-	if flags.Ext[0] != ".mp4" {
-		t.Errorf("Expected .mp4, got %s", flags.Ext[0])
-	}
-	if flags.Ext[1] != ".mkv" {
-		t.Errorf("Expected .mkv, got %s", flags.Ext[1])
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			flags := tt.flags
+			err := flags.AfterApply()
+			if err != nil {
+				t.Fatalf("AfterApply failed: %v", err)
+			}
+			if flags.Ext[0] != tt.wantExt0 {
+				t.Errorf("Ext[0] = %s, want %s", flags.Ext[0], tt.wantExt0)
+			}
+			if flags.Ext[1] != tt.wantExt1 {
+				t.Errorf("Ext[1] = %s, want %s", flags.Ext[1], tt.wantExt1)
+			}
+		})
 	}
 }
 
 func TestMergeFlags_AfterApply(t *testing.T) {
-	flags := MergeFlags{
-		Ignore: true,
+	tests := []struct {
+		name            string
+		flags           MergeFlags
+		wantOnlyNewRows bool
+	}{
+		{
+			"Ignore flag",
+			MergeFlags{Ignore: true},
+			true,
+		},
 	}
-	err := flags.AfterApply()
-	if err != nil {
-		t.Fatalf("AfterApply failed: %v", err)
-	}
-	if !flags.OnlyNewRows {
-		t.Error("Expected OnlyNewRows to be true when Ignore is true")
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			flags := tt.flags
+			err := flags.AfterApply()
+			if err != nil {
+				t.Fatalf("AfterApply failed: %v", err)
+			}
+			if flags.OnlyNewRows != tt.wantOnlyNewRows {
+				t.Errorf("OnlyNewRows = %v, want %v", flags.OnlyNewRows, tt.wantOnlyNewRows)
+			}
+		})
 	}
 }
 
 func TestSetupLogging(t *testing.T) {
-	SetupLogging(2)
-	if LogLevel.Level() != slog.LevelDebug {
-		t.Errorf("Expected debug level, got %v", LogLevel.Level())
+	tests := []struct {
+		verbosity    int
+		wantLogLevel slog.Level
+	}{
+		{2, slog.LevelDebug},
+		{1, slog.LevelInfo},
+		{0, slog.LevelWarn},
 	}
 
-	SetupLogging(1)
-	if LogLevel.Level() != slog.LevelInfo {
-		t.Errorf("Expected info level, got %v", LogLevel.Level())
-	}
-
-	SetupLogging(0)
-	if LogLevel.Level() != slog.LevelWarn {
-		t.Errorf("Expected warn level, got %v", LogLevel.Level())
+	for _, tt := range tests {
+		t.Run("verbosity", func(t *testing.T) {
+			SetupLogging(tt.verbosity)
+			if LogLevel.Level() != tt.wantLogLevel {
+				t.Errorf("LogLevel = %v, want %v", LogLevel.Level(), tt.wantLogLevel)
+			}
+		})
 	}
 }

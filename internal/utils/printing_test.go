@@ -22,44 +22,95 @@ func TestPrintOverwrite(t *testing.T) {
 }
 
 func TestColNaturalDate(t *testing.T) {
-	data := []map[string]any{
-		{"time": int64(1708682400)}, // some timestamp
-		{"time": "invalid"},
-		{"other": 1},
+	tests := []struct {
+		name      string
+		data      []map[string]any
+		col       string
+		checkFunc func([]map[string]any) bool
+	}{
+		{
+			"valid timestamps",
+			[]map[string]any{
+				{"time": int64(1708682400)},
+				{"time": "invalid"},
+				{"other": 1},
+			},
+			"time",
+			func(data []map[string]any) bool {
+				return reflect.TypeOf(data[0]["time"]).Kind() == reflect.String &&
+					data[1]["time"] == nil
+			},
+		},
 	}
-	got := ColNaturalDate(data, "time")
-	if reflect.TypeOf(got[0]["time"]).Kind() != reflect.String {
-		t.Errorf("Expected string for time, got %T", got[0]["time"])
-	}
-	if got[1]["time"] != nil {
-		t.Errorf("Expected nil for invalid time, got %v", got[1]["time"])
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := ColNaturalDate(tt.data, tt.col)
+			if !tt.checkFunc(got) {
+				t.Errorf("ColNaturalDate check failed")
+			}
+		})
 	}
 }
 
 func TestColFilesize(t *testing.T) {
-	data := []map[string]any{
-		{"size": int64(1024)},
-		{"size": int64(0)},
+	tests := []struct {
+		name     string
+		data     []map[string]any
+		col      string
+		expected string
+	}{
+		{
+			"valid sizes",
+			[]map[string]any{
+				{"size": int64(1024)},
+				{"size": int64(0)},
+			},
+			"size",
+			"1.0 KB",
+		},
 	}
-	got := ColFilesize(data, "size")
-	if got[0]["size"] != "1.0 KB" {
-		t.Errorf("Expected 1.0 KB, got %v", got[0]["size"])
-	}
-	if got[1]["size"] != nil {
-		t.Errorf("Expected nil for 0 size, got %v", got[1]["size"])
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := ColFilesize(tt.data, tt.col)
+			if got[0]["size"] != tt.expected {
+				t.Errorf("Expected %s, got %v", tt.expected, got[0]["size"])
+			}
+			if got[1]["size"] != nil {
+				t.Errorf("Expected nil for 0 size, got %v", got[1]["size"])
+			}
+		})
 	}
 }
 
 func TestColDuration(t *testing.T) {
-	data := []map[string]any{
-		{"dur": 61},
-		{"dur": 0},
+	tests := []struct {
+		name     string
+		data     []map[string]any
+		col      string
+		expected string
+	}{
+		{
+			"valid durations",
+			[]map[string]any{
+				{"dur": 61},
+				{"dur": 0},
+			},
+			"dur",
+			"1:01",
+		},
 	}
-	got := ColDuration(data, "dur")
-	if got[0]["dur"] != "1:01" {
-		t.Errorf("Expected 1:01, got %v", got[0]["dur"])
-	}
-	if got[1]["dur"] != "" {
-		t.Errorf("Expected empty string for 0 duration, got %v", got[1]["dur"])
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := ColDuration(tt.data, tt.col)
+			if got[0]["dur"] != tt.expected {
+				t.Errorf("Expected %s, got %v", tt.expected, got[0]["dur"])
+			}
+			if got[1]["dur"] != "" {
+				t.Errorf("Expected empty string for 0 duration, got %v", got[1]["dur"])
+			}
+		})
 	}
 }

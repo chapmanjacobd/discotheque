@@ -8,7 +8,7 @@ import (
 func TestGetMpvListenSocket(t *testing.T) {
 	got := GetMpvListenSocket()
 	if got == "" {
-		t.Error("GetMpvListenSocket returned empty string")
+		t.Errorf("GetMpvListenSocket returned empty string")
 	}
 	if !strings.Contains(got, "mpv_socket") {
 		t.Errorf("GetMpvListenSocket mismatch: %s", got)
@@ -18,25 +18,32 @@ func TestGetMpvListenSocket(t *testing.T) {
 func TestGetMpvWatchSocket(t *testing.T) {
 	got := GetMpvWatchSocket()
 	if got == "" {
-		t.Error("GetMpvWatchSocket returned empty string")
+		t.Errorf("GetMpvWatchSocket returned empty string")
 	}
 }
 
 func TestGetMpvWatchLaterDir(t *testing.T) {
 	got := GetMpvWatchLaterDir()
 	if got == "" {
-		t.Error("GetMpvWatchLaterDir returned empty string")
+		t.Errorf("GetMpvWatchLaterDir returned empty string")
 	}
 }
 
 func TestGetDirs(t *testing.T) {
-	if GetTempDir() == "" {
-		t.Error("GetTempDir empty")
+	tests := []struct {
+		name string
+		fn   func() string
+	}{
+		{"GetTempDir", GetTempDir},
+		{"GetCattNowPlayingFile", GetCattNowPlayingFile},
+		{"GetConfigDir", GetConfigDir},
 	}
-	if GetCattNowPlayingFile() == "" {
-		t.Error("GetCattNowPlayingFile empty")
-	}
-	if GetConfigDir() == "" {
-		t.Error("GetConfigDir empty")
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.fn(); got == "" {
+				t.Errorf("%s returned empty string", tt.name)
+			}
+		})
 	}
 }
