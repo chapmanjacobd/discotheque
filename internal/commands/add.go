@@ -255,14 +255,16 @@ func (c *AddCmd) Run(ctx *kong.Context) error {
 		}
 
 		// Print final scanning summary
-		fmt.Printf("\rScan of %s found %d files in %d folders%s\n", absRoot, totalFiles, totalDirs, utils.ClearSeq)
+		fmt.Printf("\r%s\n", strings.Repeat("#", 60))
+		fmt.Printf("Scan of %s found %d files in %d folders%s\n", absRoot, totalFiles, totalDirs, utils.ClearSeq)
 
 		if skipped > 0 {
-			slog.Info("Skipped unchanged files", "count", skipped)
+			slog.Info("  Skipped unchanged files", "count", skipped)
 		}
 
 		if len(toProbe) == 0 {
-			fmt.Printf("Processed %d/%d files\n", skipped, skipped)
+			fmt.Printf("  Processed %d/%d files\n", skipped, skipped)
+			fmt.Printf("%s\n\n", strings.Repeat("#", 60))
 			continue
 		}
 
@@ -270,11 +272,12 @@ func (c *AddCmd) Run(ctx *kong.Context) error {
 		toProbe = sortFilesByType(toProbe)
 
 		if c.Simulate {
-			fmt.Printf("Simulated: would process %d new files\n", len(toProbe))
+			fmt.Printf("  Simulated: would process %d new files\n", len(toProbe))
+			fmt.Printf("%s\n\n", strings.Repeat("#", 60))
 			continue
 		}
 
-		slog.Info("Extracting metadata", "count", len(toProbe), "initial_parallelism", c.Parallel)
+		slog.Info("  Extracting metadata", "count", len(toProbe), "initial_parallelism", c.Parallel)
 
 		startTime := time.Now()
 
@@ -323,7 +326,7 @@ func (c *AddCmd) Run(ctx *kong.Context) error {
 							ProbeImages:       c.ProbeImages,
 						})
 						if err != nil {
-							slog.Error("\nMetadata extraction failed", "path", path, "error", err)
+							slog.Error("\n  Metadata extraction failed", "path", path, "error", err)
 						} else if res != nil {
 							results <- res
 						}
@@ -451,7 +454,7 @@ func (c *AddCmd) Run(ctx *kong.Context) error {
 
 				if len(currentBatch) >= batchSize {
 					if err := flush(); err != nil {
-						slog.Error("\nFailed to commit batch", "error", err)
+						slog.Error("\n  Failed to commit batch", "error", err)
 					}
 					for i := range currentBatch {
 						currentBatch[i] = nil
@@ -475,18 +478,18 @@ func (c *AddCmd) Run(ctx *kong.Context) error {
 						workers := atomic.LoadInt32(&activeWorkers)
 						if workers == 0 && totalWorkerSamples > 0 {
 							avgWorkers := float64(workerSum) / float64(totalWorkerSamples)
-							fmt.Printf("\rProcessed %d/%d files (avg: %.1f workers)%s%s", count, len(toProbe), avgWorkers, etaStr, utils.ClearSeq)
+							fmt.Printf("\r  Processed %d/%d files (avg: %.1f workers)%s%s", count, len(toProbe), avgWorkers, etaStr, utils.ClearSeq)
 						} else {
-							fmt.Printf("\rProcessed %d/%d files (%d workers)%s%s", count, len(toProbe), workers, etaStr, utils.ClearSeq)
+							fmt.Printf("\r  Processed %d/%d files (%d workers)%s%s", count, len(toProbe), workers, etaStr, utils.ClearSeq)
 						}
 					} else {
-						fmt.Printf("\rProcessed %d/%d files%s%s", count, len(toProbe), etaStr, utils.ClearSeq)
+						fmt.Printf("\r  Processed %d/%d files%s%s", count, len(toProbe), etaStr, utils.ClearSeq)
 					}
 				}
 			}
 			// Final flush
 			if err := flush(); err != nil {
-				slog.Error("Failed to commit final batch", "error", err)
+				slog.Error("  Failed to commit final batch", "error", err)
 			}
 			for i := range currentBatch {
 				currentBatch[i] = nil
@@ -504,6 +507,7 @@ func (c *AddCmd) Run(ctx *kong.Context) error {
 		// Wait for DB writes to complete
 		<-dbWriteDone
 		fmt.Println()
+		fmt.Printf("%s\n\n", strings.Repeat("#", 60))
 	}
 
 	// Refresh FTS after adding new media (always needed for search)
