@@ -486,12 +486,12 @@ func (c *AddCmd) Run(ctx *kong.Context) error {
 							workers := atomic.LoadInt32(&activeWorkers)
 							if workers == 0 && totalWorkerSamples > 0 {
 								avgWorkers := float64(workerSum) / float64(totalWorkerSamples)
-								fmt.Printf("\r  %s: Processed %d/%d files (avg: %.1f workers)%s%s", mediaType.name, typeTotal, len(toProbe), avgWorkers, etaStr, utils.ClearSeq)
+								fmt.Printf("\r  %s: Processed %d/%d files (avg: %.1f workers)%s%s", mediaType.name, typeTotal, len(mediaType.files), avgWorkers, etaStr, utils.ClearSeq)
 							} else {
-								fmt.Printf("\r  %s: Processed %d/%d files (%d workers)%s%s", mediaType.name, typeTotal, len(toProbe), workers, etaStr, utils.ClearSeq)
+								fmt.Printf("\r  %s: Processed %d/%d files (%d workers)%s%s", mediaType.name, typeTotal, len(mediaType.files), workers, etaStr, utils.ClearSeq)
 							}
 						} else {
-							fmt.Printf("\r  %s: Processed %d/%d files%s%s", mediaType.name, typeTotal, len(toProbe), etaStr, utils.ClearSeq)
+							fmt.Printf("\r  %s: Processed %d/%d files%s%s", mediaType.name, typeTotal, len(mediaType.files), etaStr, utils.ClearSeq)
 						}
 					}
 				}
