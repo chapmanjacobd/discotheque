@@ -10,8 +10,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/chapmanjacobd/discoteca/internal/db"
 	_ "github.com/mattn/go-sqlite3"
+
+	"github.com/chapmanjacobd/discoteca/internal/db"
 )
 
 // TestHandleSubtitles_SubtitleCountOptimization tests that the subtitle endpoint

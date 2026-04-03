@@ -6,8 +6,9 @@ import (
 	"os"
 	"testing"
 
-	"github.com/chapmanjacobd/discoteca/internal/models"
 	_ "github.com/mattn/go-sqlite3"
+
+	"github.com/chapmanjacobd/discoteca/internal/models"
 )
 
 func TestExpandRelatedMedia_WithSearchTerms(t *testing.T) {

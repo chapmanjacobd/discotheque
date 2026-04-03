@@ -466,7 +466,7 @@ func CalculateSegmentsInt(total, chunk int64, gap float64) []int64 {
 	start := int64(0)
 	endSegmentStart := total - chunk
 
-	g := int64(0)
+	var g int64
 	if gap < 1 {
 		g = int64(math.Ceil(float64(total) * gap))
 	} else {

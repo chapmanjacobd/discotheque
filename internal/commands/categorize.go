@@ -101,7 +101,7 @@ func (c *CategorizeCmd) applyCategories(media []models.MediaWithDB, compiled map
 	categorizedCount := 0
 	for _, m := range media {
 		foundCategories := []string{}
-		pathAndTitle := ""
+		var pathAndTitle string
 		if c.FullPath {
 			pathAndTitle = m.Path
 		} else {
@@ -194,7 +194,7 @@ func (c *CategorizeCmd) mineCategories(media []models.MediaWithDB, compiled map[
 
 		if !matched {
 			unmatchedCount++
-			sentence := ""
+			var sentence string
 			if c.FullPath {
 				sentence = utils.PathToTokenized(m.Path)
 			} else {

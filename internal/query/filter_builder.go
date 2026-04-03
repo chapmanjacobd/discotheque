@@ -2307,7 +2307,7 @@ func (qe *QueryExecutor) ResolvePercentileFlags(
 		return flags, nil
 	}
 
-	getValues := func(field string) ([]int64, error) {
+	getValues := func(field string) []int64 {
 		tempFlags := flags
 		var cleanSize []string
 		for _, s := range flags.Size {
@@ -2412,12 +2412,12 @@ func (qe *QueryExecutor) ResolvePercentileFlags(
 			}(dbPath)
 		}
 		wg.Wait()
-		return values, nil
+		return values
 	}
 
 	if hasPSize {
-		values, err := getValues("size")
-		if err == nil && len(values) > 0 {
+		values := getValues("size")
+		if len(values) > 0 {
 			mapping := utils.CalculatePercentiles(values)
 			var newSize []string
 			for _, s := range flags.Size {
@@ -2435,8 +2435,8 @@ func (qe *QueryExecutor) ResolvePercentileFlags(
 	}
 
 	if hasPDuration {
-		values, err := getValues("duration")
-		if err == nil && len(values) > 0 {
+		values := getValues("duration")
+		if len(values) > 0 {
 			mapping := utils.CalculatePercentiles(values)
 			var newDuration []string
 			for _, d := range flags.Duration {
@@ -2454,8 +2454,8 @@ func (qe *QueryExecutor) ResolvePercentileFlags(
 	}
 
 	if hasPModified {
-		values, err := getValues("time_modified")
-		if err == nil && len(values) > 0 {
+		values := getValues("time_modified")
+		if len(values) > 0 {
 			mapping := utils.CalculatePercentiles(values)
 			for _, m := range flags.Modified {
 				if min, max, ok := utils.ParsePercentileRange(m); ok {
@@ -2469,8 +2469,8 @@ func (qe *QueryExecutor) ResolvePercentileFlags(
 	}
 
 	if hasPCreated {
-		values, err := getValues("time_created")
-		if err == nil && len(values) > 0 {
+		values := getValues("time_created")
+		if len(values) > 0 {
 			mapping := utils.CalculatePercentiles(values)
 			for _, c := range flags.Created {
 				if min, max, ok := utils.ParsePercentileRange(c); ok {
@@ -2484,8 +2484,8 @@ func (qe *QueryExecutor) ResolvePercentileFlags(
 	}
 
 	if hasPDownloaded {
-		values, err := getValues("time_downloaded")
-		if err == nil && len(values) > 0 {
+		values := getValues("time_downloaded")
+		if len(values) > 0 {
 			mapping := utils.CalculatePercentiles(values)
 			for _, d := range flags.Downloaded {
 				if min, max, ok := utils.ParsePercentileRange(d); ok {
@@ -2499,8 +2499,8 @@ func (qe *QueryExecutor) ResolvePercentileFlags(
 	}
 
 	if hasPEpisodes {
-		values, err := getValues("episodes")
-		if err == nil && len(values) > 0 {
+		values := getValues("episodes")
+		if len(values) > 0 {
 			mapping := utils.CalculatePercentiles(values)
 			if min, max, ok := utils.ParsePercentileRange(flags.FileCounts); ok {
 				minVal := mapping[int(min)]

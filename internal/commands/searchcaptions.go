@@ -67,7 +67,8 @@ func (c *SearchCaptionsCmd) Run(ctx context.Context) error {
 	merged := c.mergeCaptions(rows)
 
 	if c.Open {
-		return c.playCaptions(merged)
+		c.playCaptions(merged)
+		return nil
 	}
 
 	c.printCaptions(merged)
@@ -165,7 +166,7 @@ func (c *SearchCaptionsCmd) printCaptions(captions []MergedCaption) {
 	}
 }
 
-func (c *SearchCaptionsCmd) playCaptions(captions []MergedCaption) error {
+func (c *SearchCaptionsCmd) playCaptions(captions []MergedCaption) {
 	for _, cap := range captions {
 		fmt.Printf("Playing: %s at %s\n", cap.Path, utils.FormatDuration(int(cap.Time)))
 		fmt.Printf("Text: %s\n", cap.Text)
@@ -186,5 +187,4 @@ func (c *SearchCaptionsCmd) playCaptions(captions []MergedCaption) error {
 			fmt.Printf("Error playing %s: %v\n", cap.Path, err)
 		}
 	}
-	return nil
 }

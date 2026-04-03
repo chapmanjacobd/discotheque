@@ -117,11 +117,10 @@ func LineSorter(
 	type lineInfo struct {
 		original string
 		words    []string
-		index    int
 	}
 	infos := make([]lineInfo, len(originalLines))
 	for i := range originalLines {
-		infos[i] = lineInfo{originalLines[i], corpus[i], i}
+		infos[i] = lineInfo{originalLines[i], corpus[i]}
 	}
 
 	sort.SliceStable(infos, func(i, j int) bool {

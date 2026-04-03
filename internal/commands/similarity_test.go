@@ -30,7 +30,7 @@ func TestSimilarityCmds(t *testing.T) {
 		cmd := &SimilarFilesCmd{
 			Databases: []string{dbPath},
 		}
-		if err := cmd.Run(nil); err != nil {
+		if err := cmd.Run(); err != nil {
 			t.Fatalf("SimilarFilesCmd failed: %v", err)
 		}
 	})
@@ -39,7 +39,7 @@ func TestSimilarityCmds(t *testing.T) {
 		cmd := &SimilarFoldersCmd{
 			Databases: []string{dbPath},
 		}
-		if err := cmd.Run(nil); err != nil {
+		if err := cmd.Run(); err != nil {
 			t.Fatalf("SimilarFoldersCmd failed: %v", err)
 		}
 	})

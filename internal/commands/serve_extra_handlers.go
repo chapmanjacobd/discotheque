@@ -372,7 +372,7 @@ func (c *ServeCmd) handleCategorizeSuggest(w http.ResponseWriter, r *http.Reques
 			// Use a map to count each word only once per file
 			uniqueWords := make(map[string]bool)
 
-			sentence := ""
+			var sentence string
 			if fullPath {
 				sentence = utils.PathToTokenized(m.Path)
 			} else {

@@ -127,7 +127,7 @@ func GetTranscodeStrategy(m models.Media) TranscodeStrategy {
 	}
 
 	// Use container format from ffprobe if available, otherwise fall back to extension
-	container := ""
+	var container string
 	if m.ContainerFormat != nil && *m.ContainerFormat != "" {
 		container = *m.ContainerFormat
 	} else {

@@ -8,8 +8,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/chapmanjacobd/discoteca/internal/db"
 	_ "github.com/mattn/go-sqlite3"
+
+	"github.com/chapmanjacobd/discoteca/internal/db"
 )
 
 func TestServeAPI_Query(t *testing.T) {

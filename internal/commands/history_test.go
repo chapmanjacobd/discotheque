@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"context"
 	"testing"
 
 	"github.com/chapmanjacobd/discoteca/internal/models"
@@ -17,20 +18,22 @@ func TestHistoryCmd_Run(t *testing.T) {
 		Args: []string{fixture.DBPath, f1},
 	}
 	addCmd.AfterApply()
-	addCmd.Run(nil)
+	if err := addCmd.Run(context.Background()); err != nil {
+		t.Fatalf("AddCmd failed: %v", err)
+	}
 
 	// Add history
 	addHist := &HistoryAddCmd{
 		Args: []string{fixture.DBPath, f1},
 	}
 	addHist.AfterApply()
-	addHist.Run(nil)
+	addHist.Run()
 
 	t.Run("DefaultHistory", func(t *testing.T) {
 		cmd := &HistoryCmd{
 			Databases: []string{fixture.DBPath},
 		}
-		if err := cmd.Run(nil); err != nil {
+		if err := cmd.Run(context.Background()); err != nil {
 			t.Fatalf("HistoryCmd failed: %v", err)
 		}
 	})
@@ -42,7 +45,7 @@ func TestHistoryCmd_Run(t *testing.T) {
 			},
 			Databases: []string{fixture.DBPath},
 		}
-		if err := cmd.Run(nil); err != nil {
+		if err := cmd.Run(context.Background()); err != nil {
 			t.Fatalf("HistoryCmd failed: %v", err)
 		}
 	})
@@ -62,7 +65,7 @@ func TestHistoryAddCmd_Run(t *testing.T) {
 		t.Fatalf("AfterApply failed: %v", err)
 	}
 
-	if err := cmd.Run(nil); err != nil {
+	if err := cmd.Run(); err != nil {
 		t.Fatalf("HistoryAddCmd failed: %v", err)
 	}
 }

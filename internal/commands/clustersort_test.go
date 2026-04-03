@@ -41,7 +41,7 @@ path/to/video3.mp4
 
 		cmd.OutputPath = outputFile.Name()
 
-		if err := cmd.Run(nil); err != nil {
+		if err := cmd.Run(); err != nil {
 			t.Fatalf("ClusterSortCmd failed: %v", err)
 		}
 
@@ -64,7 +64,7 @@ path/to/video3.mp4
 			},
 		}
 		// This will write to os.Stdout
-		if err := cmd.Run(nil); err != nil {
+		if err := cmd.Run(); err != nil {
 			t.Fatalf("ClusterSortCmd failed: %v", err)
 		}
 	})

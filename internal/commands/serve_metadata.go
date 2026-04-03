@@ -341,7 +341,7 @@ func (c *ServeCmd) getCaptionsWithContext(
 			added[path] = make(map[float64]bool)
 		}
 		if !added[path][matchTime] {
-			result = append(result, database.SearchCaptionsRow(m))
+			result = append(result, m)
 			added[path][matchTime] = true
 		}
 

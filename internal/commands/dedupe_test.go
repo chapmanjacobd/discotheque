@@ -32,7 +32,7 @@ func TestDedupeCmd_Run(t *testing.T) {
 				TitleOnly: true,
 			},
 		}
-		if err := cmd.Run(nil); err != nil {
+		if err := cmd.Run(); err != nil {
 			t.Fatalf("DedupeCmd failed: %v", err)
 		}
 	})
@@ -45,7 +45,7 @@ func TestDedupeCmd_Run(t *testing.T) {
 				DurationOnly: true,
 			},
 		}
-		if err := cmd.Run(nil); err != nil {
+		if err := cmd.Run(); err != nil {
 			t.Fatalf("DedupeCmd failed: %v", err)
 		}
 	})

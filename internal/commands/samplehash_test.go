@@ -16,7 +16,7 @@ func TestSampleHashCmd_Run(t *testing.T) {
 	cmd := &SampleHashCmd{
 		Paths: []string{f1},
 	}
-	if err := cmd.Run(nil); err != nil {
+	if err := cmd.Run(); err != nil {
 		t.Fatalf("SampleHashCmd failed: %v", err)
 	}
 }

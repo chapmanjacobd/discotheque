@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"context"
 	"testing"
 
 	"github.com/chapmanjacobd/discoteca/internal/testutils"
@@ -18,12 +19,14 @@ func TestBigDirsCmd_Run(t *testing.T) {
 		Args: []string{fixture.DBPath, fixture.TempDir},
 	}
 	addCmd.AfterApply()
-	addCmd.Run(nil)
+	if err := addCmd.Run(context.Background()); err != nil {
+		t.Fatalf("AddCmd failed: %v", err)
+	}
 
 	cmd := &BigDirsCmd{
 		Databases: []string{fixture.DBPath},
 	}
-	if err := cmd.Run(nil); err != nil {
+	if err := cmd.Run(); err != nil {
 		t.Fatalf("BigDirsCmd failed: %v", err)
 	}
 }

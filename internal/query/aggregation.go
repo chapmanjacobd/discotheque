@@ -842,7 +842,7 @@ func AggregateDUByPathWithFilters(
 
 	if !needsBackfiltering {
 		// FAST PATH: Direct SQL aggregation with basic filters
-		return aggregateDUWithBasicFilters(ctx, sqlDB, pathPrefix, targetDepth, currentDepth, flags)
+		return aggregateDUWithBasicFilters(ctx, sqlDB, pathPrefix, targetDepth, flags)
 	}
 
 	// SLOW PATH: Folder backfiltering
@@ -861,7 +861,7 @@ func AggregateDUByPathWithFilters(
 	}
 
 	// Phase 3: Aggregate only matching parent directories
-	return aggregateDUWithParentFilter(ctx, sqlDB, pathPrefix, targetDepth, currentDepth, flags, matchingParents)
+	return aggregateDUWithParentFilter(ctx, sqlDB, pathPrefix, targetDepth, flags, matchingParents)
 }
 
 // aggregateDUWithBasicFilters performs SQL aggregation with only basic filters (fast path)
@@ -869,7 +869,7 @@ func aggregateDUWithBasicFilters(
 	ctx context.Context,
 	sqlDB *sql.DB,
 	pathPrefix string,
-	targetDepth, currentDepth int,
+	targetDepth int,
 	flags models.GlobalFlags,
 ) ([]DUQueryResult, error) {
 	var query string
@@ -983,7 +983,7 @@ func aggregateDUWithParentFilter(
 	ctx context.Context,
 	sqlDB *sql.DB,
 	pathPrefix string,
-	targetDepth, currentDepth int,
+	targetDepth int,
 	flags models.GlobalFlags,
 	matchingParents map[string]struct{},
 ) ([]DUQueryResult, error) {

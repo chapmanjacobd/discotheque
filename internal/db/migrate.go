@@ -95,22 +95,19 @@ func isVersionGreaterOrEqual(v, target string) bool {
 	return v3 >= t3
 }
 
-func isTableStrict(db *sql.DB, tableName string) (bool, error) {
+func isTableStrict(db *sql.DB, tableName string) bool {
 	var isStrict bool
 	// PRAGMA table_list is available since 3.37.0
 	err := db.QueryRow(fmt.Sprintf("SELECT strict FROM pragma_table_list WHERE name='%s'", tableName)).Scan(&isStrict)
 	if err != nil {
 		// If table_list is not available or table not found, assume not strict
-		return false, nil
+		return false
 	}
-	return isStrict, nil
+	return isStrict
 }
 
 func migrateToStrict(db *sql.DB, tableName, createSql string) error {
-	strict, err := isTableStrict(db, tableName)
-	if err != nil {
-		return err
-	}
+	strict := isTableStrict(db, tableName)
 	if strict {
 		return nil
 	}
@@ -515,7 +512,7 @@ func cleanupMediaTable(db *sql.DB, hasStrict bool) error {
 	}
 	rows.Close()
 
-	strict, _ := isTableStrict(db, "media")
+	strict := isTableStrict(db, "media")
 	needsStrictMigration := hasStrict && !strict
 
 	if !hasDeadColumns && !needsStrictMigration {

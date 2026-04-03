@@ -19,7 +19,7 @@ func GetAccessTime(info os.FileInfo) time.Time {
 // GetDeviceID returns the device ID of a file
 func GetDeviceID(info os.FileInfo) (uint64, bool) {
 	if stat, ok := info.Sys().(*syscall.Stat_t); ok {
-		return uint64(stat.Dev), true
+		return stat.Dev, true
 	}
 	return 0, false
 }

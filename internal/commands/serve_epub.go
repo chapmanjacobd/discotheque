@@ -101,8 +101,8 @@ func (c *ServeCmd) handleEpubConvert(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		// Check if it's a folder (might have trailing slash or not)
 		folderPath := docPath
-		if strings.HasSuffix(folderPath, "/") {
-			folderPath = strings.TrimSuffix(folderPath, "/")
+		if before, ok := strings.CutSuffix(folderPath, "/"); ok {
+			folderPath = before
 		}
 		folderInfo, folderErr := os.Stat(folderPath)
 		if folderErr != nil || !folderInfo.IsDir() {

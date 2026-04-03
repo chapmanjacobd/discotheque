@@ -9,8 +9,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/chapmanjacobd/discoteca/internal/models"
 	_ "github.com/mattn/go-sqlite3"
+
+	"github.com/chapmanjacobd/discoteca/internal/models"
 )
 
 func TestHandleDU_CaptionsView(t *testing.T) {

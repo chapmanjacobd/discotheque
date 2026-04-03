@@ -17,7 +17,7 @@ func TestRegexSortCmd_Run(t *testing.T) {
 			Reader: strings.NewReader(input),
 			Writer: &out,
 		}
-		if err := cmd.Run(nil); err != nil {
+		if err := cmd.Run(); err != nil {
 			t.Fatalf("RegexSortCmd failed: %v", err)
 		}
 		output := out.String()
@@ -35,7 +35,7 @@ func TestRegexSortCmd_Run(t *testing.T) {
 			Reader: strings.NewReader(input),
 			Writer: &out,
 		}
-		if err := cmd.Run(nil); err != nil {
+		if err := cmd.Run(); err != nil {
 			t.Fatalf("RegexSortCmd failed: %v", err)
 		}
 		output := out.String()

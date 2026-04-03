@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"os"
@@ -63,7 +64,7 @@ func TestComplexFilteringAndAggregation(t *testing.T) {
 		r, w, _ := os.Pipe()
 		os.Stdout = w
 
-		err := cmd.Run(nil)
+		err := cmd.Run(context.Background())
 		w.Close()
 		os.Stdout = oldStdout
 
@@ -102,7 +103,7 @@ func TestComplexFilteringAndAggregation(t *testing.T) {
 		r, w, _ := os.Pipe()
 		os.Stdout = w
 
-		err := cmd.Run(nil)
+		err := cmd.Run(context.Background())
 		w.Close()
 		os.Stdout = oldStdout
 
@@ -149,7 +150,7 @@ func TestClusterSort(t *testing.T) {
 		ro, wo, _ := os.Pipe()
 		os.Stdout = wo
 
-		err := cmd.Run(nil)
+		err := cmd.Run()
 		wo.Close()
 		os.Stdin = oldStdin
 		os.Stdout = oldStdout
@@ -195,7 +196,7 @@ func TestStatsWithFrequency(t *testing.T) {
 	r, w, _ := os.Pipe()
 	os.Stdout = w
 
-	err := cmd.Run(nil)
+	err := cmd.Run(context.Background())
 	w.Close()
 	os.Stdout = oldStdout
 

@@ -135,7 +135,7 @@ func QuickWordCount(path string, size int64) (int, error) {
 					continue
 				}
 				// Use readAllLimited to avoid memory exhaustion from huge files inside zip
-				content, err := readAllLimited(rc, 10*1024*1024)
+				content, err := readAllLimited(rc)
 				rc.Close()
 				if err != nil {
 					continue
@@ -251,10 +251,10 @@ func EstimateWordCountFromSize(path string, size int64) int {
 	return estimatedWords
 }
 
-// readAllLimited reads from an io.Reader up to a specified limit.
-func readAllLimited(r io.Reader, limit int64) ([]byte, error) {
+// readAllLimited reads from an io.Reader up to 10MB limit.
+func readAllLimited(r io.Reader) ([]byte, error) {
 	// Use a limited reader to cap memory usage
-	lr := io.LimitReader(r, limit)
+	lr := io.LimitReader(r, 10*1024*1024)
 	return io.ReadAll(lr)
 }
 
@@ -622,7 +622,7 @@ func extractTextFromEPUB(path string) (string, error) {
 			continue
 		}
 		// Limit each file extraction to 10MB
-		content, err := readAllLimited(rc, 10*1024*1024)
+		content, err := readAllLimited(rc)
 		rc.Close()
 		if err != nil {
 			continue
@@ -664,7 +664,7 @@ func extractTextFromOpenDocument(path string) (string, error) {
 	}
 	defer rc.Close()
 
-	content, err := readAllLimited(rc, 10*1024*1024)
+	content, err := readAllLimited(rc)
 	if err != nil {
 		return "", err
 	}
@@ -701,7 +701,7 @@ func extractTextFromDOCX(path string) (string, error) {
 	}
 	defer rc.Close()
 
-	content, err := readAllLimited(rc, 10*1024*1024)
+	content, err := readAllLimited(rc)
 	if err != nil {
 		return "", err
 	}
@@ -742,7 +742,7 @@ func extractTextFromXLSX(path string) (string, error) {
 		if err != nil {
 			continue
 		}
-		content, err := readAllLimited(rc, 10*1024*1024)
+		content, err := readAllLimited(rc)
 		rc.Close()
 		if err != nil {
 			continue
@@ -789,7 +789,7 @@ func extractTextFromPPTX(path string) (string, error) {
 		if err != nil {
 			continue
 		}
-		content, err := readAllLimited(rc, 10*1024*1024)
+		content, err := readAllLimited(rc)
 		rc.Close()
 		if err != nil {
 			continue

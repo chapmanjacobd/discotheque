@@ -13,6 +13,7 @@ import (
 
 	"github.com/adrg/strutil"
 	"github.com/adrg/strutil/metrics"
+
 	"github.com/chapmanjacobd/discoteca/internal/db"
 	"github.com/chapmanjacobd/discoteca/internal/models"
 	"github.com/chapmanjacobd/discoteca/internal/shellquote"
@@ -243,7 +244,7 @@ func (c *DedupeCmd) Run() error {
 	return nil
 }
 
-func (c *DedupeCmd) getDuplicatesBy(dbPath, groupByCols, selectCols, whereClause string) ([]DedupeDuplicate, error) {
+func (c *DedupeCmd) getDuplicatesBy(dbPath, groupByCols, whereClause string) ([]DedupeDuplicate, error) {
 	sqlDB, _, err := db.ConnectWithInit(dbPath)
 	if err != nil {
 		return nil, err
@@ -335,19 +336,19 @@ func (c *DedupeCmd) getDuplicatesBy(dbPath, groupByCols, selectCols, whereClause
 }
 
 func (c *DedupeCmd) getMusicDuplicates(dbPath string) ([]DedupeDuplicate, error) {
-	return c.getDuplicatesBy(dbPath, "title, artist, album", "path, size, duration", "title != '' AND artist != ''")
+	return c.getDuplicatesBy(dbPath, "title, artist, album", "title != '' AND artist != ''")
 }
 
 func (c *DedupeCmd) getIDDuplicates(dbPath string) ([]DedupeDuplicate, error) {
-	return c.getDuplicatesBy(dbPath, "webpath", "path, size, duration", "webpath != ''")
+	return c.getDuplicatesBy(dbPath, "webpath", "webpath != ''")
 }
 
 func (c *DedupeCmd) getTitleDuplicates(dbPath string) ([]DedupeDuplicate, error) {
-	return c.getDuplicatesBy(dbPath, "title", "path, size, duration", "title != ''")
+	return c.getDuplicatesBy(dbPath, "title", "title != ''")
 }
 
 func (c *DedupeCmd) getDurationDuplicates(dbPath string) ([]DedupeDuplicate, error) {
-	return c.getDuplicatesBy(dbPath, "duration", "path, size", "duration > 0")
+	return c.getDuplicatesBy(dbPath, "duration", "duration > 0")
 }
 
 func (c *DedupeCmd) getFSDuplicates(dbPath string, flags models.GlobalFlags) ([]DedupeDuplicate, error) {

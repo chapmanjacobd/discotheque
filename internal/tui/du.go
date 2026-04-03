@@ -6,12 +6,13 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/chapmanjacobd/discoteca/internal/models"
-	"github.com/chapmanjacobd/discoteca/internal/query"
-	"github.com/chapmanjacobd/discoteca/internal/utils"
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+
+	"github.com/chapmanjacobd/discoteca/internal/models"
+	"github.com/chapmanjacobd/discoteca/internal/query"
+	"github.com/chapmanjacobd/discoteca/internal/utils"
 )
 
 var (
@@ -220,7 +221,6 @@ func (m *DUModel) updateList() {
 			maxSize = s.TotalSize
 		}
 	}
-	m.totalSize = maxSize
 
 	l := list.New(items, duDelegate{maxSize: maxSize}, 0, 0)
 	l.Title = "🪩  " + StyleLogoPrefix.Render(

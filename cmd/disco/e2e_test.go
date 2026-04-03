@@ -1,17 +1,19 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/alecthomas/kong"
+	_ "github.com/mattn/go-sqlite3"
+
 	"github.com/chapmanjacobd/discoteca/internal/commands"
 	"github.com/chapmanjacobd/discoteca/internal/db"
 	"github.com/chapmanjacobd/discoteca/internal/models"
 	"github.com/chapmanjacobd/discoteca/internal/testutils"
-	_ "github.com/mattn/go-sqlite3"
 )
 
 func TestE2E_AddAndCheck(t *testing.T) {
@@ -103,7 +105,7 @@ func TestE2E_HistoryAdd(t *testing.T) {
 		Paths:    []string{dummyPath},
 		Done:     true,
 	}
-	if err := histCmd.Run(nil); err != nil {
+	if err := histCmd.Run(); err != nil {
 		t.Fatalf("HistoryAddCmd failed: %v", err)
 	}
 
@@ -238,13 +240,13 @@ func TestE2E_Stats(t *testing.T) {
 		Database: fixture.DBPath,
 		Paths:    []string{dummyPath},
 	}
-	histCmd.Run(nil)
+	histCmd.Run()
 
 	// 3. Run Stats
 	statsCmd := &commands.StatsCmd{
 		Databases: []string{fixture.DBPath},
 	}
-	if err := statsCmd.Run(nil); err != nil {
+	if err := statsCmd.Run(context.Background()); err != nil {
 		t.Fatalf("StatsCmd failed: %v", err)
 	}
 }
