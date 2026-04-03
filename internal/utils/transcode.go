@@ -163,6 +163,7 @@ func GetTranscodeStrategy(m models.Media) TranscodeStrategy {
 			// Most browsers support H264/AAC in MKV, MOV, MP4, M4V
 			if container == "mp4" || container == "m4v" || container == "mov" || container == "mkv" ||
 				container == "matroska" {
+
 				containerMatches = true
 			}
 		case "video/webm":
@@ -185,6 +186,7 @@ func GetTranscodeStrategy(m models.Media) TranscodeStrategy {
 		// Audio container validation using ffprobe format_name
 		if !isSupportedAudioCodec(aCodecs) ||
 			(container != "mp3" && container != "mp4" && container != "m4a" && container != "ogg" && container != "flac" && container != "wav" && container != "opus" && container != "webm") {
+
 			strategy = TranscodeStrategy{
 				NeedsTranscode: true,
 				AudioCopy:      isSupportedAudioCodec(aCodecs),

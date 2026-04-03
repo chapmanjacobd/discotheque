@@ -236,22 +236,26 @@ func (c *ServeCmd) Mux() http.Handler {
 		if !c.Dev {
 			if strings.HasSuffix(r.URL.Path, ".js") || strings.HasSuffix(r.URL.Path, ".mjs") ||
 				strings.HasSuffix(r.URL.Path, ".ts") {
+
 				w.Header().Set("Content-Type", "text/javascript")
 				w.Header().Set("Cache-Control", "public, max-age=604800") // 1 week
 			} else if strings.HasSuffix(
 				r.URL.Path,
 				".css",
 			) {
+
 				w.Header().Set("Cache-Control", "public, max-age=604800") // 1 week
 			} else if strings.HasSuffix(
 				r.URL.Path,
 				".html",
 			) {
+
 				w.Header().Set("Cache-Control", "no-cache, must-revalidate") // HTML should not be cached
 			} else if strings.HasPrefix(
 				r.URL.Path,
 				"/lib/",
 			) {
+
 				w.Header().Set("Cache-Control", "public, max-age=604800") // 1 week for library files
 			}
 		} else {

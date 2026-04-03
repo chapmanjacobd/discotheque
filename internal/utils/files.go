@@ -723,7 +723,7 @@ func GetLanguageCode(name string) string {
 		"yoruba": "yo", "igbo": "ig", "hausa": "ha",
 		// Native names (non-English only)
 		"deutsch": "de", "español": "es", "français": "fr", "italiano": "it",
-		"português": "pt", "portuguese": "pt", "русский": "ru", "russkij": "ru",
+		"português": "pt", "русский": "ru", "russkij": "ru",
 		"日本語": "ja", "한국어": "ko", "hangugeo": "ko", "中文": "zh",
 		"العربية": "ar", "arabi": "ar", "हिन्दी": "hi", "nederlands": "nl",
 		"polski": "pl", "türkçe": "tr", "turkce": "tr", "svenska": "sv",

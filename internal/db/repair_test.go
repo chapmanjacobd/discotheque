@@ -109,6 +109,7 @@ func TestRepairRace(t *testing.T) {
 	for _, entry := range entries {
 		if entry.IsDir() && strings.HasPrefix(entry.Name(), "race-test-") &&
 			strings.Contains(entry.Name(), ".corrupt.") {
+
 			t.Errorf("Found leftover backup directory: %s", entry.Name())
 		}
 	}

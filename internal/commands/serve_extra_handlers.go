@@ -209,6 +209,7 @@ func (c *ServeCmd) handleRandomClip(w http.ResponseWriter, r *http.Request) {
 			// Default behavior: video or audio
 			if strings.HasPrefix(*m.MediaType, "video") || strings.HasPrefix(*m.MediaType, "audio") ||
 				*m.MediaType == "audiobook" {
+
 				playable = append(playable, m)
 			}
 		}

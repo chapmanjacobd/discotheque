@@ -89,6 +89,7 @@ func TestConstructSearchBindings(t *testing.T) {
 			sql,
 			"AND ((COALESCE(col1,'') NOT LIKE :S_exclude0 AND COALESCE(col2,'') NOT LIKE :S_exclude0))",
 		) {
+
 			t.Errorf("ConstructSearchBindings() sql = %q", sql)
 		}
 		if bindings["S_exclude0"] != "%test%" {

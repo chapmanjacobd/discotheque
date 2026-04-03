@@ -127,6 +127,7 @@ func (c *DedupeCmd) Run(ctx *kong.Context) error {
 				filepath.Dir(d.DuplicatePath),
 				metric,
 			) < c.MinSimilarityRatio {
+
 				continue
 			}
 		}
@@ -137,6 +138,7 @@ func (c *DedupeCmd) Run(ctx *kong.Context) error {
 				filepath.Base(d.DuplicatePath),
 				metric,
 			) < c.MinSimilarityRatio {
+
 				continue
 			}
 		}

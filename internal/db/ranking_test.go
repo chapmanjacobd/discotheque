@@ -550,7 +550,7 @@ func TestRankingReorderAmount(t *testing.T) {
 
 	// Count inversions (pairs that flipped relative order)
 	inversions := 0
-	for i := range len(results) {
+	for i := range results {
 		for j := i + 1; j < len(results); j++ {
 			// Check if this pair is inverted
 			origI := results[i].origPos

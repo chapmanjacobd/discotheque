@@ -346,6 +346,7 @@ func AggregateMediaWithMode(media []models.MediaWithDB, flags models.GlobalFlags
 	// Post-aggregation filtering (unchanged)
 	if flags.FoldersOnly || flags.FilesOnly || flags.FolderSizes != nil || flags.FileCounts != "" ||
 		flags.FolderCounts != "" {
+
 		var filtered []models.FolderStats
 		for _, f := range stats {
 			keep := true

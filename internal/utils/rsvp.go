@@ -1259,6 +1259,7 @@ func extractCHMContents(path string) (string, error) {
 			}
 			if !info.IsDir() &&
 				(strings.HasSuffix(strings.ToLower(path), ".html") || strings.HasSuffix(strings.ToLower(path), ".htm")) {
+
 				data, err := os.ReadFile(path)
 				if err == nil {
 					content.WriteString(stripHTMLTags(string(data)))
@@ -1728,6 +1729,7 @@ func FindMainContentFile(oebDir string) string {
 				if strings.Contains(base, "chapter") || strings.Contains(base, "content") ||
 					strings.Contains(base, "ch0") ||
 					strings.Contains(base, "split_") {
+
 					firstContentHTML = path
 					return filepath.SkipAll
 				}
