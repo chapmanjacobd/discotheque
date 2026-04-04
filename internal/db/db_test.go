@@ -50,7 +50,7 @@ func TestIsHealthy(t *testing.T) {
 	f.Close()
 	defer os.Remove(unhealthyPath)
 
-	if isHealthy(unhealthyPath) {
+	if isHealthy(context.Background(), unhealthyPath) {
 		t.Error("Garbage file should not be healthy DB")
 	}
 
@@ -64,11 +64,11 @@ func TestIsHealthy(t *testing.T) {
 	db.Exec("CREATE TABLE t(id INT)")
 	db.Close()
 
-	if !isHealthy(healthyPath) {
+	if !isHealthy(context.Background(), healthyPath) {
 		t.Error("Valid DB should be healthy")
 	}
 
-	if isHealthy("/non/existent/path") {
+	if isHealthy(context.Background(), "/non/existent/path") {
 		t.Error("Non-existent path should not be healthy")
 	}
 }

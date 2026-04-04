@@ -62,12 +62,12 @@ func TestRepairRace(t *testing.T) {
 	// Actually, let's just trust the code if it passes the concurrency test.
 
 	// Verify it's corrupt
-	if isHealthy(dbPath) {
+	if isHealthy(context.Background(), dbPath) {
 		t.Log("Warning: isHealthy didn't detect corruption at offset 5000, trying more extensive corruption")
 		file, _ = os.OpenFile(dbPath, os.O_WRONLY, 0o644)
 		file.WriteAt([]byte("CORRUPT"), 100) // Near header
 		file.Close()
-		if isHealthy(dbPath) {
+		if isHealthy(context.Background(), dbPath) {
 			t.Fatal("Failed to create a corrupt database that isHealthy detects")
 		}
 	}
@@ -93,7 +93,7 @@ func TestRepairRace(t *testing.T) {
 	wg.Wait()
 
 	// Final check
-	if !isHealthy(dbPath) {
+	if !isHealthy(context.Background(), dbPath) {
 		t.Error("Database should be healthy after repairs")
 	}
 

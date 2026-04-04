@@ -65,7 +65,7 @@ END;
 	db.Close()
 
 	// 2. Verify Healthy
-	if !isHealthy(dbPath) {
+	if !isHealthy(context.Background(), dbPath) {
 		t.Fatal("Database should be healthy initially")
 	}
 
@@ -91,14 +91,14 @@ END;
 	file.Close()
 
 	// 4. Verify Corrupt
-	if isHealthy(dbPath) {
+	if isHealthy(context.Background(), dbPath) {
 		t.Log("isHealthy did NOT detect corruption, trying additional corruption")
 		// Add more corruption to ensure detection
 		file, _ = os.OpenFile(dbPath, os.O_WRONLY, 0o644)
 		file.WriteAt([]byte("CORRUPT"), corruptOffset+4096)
 		file.WriteAt([]byte("CORRUPT"), corruptOffset+8192)
 		file.Close()
-		if isHealthy(dbPath) {
+		if isHealthy(context.Background(), dbPath) {
 			t.Fatal("Failed to corrupt database in a way isHealthy detects")
 		}
 	}
@@ -110,7 +110,7 @@ END;
 	}
 
 	// 6. Verify Healthy again
-	if !isHealthy(dbPath) {
+	if !isHealthy(context.Background(), dbPath) {
 		t.Fatal("Database should be healthy after repair")
 	}
 
