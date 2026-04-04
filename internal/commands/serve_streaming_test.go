@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"net/http"
@@ -9,9 +10,10 @@ import (
 	"path/filepath"
 	"testing"
 
+	_ "github.com/mattn/go-sqlite3"
+
 	"github.com/chapmanjacobd/discoteca/internal/db"
 	"github.com/chapmanjacobd/discoteca/internal/models"
-	_ "github.com/mattn/go-sqlite3"
 )
 
 // TestHandleSubtitles tests the subtitles endpoint
@@ -20,7 +22,7 @@ func TestHandleSubtitles(t *testing.T) {
 	dbPath := filepath.Join(tempDir, "test_subtitles.db")
 
 	sqlDB, _ := sql.Open("sqlite3", dbPath)
-	db.InitDB(sqlDB)
+	db.InitDB(context.Background(), sqlDB)
 
 	// Create a test subtitle file
 	subPath := filepath.Join(tempDir, "test.vtt")
@@ -98,7 +100,7 @@ func TestHandleDU(t *testing.T) {
 	defer sqlDB.Close()
 
 	// Initialize database schema
-	if err := db.InitDB(sqlDB); err != nil {
+	if err := db.InitDB(context.Background(), sqlDB); err != nil {
 		t.Fatalf("Failed to initialize DB: %v", err)
 	}
 
@@ -400,7 +402,7 @@ func TestHandleEpisodes(t *testing.T) {
 	dbPath := filepath.Join(tempDir, "test_episodes.db")
 
 	sqlDB, _ := sql.Open("sqlite3", dbPath)
-	db.InitDB(sqlDB)
+	db.InitDB(context.Background(), sqlDB)
 
 	// Create test TV show episodes with same parent path
 	_, err := sqlDB.Exec(`INSERT INTO media (path, title, media_type, time_deleted) VALUES 

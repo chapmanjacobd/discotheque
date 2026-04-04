@@ -3,6 +3,7 @@
 package db
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -12,7 +13,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-func Repair(dbPath string) error {
+func Repair(ctx context.Context, dbPath string) error {
 	start := time.Now()
 
 	// 1. Process-local lock
@@ -72,7 +73,7 @@ func Repair(dbPath string) error {
 	repairStepSuccess := false
 	Log.Info("Trying recovery via .dump...")
 	// On Windows, use cmd /c and redirection instead of bash
-	cmdDump := exec.Command("cmd", "/c", fmt.Sprintf("%s %s \".dump\" | %s %s", sqliteTool, quotedCorrupt, sqliteTool, quotedDB))
+	cmdDump := exec.CommandContext(ctx, "cmd", "/c", fmt.Sprintf("%s %s \".dump\" | %s %s", sqliteTool, quotedCorrupt, sqliteTool, quotedDB))
 	out, err := cmdDump.CombinedOutput()
 	if err == nil {
 		Log.Info("Initial recovery step successful via .dump")
@@ -82,7 +83,7 @@ func Repair(dbPath string) error {
 		os.Remove(dbPath)
 
 		// Fallback to .recover
-		cmdRecover := exec.Command("cmd", "/c", fmt.Sprintf("%s %s \".recover\" \".quit\" | %s %s", sqliteTool, quotedCorrupt, sqliteTool, quotedDB))
+		cmdRecover := exec.CommandContext(ctx, "cmd", "/c", fmt.Sprintf("%s %s \".recover\" \".quit\" | %s %s", sqliteTool, quotedCorrupt, sqliteTool, quotedDB))
 		out, err = cmdRecover.CombinedOutput()
 		if err == nil {
 			Log.Info("Initial recovery step successful via .recover")
@@ -94,33 +95,33 @@ func Repair(dbPath string) error {
 
 	if repairStepSuccess {
 		// 6. Polish and Verify
-		db, err := Connect(dbPath)
+		db, err := Connect(ctx, dbPath)
 		if err != nil {
 			Log.Error("Failed to open recovered database for polish", "error", err)
 		} else {
 			Log.Info("Running final polish (REINDEX, FTS REBUILD, VACUUM)...")
-			if _, err := db.Exec("REINDEX;"); err != nil {
+			if _, err := db.ExecContext(ctx, "REINDEX;"); err != nil {
 				Log.Warn("REINDEX failed", "error", err)
 			}
 
 			// FTS rebuilding is critical as corruption often hides here
 			var hasMediaFTS bool
-			_ = db.QueryRow("SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='media_fts')").Scan(&hasMediaFTS)
+			_ = db.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='media_fts')").Scan(&hasMediaFTS)
 			if hasMediaFTS {
-				if _, err := db.Exec("INSERT INTO media_fts(media_fts) VALUES('rebuild');"); err != nil {
+				if _, err := db.ExecContext(ctx, "INSERT INTO media_fts(media_fts) VALUES('rebuild');"); err != nil {
 					Log.Warn("media_fts rebuild failed", "error", err)
 				}
 			}
 
 			var hasCaptionsFTS bool
-			_ = db.QueryRow("SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='captions_fts')").Scan(&hasCaptionsFTS)
+			_ = db.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='captions_fts')").Scan(&hasCaptionsFTS)
 			if hasCaptionsFTS {
-				if _, err := db.Exec("INSERT INTO captions_fts(captions_fts) VALUES('rebuild');"); err != nil {
+				if _, err := db.ExecContext(ctx, "INSERT INTO captions_fts(captions_fts) VALUES('rebuild');"); err != nil {
 					Log.Warn("captions_fts rebuild failed", "error", err)
 				}
 			}
 
-			if _, err := db.Exec("VACUUM;"); err != nil {
+			if _, err := db.ExecContext(ctx, "VACUUM;"); err != nil {
 				Log.Error("Final VACUUM failed", "error", err)
 			}
 			db.Close()

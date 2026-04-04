@@ -13,6 +13,7 @@ import (
 
 	"github.com/adrg/strutil"
 	"github.com/adrg/strutil/metrics"
+
 	"github.com/chapmanjacobd/discoteca/internal/db"
 	"github.com/chapmanjacobd/discoteca/internal/models"
 	"github.com/chapmanjacobd/discoteca/internal/shellquote"
@@ -256,7 +257,10 @@ func (c *DedupeCmd) Run(ctx context.Context) error {
 	return nil
 }
 
-func (c *DedupeCmd) getDuplicatesBy(ctx context.Context, dbPath, groupByCols, whereClause string) ([]DedupeDuplicate, error) {
+func (c *DedupeCmd) getDuplicatesBy(
+	ctx context.Context,
+	dbPath, groupByCols, whereClause string,
+) ([]DedupeDuplicate, error) {
 	sqlDB, _, err := db.ConnectWithInit(ctx, dbPath)
 	if err != nil {
 		return nil, err
@@ -369,7 +373,11 @@ func (c *DedupeCmd) getDurationDuplicates(ctx context.Context, dbPath string) ([
 	return c.getDuplicatesBy(ctx, dbPath, "duration", "duration > 0")
 }
 
-func (c *DedupeCmd) getFSDuplicates(ctx context.Context, dbPath string, flags models.GlobalFlags) ([]DedupeDuplicate, error) {
+func (c *DedupeCmd) getFSDuplicates(
+	ctx context.Context,
+	dbPath string,
+	flags models.GlobalFlags,
+) ([]DedupeDuplicate, error) {
 	sqlDB, _, err := db.ConnectWithInit(ctx, dbPath)
 	if err != nil {
 		return nil, err

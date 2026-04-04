@@ -1,15 +1,17 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/alecthomas/kong"
+	_ "github.com/mattn/go-sqlite3"
+
 	"github.com/chapmanjacobd/discoteca/internal/models"
 	"github.com/chapmanjacobd/discoteca/internal/utils"
-	_ "github.com/mattn/go-sqlite3"
 )
 
 func main() {
@@ -52,7 +54,7 @@ func main() {
 	// Configure default logger (Warn level by default)
 	models.SetupLogging(0)
 
-	err = ctx.Run()
+	err = ctx.Run(context.Background())
 	if err != nil {
 		models.Log.Error("Command failed", "error", err)
 		os.Exit(1)

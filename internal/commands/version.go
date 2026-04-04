@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"context"
 	"fmt"
 	"runtime"
 	"runtime/debug"
@@ -12,7 +13,7 @@ type VersionCmd struct {
 	Verbose int `help:"Show verbose output including dependencies" short:"v" env:"DISCO_VERBOSE" type:"counter"`
 }
 
-func (c *VersionCmd) Run() error {
+func (c *VersionCmd) Run(ctx context.Context) error {
 	// Get build info from runtime/debug
 	bi, ok := debug.ReadBuildInfo()
 

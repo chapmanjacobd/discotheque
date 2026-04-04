@@ -2,6 +2,7 @@ package commands
 
 import (
 	"bytes"
+	"context"
 	"database/sql"
 	"encoding/json"
 	"net/http"
@@ -9,8 +10,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/chapmanjacobd/discoteca/internal/db"
 	_ "github.com/mattn/go-sqlite3"
+
+	"github.com/chapmanjacobd/discoteca/internal/db"
 )
 
 // TestHandleRate tests the rate endpoint
@@ -20,7 +22,7 @@ func TestHandleRate(t *testing.T) {
 	dbPath := filepath.Join(tempDir, "test_rate.db")
 
 	sqlDB, _ := sql.Open("sqlite3", dbPath)
-	db.InitDB(sqlDB)
+	db.InitDB(context.Background(), sqlDB)
 	_, err := sqlDB.Exec(`INSERT INTO media (path, title, media_type, score, time_deleted) VALUES 
 		(?, 'Test1', 'video', 0, 0)`, filepath.FromSlash("/tmp/test1.mp4"))
 	if err != nil {
@@ -95,7 +97,7 @@ func TestHandleDelete(t *testing.T) {
 	dbPath := filepath.Join(tempDir, "test_delete.db")
 
 	sqlDB, _ := sql.Open("sqlite3", dbPath)
-	db.InitDB(sqlDB)
+	db.InitDB(context.Background(), sqlDB)
 	_, err := sqlDB.Exec(`INSERT INTO media (path, title, media_type, time_deleted) VALUES 
 		(?, 'Test1', 'video', 0)`, filepath.FromSlash("/tmp/test1.mp4"))
 	if err != nil {
@@ -185,7 +187,7 @@ func TestHandleProgress(t *testing.T) {
 	dbPath := filepath.Join(tempDir, "test_progress.db")
 
 	sqlDB, _ := sql.Open("sqlite3", dbPath)
-	db.InitDB(sqlDB)
+	db.InitDB(context.Background(), sqlDB)
 	_, err := sqlDB.Exec(`INSERT INTO media (path, title, media_type, playhead, play_count, time_deleted) VALUES 
 		(?, 'Test1', 'video', 0, 0, 0)`, filepath.FromSlash("/tmp/test1.mp4"))
 	if err != nil {

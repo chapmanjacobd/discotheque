@@ -16,7 +16,7 @@ func TestSearchCaptionsCmd_Run(t *testing.T) {
 
 	dbPath := fixture.DBPath
 	sqlDB, _ := sql.Open("sqlite3", dbPath)
-	db.InitDB(sqlDB)
+	db.InitDB(context.Background(), sqlDB)
 
 	// Skip if FTS5 is not available
 	var name string

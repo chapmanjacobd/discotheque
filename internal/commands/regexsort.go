@@ -2,6 +2,7 @@ package commands
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -24,7 +25,7 @@ type RegexSortCmd struct {
 	Writer io.Writer `kong:"-"`
 }
 
-func (c *RegexSortCmd) Run() error {
+func (c *RegexSortCmd) Run(ctx context.Context) error {
 	models.SetupLogging(c.Verbose)
 	flags := models.GlobalFlags{
 		CoreFlags: c.CoreFlags,

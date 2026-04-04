@@ -2,6 +2,7 @@ package commands
 
 import (
 	"bytes"
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -10,8 +11,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/chapmanjacobd/discoteca/internal/db"
 	_ "github.com/mattn/go-sqlite3"
+
+	"github.com/chapmanjacobd/discoteca/internal/db"
 )
 
 func TestServeReorder_Playlist(t *testing.T) {
@@ -19,7 +21,7 @@ func TestServeReorder_Playlist(t *testing.T) {
 	dbPath := filepath.Join(tempDir, "test_reorder.db")
 
 	sqlDB, _ := sql.Open("sqlite3", dbPath)
-	db.InitDB(sqlDB)
+	db.InitDB(context.Background(), sqlDB)
 
 	// Setup: 1 playlist with 3 items
 	res := sqlDB.QueryRow(
@@ -88,7 +90,7 @@ func TestServeReorder_Security(t *testing.T) {
 	dbPath := filepath.Join(tempDir, "test_reorder_sec.db")
 
 	sqlDB, _ := sql.Open("sqlite3", dbPath)
-	db.InitDB(sqlDB)
+	db.InitDB(context.Background(), sqlDB)
 	sqlDB.Close()
 
 	cmd := &ServeCmd{
@@ -120,7 +122,7 @@ func TestServeReorder_Security(t *testing.T) {
 	t.Run("MultipleDatabasesAllowed", func(t *testing.T) {
 		dbPath2 := filepath.Join(tempDir, "test_reorder_sec2.db")
 		db2, _ := sql.Open("sqlite3", dbPath2)
-		db.InitDB(db2)
+		db.InitDB(context.Background(), db2)
 		// Add a playlist to the second DB
 		db2.Exec(`INSERT INTO playlists (path, title) VALUES (?, 'Other Playlist')`, filepath.FromSlash("/plist2"))
 		db2.Close()

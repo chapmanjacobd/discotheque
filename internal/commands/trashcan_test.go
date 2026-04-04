@@ -1,13 +1,15 @@
 package commands
 
 import (
+	"context"
 	"database/sql"
 	"path/filepath"
 	"testing"
 
+	_ "github.com/mattn/go-sqlite3"
+
 	"github.com/chapmanjacobd/discoteca/internal/db"
 	"github.com/chapmanjacobd/discoteca/internal/models"
-	_ "github.com/mattn/go-sqlite3"
 )
 
 // TestDeletedMedia tests querying and restoring deleted media items
@@ -16,7 +18,7 @@ func TestDeletedMedia(t *testing.T) {
 	dbPath := filepath.Join(tempDir, "test_trash.db")
 
 	sqlDB, _ := sql.Open("sqlite3", dbPath)
-	db.InitDB(sqlDB)
+	db.InitDB(context.Background(), sqlDB)
 
 	// Add 2 deleted and 1 non-deleted media
 	sqlDB.Exec(`INSERT INTO media (path, time_deleted) VALUES ('/deleted1.mp4', 100)`)

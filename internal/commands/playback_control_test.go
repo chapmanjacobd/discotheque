@@ -2,6 +2,7 @@ package commands
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"net"
 	"path/filepath"
@@ -62,7 +63,7 @@ func TestPlaybackControlCmds(t *testing.T) {
 		cmd := &NowCmd{
 			MpvControlBase: MpvControlBase{ControlFlags: baseFlags},
 		}
-		if err := cmd.Run(); err != nil {
+		if err := cmd.Run(context.Background()); err != nil {
 			t.Errorf("NowCmd failed: %v", err)
 		}
 	})
@@ -71,7 +72,7 @@ func TestPlaybackControlCmds(t *testing.T) {
 		cmd := &PauseCmd{
 			MpvControlBase: MpvControlBase{ControlFlags: baseFlags},
 		}
-		if err := cmd.Run(); err != nil {
+		if err := cmd.Run(context.Background()); err != nil {
 			t.Errorf("PauseCmd failed: %v", err)
 		}
 	})
@@ -80,7 +81,7 @@ func TestPlaybackControlCmds(t *testing.T) {
 		cmd := &NextCmd{
 			MpvControlBase: MpvControlBase{ControlFlags: baseFlags},
 		}
-		if err := cmd.Run(); err != nil {
+		if err := cmd.Run(context.Background()); err != nil {
 			t.Errorf("NextCmd failed: %v", err)
 		}
 	})
@@ -89,7 +90,7 @@ func TestPlaybackControlCmds(t *testing.T) {
 		cmd := &StopCmd{
 			MpvControlBase: MpvControlBase{ControlFlags: baseFlags},
 		}
-		if err := cmd.Run(); err != nil {
+		if err := cmd.Run(context.Background()); err != nil {
 			t.Errorf("StopCmd failed: %v", err)
 		}
 	})
@@ -99,12 +100,12 @@ func TestPlaybackControlCmds(t *testing.T) {
 			MpvControlBase: MpvControlBase{ControlFlags: baseFlags},
 			Time:           "+10",
 		}
-		if err := cmd.Run(); err != nil {
+		if err := cmd.Run(context.Background()); err != nil {
 			t.Errorf("SeekCmd failed: %v", err)
 		}
 
 		cmd.Time = "00:01:00"
-		if err := cmd.Run(); err != nil {
+		if err := cmd.Run(context.Background()); err != nil {
 			t.Errorf("SeekCmd failed: %v", err)
 		}
 	})

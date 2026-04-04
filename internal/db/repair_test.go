@@ -1,6 +1,7 @@
 package db
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"os"
@@ -79,7 +80,7 @@ func TestRepairRace(t *testing.T) {
 	for i := range numGoroutines {
 		go func(id int) {
 			defer wg.Done()
-			err := Repair(dbPath)
+			err := Repair(context.Background(), dbPath)
 			if err != nil {
 				// Some might fail if they catch it in a weird state, but the goal is at least one succeeds
 				// and others either wait and see health or fail gracefully.

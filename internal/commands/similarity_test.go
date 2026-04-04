@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"context"
 	"database/sql"
 	"testing"
 
@@ -14,7 +15,7 @@ func TestSimilarityCmds(t *testing.T) {
 
 	dbPath := fixture.DBPath
 	sqlDB, _ := sql.Open("sqlite3", dbPath)
-	db.InitDB(sqlDB)
+	db.InitDB(context.Background(), sqlDB)
 
 	// Create files that are similar in size/duration
 	f1 := fixture.CreateDummyFile("video1.mp4")
@@ -30,7 +31,7 @@ func TestSimilarityCmds(t *testing.T) {
 		cmd := &SimilarFilesCmd{
 			Databases: []string{dbPath},
 		}
-		if err := cmd.Run(); err != nil {
+		if err := cmd.Run(context.Background()); err != nil {
 			t.Fatalf("SimilarFilesCmd failed: %v", err)
 		}
 	})
@@ -39,7 +40,7 @@ func TestSimilarityCmds(t *testing.T) {
 		cmd := &SimilarFoldersCmd{
 			Databases: []string{dbPath},
 		}
-		if err := cmd.Run(); err != nil {
+		if err := cmd.Run(context.Background()); err != nil {
 			t.Fatalf("SimilarFoldersCmd failed: %v", err)
 		}
 	})

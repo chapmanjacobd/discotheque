@@ -1,6 +1,8 @@
 package commands
 
 import (
+	"context"
+
 	database "github.com/chapmanjacobd/discoteca/internal/db"
 	"github.com/chapmanjacobd/discoteca/internal/models"
 )
@@ -11,7 +13,7 @@ type RepairCmd struct {
 	Database string `help:"Database file to repair" required:"" arg:"" type:"existingfile"`
 }
 
-func (c *RepairCmd) Run() error {
+func (c *RepairCmd) Run(ctx context.Context) error {
 	models.SetupLogging(c.Verbose)
-	return database.Repair(c.Database)
+	return database.Repair(ctx, c.Database)
 }

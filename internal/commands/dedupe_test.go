@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"context"
 	"database/sql"
 	"testing"
 
@@ -15,7 +16,7 @@ func TestDedupeCmd_Run(t *testing.T) {
 
 	dbPath := fixture.DBPath
 	sqlDB, _ := sql.Open("sqlite3", dbPath)
-	db.InitDB(sqlDB)
+	db.InitDB(context.Background(), sqlDB)
 
 	f1 := fixture.CreateDummyFile("video1.mp4")
 	f2 := fixture.CreateDummyFile("video2.mp4")
@@ -32,7 +33,7 @@ func TestDedupeCmd_Run(t *testing.T) {
 				TitleOnly: true,
 			},
 		}
-		if err := cmd.Run(); err != nil {
+		if err := cmd.Run(context.Background()); err != nil {
 			t.Fatalf("DedupeCmd failed: %v", err)
 		}
 	})
@@ -45,7 +46,7 @@ func TestDedupeCmd_Run(t *testing.T) {
 				DurationOnly: true,
 			},
 		}
-		if err := cmd.Run(); err != nil {
+		if err := cmd.Run(context.Background()); err != nil {
 			t.Fatalf("DedupeCmd failed: %v", err)
 		}
 	})

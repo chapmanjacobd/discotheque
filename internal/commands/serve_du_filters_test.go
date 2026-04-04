@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"net/http"
@@ -9,9 +10,10 @@ import (
 	"strings"
 	"testing"
 
+	_ "github.com/mattn/go-sqlite3"
+
 	"github.com/chapmanjacobd/discoteca/internal/db"
 	"github.com/chapmanjacobd/discoteca/internal/models"
-	_ "github.com/mattn/go-sqlite3"
 )
 
 func TestHandleDU_WithFilters(t *testing.T) {
@@ -25,7 +27,7 @@ func TestHandleDU_WithFilters(t *testing.T) {
 	defer sqlDB.Close()
 
 	// Initialize database schema
-	if err := db.InitDB(sqlDB); err != nil {
+	if err := db.InitDB(context.Background(), sqlDB); err != nil {
 		t.Fatalf("Failed to initialize DB: %v", err)
 	}
 
@@ -521,7 +523,7 @@ func TestHandleDU_WithFilters_WindowsPaths(t *testing.T) {
 	defer sqlDB.Close()
 
 	// Initialize database schema
-	if err := db.InitDB(sqlDB); err != nil {
+	if err := db.InitDB(context.Background(), sqlDB); err != nil {
 		t.Fatalf("Failed to initialize DB: %v", err)
 	}
 

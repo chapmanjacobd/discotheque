@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"context"
 	"database/sql"
 	"net/http"
 	"net/http/httptest"
@@ -10,8 +11,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/chapmanjacobd/discoteca/internal/db"
 	_ "github.com/mattn/go-sqlite3"
+
+	"github.com/chapmanjacobd/discoteca/internal/db"
 )
 
 // TestHandleSubtitles_SubtitleCountOptimization tests that the subtitle endpoint
@@ -29,7 +31,7 @@ func TestHandleSubtitles_SubtitleCountOptimization(t *testing.T) {
 	}
 	defer sqlDB.Close()
 
-	db.InitDB(sqlDB)
+	db.InitDB(context.Background(), sqlDB)
 
 	// Create a test video file (copy from system or create dummy)
 	videoPath := filepath.Join(tempDir, "test_no_subs.mp4")
@@ -118,7 +120,7 @@ func TestHandleSubtitles_WithEmbeddedSubtitles(t *testing.T) {
 	}
 	defer sqlDB.Close()
 
-	db.InitDB(sqlDB)
+	db.InitDB(context.Background(), sqlDB)
 
 	// Create a test video file
 	videoPath := filepath.Join(tempDir, "test_with_subs.mp4")
@@ -182,7 +184,7 @@ func TestSubtitleCountDatabaseQuery(t *testing.T) {
 	}
 	defer sqlDB.Close()
 
-	db.InitDB(sqlDB)
+	db.InitDB(context.Background(), sqlDB)
 
 	// Insert multiple media files with varying subtitle counts
 	files := []struct {
@@ -247,7 +249,7 @@ func TestHandleSubtitles_ExternalSubtitleFile(t *testing.T) {
 	}
 	defer sqlDB.Close()
 
-	db.InitDB(sqlDB)
+	db.InitDB(context.Background(), sqlDB)
 
 	// Create an external subtitle file
 	subPath := filepath.Join(tempDir, "movie.srt")
@@ -308,7 +310,7 @@ func TestHandleSubtitles_NoFFmpegCallForZeroCount(t *testing.T) {
 	}
 	defer sqlDB.Close()
 
-	db.InitDB(sqlDB)
+	db.InitDB(context.Background(), sqlDB)
 
 	// Create a video file
 	videoPath := filepath.Join(tempDir, "test.mp4")

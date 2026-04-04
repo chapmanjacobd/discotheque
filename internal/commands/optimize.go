@@ -126,7 +126,7 @@ type SampleHashCmd struct {
 	Paths []string `help:"Files to hash" required:"" arg:"" type:"existingfile"`
 }
 
-func (c *SampleHashCmd) Run() error {
+func (c *SampleHashCmd) Run(ctx context.Context) error {
 	models.SetupLogging(c.Verbose)
 	flags := models.GlobalFlags{
 		CoreFlags:    c.CoreFlags,

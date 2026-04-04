@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/alecthomas/kong"
+
 	"github.com/chapmanjacobd/discoteca/internal/models"
 )
 

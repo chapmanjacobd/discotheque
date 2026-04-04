@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"context"
 	"testing"
 
 	"github.com/chapmanjacobd/discoteca/internal/testutils"
@@ -16,7 +17,7 @@ func TestSampleHashCmd_Run(t *testing.T) {
 	cmd := &SampleHashCmd{
 		Paths: []string{f1},
 	}
-	if err := cmd.Run(); err != nil {
+	if err := cmd.Run(context.Background()); err != nil {
 		t.Fatalf("SampleHashCmd failed: %v", err)
 	}
 }

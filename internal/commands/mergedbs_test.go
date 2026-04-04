@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"context"
 	"database/sql"
 	"os"
 	"testing"
@@ -39,7 +40,7 @@ func TestMergeDBsCmd_Run(t *testing.T) {
 		TargetDB:  targetPath,
 		SourceDBs: []string{src1Path, src2Path},
 	}
-	if err := cmd.Run(); err != nil {
+	if err := cmd.Run(context.Background()); err != nil {
 		t.Fatalf("MergeDBsCmd failed: %v", err)
 	}
 

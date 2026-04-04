@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"net/http"
@@ -8,8 +9,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/chapmanjacobd/discoteca/internal/db"
 	_ "github.com/mattn/go-sqlite3"
+
+	"github.com/chapmanjacobd/discoteca/internal/db"
 )
 
 func TestServeAPI_Query(t *testing.T) {
@@ -20,7 +22,7 @@ func TestServeAPI_Query(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	db.InitDB(sqlDB)
+	db.InitDB(context.Background(), sqlDB)
 
 	// Add test data
 	_, err = sqlDB.Exec(
@@ -74,7 +76,7 @@ func TestServeAPI_Metadata(t *testing.T) {
 	dbPath := filepath.Join(tempDir, "test_meta.db")
 
 	sqlDB, _ := sql.Open("sqlite3", dbPath)
-	db.InitDB(sqlDB)
+	db.InitDB(context.Background(), sqlDB)
 	sqlDB.Exec(
 		`INSERT INTO media (path, title, media_type, time_deleted) VALUES ('/tmp/meta.mp4', 'Meta Video', 'video', 0)`,
 	)

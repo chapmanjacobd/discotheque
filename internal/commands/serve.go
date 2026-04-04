@@ -288,7 +288,7 @@ func (c *ServeCmd) execDB(ctx context.Context, dbPath string, fn func(ctx contex
 				// Connect error might be corruption too (e.g. invalid header)
 				if db.IsCorruptionError(err) && i < maxRetries {
 					models.Log.Warn("Database corruption detected on connect, attempting repair", "db", dbPath)
-					if repErr := db.Repair(dbPath); repErr != nil {
+					if repErr := db.Repair(ctx, dbPath); repErr != nil {
 						return fmt.Errorf("repair failed: %w (original error: %w)", repErr, err)
 					}
 					models.Log.Info("Database repaired, retrying connect", "db", dbPath)
@@ -314,7 +314,7 @@ func (c *ServeCmd) execDB(ctx context.Context, dbPath string, fn func(ctx contex
 				sqlDB.Close()
 
 				models.Log.Warn("Database corruption detected on query, attempting repair", "db", dbPath)
-				if repErr := db.Repair(dbPath); repErr != nil {
+				if repErr := db.Repair(ctx, dbPath); repErr != nil {
 					models.Log.Error("Database repair failed", "db", dbPath, "error", repErr)
 					return err // Return original error if repair fails
 				}

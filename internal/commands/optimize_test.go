@@ -19,7 +19,7 @@ func TestOptimizeCmd_Run(t *testing.T) {
 	addCmd.AfterApply() // Will fail if no paths, but we just want to init DB
 	// Manually init DB
 	dbConn := fixture.GetDB()
-	db.InitDB(dbConn)
+	db.InitDB(context.Background(), dbConn)
 	dbConn.Close()
 
 	cmd := &OptimizeCmd{

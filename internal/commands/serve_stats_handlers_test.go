@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"net/http"
@@ -8,9 +9,10 @@ import (
 	"path/filepath"
 	"testing"
 
+	_ "github.com/mattn/go-sqlite3"
+
 	"github.com/chapmanjacobd/discoteca/internal/db"
 	"github.com/chapmanjacobd/discoteca/internal/models"
-	_ "github.com/mattn/go-sqlite3"
 )
 
 // TestHandleCategories tests the categories endpoint
@@ -20,7 +22,7 @@ func TestHandleCategories(t *testing.T) {
 	dbPath := filepath.Join(tempDir, "test_categories.db")
 
 	sqlDB, _ := sql.Open("sqlite3", dbPath)
-	db.InitDB(sqlDB)
+	db.InitDB(context.Background(), sqlDB)
 	_, err := sqlDB.Exec(`INSERT INTO media (path, title, media_type, categories, time_deleted) VALUES 
 		(?, 'Test1', 'video', 'comedy;action', 0),
 		(?, 'Test2', 'video', 'comedy', 0),
@@ -75,7 +77,7 @@ func TestHandleGenres(t *testing.T) {
 	dbPath := filepath.Join(tempDir, "test_genres.db")
 
 	sqlDB, _ := sql.Open("sqlite3", dbPath)
-	db.InitDB(sqlDB)
+	db.InitDB(context.Background(), sqlDB)
 	_, err := sqlDB.Exec(`INSERT INTO media (path, title, media_type, genre, time_deleted) VALUES 
 		(?, 'Test1', 'video', 'Action', 0),
 		(?, 'Test2', 'video', 'Action', 0),
@@ -130,7 +132,7 @@ func TestHandleRatings(t *testing.T) {
 	dbPath := filepath.Join(tempDir, "test_ratings.db")
 
 	sqlDB, _ := sql.Open("sqlite3", dbPath)
-	db.InitDB(sqlDB)
+	db.InitDB(context.Background(), sqlDB)
 	_, err := sqlDB.Exec(`INSERT INTO media (path, title, media_type, score, time_deleted) VALUES 
 		(?, 'Test1', 'video', 5.0, 0),
 		(?, 'Test2', 'video', 5.0, 0),

@@ -2,6 +2,7 @@ package commands
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"os"
 	"strings"
@@ -20,7 +21,7 @@ type ClusterSortCmd struct {
 	OutputPath string `help:"Output file path (default stdout)"`
 }
 
-func (c *ClusterSortCmd) Run() error {
+func (c *ClusterSortCmd) Run(ctx context.Context) error {
 	models.SetupLogging(c.Verbose)
 	flags := models.GlobalFlags{
 		CoreFlags:       c.CoreFlags,

@@ -3,6 +3,7 @@
 package db
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"os"
@@ -104,7 +105,7 @@ END;
 
 	// 5. Repair
 	t.Log("Running Repair...")
-	if err := Repair(dbPath); err != nil {
+	if err := Repair(context.Background(), dbPath); err != nil {
 		t.Fatalf("Repair failed: %v", err)
 	}
 

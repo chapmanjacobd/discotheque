@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -29,7 +30,7 @@ func TestServeCmd_HandleLs(t *testing.T) {
 	}
 
 	dbConn := fixture.GetDB()
-	if err := db.InitDB(dbConn); err != nil {
+	if err := db.InitDB(context.Background(), dbConn); err != nil {
 		t.Fatalf("Failed to initialize DB: %v", err)
 	}
 	for _, p := range paths {

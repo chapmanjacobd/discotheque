@@ -150,7 +150,7 @@ func TestClusterSort(t *testing.T) {
 		ro, wo, _ := os.Pipe()
 		os.Stdout = wo
 
-		err := cmd.Run()
+		err := cmd.Run(context.Background())
 		wo.Close()
 		os.Stdin = oldStdin
 		os.Stdout = oldStdout

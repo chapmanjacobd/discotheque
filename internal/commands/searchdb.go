@@ -221,9 +221,9 @@ func (c *SearchDBCmd) printRows(ctx context.Context, sqlDB *sql.DB, table string
 	for colRows.Next() {
 		var cid int
 		var name, colType string
-		var notnull int
+		var notnull, pk int
 		var dfltValue sql.NullString
-		if err := colRows.Scan(&cid, &name, &colType, &notnull, &dfltValue, nil); err != nil {
+		if err := colRows.Scan(&cid, &name, &colType, &notnull, &dfltValue, &pk); err != nil {
 			colRows.Close()
 			return err
 		}

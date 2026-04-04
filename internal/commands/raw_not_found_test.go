@@ -1,14 +1,16 @@
 package commands
 
 import (
+	"context"
 	"database/sql"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
 	"testing"
 
-	"github.com/chapmanjacobd/discoteca/internal/db"
 	_ "github.com/mattn/go-sqlite3"
+
+	"github.com/chapmanjacobd/discoteca/internal/db"
 )
 
 func TestRawNotFound(t *testing.T) {
@@ -16,7 +18,7 @@ func TestRawNotFound(t *testing.T) {
 	dbPath := filepath.Join(tempDir, "test_notfound.db")
 
 	sqlDB, _ := sql.Open("sqlite3", dbPath)
-	db.InitDB(sqlDB)
+	db.InitDB(context.Background(), sqlDB)
 	sqlDB.Close()
 
 	cmd := &ServeCmd{

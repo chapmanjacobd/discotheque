@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"net/http"
@@ -8,8 +9,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/chapmanjacobd/discoteca/internal/db"
 	_ "github.com/mattn/go-sqlite3"
+
+	"github.com/chapmanjacobd/discoteca/internal/db"
 )
 
 func TestServeExtended_Filters(t *testing.T) {
@@ -17,7 +19,7 @@ func TestServeExtended_Filters(t *testing.T) {
 	dbPath := filepath.Join(tempDir, "test_filters.db")
 
 	sqlDB, _ := sql.Open("sqlite3", dbPath)
-	db.InitDB(sqlDB)
+	db.InitDB(context.Background(), sqlDB)
 	// Add diverse test data
 	sqlDB.Exec(`INSERT INTO media (path, media_type, size, time_deleted) VALUES ('/v1.mp4', 'video', 100, 0)`)
 	sqlDB.Exec(`INSERT INTO media (path, media_type, size, time_deleted) VALUES ('/a1.mp3', 'audio', 200, 0)`)
