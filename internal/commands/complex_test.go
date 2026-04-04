@@ -23,7 +23,7 @@ func TestComplexFilteringAndAggregation(t *testing.T) {
 	dbPath := fixture.DBPath
 	sqlDB, _ := sql.Open("sqlite3", dbPath)
 	defer sqlDB.Close()
-	db.InitDB(sqlDB)
+	db.InitDB(context.Background(), sqlDB)
 
 	files := []struct {
 		path     string
@@ -174,7 +174,7 @@ func TestStatsWithFrequency(t *testing.T) {
 
 	dbPath := fixture.DBPath
 	sqlDB, _ := sql.Open("sqlite3", dbPath)
-	db.InitDB(sqlDB)
+	db.InitDB(context.Background(), sqlDB)
 
 	now := 1708358400 // 2024-02-19
 	sqlDB.Exec("INSERT INTO media (path, size, duration, time_last_played) VALUES (?, ?, ?, ?)",

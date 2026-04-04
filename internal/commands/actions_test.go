@@ -29,7 +29,7 @@ func TestMarkDeletedItem(t *testing.T) {
 		DB:    fixture.DBPath,
 	}
 
-	if err := MarkDeletedItem(m); err != nil {
+	if err := MarkDeletedItem(context.Background(), m); err != nil {
 		t.Fatalf("MarkDeletedItem failed: %v", err)
 	}
 
@@ -63,7 +63,7 @@ func TestMoveMediaItem(t *testing.T) {
 		DB:    fixture.DBPath,
 	}
 
-	if err := MoveMediaItem(destDir, m); err != nil {
+	if err := MoveMediaItem(context.Background(), destDir, m); err != nil {
 		t.Fatalf("MoveMediaItem failed: %v", err)
 	}
 
@@ -148,11 +148,11 @@ func TestExecutePostAction(t *testing.T) {
 	}
 	// Manually init DB
 	dbConn := fixture.GetDB()
-	db.InitDB(dbConn)
+	db.InitDB(context.Background(), dbConn)
 	dbConn.Exec("INSERT INTO media (path) VALUES (?)", f1)
 	dbConn.Close()
 
-	if err := ExecutePostAction(flags, []models.MediaWithDB{m}); err != nil {
+	if err := ExecutePostAction(context.Background(), flags, []models.MediaWithDB{m}); err != nil {
 		t.Fatalf("ExecutePostAction mark-deleted failed: %v", err)
 	}
 

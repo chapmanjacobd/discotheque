@@ -8,12 +8,11 @@ import (
 	"testing"
 
 	"github.com/alecthomas/kong"
-	_ "github.com/mattn/go-sqlite3"
-
 	"github.com/chapmanjacobd/discoteca/internal/commands"
 	"github.com/chapmanjacobd/discoteca/internal/db"
 	"github.com/chapmanjacobd/discoteca/internal/models"
 	"github.com/chapmanjacobd/discoteca/internal/testutils"
+	_ "github.com/mattn/go-sqlite3"
 )
 
 func TestE2E_AddAndCheck(t *testing.T) {
@@ -21,7 +20,7 @@ func TestE2E_AddAndCheck(t *testing.T) {
 	defer fixture.Cleanup()
 	sqlDB := fixture.GetDB()
 	defer sqlDB.Close()
-	if err := db.InitDB(sqlDB); err != nil {
+	if err := db.InitDB(context.Background(), sqlDB); err != nil {
 		t.Fatalf("database initialization failed: %v", err)
 	}
 
@@ -84,7 +83,7 @@ func TestE2E_HistoryAdd(t *testing.T) {
 	defer fixture.Cleanup()
 	sqlDB := fixture.GetDB()
 	defer sqlDB.Close()
-	if err := db.InitDB(sqlDB); err != nil {
+	if err := db.InitDB(context.Background(), sqlDB); err != nil {
 		t.Fatalf("database initialization failed: %v", err)
 	}
 
@@ -127,7 +126,7 @@ func TestE2E_PathConsolidation(t *testing.T) {
 	defer fixture.Cleanup()
 	sqlDB := fixture.GetDB()
 	defer sqlDB.Close()
-	if err := db.InitDB(sqlDB); err != nil {
+	if err := db.InitDB(context.Background(), sqlDB); err != nil {
 		t.Fatalf("database initialization failed: %v", err)
 	}
 
@@ -176,7 +175,7 @@ func TestE2E_PathConsolidation_WindowsPaths(t *testing.T) {
 	defer fixture.Cleanup()
 	sqlDB := fixture.GetDB()
 	defer sqlDB.Close()
-	if err := db.InitDB(sqlDB); err != nil {
+	if err := db.InitDB(context.Background(), sqlDB); err != nil {
 		t.Fatalf("database initialization failed: %v", err)
 	}
 
@@ -268,7 +267,7 @@ func TestE2E_AddWithVTTCaptions(t *testing.T) {
 		t.Fatalf("failed to open database: %v", err)
 	}
 	defer sqlDBInit.Close()
-	if err := db.InitDB(sqlDBInit); err != nil {
+	if err := db.InitDB(context.Background(), sqlDBInit); err != nil {
 		t.Fatalf("database initialization failed: %v", err)
 	}
 

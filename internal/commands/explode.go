@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 
 	"github.com/alecthomas/kong"
-
 	"github.com/chapmanjacobd/discoteca/internal/models"
 )
 

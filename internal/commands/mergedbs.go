@@ -30,7 +30,7 @@ func (c *MergeDBsCmd) Run(ctx context.Context) error {
 	defer targetConn.Close()
 
 	// Ensure target schema is initialized (if it's a new file)
-	if err := db.InitDB(targetConn); err != nil {
+	if err := db.InitDB(ctx, targetConn); err != nil {
 		models.Log.Warn(
 			"Target DB initialization might have partially failed or it was already initialized",
 			"error",

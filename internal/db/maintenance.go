@@ -149,12 +149,12 @@ func RunMaintenance(ctx context.Context, db *sql.DB, config MaintenanceConfig, d
 	Log.Info("Running scheduled maintenance...", "db", dbPath, "interval", config.RefreshInterval)
 
 	// Run maintenance tasks
-	if err := RefreshFolderStats(db); err != nil {
+	if err := RefreshFolderStats(ctx, db); err != nil {
 		Log.Error("Failed to refresh folder_stats", "db", dbPath, "error", err)
 		// Continue with FTS rebuild even if folder_stats fails
 	}
 
-	if err := RebuildFTS(db, dbPath); err != nil {
+	if err := RebuildFTS(ctx, db, dbPath); err != nil {
 		Log.Error("Failed to rebuild FTS", "db", dbPath, "error", err)
 		return err
 	}

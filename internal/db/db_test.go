@@ -1,6 +1,7 @@
 package db
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"os"
@@ -18,7 +19,7 @@ func TestConnect(t *testing.T) {
 	f.Close()
 	defer os.Remove(dbPath)
 
-	db, err := Connect(dbPath)
+	db, err := Connect(context.Background(), dbPath)
 	if err != nil {
 		t.Fatalf("Connect failed: %v", err)
 	}

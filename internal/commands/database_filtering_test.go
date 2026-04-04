@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -18,7 +19,7 @@ func TestDatabaseFiltering_Security(t *testing.T) {
 
 	// Initialize the DB
 	sqlDB := fixture.GetDB()
-	db.InitDB(sqlDB)
+	db.InitDB(context.Background(), sqlDB)
 	sqlDB.Close()
 
 	// Create ServeCmd with only the fixture database
@@ -103,7 +104,7 @@ func TestDatabaseFiltering_FilterBins(t *testing.T) {
 
 	// Initialize the DB with some test data
 	sqlDB := fixture.GetDB()
-	db.InitDB(sqlDB)
+	db.InitDB(context.Background(), sqlDB)
 	_, err := sqlDB.Exec(`
 		INSERT INTO media (path, size, duration, media_type, time_deleted)
 		VALUES ('/test/video.mp4', 1000000, 120, 'video', 0)
@@ -152,11 +153,11 @@ func TestDatabaseFiltering_WithMultipleDatabases(t *testing.T) {
 
 	// Initialize both databases with schema
 	db1 := fixture1.GetDB()
-	db.InitDB(db1)
+	db.InitDB(context.Background(), db1)
 	db1.Close()
 
 	db2 := fixture2.GetDB()
-	db.InitDB(db2)
+	db.InitDB(context.Background(), db2)
 	db2.Close()
 
 	cmd := &ServeCmd{
@@ -195,7 +196,7 @@ func TestDatabaseFiltering_WithMultipleDatabases(t *testing.T) {
 
 		// Initialize the other database too
 		otherDB := otherFixture.GetDB()
-		db.InitDB(otherDB)
+		db.InitDB(context.Background(), otherDB)
 		otherDB.Close()
 
 		req := httptest.NewRequest(http.MethodGet, "/api/query?db="+otherFixture.DBPath, nil)

@@ -55,7 +55,7 @@ func ConnectWithInit(ctx context.Context, dbPath string) (*sql.DB, *Queries, err
 		return nil, nil, err
 	}
 
-	if err := InitDB(sqlDB); err != nil {
+	if err := InitDB(ctx, sqlDB); err != nil {
 		sqlDB.Close()
 		return nil, nil, fmt.Errorf("failed to initialize database %s: %w", dbPath, err)
 	}

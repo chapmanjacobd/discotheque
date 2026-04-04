@@ -191,7 +191,7 @@ func TestDeleteHistoryByPaths(t *testing.T) {
 	sqlDB.Exec("INSERT INTO media (path, play_count) VALUES (?, 5)", path)
 	sqlDB.Exec("INSERT INTO history (media_path, playhead) VALUES (?, 100)", path)
 
-	if err := DeleteHistoryByPaths(dbPath, []string{path}); err != nil {
+	if err := DeleteHistoryByPaths(context.Background(), dbPath, []string{path}); err != nil {
 		t.Fatal(err)
 	}
 

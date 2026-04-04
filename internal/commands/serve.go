@@ -386,7 +386,7 @@ func (c *ServeCmd) Run(ctx context.Context) error {
 		config := db.DefaultMaintenanceConfig()
 		for _, dbPath := range c.Databases {
 			if sqlDB, ok := c.dbCache.Load(dbPath); ok {
-				if err := db.RunMaintenance(sqlDB.(*sql.DB), config, dbPath); err != nil {
+				if err := db.RunMaintenance(ctx, sqlDB.(*sql.DB), config, dbPath); err != nil {
 					models.Log.Error("Maintenance failed", "db", dbPath, "error", err)
 				}
 			}
