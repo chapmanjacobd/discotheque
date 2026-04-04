@@ -19,18 +19,8 @@ func TestMain(m *testing.M) {
 		Stderr = origStderr
 	}()
 
-	// Silence slog during tests by setting Log to discard
-	models.Log = &discardLogger{}
+	// Set verbose logging (go test will only show output on test failure)
+	models.SetupLogging(2) // Debug level
 
 	os.Exit(m.Run())
-}
-
-type discardLogger struct{}
-
-func (d *discardLogger) Info(msg string, args ...any)  {}
-func (d *discardLogger) Debug(msg string, args ...any) {}
-func (d *discardLogger) Warn(msg string, args ...any)  {}
-func (d *discardLogger) Error(msg string, args ...any) {}
-func (d *discardLogger) With(args ...any) models.Logger {
-	return d
 }
