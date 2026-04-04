@@ -36,7 +36,7 @@ type SimilarFoldersCmd struct {
 	Databases []string `help:"SQLite database files" required:"" arg:"" type:"existingfile"`
 }
 
-func (c *SimilarFilesCmd) Run() error {
+func (c *SimilarFilesCmd) Run(ctx context.Context) error {
 	flags := models.GlobalFlags{
 		CoreFlags:        c.CoreFlags,
 		PathFilterFlags:  c.PathFilterFlags,
@@ -47,10 +47,10 @@ func (c *SimilarFilesCmd) Run() error {
 		DisplayFlags:     c.DisplayFlags,
 		SimilarityFlags:  c.SimilarityFlags,
 	}
-	return runSimilar(flags, c.Databases, false)
+	return runSimilar(ctx, flags, c.Databases, false)
 }
 
-func (c *SimilarFoldersCmd) Run() error {
+func (c *SimilarFoldersCmd) Run(ctx context.Context) error {
 	flags := models.GlobalFlags{
 		CoreFlags:        c.CoreFlags,
 		PathFilterFlags:  c.PathFilterFlags,
@@ -61,13 +61,13 @@ func (c *SimilarFoldersCmd) Run() error {
 		DisplayFlags:     c.DisplayFlags,
 		SimilarityFlags:  c.SimilarityFlags,
 	}
-	return runSimilar(flags, c.Databases, true)
+	return runSimilar(ctx, flags, c.Databases, true)
 }
 
-func runSimilar(flags models.GlobalFlags, dbs []string, folderMode bool) error {
+func runSimilar(ctx context.Context, flags models.GlobalFlags, dbs []string, folderMode bool) error {
 	models.SetupLogging(flags.Verbose)
 
-	media, err := query.MediaQuery(context.Background(), dbs, flags)
+	media, err := query.MediaQuery(ctx, dbs, flags)
 	if err != nil {
 		return err
 	}

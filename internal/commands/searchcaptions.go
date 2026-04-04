@@ -38,7 +38,7 @@ type MergedCaption struct {
 func (c *SearchCaptionsCmd) Run(ctx context.Context) error {
 	models.SetupLogging(c.Verbose)
 
-	sqlDB, err := db.Connect(c.Database)
+	sqlDB, err := db.Connect(ctx, c.Database)
 	if err != nil {
 		return err
 	}

@@ -60,7 +60,7 @@ func (c *OpenCmd) Run(ctx context.Context) error {
 		}
 	}
 
-	return ExecutePostAction(flags, media)
+	return ExecutePostAction(ctx, flags, media)
 }
 
 type BrowseCmd struct {

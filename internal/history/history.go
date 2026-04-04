@@ -56,7 +56,7 @@ func UpdateHistoryWithTime(
 	timePlayed int64,
 	markDone bool,
 ) error {
-	sqlDB, err := db.Connect(dbPath)
+	sqlDB, err := db.Connect(ctx, dbPath)
 	if err != nil {
 		return err
 	}

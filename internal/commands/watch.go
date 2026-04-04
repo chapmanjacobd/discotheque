@@ -209,7 +209,7 @@ func (c *WatchCmd) Run(ctx context.Context) error {
 		}
 
 		// Execute post action for this item
-		if err := ExecutePostAction(flags, []models.MediaWithDB{m}); err != nil {
+		if err := ExecutePostAction(ctx, flags, []models.MediaWithDB{m}); err != nil {
 			models.Log.Error("Post action failed", "path", m.Path, "error", err)
 		}
 
@@ -378,7 +378,7 @@ func (c *ListenCmd) Run(ctx context.Context) error {
 			}
 		}
 
-		if err := ExecutePostAction(flags, []models.MediaWithDB{m}); err != nil {
+		if err := ExecutePostAction(ctx, flags, []models.MediaWithDB{m}); err != nil {
 			models.Log.Error("Post action failed", "path", m.Path, "error", err)
 		}
 	}

@@ -95,7 +95,7 @@ func (c *MediaCheckCmd) Run(ctx context.Context) error {
 						models.Log.Error("Failed to delete corrupt file", "path", m.Path, "error", err)
 					} else {
 						// Mark as deleted in DB
-						sqlDB, err := db.Connect(m.DB)
+						sqlDB, err := db.Connect(ctx, m.DB)
 						if err == nil {
 							defer sqlDB.Close()
 							queries := db.New(sqlDB)

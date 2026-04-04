@@ -20,7 +20,7 @@ type BigDirsCmd struct {
 	Databases []string `help:"SQLite database files" required:"" arg:"" type:"existingfile"`
 }
 
-func (c *BigDirsCmd) Run() error {
+func (c *BigDirsCmd) Run(ctx context.Context) error {
 	// Bigdirs is Essentially Print with BigDirs enabled by default
 	c.BigDirs = true
 	printCmd := PrintCmd{
@@ -35,5 +35,5 @@ func (c *BigDirsCmd) Run() error {
 		DisplayFlags:     c.DisplayFlags,
 		Databases:        c.Databases,
 	}
-	return printCmd.Run(context.Background())
+	return printCmd.Run(ctx)
 }

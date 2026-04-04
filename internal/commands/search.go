@@ -41,7 +41,7 @@ func (c *SearchCmd) Run(ctx context.Context) error {
 	if !flags.FTS && !flags.NoFTS {
 		// Check if FTS table exists in first database
 		if len(c.Databases) > 0 {
-			if sqlDB, err := db.Connect(c.Databases[0]); err == nil {
+			if sqlDB, err := db.Connect(ctx, c.Databases[0]); err == nil {
 				var name string
 				err := sqlDB.QueryRow("SELECT name FROM sqlite_master WHERE type='table' AND name='media_fts'").
 					Scan(&name)

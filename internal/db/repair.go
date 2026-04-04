@@ -109,7 +109,7 @@ func Repair(dbPath string) error {
 
 	if repairStepSuccess {
 		// 6. Polish and Verify
-		db, err := Connect(dbPath)
+		db, err := Connect(context.Background(), dbPath)
 		if err != nil {
 			Log.Error("Failed to open recovered database for polish", "error", err)
 		} else {

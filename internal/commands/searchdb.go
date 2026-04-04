@@ -31,7 +31,7 @@ type SearchDBCmd struct {
 func (c *SearchDBCmd) Run(ctx context.Context) error {
 	models.SetupLogging(c.Verbose)
 
-	sqlDB, _, err := db.ConnectWithInit(c.Database)
+	sqlDB, _, err := db.ConnectWithInit(ctx, c.Database)
 	if err != nil {
 		return err
 	}

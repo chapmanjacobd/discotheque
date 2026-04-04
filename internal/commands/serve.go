@@ -283,7 +283,7 @@ func (c *ServeCmd) execDB(ctx context.Context, dbPath string, fn func(ctx contex
 			sqlDB = val.(*sql.DB)
 		} else {
 			// Create a new connection
-			newDB, err := db.Connect(dbPath)
+			newDB, err := db.Connect(ctx, dbPath)
 			if err != nil {
 				// Connect error might be corruption too (e.g. invalid header)
 				if db.IsCorruptionError(err) && i < maxRetries {
@@ -351,13 +351,13 @@ func (c *ServeCmd) Close() error {
 }
 
 // Run starts the HTTP server
-func (c *ServeCmd) Run() error {
+func (c *ServeCmd) Run(ctx context.Context) error {
 	defer c.Close()
 	models.SetupLogging(c.Verbose)
 	db.SetFtsEnabled(true)
 
 	for _, dbPath := range c.Databases {
-		sqlDB, _, err := db.ConnectWithInit(dbPath)
+		sqlDB, _, err := db.ConnectWithInit(ctx, dbPath)
 		if err == nil {
 			sqlDB.Close()
 		}
@@ -372,7 +372,7 @@ func (c *ServeCmd) Run() error {
 	}
 
 	for _, dbPath := range c.Databases {
-		sqlDB, _, err := db.ConnectWithInit(dbPath)
+		sqlDB, _, err := db.ConnectWithInit(ctx, dbPath)
 		if err != nil {
 			models.Log.Error("Failed to connect to database on startup", "db", dbPath, "error", err)
 			continue

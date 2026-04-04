@@ -94,7 +94,7 @@ func AggregateDUByPath(
 	dbPath, pathPrefix string,
 	targetDepth int,
 ) ([]DUQueryResult, error) {
-	sqlDB, err := db.Connect(dbPath)
+	sqlDB, err := db.Connect(ctx, dbPath)
 	if err != nil {
 		return nil, err
 	}
@@ -256,7 +256,7 @@ func FetchDUDirectFiles(
 	allFiles := make([]models.MediaWithDB, 0)
 
 	for _, dbPath := range dbPaths {
-		sqlDB, err := db.Connect(dbPath)
+		sqlDB, err := db.Connect(ctx, dbPath)
 		if err != nil {
 			return nil, err
 		}
@@ -669,7 +669,7 @@ func getMatchingParentDirs(
 	targetDepth int,
 	flags models.GlobalFlags,
 ) (map[string]int64, error) {
-	sqlDB, err := db.Connect(dbPath)
+	sqlDB, err := db.Connect(ctx, dbPath)
 	if err != nil {
 		return nil, err
 	}
@@ -831,7 +831,7 @@ func AggregateDUByPathWithFilters(
 	targetDepth int,
 	flags models.GlobalFlags,
 ) ([]DUQueryResult, error) {
-	sqlDB, err := db.Connect(dbPath)
+	sqlDB, err := db.Connect(ctx, dbPath)
 	if err != nil {
 		return nil, err
 	}
@@ -1193,7 +1193,7 @@ func FetchDUDirectFilesWithFilters(
 	hasFilters := hasBasicFilters(flags) || hasActiveFilters(flags)
 
 	for _, dbPath := range dbPaths {
-		sqlDB, err := db.Connect(dbPath)
+		sqlDB, err := db.Connect(ctx, dbPath)
 		if err != nil {
 			return nil, err
 		}

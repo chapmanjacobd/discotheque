@@ -57,7 +57,7 @@ func (c *CategorizeCmd) Run(ctx context.Context) error {
 		return errors.New("no media found")
 	}
 
-	compiled := c.CompileRegexes()
+	compiled := c.CompileRegexes(ctx)
 
 	if c.Other {
 		return c.mineCategories(media, compiled)
@@ -66,16 +66,16 @@ func (c *CategorizeCmd) Run(ctx context.Context) error {
 	return c.applyCategories(ctx, media, compiled)
 }
 
-func (c *CategorizeCmd) CompileRegexes() map[string][]*regexp.Regexp {
+func (c *CategorizeCmd) CompileRegexes(ctx context.Context) map[string][]*regexp.Regexp {
 	compiled := make(map[string][]*regexp.Regexp)
 
 	// Load custom keywords from databases
 	for _, dbPath := range c.Databases {
-		sqlDB, err := db.Connect(dbPath)
+		sqlDB, err := db.Connect(ctx, dbPath)
 		if err != nil {
 			continue
 		}
-		rows, err := sqlDB.QueryContext(context.Background(), "SELECT category, keyword FROM custom_keywords")
+		rows, err := sqlDB.QueryContext(ctx, "SELECT category, keyword FROM custom_keywords")
 		if err == nil {
 			for rows.Next() {
 				var cat, kw string
@@ -145,7 +145,7 @@ func (c *CategorizeCmd) applyCategories(
 			newCategories := ";" + strings.Join(combined, ";") + ";"
 
 			if !c.Simulate {
-				sqlDB, queries, err := db.ConnectWithInit(m.DB)
+				sqlDB, queries, err := db.ConnectWithInit(ctx, m.DB)
 				if err != nil {
 					models.Log.Error("Failed to connect to database", "db", m.DB, "error", err)
 					continue

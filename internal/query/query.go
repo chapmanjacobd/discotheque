@@ -329,7 +329,7 @@ func SummarizeMedia(media []models.MediaWithDB) []FrequencyStats {
 }
 
 func HistoricalUsage(ctx context.Context, dbPath, freq, timeColumn string) ([]FrequencyStats, error) {
-	sqlDB, err := db.Connect(dbPath)
+	sqlDB, err := db.Connect(ctx, dbPath)
 	if err != nil {
 		return nil, err
 	}

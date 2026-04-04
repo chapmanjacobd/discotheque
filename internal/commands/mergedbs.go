@@ -20,10 +20,10 @@ type MergeDBsCmd struct {
 	SourceDBs []string `help:"Source SQLite database files" required:"" arg:"" type:"existingfile"`
 }
 
-func (c *MergeDBsCmd) Run() error {
+func (c *MergeDBsCmd) Run(ctx context.Context) error {
 	models.SetupLogging(c.Verbose)
 
-	targetConn, err := db.Connect(c.TargetDB)
+	targetConn, err := db.Connect(ctx, c.TargetDB)
 	if err != nil {
 		return fmt.Errorf("failed to connect to target DB %s: %w", c.TargetDB, err)
 	}
@@ -40,7 +40,7 @@ func (c *MergeDBsCmd) Run() error {
 
 	for _, srcPath := range c.SourceDBs {
 		models.Log.Info("Merging database", "src", srcPath)
-		if err := c.mergeDatabase(srcPath, targetConn); err != nil {
+		if err := c.mergeDatabase(ctx, srcPath, targetConn); err != nil {
 			return err
 		}
 	}
@@ -48,14 +48,14 @@ func (c *MergeDBsCmd) Run() error {
 	return nil
 }
 
-func (c *MergeDBsCmd) mergeDatabase(srcPath string, targetConn *sql.DB) error {
-	srcConn, err := db.Connect(srcPath)
+func (c *MergeDBsCmd) mergeDatabase(ctx context.Context, srcPath string, targetConn *sql.DB) error {
+	srcConn, err := db.Connect(ctx, srcPath)
 	if err != nil {
 		return fmt.Errorf("failed to connect to source DB %s: %w", srcPath, err)
 	}
 	defer srcConn.Close()
 
-	tables, err := c.getTables(srcConn)
+	tables, err := c.getTables(ctx, srcConn)
 	if err != nil {
 		return err
 	}
@@ -65,7 +65,7 @@ func (c *MergeDBsCmd) mergeDatabase(srcPath string, targetConn *sql.DB) error {
 			continue
 		}
 		models.Log.Info("Merging table", "table", table)
-		if err := c.mergeTable(srcConn, targetConn, table); err != nil {
+		if err := c.mergeTable(ctx, srcConn, targetConn, table); err != nil {
 			models.Log.Error("Failed to merge table", "table", table, "error", err)
 			continue
 		}
@@ -74,9 +74,9 @@ func (c *MergeDBsCmd) mergeDatabase(srcPath string, targetConn *sql.DB) error {
 	return nil
 }
 
-func (c *MergeDBsCmd) getTables(conn *sql.DB) ([]string, error) {
+func (c *MergeDBsCmd) getTables(ctx context.Context, conn *sql.DB) ([]string, error) {
 	rows, err := conn.QueryContext(
-		context.Background(),
+		ctx,
 		"SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '%_fts%'",
 	)
 	if err != nil {
@@ -108,13 +108,13 @@ func (c *MergeDBsCmd) shouldProcessTable(table string) bool {
 	return true
 }
 
-func (c *MergeDBsCmd) mergeTable(srcConn, targetConn *sql.DB, table string) error {
-	srcCols, err := c.getTableColumns(srcConn, table)
+func (c *MergeDBsCmd) mergeTable(ctx context.Context, srcConn, targetConn *sql.DB, table string) error {
+	srcCols, err := c.getTableColumns(ctx, srcConn, table)
 	if err != nil {
 		return err
 	}
 
-	targetCols, err := c.getTableColumns(targetConn, table)
+	targetCols, err := c.getTableColumns(ctx, targetConn, table)
 	if err != nil {
 		// Table might not exist in target. If not OnlyTargetColumns, we might want to create it?
 		// Python sqlite-utils insert_all(alter=True) handles this.
@@ -167,7 +167,7 @@ func (c *MergeDBsCmd) mergeTable(srcConn, targetConn *sql.DB, table string) erro
 	}
 	// If no PKs provided, try to find from schema if we are doing UPSERT
 	if c.Upsert && len(pks) == 0 {
-		pks, _ = c.getPrimaryKeyColumns(targetConn, table)
+		pks, _ = c.getPrimaryKeyColumns(ctx, targetConn, table)
 	}
 
 	// Build SELECT query
@@ -177,7 +177,7 @@ func (c *MergeDBsCmd) mergeTable(srcConn, targetConn *sql.DB, table string) erro
 	}
 	selectQuery := fmt.Sprintf("SELECT %s FROM %s%s", strings.Join(selectedCols, ", "), table, whereClause)
 
-	rows, err := srcConn.QueryContext(context.Background(), selectQuery)
+	rows, err := srcConn.QueryContext(ctx, selectQuery)
 	if err != nil {
 		return fmt.Errorf("failed to select from source: %w", err)
 	}
@@ -229,13 +229,13 @@ func (c *MergeDBsCmd) mergeTable(srcConn, targetConn *sql.DB, table string) erro
 		}
 	}
 
-	tx, err := targetConn.BeginTx(context.Background(), nil)
+	tx, err := targetConn.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
 
-	stmt, err := tx.PrepareContext(context.Background(), insertQuery)
+	stmt, err := tx.PrepareContext(ctx, insertQuery)
 	if err != nil {
 		return fmt.Errorf("failed to prepare insert: %w", err)
 	}
@@ -252,7 +252,7 @@ func (c *MergeDBsCmd) mergeTable(srcConn, targetConn *sql.DB, table string) erro
 		if err := rows.Scan(destPtrs...); err != nil {
 			return err
 		}
-		if _, err := stmt.ExecContext(context.Background(), dest...); err != nil {
+		if _, err := stmt.ExecContext(ctx, dest...); err != nil {
 			return fmt.Errorf("failed to exec insert: %w", err)
 		}
 		count++
@@ -269,8 +269,8 @@ func (c *MergeDBsCmd) mergeTable(srcConn, targetConn *sql.DB, table string) erro
 	return nil
 }
 
-func (c *MergeDBsCmd) getTableColumns(conn *sql.DB, table string) ([]string, error) {
-	rows, err := conn.QueryContext(context.Background(), fmt.Sprintf("PRAGMA table_info(%s)", table))
+func (c *MergeDBsCmd) getTableColumns(ctx context.Context, conn *sql.DB, table string) ([]string, error) {
+	rows, err := conn.QueryContext(ctx, fmt.Sprintf("PRAGMA table_info(%s)", table))
 	if err != nil {
 		return nil, err
 	}
@@ -293,8 +293,8 @@ func (c *MergeDBsCmd) getTableColumns(conn *sql.DB, table string) ([]string, err
 	return cols, nil
 }
 
-func (c *MergeDBsCmd) getPrimaryKeyColumns(conn *sql.DB, table string) ([]string, error) {
-	rows, err := conn.QueryContext(context.Background(), fmt.Sprintf("PRAGMA table_info(%s)", table))
+func (c *MergeDBsCmd) getPrimaryKeyColumns(ctx context.Context, conn *sql.DB, table string) ([]string, error) {
+	rows, err := conn.QueryContext(ctx, fmt.Sprintf("PRAGMA table_info(%s)", table))
 	if err != nil {
 		return nil, err
 	}

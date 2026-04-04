@@ -340,7 +340,7 @@ func (c *ServeCmd) handleCategorizeSuggest(w http.ResponseWriter, r *http.Reques
 	// Since I'm in the same package 'commands', I can call them directly.
 
 	// We need to compile regexes first
-	compiled := cmd.CompileRegexes()
+	compiled := cmd.CompileRegexes(r.Context())
 
 	wordCounts := make(map[string]int)
 	for _, m := range allMedia {
@@ -458,7 +458,7 @@ func (c *ServeCmd) handleCategorizeApply(w http.ResponseWriter, r *http.Request)
 		Databases:        c.Databases,
 		FullPath:         fullPath,
 	}
-	compiled := cmd.CompileRegexes()
+	compiled := cmd.CompileRegexes(r.Context())
 
 	if len(compiled) == 0 {
 		w.Header().Set("Content-Type", "application/json")

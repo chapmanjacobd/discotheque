@@ -1878,7 +1878,7 @@ func ScanMedia(rows *sql.Rows, dbPath string) ([]models.MediaWithDB, error) {
 
 // QueryDatabase executes a query against a single database
 func QueryDatabase(ctx context.Context, dbPath, query string, args []any) ([]models.MediaWithDB, error) {
-	sqlDB, err := db.Connect(dbPath)
+	sqlDB, err := db.Connect(ctx, dbPath)
 	if err != nil {
 		return nil, err
 	}
@@ -2070,7 +2070,7 @@ func (qe *QueryExecutor) MediaQueryCount(ctx context.Context, dbs []string) (int
 		wg.Add(1)
 		go func(path string) {
 			defer wg.Done()
-			sqlDB, err := db.Connect(path)
+			sqlDB, err := db.Connect(ctx, path)
 			if err != nil {
 				errorsChan <- err
 				return
@@ -2369,7 +2369,7 @@ func (qe *QueryExecutor) ResolvePercentileFlags(
 			wg.Add(1)
 			go func(path string) {
 				defer wg.Done()
-				sqlDB, err := db.Connect(path)
+				sqlDB, err := db.Connect(ctx, path)
 				if err != nil {
 					return
 				}

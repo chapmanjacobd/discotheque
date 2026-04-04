@@ -19,7 +19,7 @@ import (
 )
 
 // ExecutePostAction executes actions after a command
-func ExecutePostAction(flags models.GlobalFlags, media []models.MediaWithDB) error {
+func ExecutePostAction(ctx context.Context, flags models.GlobalFlags, media []models.MediaWithDB) error {
 	action := flags.PostAction
 
 	if flags.DeleteFiles {
@@ -68,9 +68,9 @@ func ExecutePostAction(flags models.GlobalFlags, media []models.MediaWithDB) err
 		case "delete":
 			err = DeleteMediaItem(m)
 		case "mark-deleted":
-			err = MarkDeletedItem(m)
+			err = MarkDeletedItem(ctx, m)
 		case "move":
-			err = MoveMediaItem(flags.MoveTo, m)
+			err = MoveMediaItem(ctx, flags.MoveTo, m)
 		case "copy":
 			err = CopyMediaItem(flags.CopyTo, m)
 		case "trash":
@@ -157,22 +157,22 @@ func DeleteMediaItem(m models.MediaWithDB) error {
 	return nil
 }
 
-func MarkDeletedItem(m models.MediaWithDB) error {
-	sqlDB, err := db.Connect(m.DB)
+func MarkDeletedItem(ctx context.Context, m models.MediaWithDB) error {
+	sqlDB, err := db.Connect(ctx, m.DB)
 	if err != nil {
 		return err
 	}
 	defer sqlDB.Close()
 
 	now := time.Now().Unix()
-	_, err = sqlDB.ExecContext(context.Background(), "UPDATE media SET time_deleted = ? WHERE path = ?", now, m.Path)
+	_, err = sqlDB.ExecContext(ctx, "UPDATE media SET time_deleted = ? WHERE path = ?", now, m.Path)
 	if err == nil {
 		fmt.Printf("Marked deleted: %s\n", m.Path)
 	}
 	return err
 }
 
-func MoveMediaItem(destDir string, m models.MediaWithDB) error {
+func MoveMediaItem(ctx context.Context, destDir string, m models.MediaWithDB) error {
 	if err := os.MkdirAll(destDir, 0o755); err != nil {
 		return err
 	}
@@ -187,12 +187,12 @@ func MoveMediaItem(destDir string, m models.MediaWithDB) error {
 	}
 
 	// Update database
-	sqlDB, err := db.Connect(m.DB)
+	sqlDB, err := db.Connect(ctx, m.DB)
 	if err != nil {
 		return err
 	}
 	defer sqlDB.Close()
-	_, err = sqlDB.ExecContext(context.Background(), "UPDATE media SET path = ? WHERE path = ?", dest, m.Path)
+	_, err = sqlDB.ExecContext(ctx, "UPDATE media SET path = ? WHERE path = ?", dest, m.Path)
 	if err == nil {
 		fmt.Printf("Moved: %s -> %s\n", m.Path, dest)
 	}

@@ -23,7 +23,7 @@ func (c *OptimizeCmd) Run(ctx context.Context) error {
 	models.SetupLogging(c.Verbose)
 	for _, dbPath := range c.Databases {
 		models.Log.Info("Optimizing database", "path", dbPath)
-		sqlDB, queries, err := db.ConnectWithInit(dbPath)
+		sqlDB, queries, err := db.ConnectWithInit(ctx, dbPath)
 		if err != nil {
 			return err
 		}
