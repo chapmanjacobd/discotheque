@@ -30,7 +30,11 @@ func (c *MergeDBsCmd) Run() error {
 
 	// Ensure target schema is initialized (if it's a new file)
 	if err := db.InitDB(targetConn); err != nil {
-		models.Log.Warn("Target DB initialization might have partially failed or it was already initialized", "error", err)
+		models.Log.Warn(
+			"Target DB initialization might have partially failed or it was already initialized",
+			"error",
+			err,
+		)
 	}
 
 	for _, srcPath := range c.SourceDBs {

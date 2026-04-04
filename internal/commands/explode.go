@@ -1,12 +1,13 @@
 package commands
 
 import (
-	"github.com/chapmanjacobd/discoteca/internal/models"
 	"fmt"
 	"os"
 	"path/filepath"
 
 	"github.com/alecthomas/kong"
+
+	"github.com/chapmanjacobd/discoteca/internal/models"
 )
 
 type ExplodeCmd struct {

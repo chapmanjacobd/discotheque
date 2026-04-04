@@ -5,14 +5,13 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"math/rand"
+	"math/rand/v2"
 	"path/filepath"
 	"regexp"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/chapmanjacobd/discoteca/internal/db"
 	"github.com/chapmanjacobd/discoteca/internal/models"
@@ -757,8 +756,7 @@ func NewSortBuilder(flags models.GlobalFlags) *SortBuilder {
 
 func (sb *SortBuilder) Sort(media []models.MediaWithDB) {
 	if sb.flags.Random {
-		r := rand.New(rand.NewSource(time.Now().UnixNano()))
-		r.Shuffle(len(media), func(i, j int) {
+		rand.Shuffle(len(media), func(i, j int) {
 			media[i], media[j] = media[j], media[i]
 		})
 		return

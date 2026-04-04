@@ -146,7 +146,13 @@ func (c *AddCmd) Run(ctx context.Context) error {
 				// e.g., /home/xk/sync is NOT a child of /home/xk/sync/audio
 				// but /home/xk/sync/audio IS a child of /home/xk/sync
 				if strings.HasPrefix(absRootSlash, plPathSlash+"/") {
-					models.Log.Info("Path is child of existing scan root, skipping", "path", absRoot, "root", pl.Path.String)
+					models.Log.Info(
+						"Path is child of existing scan root, skipping",
+						"path",
+						absRoot,
+						"root",
+						pl.Path.String,
+					)
 					isChildPath = true
 					break
 				}

@@ -1,7 +1,6 @@
 package metadata
 
 import (
-	"github.com/chapmanjacobd/discoteca/internal/models"
 	"archive/zip"
 	"bufio"
 	"context"
@@ -20,6 +19,7 @@ import (
 	"time"
 
 	"github.com/chapmanjacobd/discoteca/internal/db"
+	"github.com/chapmanjacobd/discoteca/internal/models"
 	"github.com/chapmanjacobd/discoteca/internal/utils"
 )
 

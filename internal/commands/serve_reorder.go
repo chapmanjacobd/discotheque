@@ -1,7 +1,6 @@
 package commands
 
 import (
-	"github.com/chapmanjacobd/discoteca/internal/models"
 	"context"
 	"database/sql"
 	"encoding/json"
@@ -10,6 +9,7 @@ import (
 	"strings"
 
 	database "github.com/chapmanjacobd/discoteca/internal/db"
+	"github.com/chapmanjacobd/discoteca/internal/models"
 )
 
 type playlistItem struct {

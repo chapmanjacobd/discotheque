@@ -1,6 +1,7 @@
 package db
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 
@@ -10,7 +11,7 @@ import (
 func InitDB(sqlDB *sql.DB) error {
 	// 1. Create Core Tables (media, playlists, history, meta)
 	// This does NOT include captions or FTS tables
-	if _, err := sqlDB.Exec(schema.GetCoreTables()); err != nil {
+	if _, err := sqlDB.ExecContext(context.Background(), schema.GetCoreTables()); err != nil {
 		return fmt.Errorf("failed to create core tables: %w", err)
 	}
 
@@ -20,14 +21,14 @@ func InitDB(sqlDB *sql.DB) error {
 	}
 
 	// 3. Create Core Indexes
-	if _, err := sqlDB.Exec(schema.GetCoreIndexes()); err != nil {
+	if _, err := sqlDB.ExecContext(context.Background(), schema.GetCoreIndexes()); err != nil {
 		return fmt.Errorf("failed to create core indexes: %w", err)
 	}
 
 	// 4. Create Captions table (ONLY if enabled)
 	if IsFtsEnabled() {
 		// Create captions table if not exists
-		if _, err := sqlDB.Exec(schema.GetCaptionsTable()); err != nil {
+		if _, err := sqlDB.ExecContext(context.Background(), schema.GetCaptionsTable()); err != nil {
 			return fmt.Errorf("failed to create captions table: %w", err)
 		}
 	}
@@ -36,7 +37,7 @@ func InitDB(sqlDB *sql.DB) error {
 	if IsFtsEnabled() {
 		// Create FTS tables (media_fts, captions_fts)
 		// We do this LAST because triggers might depend on columns added/renamed during Migrate
-		if _, err := sqlDB.Exec(schema.GetFTSTables()); err != nil {
+		if _, err := sqlDB.ExecContext(context.Background(), schema.GetFTSTables()); err != nil {
 			return fmt.Errorf("failed to create fts tables: %w", err)
 		}
 	}

@@ -346,7 +346,7 @@ func SetupLogging(verbosity int) {
 		// Default to Warn (hides Info and Debug, shows Warn and Error)
 		level = slog.LevelWarn
 	}
-	
+
 	// Use a simple slog logger as default
 	handler := &plainHandler{
 		level: level,

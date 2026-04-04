@@ -1043,7 +1043,15 @@ func (c *ServeCmd) handlePlaylistItems(w http.ResponseWriter, r *http.Request) {
 				})
 			})
 			if err != nil {
-				models.Log.Error("Failed to insert playlist item", "db", dbPath, "title", req.PlaylistTitle, "error", err)
+				models.Log.Error(
+					"Failed to insert playlist item",
+					"db",
+					dbPath,
+					"title",
+					req.PlaylistTitle,
+					"error",
+					err,
+				)
 			}
 		}
 		w.WriteHeader(http.StatusOK)

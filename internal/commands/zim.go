@@ -1,7 +1,6 @@
 package commands
 
 import (
-	"github.com/chapmanjacobd/discoteca/internal/models"
 	"context"
 	"encoding/xml"
 	"errors"
@@ -17,11 +16,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/chapmanjacobd/discoteca/internal/models"
 	"github.com/chapmanjacobd/discoteca/internal/utils"
 )
 
 const (
-	KiwixBin        = "kiwix-serve"
+	KiwixBin       = "kiwix-serve"
 	KiwixPortStart = 8181
 )
 

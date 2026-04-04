@@ -3,7 +3,7 @@ package utils
 import (
 	"fmt"
 	"math"
-	"math/rand"
+	"math/rand/v2"
 	"regexp"
 	"sort"
 	"strconv"
@@ -22,7 +22,7 @@ func RandomInt(min, max int) int {
 	if min >= max {
 		return min
 	}
-	return rand.Intn(max-min) + min
+	return rand.IntN(max-min) + min
 }
 
 func LinearInterpolation(x float64, dataPoints [][2]float64) float64 {

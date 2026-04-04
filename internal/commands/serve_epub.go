@@ -1,7 +1,6 @@
 package commands
 
 import (
-	"github.com/chapmanjacobd/discoteca/internal/models"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -9,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/chapmanjacobd/discoteca/internal/models"
 	"github.com/chapmanjacobd/discoteca/internal/utils"
 )
 

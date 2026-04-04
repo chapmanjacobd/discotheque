@@ -123,11 +123,7 @@ func TestPathToMpvWatchLaterMD5(t *testing.T) {
 }
 
 func TestGetPlayhead(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "mpv_test")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	flags := models.GlobalFlags{
 		PlaybackFlags: models.PlaybackFlags{

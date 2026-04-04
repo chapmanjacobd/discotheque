@@ -7,8 +7,7 @@ import (
 )
 
 func TestDecodeQuickScan_MockFFmpeg(t *testing.T) {
-	tmpDir, _ := os.MkdirTemp("", "mock-ffmpeg-path")
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	createMock(t, tmpDir, "ffmpeg", `
 for arg in "$@"; do
@@ -33,8 +32,7 @@ exit 0
 }
 
 func TestDecodeFullScan_MockFFProbe(t *testing.T) {
-	tmpDir, _ := os.MkdirTemp("", "mock-ffprobe-path")
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	createMock(t, tmpDir, "ffprobe", `{
   "streams": [

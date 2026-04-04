@@ -33,7 +33,7 @@ func Connect(dbPath string) (*sql.DB, error) {
 	}
 
 	for _, pragma := range tuning {
-		if _, err := baseDB.Exec(pragma); err != nil {
+		if _, err := baseDB.ExecContext(context.Background(), pragma); err != nil {
 			baseDB.Close()
 			return nil, fmt.Errorf("failed to apply pragma %q: %w", pragma, err)
 		}

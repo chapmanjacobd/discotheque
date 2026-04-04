@@ -151,8 +151,7 @@ func TestStripMountSyntax(t *testing.T) {
 }
 
 func TestFolderFunctions(t *testing.T) {
-	tmpDir, _ := os.MkdirTemp("", "folder-test")
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	if !IsEmptyFolder(tmpDir) {
 		t.Error("IsEmptyFolder should be true for empty dir")

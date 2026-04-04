@@ -65,8 +65,7 @@ func TestExtract_NonExistent(t *testing.T) {
 
 func TestExtract_WithMockFFProbe(t *testing.T) {
 	// Create a mock ffprobe script
-	tmpDir, _ := os.MkdirTemp("", "mock-path")
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	createMock(t, tmpDir, "ffprobe", `{
   "streams": [
@@ -154,11 +153,7 @@ func TestParseFPS(t *testing.T) {
 
 func TestExtract_ComicArchive_OCR(t *testing.T) {
 	// Create a mock CBZ file (ZIP with image files)
-	tmpDir, err := os.MkdirTemp("", "cbz-test-*")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	// Create mock image files (empty files with image extensions for testing structure)
 	img1 := filepath.Join(tmpDir, "01.jpg")
@@ -188,11 +183,7 @@ func TestExtract_ComicArchive_OCR(t *testing.T) {
 
 func TestExtractImageTextFromCBZ_Structure(t *testing.T) {
 	// Test the CBZ extraction function directly
-	tmpDir, err := os.MkdirTemp("", "cbz-struct-test-*")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	// Create mock image files
 	img1 := filepath.Join(tmpDir, "01.png")
@@ -219,11 +210,7 @@ func TestExtractImageTextFromCBZ_Structure(t *testing.T) {
 
 func TestExtractImageTextFromCBZ_PageOrdering(t *testing.T) {
 	// Test that pages are sorted correctly
-	tmpDir, err := os.MkdirTemp("", "cbz-order-test-*")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	// Create mock image files with various naming patterns
 	pages := []string{"01.jpg", "02.jpg", "10.jpg", "page_3.jpg", "cover.png"}
@@ -263,11 +250,7 @@ func TestExtractImageTextFromCBZ_PageOrdering(t *testing.T) {
 
 func TestExtractImageTextFromCBZ_TIFFConversion(t *testing.T) {
 	// Test that TIFF images in CBZ archives can be OCR'd via temporary conversion
-	tmpDir, err := os.MkdirTemp("", "cbz-tiff-test-*")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	// Create a minimal valid TIFF file (1x1 pixel, uncompressed)
 	minimalTIFF := []byte{
@@ -371,11 +354,7 @@ func createZip(t *testing.T, dst string, files []string) {
 
 func TestExtract_Audio_SpeechRecognition(t *testing.T) {
 	// Create a mock audio file (WAV format header for detection)
-	tmpDir, err := os.MkdirTemp("", "audio-test-*")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	// Create a minimal WAV file header (44 bytes)
 	// This is enough for mimetype detection as audio/wav
@@ -418,11 +397,7 @@ func TestExtract_Audio_SpeechRecognition(t *testing.T) {
 
 func TestExtract_Audio_SpeechRecognition_Enabled(t *testing.T) {
 	// Create a mock audio file
-	tmpDir, err := os.MkdirTemp("", "audio-sr-test-*")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	// Create a minimal WAV file header
 	wavHeader := []byte{
@@ -463,11 +438,7 @@ func TestExtract_Audio_SpeechRecognition_Enabled(t *testing.T) {
 
 func TestExtractSpeechToText_EngineSelection(t *testing.T) {
 	// Create a mock audio file
-	tmpDir, err := os.MkdirTemp("", "stt-engine-test-*")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	wavHeader := []byte{
 		'R', 'I', 'F', 'F', 0x24, 0x00, 0x00, 0x00,
@@ -485,7 +456,7 @@ func TestExtractSpeechToText_EngineSelection(t *testing.T) {
 	}
 
 	// Test vosk engine selection (will fail without vosk, but should not panic)
-	_, err = extractSpeechToText(audioPath, "vosk")
+	_, err := extractSpeechToText(audioPath, "vosk")
 	if err == nil {
 		t.Log("Vosk extraction succeeded (vosk installed)")
 	} else {
@@ -511,11 +482,7 @@ func TestExtractSpeechToText_EngineSelection(t *testing.T) {
 
 func TestExtract_Video_SpeechRecognition(t *testing.T) {
 	// Create a mock video file (minimal MP4 header for detection)
-	tmpDir, err := os.MkdirTemp("", "video-sr-test-*")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	// Create a minimal MP4 file header (ftyp box)
 	mp4Header := []byte{
@@ -552,11 +519,7 @@ func TestExtract_Video_SpeechRecognition(t *testing.T) {
 
 func TestExtract_Image_MediaType(t *testing.T) {
 	// Create a mock image file (PNG header for detection)
-	tmpDir, err := os.MkdirTemp("", "image-type-test-*")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	// Create a minimal PNG file header (8 bytes signature + IHDR chunk)
 	pngHeader := []byte{
@@ -597,11 +560,7 @@ func TestExtract_Image_WithoutOCR_NoTesseract(t *testing.T) {
 	// This test verifies that images WITHOUT --OCR flag do NOT trigger tesseract
 	// even if --extract-text is enabled
 
-	tmpDir, err := os.MkdirTemp("", "image-no-ocr-test-*")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	// Create a minimal PNG file
 	pngHeader := []byte{
@@ -650,11 +609,7 @@ func TestExtract_Image_WithoutOCR_NoTesseract(t *testing.T) {
 
 func TestConvertImageForOCR(t *testing.T) {
 	// Test that convertImageForOCR handles different formats correctly
-	tmpDir, err := os.MkdirTemp("", "ocr-convert-test-*")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	// Test 1: PNG should return original path (no conversion needed)
 	pngPath := filepath.Join(tmpDir, "test.png")
@@ -747,11 +702,7 @@ func TestConvertImageForOCR(t *testing.T) {
 func TestExtract_Image_WithOCR_Tesseract(t *testing.T) {
 	// This test verifies that images WITH --OCR flag ARE passed through tesseract
 
-	tmpDir, err := os.MkdirTemp("", "image-ocr-test-*")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	// Create a minimal PNG file
 	pngHeader := []byte{
@@ -788,11 +739,7 @@ func TestExtract_Image_WithOCR_Tesseract(t *testing.T) {
 func TestExtract_Image_OCREngineSelection(t *testing.T) {
 	// Test that different OCR engines can be selected for images
 
-	tmpDir, err := os.MkdirTemp("", "image-ocr-engine-test-*")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	// Create a minimal PNG file
 	pngHeader := []byte{
@@ -808,7 +755,7 @@ func TestExtract_Image_OCREngineSelection(t *testing.T) {
 	}
 
 	// Test tesseract engine
-	_, err = Extract(context.Background(), imagePath, ExtractOptions{OCR: true, OCREngine: "tesseract"})
+	_, err := Extract(context.Background(), imagePath, ExtractOptions{OCR: true, OCREngine: "tesseract"})
 	if err != nil {
 		t.Logf("Tesseract OCR failed (expected if not installed): %v", err)
 	} else {

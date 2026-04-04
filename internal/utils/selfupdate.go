@@ -8,7 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"math/rand"
+	"math/rand/v2"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -44,7 +44,7 @@ func AutoUpdate() {
 	go func() {
 		// "don't check on startup" - wait 15 minutes before the first potential check
 		// and add some jitter to further distribute load.
-		time.Sleep(15*time.Minute + time.Duration(rand.Int63n(int64(15*time.Minute))))
+		time.Sleep(15*time.Minute + time.Duration(rand.Int64N(int64(15*time.Minute))))
 
 		for {
 			if shouldCheckProbabilistically() {

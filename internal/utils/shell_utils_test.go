@@ -30,8 +30,7 @@ func TestShellQuote(t *testing.T) {
 }
 
 func TestResolveAbsolutePath(t *testing.T) {
-	tmpDir, _ := os.MkdirTemp("", "shell-test-*")
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	f := filepath.Join(tmpDir, "testfile")
 	os.WriteFile(f, []byte("test"), 0o644)
@@ -47,8 +46,7 @@ func TestResolveAbsolutePath(t *testing.T) {
 }
 
 func TestFlattenWrapperFolder(t *testing.T) {
-	tmpDir, _ := os.MkdirTemp("", "flatten-test-*")
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	// struct: tmpDir/wrapper/file.txt
 	wrapper := filepath.Join(tmpDir, "wrapper")
@@ -69,8 +67,7 @@ func TestFlattenWrapperFolder(t *testing.T) {
 }
 
 func TestFlattenWrapperFolderConflict(t *testing.T) {
-	tmpDir, _ := os.MkdirTemp("", "flatten-conflict-test-*")
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	// struct: tmpDir/wrapper/wrapper (file)
 	wrapper := filepath.Join(tmpDir, "wrapper")

@@ -91,11 +91,7 @@ func TestAddCmd_AllFiles(t *testing.T) {
 	defer fixture.Cleanup()
 
 	// Create temp directory for scanning
-	tempDir, err := os.MkdirTemp("", "discoteca-scan-*")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tempDir)
+	tempDir := t.TempDir()
 
 	// Create a mix of media and non-media files
 	mediaFile := filepath.Join(tempDir, "video.mp4")
@@ -125,7 +121,7 @@ func TestAddCmd_AllFiles(t *testing.T) {
 	defer dbConn.Close()
 
 	var count int
-	err = dbConn.QueryRow("SELECT COUNT(*) FROM media").Scan(&count)
+	err := dbConn.QueryRow("SELECT COUNT(*) FROM media").Scan(&count)
 	if err != nil {
 		t.Fatalf("Query failed: %v", err)
 	}
@@ -153,8 +149,7 @@ func TestAddCmd_FilterVideo(t *testing.T) {
 	fixture := testutils.Setup(t)
 	defer fixture.Cleanup()
 
-	tempDir, _ := os.MkdirTemp("", "discoteca-scan-*")
-	defer os.RemoveAll(tempDir)
+	tempDir := t.TempDir()
 
 	mediaFile := filepath.Join(tempDir, "video.mp4")
 	nonMediaFile := filepath.Join(tempDir, "document.txt")

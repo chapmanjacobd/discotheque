@@ -116,7 +116,15 @@ func (c *ServeCmd) handleTranscode(
 	}
 
 	ffmpegArgs := append([]string{"-hide_banner", "-loglevel", "error"}, args...)
-	models.Log.Info("Streaming with transcode", "path", path, "strategy", strategy, "args", strings.Join(ffmpegArgs, " "))
+	models.Log.Info(
+		"Streaming with transcode",
+		"path",
+		path,
+		"strategy",
+		strategy,
+		"args",
+		strings.Join(ffmpegArgs, " "),
+	)
 
 	cmd := exec.CommandContext(r.Context(), "ffmpeg", ffmpegArgs...)
 	cmd.Stdout = w

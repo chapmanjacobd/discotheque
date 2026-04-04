@@ -91,8 +91,7 @@ func TestAltName(t *testing.T) {
 }
 
 func TestGetExternalSubtitles(t *testing.T) {
-	tmpDir, _ := os.MkdirTemp("", "subs-test")
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	movie := filepath.Join(tmpDir, "movie.mp4")
 	os.WriteFile(movie, []byte(""), 0o644)
@@ -110,8 +109,7 @@ func TestGetExternalSubtitles(t *testing.T) {
 }
 
 func TestGetExternalSubtitles_MorePatterns(t *testing.T) {
-	tmpDir, _ := os.MkdirTemp("", "subs-test-2")
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	movie := filepath.Join(tmpDir, "show S01E01.mkv")
 	os.WriteFile(movie, []byte(""), 0o644)
@@ -175,8 +173,7 @@ func TestGetLanguageName(t *testing.T) {
 }
 
 func TestFilterDeleted(t *testing.T) {
-	tmpDir, _ := os.MkdirTemp("", "filter-deleted")
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	f1 := filepath.Join(tmpDir, "exists.txt")
 	os.WriteFile(f1, []byte(""), 0o644)

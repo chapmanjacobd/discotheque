@@ -23,8 +23,7 @@ func TestFileExists(t *testing.T) {
 }
 
 func TestDirExists(t *testing.T) {
-	tmpDir, _ := os.MkdirTemp("", "dir-exists-test")
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	if !DirExists(tmpDir) {
 		t.Errorf("DirExists(%s) should be true", tmpDir)
@@ -47,8 +46,7 @@ func TestGetDefaultBrowser(t *testing.T) {
 }
 
 func TestIsSQLite(t *testing.T) {
-	tmpDir, _ := os.MkdirTemp("", "sqlite-test")
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	dbPath := filepath.Join(tmpDir, "test.db")
 	os.WriteFile(dbPath, []byte("SQLite format 3\x00extra data"), 0o644)
