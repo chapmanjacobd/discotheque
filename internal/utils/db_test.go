@@ -1,8 +1,10 @@
-package utils
+package utils_test
 
 import (
 	"strings"
 	"testing"
+
+	"github.com/chapmanjacobd/discoteca/internal/utils"
 )
 
 func TestMostSimilarSchema(t *testing.T) {
@@ -24,7 +26,7 @@ func TestMostSimilarSchema(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := MostSimilarSchema(tt.keys, existingTables)
+			got := utils.MostSimilarSchema(tt.keys, existingTables)
 			if got != tt.expected {
 				t.Errorf("MostSimilarSchema() = %v, want %v", got, tt.expected)
 			}
@@ -41,7 +43,7 @@ func TestBlockDictsLikeSQL(t *testing.T) {
 	}
 	blocklist := []map[string]any{{"genre": "Comedy"}, {"genre": "Thriller"}}
 
-	got := BlockDictsLikeSQL(media, blocklist)
+	got := utils.BlockDictsLikeSQL(media, blocklist)
 	if len(got) != 2 {
 		t.Errorf("BlockDictsLikeSQL() len = %d, want 2", len(got))
 	}
@@ -56,7 +58,7 @@ func TestAllowDictsLikeSQL(t *testing.T) {
 	}
 	allowlist := []map[string]any{{"genre": "Comedy"}, {"genre": "Thriller"}}
 
-	got := AllowDictsLikeSQL(media, allowlist)
+	got := utils.AllowDictsLikeSQL(media, allowlist)
 	if len(got) != 2 {
 		t.Errorf("AllowDictsLikeSQL() len = %d, want 2", len(got))
 	}
@@ -64,7 +66,7 @@ func TestAllowDictsLikeSQL(t *testing.T) {
 
 func TestConstructSearchBindings(t *testing.T) {
 	t.Run("Includes", func(t *testing.T) {
-		sql, bindings := ConstructSearchBindings([]string{"test"}, []string{}, []string{"col1", "col2"}, false)
+		sql, bindings := utils.ConstructSearchBindings([]string{"test"}, []string{}, []string{"col1", "col2"}, false)
 		if !strings.Contains(sql, "col1 LIKE :S_include0 OR col2 LIKE :S_include0") {
 			t.Errorf("ConstructSearchBindings() sql = %q", sql)
 		}
@@ -74,7 +76,7 @@ func TestConstructSearchBindings(t *testing.T) {
 	})
 
 	t.Run("Exact Match", func(t *testing.T) {
-		sql, bindings := ConstructSearchBindings([]string{"test"}, []string{}, []string{"col1"}, true)
+		sql, bindings := utils.ConstructSearchBindings([]string{"test"}, []string{}, []string{"col1"}, true)
 		if !strings.Contains(sql, "col1 LIKE :S_include0") {
 			t.Errorf("ConstructSearchBindings() sql = %q", sql)
 		}
@@ -84,7 +86,7 @@ func TestConstructSearchBindings(t *testing.T) {
 	})
 
 	t.Run("Excludes", func(t *testing.T) {
-		sql, bindings := ConstructSearchBindings([]string{}, []string{"test"}, []string{"col1", "col2"}, false)
+		sql, bindings := utils.ConstructSearchBindings([]string{}, []string{"test"}, []string{"col1", "col2"}, false)
 		if !strings.Contains(
 			sql,
 			"AND ((COALESCE(col1,'') NOT LIKE :S_exclude0 AND COALESCE(col2,'') NOT LIKE :S_exclude0))",

@@ -87,7 +87,8 @@ func TestTrigramBM25WithMoreData(t *testing.T) {
 
 	t.Run("BM25 Ranking", func(t *testing.T) {
 		for _, tc := range strategies {
-			sql := `
+			func() {
+				sql := `
 		SELECT m.path, m.title, media_fts.rank,
 			(LENGTH(m.title) + LENGTH(m.description) - LENGTH(REPLACE(LOWER(m.title || ' ' || m.description), 'python', ''))) / 6 as python_count
 		FROM media m, media_fts
@@ -96,33 +97,37 @@ func TestTrigramBM25WithMoreData(t *testing.T) {
 		ORDER BY media_fts.rank DESC
 		LIMIT 10
 		`
-			rows, err := sqlDB.QueryContext(ctx, sql, tc.query)
-			if err != nil {
-				t.Errorf("%s: ERROR - %v", tc.name, err)
-				continue
-			}
-			defer rows.Close()
-
-			var results []string
-			rank := 0
-			for rows.Next() {
-				var path, title string
-				var bm25 float64
-				var pythonCount int
-				if err := rows.Scan(&path, &title, &bm25, &pythonCount); err != nil {
-					t.Errorf("%s: Scan error: %v", tc.name, err)
-					continue
+				rows, err := sqlDB.QueryContext(ctx, sql, tc.query)
+				if err != nil {
+					t.Errorf("%s: ERROR - %v", tc.name, err)
+					return
 				}
-				rank++
-				results = append(results, fmt.Sprintf("%d. %s (python#=%d, score=%.6f)", rank, path, pythonCount, bm25))
-			}
-			if err := rows.Err(); err != nil {
-				t.Errorf("%s: rows error: %v", tc.name, err)
-			}
+				defer rows.Close()
 
-			if len(results) == 0 {
-				t.Errorf("%s: no results returned", tc.name)
-			}
+				var results []string
+				rank := 0
+				for rows.Next() {
+					var path, title string
+					var bm25 float64
+					var pythonCount int
+					if err := rows.Scan(&path, &title, &bm25, &pythonCount); err != nil {
+						t.Errorf("%s: Scan error: %v", tc.name, err)
+						continue
+					}
+					rank++
+					results = append(
+						results,
+						fmt.Sprintf("%d. %s (python#=%d, score=%.6f)", rank, path, pythonCount, bm25),
+					)
+				}
+				if err := rows.Err(); err != nil {
+					t.Errorf("%s: rows error: %v", tc.name, err)
+				}
+
+				if len(results) == 0 {
+					t.Errorf("%s: no results returned", tc.name)
+				}
+			}()
 		}
 	})
 
@@ -222,31 +227,33 @@ func TestFirstTrigramOnly(t *testing.T) {
 
 	t.Run("First Trigram vs All Trigrams", func(t *testing.T) {
 		for _, tc := range tests {
-			sql := `SELECT m.path, m.title, media_fts.rank FROM media m, media_fts WHERE m.rowid = media_fts.rowid AND media_fts MATCH ? ORDER BY media_fts.rank DESC`
-			rows, err := sqlDB.QueryContext(ctx, sql, tc.query)
-			if err != nil {
-				t.Errorf("%-35s ERROR: %v", tc.name, err)
-				continue
-			}
-			defer rows.Close()
-
-			var results []string
-			for rows.Next() {
-				var path, title string
-				var rank float64
-				if err := rows.Scan(&path, &title, &rank); err != nil {
-					t.Errorf("%s: Scan error: %v", tc.name, err)
-					continue
+			func() {
+				sql := `SELECT m.path, m.title, media_fts.rank FROM media m, media_fts WHERE m.rowid = media_fts.rowid AND media_fts MATCH ? ORDER BY media_fts.rank DESC`
+				rows, err := sqlDB.QueryContext(ctx, sql, tc.query)
+				if err != nil {
+					t.Errorf("%-35s ERROR: %v", tc.name, err)
+					return
 				}
-				results = append(results, fmt.Sprintf("%s(%.0f)", path, rank*1000000))
-			}
-			if err := rows.Err(); err != nil {
-				t.Errorf("%s: rows error: %v", tc.name, err)
-			}
+				defer rows.Close()
 
-			if len(results) == 0 {
-				t.Errorf("%s: no results returned", tc.name)
-			}
+				var results []string
+				for rows.Next() {
+					var path, title string
+					var rank float64
+					if err := rows.Scan(&path, &title, &rank); err != nil {
+						t.Errorf("%s: Scan error: %v", tc.name, err)
+						continue
+					}
+					results = append(results, fmt.Sprintf("%s(%.0f)", path, rank*1000000))
+				}
+				if err := rows.Err(); err != nil {
+					t.Errorf("%s: rows error: %v", tc.name, err)
+				}
+
+				if len(results) == 0 {
+					t.Errorf("%s: no results returned", tc.name)
+				}
+			}()
 		}
 	})
 }

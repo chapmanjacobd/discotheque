@@ -1,8 +1,10 @@
-package utils
+package utils_test
 
 import (
 	"reflect"
 	"testing"
+
+	"github.com/chapmanjacobd/discoteca/internal/utils"
 )
 
 func TestGetString(t *testing.T) {
@@ -15,7 +17,7 @@ func TestGetString(t *testing.T) {
 		{nil, ""},
 	}
 	for _, tt := range tests {
-		if got := GetString(tt.input); got != tt.expected {
+		if got := utils.GetString(tt.input); got != tt.expected {
 			t.Errorf("GetString(%v) = %v, want %v", tt.input, got, tt.expected)
 		}
 	}
@@ -32,7 +34,7 @@ func TestGetInt(t *testing.T) {
 		{nil, 0},
 	}
 	for _, tt := range tests {
-		if got := GetInt(tt.input); got != tt.expected {
+		if got := utils.GetInt(tt.input); got != tt.expected {
 			t.Errorf("GetInt(%v) = %v, want %v", tt.input, got, tt.expected)
 		}
 	}
@@ -48,7 +50,7 @@ func TestGetInt64(t *testing.T) {
 		{nil, 0},
 	}
 	for _, tt := range tests {
-		if got := GetInt64(tt.input); got != tt.expected {
+		if got := utils.GetInt64(tt.input); got != tt.expected {
 			t.Errorf("GetInt64(%v) = %v, want %v", tt.input, got, tt.expected)
 		}
 	}
@@ -56,20 +58,20 @@ func TestGetInt64(t *testing.T) {
 
 func TestStringValue(t *testing.T) {
 	s := "hello"
-	if got := StringValue(&s); got != "hello" {
+	if got := utils.StringValue(&s); got != "hello" {
 		t.Errorf("StringValue(&s) = %v, want hello", got)
 	}
-	if got := StringValue(nil); got != "" {
+	if got := utils.StringValue(nil); got != "" {
 		t.Errorf("StringValue(nil) = %v, want empty string", got)
 	}
 }
 
 func TestInt64Value(t *testing.T) {
 	var i int64 = 123
-	if got := Int64Value(&i); got != 123 {
+	if got := utils.Int64Value(&i); got != 123 {
 		t.Errorf("Int64Value(&i) = %v, want 123", got)
 	}
-	if got := Int64Value(nil); got != 0 {
+	if got := utils.Int64Value(nil); got != 0 {
 		t.Errorf("Int64Value(nil) = %v, want 0", got)
 	}
 }
@@ -77,16 +79,23 @@ func TestInt64Value(t *testing.T) {
 func TestParseSlice(t *testing.T) {
 	tests := []struct {
 		input    string
-		expected Slice
+		expected utils.Slice
 	}{
-		{"1:5:2", Slice{Start: new(1), Stop: new(5), Step: new(2)}},
-		{"3", Slice{Start: new(3)}},
-		{"3:4", Slice{Start: new(3), Stop: new(4)}},
-		{":4", Slice{Stop: new(4)}},
+		{"1:5:2", utils.Slice{Start: new(int), Stop: new(int), Step: new(int)}},
+		{"3", utils.Slice{Start: new(int)}},
+		{"3:4", utils.Slice{Start: new(int), Stop: new(int)}},
+		{":4", utils.Slice{Stop: new(int)}},
 	}
+	*tests[0].expected.Start = 1
+	*tests[0].expected.Stop = 5
+	*tests[0].expected.Step = 2
+	*tests[1].expected.Start = 3
+	*tests[2].expected.Start = 3
+	*tests[2].expected.Stop = 4
+	*tests[3].expected.Stop = 4
 
 	for _, tt := range tests {
-		got, err := ParseSlice(tt.input)
+		got, err := utils.ParseSlice(tt.input)
 		if err != nil {
 			t.Errorf("ParseSlice(%q) error: %v", tt.input, err)
 			continue
@@ -105,14 +114,14 @@ func TestDictFilterBool(t *testing.T) {
 		"d": "",
 		"e": false,
 	}
-	got := DictFilterBool(data)
+	got := utils.DictFilterBool(data)
 	if len(got) != 1 || got["a"] != 1 {
 		t.Errorf("DictFilterBool() = %v, want {a: 1}", got)
 	}
-	if got := DictFilterBool(nil); got != nil {
+	if got := utils.DictFilterBool(nil); got != nil {
 		t.Errorf("DictFilterBool(nil) = %v, want nil", got)
 	}
-	if got := DictFilterBool(map[string]any{"a": 0}); got != nil {
+	if got := utils.DictFilterBool(map[string]any{"a": 0}); got != nil {
 		t.Errorf("DictFilterBool(all false) = %v, want nil", got)
 	}
 }
@@ -121,17 +130,17 @@ func TestRangeMatches(t *testing.T) {
 	val10 := int64(10)
 	val20 := int64(20)
 	tests := []struct {
-		r     Range
+		r     utils.Range
 		val   int64
 		match bool
 	}{
-		{Range{Value: &val10}, 10, true},
-		{Range{Value: &val10}, 11, false},
-		{Range{Min: &val10}, 10, true},
-		{Range{Min: &val10}, 9, false},
-		{Range{Max: &val20}, 20, true},
-		{Range{Max: &val20}, 21, false},
-		{Range{Min: &val10, Max: &val20}, 15, true},
+		{utils.Range{Value: &val10}, 10, true},
+		{utils.Range{Value: &val10}, 11, false},
+		{utils.Range{Min: &val10}, 10, true},
+		{utils.Range{Min: &val10}, 9, false},
+		{utils.Range{Max: &val20}, 20, true},
+		{utils.Range{Max: &val20}, 21, false},
+		{utils.Range{Min: &val10, Max: &val20}, 15, true},
 	}
 	for _, tt := range tests {
 		if got := tt.r.Matches(tt.val); got != tt.match {
@@ -141,24 +150,24 @@ func TestRangeMatches(t *testing.T) {
 }
 
 func TestToNull(t *testing.T) {
-	if got := ToNullInt64(123); !got.Valid || got.Int64 != 123 {
+	if got := utils.ToNullInt64(123); !got.Valid || got.Int64 != 123 {
 		t.Errorf("ToNullInt64(123) failed: %v", got)
 	}
-	if got := ToNullInt64(0); got.Valid {
+	if got := utils.ToNullInt64(0); got.Valid {
 		t.Error("ToNullInt64(0) should be invalid")
 	}
 
-	if got := ToNullString("hello"); !got.Valid || got.String != "hello" {
+	if got := utils.ToNullString("hello"); !got.Valid || got.String != "hello" {
 		t.Errorf("ToNullString(hello) failed: %v", got)
 	}
-	if got := ToNullString(""); got.Valid {
+	if got := utils.ToNullString(""); got.Valid {
 		t.Error("ToNullString('') should be invalid")
 	}
 
-	if got := ToNullFloat64(1.23); !got.Valid || got.Float64 != 1.23 {
+	if got := utils.ToNullFloat64(1.23); !got.Valid || got.Float64 != 1.23 {
 		t.Errorf("ToNullFloat64(1.23) failed: %v", got)
 	}
-	if got := ToNullFloat64(0); got.Valid {
+	if got := utils.ToNullFloat64(0); got.Valid {
 		t.Error("ToNullFloat64(0) should be invalid")
 	}
 }
