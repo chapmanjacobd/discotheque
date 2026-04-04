@@ -1,6 +1,7 @@
-package commands
+package commands_test
 
 import (
+	"github.com/chapmanjacobd/discoteca/internal/commands"
 	"database/sql"
 	"encoding/json"
 	"net/http"
@@ -83,13 +84,14 @@ func TestHandleDU_CaptionsView(t *testing.T) {
 
 	db.Close()
 
-	// Create ServeCmd with test database
-	cmd := &ServeCmd{
+	// Create commands.ServeCmd with test database
+	cmd := &commands.ServeCmd{
 		Databases: []string{tmpDB.Name()},
 	}
 	defer cmd.Close()
 
 	t.Run("GetAllCaptions returns all captions", func(t *testing.T) {
+	t.Parallel()
 		req := httptest.NewRequest(http.MethodGet, "/api/query?captions=true&limit=100", nil)
 		w := httptest.NewRecorder()
 
@@ -123,6 +125,7 @@ func TestHandleDU_CaptionsView(t *testing.T) {
 	})
 
 	t.Run("GetAllCaptions respects limit", func(t *testing.T) {
+	t.Parallel()
 		req := httptest.NewRequest(http.MethodGet, "/api/query?captions=true&limit=2", nil)
 		w := httptest.NewRecorder()
 
@@ -143,6 +146,7 @@ func TestHandleDU_CaptionsView(t *testing.T) {
 	})
 
 	t.Run("GetAllCaptions returns X-Total-Count header", func(t *testing.T) {
+	t.Parallel()
 		req := httptest.NewRequest(http.MethodGet, "/api/query?captions=true&limit=2", nil)
 		w := httptest.NewRecorder()
 
@@ -155,6 +159,7 @@ func TestHandleDU_CaptionsView(t *testing.T) {
 	})
 
 	t.Run("GetAllCaptions with all flag returns all captions", func(t *testing.T) {
+	t.Parallel()
 		req := httptest.NewRequest(http.MethodGet, "/api/query?captions=true&all=true", nil)
 		w := httptest.NewRecorder()
 
@@ -215,12 +220,13 @@ func TestHandleDU_CaptionsView_EmptyDatabase(t *testing.T) {
 
 	db.Close()
 
-	cmd := &ServeCmd{
+	cmd := &commands.ServeCmd{
 		Databases: []string{tmpDB.Name()},
 	}
 	defer cmd.Close()
 
 	t.Run("GetAllCaptions with no captions returns empty array", func(t *testing.T) {
+	t.Parallel()
 		req := httptest.NewRequest(http.MethodGet, "/api/query?captions=true&limit=100", nil)
 		w := httptest.NewRecorder()
 
@@ -290,12 +296,13 @@ func TestHandleDU_CaptionsView_MultipleDatabases(t *testing.T) {
 	}
 	db2.Close()
 
-	cmd := &ServeCmd{
+	cmd := &commands.ServeCmd{
 		Databases: []string{tmpDB1.Name(), tmpDB2.Name()},
 	}
 	defer cmd.Close()
 
 	t.Run("GetAllCaptions merges results from multiple databases", func(t *testing.T) {
+	t.Parallel()
 		req := httptest.NewRequest(http.MethodGet, "/api/query?captions=true&limit=100", nil)
 		w := httptest.NewRecorder()
 

@@ -1,8 +1,10 @@
-package aggregate
+package aggregate_test
 
 import (
+	"fmt"
 	"testing"
 
+	"github.com/chapmanjacobd/discoteca/internal/aggregate"
 	"github.com/chapmanjacobd/discoteca/internal/models"
 )
 
@@ -36,7 +38,7 @@ func TestIsSameGroup(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := IsSameGroup(flags, m0, tt.other); got != tt.expected {
+			if got := aggregate.IsSameGroup(flags, m0, tt.other); got != tt.expected {
 				t.Errorf("IsSameGroup() = %v, want %v", got, tt.expected)
 			}
 		})
@@ -64,7 +66,7 @@ func TestIsSameFolderGroup(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := IsSameFolderGroup(flags, f0, tt.other); got != tt.expected {
+			if got := aggregate.IsSameFolderGroup(flags, f0, tt.other); got != tt.expected {
 				t.Errorf("IsSameFolderGroup() = %v, want %v", got, tt.expected)
 			}
 		})
@@ -99,7 +101,7 @@ func TestClusterByNumbers(t *testing.T) {
 		{Media: models.Media{Path: "f", Size: &s116, Duration: &d108}},
 	}
 
-	got := ClusterByNumbers(flags, media)
+	got := aggregate.ClusterByNumbers(flags, media)
 	// Python test said: [0, 0, 0, 1, 1, 2]
 	// group 0: a, b, c
 	// group 1: d, e
@@ -127,7 +129,7 @@ func TestClusterFoldersByNumbers(t *testing.T) {
 		{Path: "/dir3", ExistsCount: 110, Count: 1},
 	}
 
-	got := ClusterFoldersByNumbers(flags, folders)
+	got := aggregate.ClusterFoldersByNumbers(flags, folders)
 	if len(got) != 1 {
 		t.Errorf("Expected 1 group, got %d", len(got))
 	}
@@ -144,7 +146,7 @@ func TestByFolder(t *testing.T) {
 		{Path: "/dir2/file3.mp4", Size: &s100},
 	}
 
-	got := ByFolder(media)
+	got := aggregate.ByFolder(media)
 	if len(got) != 2 {
 		t.Errorf("Expected 2 folders, got %d", len(got))
 	}
@@ -165,11 +167,11 @@ func TestSortFolders_Aggregate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			folders := []FolderStats{
+			folders := []aggregate.FolderStats{
 				{Path: "b", Count: 2},
 				{Path: "a", Count: 1},
 			}
-			SortFolders(folders, tt.sortBy, tt.reverse)
+			aggregate.SortFolders(folders, tt.sortBy, tt.reverse)
 			if folders[0].Path != tt.expected {
 				t.Errorf("SortFolders(%s, %v) = %s, want %s", tt.sortBy, tt.reverse, folders[0].Path, tt.expected)
 			}
@@ -189,7 +191,7 @@ func TestFilterNearDuplicates(t *testing.T) {
 		},
 	}
 
-	got := FilterNearDuplicates(groups)
+	got := aggregate.FilterNearDuplicates(groups)
 	// movie_final and movie_final_v2 should be grouped together, something_else separate
 	if len(got) < 2 {
 		t.Errorf("Expected group to be split, got %d", len(got))
@@ -203,7 +205,7 @@ func TestClusterFoldersByName(t *testing.T) {
 		{Path: "/path/to/completely_different_thing", Count: 1},
 	}
 
-	got := ClusterFoldersByName(models.GlobalFlags{SimilarityFlags: models.SimilarityFlags{Similar: false}}, folders)
+	got := aggregate.ClusterFoldersByName(models.GlobalFlags{SimilarityFlags: models.SimilarityFlags{Similar: false}}, folders)
 	if len(got) != 2 {
 		t.Errorf("Expected 2 groups, got %d", len(got))
 	}
@@ -218,7 +220,7 @@ func TestClusterPaths(t *testing.T) {
 		"/other/completely/different/file.txt",
 	}
 
-	got := ClusterPaths(models.GlobalFlags{SimilarityFlags: models.SimilarityFlags{Clusters: 2}}, lines)
+	got := aggregate.ClusterPaths(models.GlobalFlags{SimilarityFlags: models.SimilarityFlags{Clusters: 2}}, lines)
 	if len(got) < 1 {
 		t.Error("ClusterPaths returned no groups")
 	}

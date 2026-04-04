@@ -1,6 +1,7 @@
-package commands
+package commands_test
 
 import (
+	"github.com/chapmanjacobd/discoteca/internal/commands"
 	"context"
 	"database/sql"
 	"os"
@@ -18,7 +19,7 @@ func TestMarkDeletedItem(t *testing.T) {
 	defer fixture.Cleanup()
 
 	f1 := fixture.CreateDummyFile("media1.mp4")
-	addCmd := &AddCmd{
+	addCmd := &commands.AddCmd{
 		Args: []string{fixture.DBPath, f1},
 	}
 	addCmd.AfterApply()
@@ -29,8 +30,8 @@ func TestMarkDeletedItem(t *testing.T) {
 		DB:    fixture.DBPath,
 	}
 
-	if err := MarkDeletedItem(context.Background(), m); err != nil {
-		t.Fatalf("MarkDeletedItem failed: %v", err)
+	if err := commands.MarkDeletedItem(context.Background(), m); err != nil {
+		t.Fatalf("commands.MarkDeletedItem failed: %v", err)
 	}
 
 	dbConn := fixture.GetDB()
@@ -51,7 +52,7 @@ func TestMoveMediaItem(t *testing.T) {
 	defer fixture.Cleanup()
 
 	f1 := fixture.CreateDummyFile("media1.mp4")
-	addCmd := &AddCmd{
+	addCmd := &commands.AddCmd{
 		Args: []string{fixture.DBPath, f1},
 	}
 	addCmd.AfterApply()
@@ -63,8 +64,8 @@ func TestMoveMediaItem(t *testing.T) {
 		DB:    fixture.DBPath,
 	}
 
-	if err := MoveMediaItem(context.Background(), destDir, m); err != nil {
-		t.Fatalf("MoveMediaItem failed: %v", err)
+	if err := commands.MoveMediaItem(context.Background(), destDir, m); err != nil {
+		t.Fatalf("commands.MoveMediaItem failed: %v", err)
 	}
 
 	destPath := filepath.Join(destDir, filepath.Base(f1))
@@ -95,8 +96,8 @@ func TestCopyMediaItem(t *testing.T) {
 	}
 
 	destDir := filepath.Join(fixture.TempDir, "copied")
-	if err := CopyMediaItem(destDir, m); err != nil {
-		t.Fatalf("CopyMediaItem failed: %v", err)
+	if err := commands.CopyMediaItem(destDir, m); err != nil {
+		t.Fatalf("commands.CopyMediaItem failed: %v", err)
 	}
 
 	destPath := filepath.Join(destDir, filepath.Base(f1))
@@ -120,12 +121,12 @@ func TestDeleteMediaItem(t *testing.T) {
 		Media: models.Media{Path: f.Name()},
 	}
 
-	if err := DeleteMediaItem(m); err != nil {
-		t.Fatalf("DeleteMediaItem failed: %v", err)
+	if err := commands.DeleteMediaItem(m); err != nil {
+		t.Fatalf("commands.DeleteMediaItem failed: %v", err)
 	}
 
 	if _, err := os.Stat(f.Name()); !os.IsNotExist(err) {
-		t.Error("File still exists after DeleteMediaItem")
+		t.Error("File still exists after commands.DeleteMediaItem")
 	}
 }
 
@@ -152,8 +153,8 @@ func TestExecutePostAction(t *testing.T) {
 	dbConn.Exec("INSERT INTO media (path) VALUES (?)", f1)
 	dbConn.Close()
 
-	if err := ExecutePostAction(context.Background(), flags, []models.MediaWithDB{m}); err != nil {
-		t.Fatalf("ExecutePostAction mark-deleted failed: %v", err)
+	if err := commands.ExecutePostAction(context.Background(), flags, []models.MediaWithDB{m}); err != nil {
+		t.Fatalf("commands.ExecutePostAction mark-deleted failed: %v", err)
 	}
 
 	dbConn = fixture.GetDB()
