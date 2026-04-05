@@ -3,7 +3,7 @@ package tui
 import "github.com/charmbracelet/lipgloss"
 
 var (
-	// Colors inspired by the Web UI
+	// ColorAccent is a color inspired by the Web UI
 	ColorAccent = lipgloss.Color("#77b3ff")
 	ColorText   = lipgloss.Color("#e6e6e6")
 	ColorMuted  = lipgloss.Color("#888888")
@@ -12,7 +12,7 @@ var (
 	ColorLogo2  = lipgloss.Color("#00ffff")
 	ColorBorder = lipgloss.Color("#32394d")
 
-	// Styles
+	// StyleDoc is the main document style
 	StyleDoc = lipgloss.NewStyle().Margin(1, 2)
 
 	StyleTitle = lipgloss.NewStyle().

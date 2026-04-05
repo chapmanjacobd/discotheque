@@ -33,7 +33,7 @@ func ParseDate(dateStr string) int64 {
 }
 
 // IsTZAware checks if a time is not in the Local or UTC location (as a proxy for "aware")
-// In Go, time.Time is always aware of its Location.
+// In Go, [time.Time] is always aware of its Location.
 func IsTZAware(t time.Time) bool {
 	name, offset := t.Zone()
 	return name != "UTC" && name != "Local" || offset != 0

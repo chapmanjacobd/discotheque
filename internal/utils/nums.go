@@ -103,23 +103,12 @@ func Percentile[T Number](slice []T, p float64) float64 {
 	return sorted[i]*(1-fraction) + sorted[i+1]*fraction
 }
 
-func HumanToBytes(s string) (int64, error) {
+func humanToUnit(s string, suffixes []struct {
+	suffix string
+	mult   int64
+},
+) (int64, error) {
 	s = strings.ToUpper(strings.TrimSpace(s))
-
-	suffixes := []struct {
-		suffix string
-		mult   int64
-	}{
-		{"KB", 1000},
-		{"MB", 1000 * 1000},
-		{"GB", 1000 * 1000 * 1000},
-		{"TB", 1000 * 1000 * 1000 * 1000},
-		{"K", 1000},
-		{"M", 1000 * 1000},
-		{"G", 1000 * 1000 * 1000},
-		{"T", 1000 * 1000 * 1000 * 1000},
-		{"B", 1},
-	}
 
 	for _, entry := range suffixes {
 		if before, ok := strings.CutSuffix(s, entry.suffix); ok {
@@ -136,9 +125,25 @@ func HumanToBytes(s string) (int64, error) {
 	return num, err
 }
 
-func HumanToBits(s string) (int64, error) {
-	s = strings.ToUpper(strings.TrimSpace(s))
+func HumanToBytes(s string) (int64, error) {
+	suffixes := []struct {
+		suffix string
+		mult   int64
+	}{
+		{"KB", 1000},
+		{"MB", 1000 * 1000},
+		{"GB", 1000 * 1000 * 1000},
+		{"TB", 1000 * 1000 * 1000 * 1000},
+		{"K", 1000},
+		{"M", 1000 * 1000},
+		{"G", 1000 * 1000 * 1000},
+		{"T", 1000 * 1000 * 1000 * 1000},
+		{"B", 1},
+	}
+	return humanToUnit(s, suffixes)
+}
 
+func HumanToBits(s string) (int64, error) {
 	suffixes := []struct {
 		suffix string
 		mult   int64
@@ -153,20 +158,7 @@ func HumanToBits(s string) (int64, error) {
 		{"T", 1000 * 1000 * 1000 * 1000},
 		{"BIT", 1},
 	}
-
-	for _, entry := range suffixes {
-		if before, ok := strings.CutSuffix(s, entry.suffix); ok {
-			numStr := strings.TrimSpace(before)
-			num, err := strconv.ParseFloat(numStr, 64)
-			if err != nil {
-				return 0, err
-			}
-			return int64(num * float64(entry.mult)), nil
-		}
-	}
-
-	num, err := strconv.ParseInt(s, 10, 64)
-	return num, err
+	return humanToUnit(s, suffixes)
 }
 
 func HumanToSeconds(s string) (int64, error) {

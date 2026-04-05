@@ -19,7 +19,7 @@ import (
 )
 
 // CountWordsFast estimates word count by counting spaces.
-// This is much faster than strings.Fields() and sufficient for duration estimation.
+// This is much faster than [strings.Fields] and sufficient for duration estimation.
 func CountWordsFast(b []byte) int {
 	return bytes.Count(b, []byte{' '}) + bytes.Count(b, []byte{'\n'}) + bytes.Count(b, []byte{'\t'}) + 1
 }
@@ -251,7 +251,7 @@ func EstimateWordCountFromSize(path string, size int64) int {
 	return estimatedWords
 }
 
-// readAllLimited reads from an io.Reader up to 10MB limit.
+// readAllLimited reads from an [io.Reader] up to 10MB limit.
 func readAllLimited(r io.Reader) ([]byte, error) {
 	// Use a limited reader to cap memory usage
 	lr := io.LimitReader(r, 10*1024*1024)
@@ -711,29 +711,27 @@ func extractTextFromDOCX(path string) (string, error) {
 	return strings.TrimSpace(text), nil
 }
 
-// extractTextFromXLSX extracts text from XLSX (cell values from all sheets)
-func extractTextFromXLSX(path string) (string, error) {
+func extractTextFromZipXML(path, filePattern, noFilesErr string, extractFunc func(string) string) (string, error) {
 	r, err := zip.OpenReader(path)
 	if err != nil {
 		return "", err
 	}
 	defer r.Close()
 
-	// Find all worksheet files
-	var worksheetFiles []string
+	var targetFiles []string
 	for _, f := range r.File {
 		name := strings.ToLower(f.Name)
-		if strings.Contains(name, "worksheets/sheet") && strings.HasSuffix(name, ".xml") {
-			worksheetFiles = append(worksheetFiles, f.Name)
+		if strings.Contains(name, filePattern) && strings.HasSuffix(name, ".xml") {
+			targetFiles = append(targetFiles, f.Name)
 		}
 	}
 
-	if len(worksheetFiles) == 0 {
-		return "", errors.New("no worksheets found in XLSX")
+	if len(targetFiles) == 0 {
+		return "", errors.New(noFilesErr)
 	}
 
 	var fullText strings.Builder
-	for _, fname := range worksheetFiles {
+	for _, fname := range targetFiles {
 		idx := findFileIndex(r.File, fname)
 		if idx < 0 {
 			continue
@@ -747,8 +745,7 @@ func extractTextFromXLSX(path string) (string, error) {
 		if err != nil {
 			continue
 		}
-		// Extract <v>...</v> cell values from XML
-		text := extractXLSXCellValues(string(content))
+		text := extractFunc(string(content))
 		if text != "" {
 			fullText.WriteString(text)
 			fullText.WriteString(" ")
@@ -758,51 +755,14 @@ func extractTextFromXLSX(path string) (string, error) {
 	return strings.TrimSpace(fullText.String()), nil
 }
 
+// extractTextFromXLSX extracts text from XLSX (cell values from all sheets)
+func extractTextFromXLSX(path string) (string, error) {
+	return extractTextFromZipXML(path, "worksheets/sheet", "no worksheets found in XLSX", extractXLSXCellValues)
+}
+
 // extractTextFromPPTX extracts text from PPTX (slide content)
 func extractTextFromPPTX(path string) (string, error) {
-	r, err := zip.OpenReader(path)
-	if err != nil {
-		return "", err
-	}
-	defer r.Close()
-
-	// Find all slide files
-	var slideFiles []string
-	for _, f := range r.File {
-		name := strings.ToLower(f.Name)
-		if strings.Contains(name, "slides/slide") && strings.HasSuffix(name, ".xml") {
-			slideFiles = append(slideFiles, f.Name)
-		}
-	}
-
-	if len(slideFiles) == 0 {
-		return "", errors.New("no slides found in PPTX")
-	}
-
-	var fullText strings.Builder
-	for _, fname := range slideFiles {
-		idx := findFileIndex(r.File, fname)
-		if idx < 0 {
-			continue
-		}
-		rc, err := r.File[idx].Open()
-		if err != nil {
-			continue
-		}
-		content, err := readAllLimited(rc)
-		rc.Close()
-		if err != nil {
-			continue
-		}
-		// Extract text from XML (strip tags, keep text content)
-		text := stripXMLTags(string(content))
-		if text != "" {
-			fullText.WriteString(text)
-			fullText.WriteString(" ")
-		}
-	}
-
-	return strings.TrimSpace(fullText.String()), nil
+	return extractTextFromZipXML(path, "slides/slide", "no slides found in PPTX", stripXMLTags)
 }
 
 // extractXLSXCellValues extracts cell values from XLSX worksheet XML
@@ -1353,7 +1313,7 @@ func stripXMLTags(xml string) string {
 	return strings.Join(strings.Fields(text), " ")
 }
 
-// findFileIndex finds the index of a file in a zip.File slice
+// findFileIndex finds the index of a file in a [zip.File] slice
 func findFileIndex(files []*zip.File, name string) int {
 	for i, f := range files {
 		if f.Name == name {

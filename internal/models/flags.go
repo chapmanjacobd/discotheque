@@ -356,7 +356,7 @@ func SetupLogging(verbosity int) {
 	Log = &slogLogger{logger}
 }
 
-// plainHandler implements slog.Handler with plain output
+// plainHandler implements [slog.Handler] with plain output
 type plainHandler struct {
 	level slog.Level
 	out   io.Writer
@@ -393,7 +393,7 @@ func (h *plainHandler) WithGroup(_ string) slog.Handler {
 	return h
 }
 
-// slogLogger wraps slog.Logger and implements Logger interface
+// slogLogger wraps [slog.Logger] and implements Logger interface
 type slogLogger struct {
 	*slog.Logger
 }

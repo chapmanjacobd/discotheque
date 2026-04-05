@@ -147,27 +147,28 @@ func (c *ServeCmd) HandleCategories(w http.ResponseWriter, r *http.Request) {
 	sendJSON(w, http.StatusOK, res)
 }
 
-// HandleGenres returns genre statistics.
-// GET /api/genres
-func (c *ServeCmd) HandleGenres(w http.ResponseWriter, r *http.Request) {
+func (c *ServeCmd) handleCommonStats(
+	w http.ResponseWriter,
+	r *http.Request,
+	fetch func(context.Context, *database.Queries) ([]models.CatStat, error),
+	errorMsg string,
+) {
 	counts := make(map[string]int64)
 
 	for _, dbPath := range c.Databases {
 		err := c.execDB(r.Context(), dbPath, func(ctx context.Context, sqlDB *sql.DB) error {
 			queries := database.New(sqlDB)
-			rows, err := queries.GetGenreStats(ctx)
+			stats, err := fetch(ctx, queries)
 			if err != nil {
 				return err
 			}
-			for _, row := range rows {
-				if row.Genre.Valid {
-					counts[row.Genre.String] = row.Count
-				}
+			for _, s := range stats {
+				counts[s.Category] += s.Count
 			}
 			return nil
 		})
 		if err != nil {
-			models.Log.Error("Failed to fetch genres", "db", dbPath, "error", err)
+			models.Log.Error(errorMsg, "db", dbPath, "error", err)
 			continue
 		}
 	}
@@ -185,6 +186,26 @@ func (c *ServeCmd) HandleGenres(w http.ResponseWriter, r *http.Request) {
 	})
 
 	sendJSON(w, http.StatusOK, res)
+}
+
+// HandleGenres returns genre statistics.
+// GET /api/genres
+func (c *ServeCmd) HandleGenres(w http.ResponseWriter, r *http.Request) {
+	c.handleCommonStats(w, r, func(ctx context.Context, q *database.Queries) ([]models.CatStat, error) {
+		rows, err := q.GetGenreStats(ctx)
+		if err != nil {
+			return nil, err
+		}
+		res := make([]models.CatStat, len(rows))
+		for i, row := range rows {
+			cat := ""
+			if row.Genre.Valid {
+				cat = row.Genre.String
+			}
+			res[i] = models.CatStat{Category: cat, Count: row.Count}
+		}
+		return res, nil
+	}, "Failed to fetch genres")
 }
 
 // HandleRatings returns rating statistics.
@@ -227,41 +248,21 @@ func (c *ServeCmd) HandleRatings(w http.ResponseWriter, r *http.Request) {
 // HandleLanguages returns language statistics.
 // GET /api/languages
 func (c *ServeCmd) HandleLanguages(w http.ResponseWriter, r *http.Request) {
-	counts := make(map[string]int64)
-
-	for _, dbPath := range c.Databases {
-		err := c.execDB(r.Context(), dbPath, func(ctx context.Context, sqlDB *sql.DB) error {
-			queries := database.New(sqlDB)
-			rows, err := queries.GetLanguageStats(ctx)
-			if err != nil {
-				return err
-			}
-			for _, row := range rows {
-				if row.Language.Valid {
-					counts[row.Language.String] = row.Count
-				}
-			}
-			return nil
-		})
+	c.handleCommonStats(w, r, func(ctx context.Context, q *database.Queries) ([]models.CatStat, error) {
+		rows, err := q.GetLanguageStats(ctx)
 		if err != nil {
-			models.Log.Error("Failed to fetch languages", "db", dbPath, "error", err)
-			continue
+			return nil, err
 		}
-	}
-
-	res := make([]models.CatStat, 0, len(counts))
-	for k, v := range counts {
-		res = append(res, models.CatStat{Category: k, Count: v})
-	}
-
-	sort.Slice(res, func(i, j int) bool {
-		if res[i].Count != res[j].Count {
-			return res[i].Count > res[j].Count
+		res := make([]models.CatStat, len(rows))
+		for i, row := range rows {
+			cat := ""
+			if row.Language.Valid {
+				cat = row.Language.String
+			}
+			res[i] = models.CatStat{Category: cat, Count: row.Count}
 		}
-		return res[i].Category < res[j].Category
-	})
-
-	sendJSON(w, http.StatusOK, res)
+		return res, nil
+	}, "Failed to fetch languages")
 }
 
 // getCaptionsWithContext fetches captions matching a query along with 2 captions before and after each match

@@ -38,17 +38,10 @@ func (c *CheckCmd) AfterApply() error {
 		return errors.New("at least one database file is required")
 	}
 
-	if utils.IsSQLite(c.Args[0]) || strings.HasSuffix(c.Args[0], ".db") {
-		c.Databases = []string{c.Args[0]}
-		if len(c.Args) > 1 {
-			c.CheckPaths = c.Args[1:]
-		}
-	} else {
-		// Fallback: first is DB
-		c.Databases = []string{c.Args[0]}
-		if len(c.Args) > 1 {
-			c.CheckPaths = c.Args[1:]
-		}
+	// First argument is always treated as a database file
+	c.Databases = []string{c.Args[0]}
+	if len(c.Args) > 1 {
+		c.CheckPaths = c.Args[1:]
 	}
 	return nil
 }
@@ -122,11 +115,9 @@ func (c *CheckCmd) Run(ctx context.Context) error {
 					// For safety, if user provided roots, we only check files in those roots.
 					continue
 				}
-			} else {
+			} else if !utils.FileExists(m.Path) {
 				// No presence set, fallback to individual Stats
-				if !utils.FileExists(m.Path) {
-					isMissing = true
-				}
+				isMissing = true
 			}
 
 			if isMissing {

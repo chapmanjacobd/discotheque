@@ -29,7 +29,7 @@ func SetLogger(logger Logger) {
 	Log = logger
 }
 
-// defaultLogger wraps the global slog.Logger as a Logger implementation
+// defaultLogger wraps the global [slog.Logger] as a Logger implementation
 type defaultLogger struct{}
 
 func (d *defaultLogger) Info(msg string, args ...any)  { slog.Default().Info(msg, args...) }

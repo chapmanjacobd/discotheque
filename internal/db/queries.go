@@ -11,6 +11,43 @@ import (
 // mediaColumns is the standard column list for media queries
 const mediaColumns = "path, path_tokenized, title, duration, size, time_created, time_modified, time_deleted, time_first_played, time_last_played, play_count, playhead, media_type, width, height, fps, video_codecs, audio_codecs, subtitle_codecs, video_count, audio_count, subtitle_count, album, artist, genre, categories, description, language, time_downloaded, score"
 
+func scanMedia(rows *sql.Rows) (Media, error) {
+	var i Media
+	err := rows.Scan(
+		&i.Path,
+		&i.PathTokenized,
+		&i.Title,
+		&i.Duration,
+		&i.Size,
+		&i.TimeCreated,
+		&i.TimeModified,
+		&i.TimeDeleted,
+		&i.TimeFirstPlayed,
+		&i.TimeLastPlayed,
+		&i.PlayCount,
+		&i.Playhead,
+		&i.MediaType,
+		&i.Width,
+		&i.Height,
+		&i.Fps,
+		&i.VideoCodecs,
+		&i.AudioCodecs,
+		&i.SubtitleCodecs,
+		&i.VideoCount,
+		&i.AudioCount,
+		&i.SubtitleCount,
+		&i.Album,
+		&i.Artist,
+		&i.Genre,
+		&i.Categories,
+		&i.Description,
+		&i.Language,
+		&i.TimeDownloaded,
+		&i.Score,
+	)
+	return i, err
+}
+
 // GetMedia retrieves all non-deleted media
 func (q *Queries) GetMedia(ctx context.Context, limit int64) ([]Media, error) {
 	const query = `SELECT ` + mediaColumns + ` FROM media WHERE time_deleted = 0 ORDER BY path LIMIT ?`
@@ -22,39 +59,8 @@ func (q *Queries) GetMedia(ctx context.Context, limit int64) ([]Media, error) {
 
 	var items []Media
 	for rows.Next() {
-		var i Media
-		if err := rows.Scan(
-			&i.Path,
-			&i.PathTokenized,
-			&i.Title,
-			&i.Duration,
-			&i.Size,
-			&i.TimeCreated,
-			&i.TimeModified,
-			&i.TimeDeleted,
-			&i.TimeFirstPlayed,
-			&i.TimeLastPlayed,
-			&i.PlayCount,
-			&i.Playhead,
-			&i.MediaType,
-			&i.Width,
-			&i.Height,
-			&i.Fps,
-			&i.VideoCodecs,
-			&i.AudioCodecs,
-			&i.SubtitleCodecs,
-			&i.VideoCount,
-			&i.AudioCount,
-			&i.SubtitleCount,
-			&i.Album,
-			&i.Artist,
-			&i.Genre,
-			&i.Categories,
-			&i.Description,
-			&i.Language,
-			&i.TimeDownloaded,
-			&i.Score,
-		); err != nil {
+		i, err := scanMedia(rows)
+		if err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -84,39 +90,8 @@ func (q *Queries) GetMediaByType(ctx context.Context, arg GetMediaByTypeParams) 
 
 	var items []Media
 	for rows.Next() {
-		var i Media
-		if err := rows.Scan(
-			&i.Path,
-			&i.PathTokenized,
-			&i.Title,
-			&i.Duration,
-			&i.Size,
-			&i.TimeCreated,
-			&i.TimeModified,
-			&i.TimeDeleted,
-			&i.TimeFirstPlayed,
-			&i.TimeLastPlayed,
-			&i.PlayCount,
-			&i.Playhead,
-			&i.MediaType,
-			&i.Width,
-			&i.Height,
-			&i.Fps,
-			&i.VideoCodecs,
-			&i.AudioCodecs,
-			&i.SubtitleCodecs,
-			&i.VideoCount,
-			&i.AudioCount,
-			&i.SubtitleCount,
-			&i.Album,
-			&i.Artist,
-			&i.Genre,
-			&i.Categories,
-			&i.Description,
-			&i.Language,
-			&i.TimeDownloaded,
-			&i.Score,
-		); err != nil {
+		i, err := scanMedia(rows)
+		if err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -145,39 +120,8 @@ func (q *Queries) GetMediaBySize(ctx context.Context, arg GetMediaBySizeParams) 
 
 	var items []Media
 	for rows.Next() {
-		var i Media
-		if err := rows.Scan(
-			&i.Path,
-			&i.PathTokenized,
-			&i.Title,
-			&i.Duration,
-			&i.Size,
-			&i.TimeCreated,
-			&i.TimeModified,
-			&i.TimeDeleted,
-			&i.TimeFirstPlayed,
-			&i.TimeLastPlayed,
-			&i.PlayCount,
-			&i.Playhead,
-			&i.MediaType,
-			&i.Width,
-			&i.Height,
-			&i.Fps,
-			&i.VideoCodecs,
-			&i.AudioCodecs,
-			&i.SubtitleCodecs,
-			&i.VideoCount,
-			&i.AudioCount,
-			&i.SubtitleCount,
-			&i.Album,
-			&i.Artist,
-			&i.Genre,
-			&i.Categories,
-			&i.Description,
-			&i.Language,
-			&i.TimeDownloaded,
-			&i.Score,
-		); err != nil {
+		i, err := scanMedia(rows)
+		if err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -206,39 +150,8 @@ func (q *Queries) GetMediaByDuration(ctx context.Context, arg GetMediaByDuration
 
 	var items []Media
 	for rows.Next() {
-		var i Media
-		if err := rows.Scan(
-			&i.Path,
-			&i.PathTokenized,
-			&i.Title,
-			&i.Duration,
-			&i.Size,
-			&i.TimeCreated,
-			&i.TimeModified,
-			&i.TimeDeleted,
-			&i.TimeFirstPlayed,
-			&i.TimeLastPlayed,
-			&i.PlayCount,
-			&i.Playhead,
-			&i.MediaType,
-			&i.Width,
-			&i.Height,
-			&i.Fps,
-			&i.VideoCodecs,
-			&i.AudioCodecs,
-			&i.SubtitleCodecs,
-			&i.VideoCount,
-			&i.AudioCount,
-			&i.SubtitleCount,
-			&i.Album,
-			&i.Artist,
-			&i.Genre,
-			&i.Categories,
-			&i.Description,
-			&i.Language,
-			&i.TimeDownloaded,
-			&i.Score,
-		); err != nil {
+		i, err := scanMedia(rows)
+		if err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -266,39 +179,8 @@ func (q *Queries) GetMediaByPath(ctx context.Context, arg GetMediaByPathParams) 
 
 	var items []Media
 	for rows.Next() {
-		var i Media
-		if err := rows.Scan(
-			&i.Path,
-			&i.PathTokenized,
-			&i.Title,
-			&i.Duration,
-			&i.Size,
-			&i.TimeCreated,
-			&i.TimeModified,
-			&i.TimeDeleted,
-			&i.TimeFirstPlayed,
-			&i.TimeLastPlayed,
-			&i.PlayCount,
-			&i.Playhead,
-			&i.MediaType,
-			&i.Width,
-			&i.Height,
-			&i.Fps,
-			&i.VideoCodecs,
-			&i.AudioCodecs,
-			&i.SubtitleCodecs,
-			&i.VideoCount,
-			&i.AudioCount,
-			&i.SubtitleCount,
-			&i.Album,
-			&i.Artist,
-			&i.Genre,
-			&i.Categories,
-			&i.Description,
-			&i.Language,
-			&i.TimeDownloaded,
-			&i.Score,
-		); err != nil {
+		i, err := scanMedia(rows)
+		if err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -327,39 +209,8 @@ func (q *Queries) GetMediaByPathPrefix(ctx context.Context, arg GetMediaByPathPr
 
 	var items []Media
 	for rows.Next() {
-		var i Media
-		if err := rows.Scan(
-			&i.Path,
-			&i.PathTokenized,
-			&i.Title,
-			&i.Duration,
-			&i.Size,
-			&i.TimeCreated,
-			&i.TimeModified,
-			&i.TimeDeleted,
-			&i.TimeFirstPlayed,
-			&i.TimeLastPlayed,
-			&i.PlayCount,
-			&i.Playhead,
-			&i.MediaType,
-			&i.Width,
-			&i.Height,
-			&i.Fps,
-			&i.VideoCodecs,
-			&i.AudioCodecs,
-			&i.SubtitleCodecs,
-			&i.VideoCount,
-			&i.AudioCount,
-			&i.SubtitleCount,
-			&i.Album,
-			&i.Artist,
-			&i.Genre,
-			&i.Categories,
-			&i.Description,
-			&i.Language,
-			&i.TimeDownloaded,
-			&i.Score,
-		); err != nil {
+		i, err := scanMedia(rows)
+		if err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -454,39 +305,8 @@ func (q *Queries) GetWatchedMedia(ctx context.Context, limit int64) ([]Media, er
 
 	var items []Media
 	for rows.Next() {
-		var i Media
-		if err := rows.Scan(
-			&i.Path,
-			&i.PathTokenized,
-			&i.Title,
-			&i.Duration,
-			&i.Size,
-			&i.TimeCreated,
-			&i.TimeModified,
-			&i.TimeDeleted,
-			&i.TimeFirstPlayed,
-			&i.TimeLastPlayed,
-			&i.PlayCount,
-			&i.Playhead,
-			&i.MediaType,
-			&i.Width,
-			&i.Height,
-			&i.Fps,
-			&i.VideoCodecs,
-			&i.AudioCodecs,
-			&i.SubtitleCodecs,
-			&i.VideoCount,
-			&i.AudioCount,
-			&i.SubtitleCount,
-			&i.Album,
-			&i.Artist,
-			&i.Genre,
-			&i.Categories,
-			&i.Description,
-			&i.Language,
-			&i.TimeDownloaded,
-			&i.Score,
-		); err != nil {
+		i, err := scanMedia(rows)
+		if err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -508,39 +328,8 @@ func (q *Queries) GetUnwatchedMedia(ctx context.Context, limit int64) ([]Media, 
 
 	var items []Media
 	for rows.Next() {
-		var i Media
-		if err := rows.Scan(
-			&i.Path,
-			&i.PathTokenized,
-			&i.Title,
-			&i.Duration,
-			&i.Size,
-			&i.TimeCreated,
-			&i.TimeModified,
-			&i.TimeDeleted,
-			&i.TimeFirstPlayed,
-			&i.TimeLastPlayed,
-			&i.PlayCount,
-			&i.Playhead,
-			&i.MediaType,
-			&i.Width,
-			&i.Height,
-			&i.Fps,
-			&i.VideoCodecs,
-			&i.AudioCodecs,
-			&i.SubtitleCodecs,
-			&i.VideoCount,
-			&i.AudioCount,
-			&i.SubtitleCount,
-			&i.Album,
-			&i.Artist,
-			&i.Genre,
-			&i.Categories,
-			&i.Description,
-			&i.Language,
-			&i.TimeDownloaded,
-			&i.Score,
-		); err != nil {
+		i, err := scanMedia(rows)
+		if err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -562,39 +351,8 @@ func (q *Queries) GetUnfinishedMedia(ctx context.Context, limit int64) ([]Media,
 
 	var items []Media
 	for rows.Next() {
-		var i Media
-		if err := rows.Scan(
-			&i.Path,
-			&i.PathTokenized,
-			&i.Title,
-			&i.Duration,
-			&i.Size,
-			&i.TimeCreated,
-			&i.TimeModified,
-			&i.TimeDeleted,
-			&i.TimeFirstPlayed,
-			&i.TimeLastPlayed,
-			&i.PlayCount,
-			&i.Playhead,
-			&i.MediaType,
-			&i.Width,
-			&i.Height,
-			&i.Fps,
-			&i.VideoCodecs,
-			&i.AudioCodecs,
-			&i.SubtitleCodecs,
-			&i.VideoCount,
-			&i.AudioCount,
-			&i.SubtitleCount,
-			&i.Album,
-			&i.Artist,
-			&i.Genre,
-			&i.Categories,
-			&i.Description,
-			&i.Language,
-			&i.TimeDownloaded,
-			&i.Score,
-		); err != nil {
+		i, err := scanMedia(rows)
+		if err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -623,39 +381,8 @@ func (q *Queries) GetMediaByPlayCount(ctx context.Context, arg GetMediaByPlayCou
 
 	var items []Media
 	for rows.Next() {
-		var i Media
-		if err := rows.Scan(
-			&i.Path,
-			&i.PathTokenized,
-			&i.Title,
-			&i.Duration,
-			&i.Size,
-			&i.TimeCreated,
-			&i.TimeModified,
-			&i.TimeDeleted,
-			&i.TimeFirstPlayed,
-			&i.TimeLastPlayed,
-			&i.PlayCount,
-			&i.Playhead,
-			&i.MediaType,
-			&i.Width,
-			&i.Height,
-			&i.Fps,
-			&i.VideoCodecs,
-			&i.AudioCodecs,
-			&i.SubtitleCodecs,
-			&i.VideoCount,
-			&i.AudioCount,
-			&i.SubtitleCount,
-			&i.Album,
-			&i.Artist,
-			&i.Genre,
-			&i.Categories,
-			&i.Description,
-			&i.Language,
-			&i.TimeDownloaded,
-			&i.Score,
-		); err != nil {
+		i, err := scanMedia(rows)
+		if err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -677,39 +404,8 @@ func (q *Queries) GetRandomMedia(ctx context.Context, limit int64) ([]Media, err
 
 	var items []Media
 	for rows.Next() {
-		var i Media
-		if err := rows.Scan(
-			&i.Path,
-			&i.PathTokenized,
-			&i.Title,
-			&i.Duration,
-			&i.Size,
-			&i.TimeCreated,
-			&i.TimeModified,
-			&i.TimeDeleted,
-			&i.TimeFirstPlayed,
-			&i.TimeLastPlayed,
-			&i.PlayCount,
-			&i.Playhead,
-			&i.MediaType,
-			&i.Width,
-			&i.Height,
-			&i.Fps,
-			&i.VideoCodecs,
-			&i.AudioCodecs,
-			&i.SubtitleCodecs,
-			&i.VideoCount,
-			&i.AudioCount,
-			&i.SubtitleCount,
-			&i.Album,
-			&i.Artist,
-			&i.Genre,
-			&i.Categories,
-			&i.Description,
-			&i.Language,
-			&i.TimeDownloaded,
-			&i.Score,
-		); err != nil {
+		i, err := scanMedia(rows)
+		if err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -738,39 +434,8 @@ func (q *Queries) GetSiblingMedia(ctx context.Context, arg GetSiblingMediaParams
 
 	var items []Media
 	for rows.Next() {
-		var i Media
-		if err := rows.Scan(
-			&i.Path,
-			&i.PathTokenized,
-			&i.Title,
-			&i.Duration,
-			&i.Size,
-			&i.TimeCreated,
-			&i.TimeModified,
-			&i.TimeDeleted,
-			&i.TimeFirstPlayed,
-			&i.TimeLastPlayed,
-			&i.PlayCount,
-			&i.Playhead,
-			&i.MediaType,
-			&i.Width,
-			&i.Height,
-			&i.Fps,
-			&i.VideoCodecs,
-			&i.AudioCodecs,
-			&i.SubtitleCodecs,
-			&i.VideoCount,
-			&i.AudioCount,
-			&i.SubtitleCount,
-			&i.Album,
-			&i.Artist,
-			&i.Genre,
-			&i.Categories,
-			&i.Description,
-			&i.Language,
-			&i.TimeDownloaded,
-			&i.Score,
-		); err != nil {
+		i, err := scanMedia(rows)
+		if err != nil {
 			return nil, err
 		}
 		items = append(items, i)

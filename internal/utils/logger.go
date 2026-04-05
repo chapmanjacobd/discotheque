@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-// Logger is a struct-based wrapper around slog.Logger
+// Logger is a struct-based wrapper around [slog.Logger]
 // It provides a cleaner API and makes dependency injection easier
 type Logger struct {
 	log *slog.Logger
@@ -61,7 +61,7 @@ func (l *Logger) Enabled(level slog.Level) bool {
 	return l.log.Enabled(context.Background(), level)
 }
 
-// PlainHandler is a custom slog.Handler that outputs plain key=value format
+// PlainHandler is a custom [slog.Handler] that outputs plain key=value format
 type PlainHandler struct {
 	Level slog.Leveler
 	Out   io.Writer

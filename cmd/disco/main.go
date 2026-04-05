@@ -15,6 +15,10 @@ import (
 )
 
 func main() {
+	os.Exit(run())
+}
+
+func run() int {
 	// Setup profiling (only when built with -tags pyroscope)
 	cleanup := setupProfiling()
 	defer cleanup()
@@ -28,8 +32,7 @@ func main() {
 	)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to initialize CLI parser: %v\n", err)
-		cleanup()
-		os.Exit(1)
+		return 1
 	}
 
 	args := os.Args[1:]
@@ -49,7 +52,8 @@ func main() {
 
 	ctx, err := parser.Parse(args)
 	if err != nil {
-		parser.FatalIfErrorf(err)
+		fmt.Fprintf(os.Stderr, "Parse failed: %v\n", err)
+		return 1
 	}
 
 	// Configure default logger (Warn level by default)
@@ -58,6 +62,8 @@ func main() {
 	err = ctx.Run(context.Background())
 	if err != nil {
 		models.Log.Error("Command failed", "error", err)
-		os.Exit(1)
+		return 1
 	}
+
+	return 0
 }

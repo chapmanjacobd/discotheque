@@ -45,6 +45,12 @@ func hasActiveFilters(flags models.GlobalFlags) bool {
 // hasBasicFilters checks if only basic SQL-level filters are active (size, duration, media_type, etc.)
 // These can be applied directly in SQL without folder backfiltering
 func hasBasicFilters(flags models.GlobalFlags) bool {
+	return hasTypeOrSizeFilters(flags) ||
+		hasTimeOrMetaFilters(flags) ||
+		hasStatusOrSearchFilters(flags)
+}
+
+func hasTypeOrSizeFilters(flags models.GlobalFlags) bool {
 	if flags.VideoOnly || flags.AudioOnly || flags.ImageOnly || flags.TextOnly {
 		return true
 	}
@@ -54,6 +60,10 @@ func hasBasicFilters(flags models.GlobalFlags) bool {
 	if flags.PlayCountMin > 0 || flags.PlayCountMax > 0 {
 		return true
 	}
+	return false
+}
+
+func hasTimeOrMetaFilters(flags models.GlobalFlags) bool {
 	if flags.Genre != "" || len(flags.Language) > 0 || len(flags.Ext) > 0 {
 		return true
 	}
@@ -66,6 +76,10 @@ func hasBasicFilters(flags models.GlobalFlags) bool {
 	if flags.DownloadedAfter != "" || flags.DownloadedBefore != "" {
 		return true
 	}
+	return false
+}
+
+func hasStatusOrSearchFilters(flags models.GlobalFlags) bool {
 	if flags.OnlyDeleted || flags.HideDeleted {
 		return true
 	}
@@ -81,10 +95,7 @@ func hasBasicFilters(flags models.GlobalFlags) bool {
 	if flags.Watched != nil || flags.Unfinished || flags.InProgress || flags.Completed {
 		return true
 	}
-	if flags.Partial != "" {
-		return true
-	}
-	return false
+	return flags.Partial != ""
 }
 
 // AggregateDUByPath performs SQL-level aggregation for DU mode

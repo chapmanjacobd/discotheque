@@ -109,7 +109,7 @@ func (c *simpleConnector) Driver() driver.Driver {
 	return c.driver
 }
 
-// traceConnector wraps a driver.Connector to trace queries
+// traceConnector wraps a [driver.Connector] to trace queries
 type traceConnector struct {
 	connector driver.Connector
 }
@@ -126,7 +126,7 @@ func (t *traceConnector) Driver() driver.Driver {
 	return t.connector.Driver()
 }
 
-// traceConn wraps a driver.Conn to trace query execution
+// traceConn wraps a [driver.Conn] to trace query execution
 type traceConn struct {
 	driver.Conn
 }
@@ -170,7 +170,7 @@ func (c *traceConn) QueryContext(ctx context.Context, query string, args []drive
 	return nil, errors.New("driver does not implement QueryerContext")
 }
 
-// traceStmt wraps a driver.Stmt to trace query execution
+// traceStmt wraps a [driver.Stmt] to trace query execution
 type traceStmt struct {
 	driver.Stmt
 

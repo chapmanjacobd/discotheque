@@ -150,6 +150,25 @@ func GetFileStats(path string) (FileStats, error) {
 // Used only for HTTP Content-Type headers in streaming
 func DetectMimeType(path string) string {
 	ext := strings.ToLower(filepath.Ext(path))
+	if m := detectAppMime(ext); m != "" {
+		return m
+	}
+	if m := detectTextMime(ext); m != "" {
+		return m
+	}
+	if m := detectImageMime(ext); m != "" {
+		return m
+	}
+	if m := detectAudioMime(ext); m != "" {
+		return m
+	}
+	if m := detectVideoMime(ext); m != "" {
+		return m
+	}
+	return "application/octet-stream"
+}
+
+func detectAppMime(ext string) string {
 	switch ext {
 	case ".apk":
 		return "application/vnd.android.package-archive"
@@ -165,20 +184,34 @@ func DetectMimeType(path string) string {
 		return "application/vnd.amazon.ebook"
 	case ".fb2":
 		return "application/x-fictionbook"
-	case ".djvu", ".djv":
-		return "image/vnd.djvu"
-	case ".txt":
-		return "text/plain"
-	case ".html", ".htm":
-		return "text/html"
-	case ".css":
-		return "text/css"
 	case ".js":
 		return "application/javascript"
 	case ".json":
 		return "application/json"
 	case ".xml":
 		return "application/xml"
+	case ".cbz":
+		return "application/vnd.comicbook+zip"
+	case ".cbr":
+		return "application/vnd.comicbook-rar"
+	}
+	return ""
+}
+
+func detectTextMime(ext string) string {
+	switch ext {
+	case ".txt":
+		return "text/plain"
+	case ".html", ".htm":
+		return "text/html"
+	case ".css":
+		return "text/css"
+	}
+	return ""
+}
+
+func detectImageMime(ext string) string {
+	switch ext {
 	case ".jpg", ".jpeg":
 		return "image/jpeg"
 	case ".png":
@@ -195,8 +228,32 @@ func DetectMimeType(path string) string {
 		return "image/tiff"
 	case ".ico":
 		return "image/x-icon"
+	case ".djvu", ".djv":
+		return "image/vnd.djvu"
+	}
+	return ""
+}
+
+func detectAudioMime(ext string) string {
+	switch ext {
 	case ".mp3":
 		return "audio/mpeg"
+	case ".flac":
+		return "audio/flac"
+	case ".ogg":
+		return "audio/ogg"
+	case ".wav":
+		return "audio/wav"
+	case ".opus":
+		return "audio/opus"
+	case ".aac":
+		return "audio/aac"
+	}
+	return ""
+}
+
+func detectVideoMime(ext string) string {
+	switch ext {
 	case ".mp4", ".m4v", ".m4a":
 		return "video/mp4"
 	case ".webm":
@@ -209,23 +266,8 @@ func DetectMimeType(path string) string {
 		return "video/quicktime"
 	case ".wmv":
 		return "video/x-ms-wmv"
-	case ".flac":
-		return "audio/flac"
-	case ".ogg":
-		return "audio/ogg"
-	case ".wav":
-		return "audio/wav"
-	case ".opus":
-		return "audio/opus"
-	case ".aac":
-		return "audio/aac"
-	case ".cbz":
-		return "application/vnd.comicbook+zip"
-	case ".cbr":
-		return "application/vnd.comicbook-rar"
-	default:
-		return "application/octet-stream"
 	}
+	return ""
 }
 
 // GetContentTypeFromExt returns the content type based on file extension
