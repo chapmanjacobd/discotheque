@@ -228,7 +228,9 @@ func CastPlay(ctx context.Context, flags models.GlobalFlags, media []models.Medi
 		}
 
 		models.Log.Info("Casting", "path", m.Path)
-		os.WriteFile(utils.GetCattNowPlayingFile(), []byte(m.Path), 0o644)
+		if err := os.WriteFile(utils.GetCattNowPlayingFile(), []byte(m.Path), 0o644); err != nil {
+			models.Log.Warn("Failed to write now-playing file", "error", err)
+		}
 
 		args := []string{"catt"}
 		if flags.CastDevice != "" {
@@ -252,7 +254,10 @@ func CastPlay(ctx context.Context, flags models.GlobalFlags, media []models.Medi
 		if flags.CastWithLocal {
 			// Start catt in background
 			cattCmd := exec.CommandContext(ctx, args[0], args[1:]...)
-			cattCmd.Start()
+			if err := cattCmd.Start(); err != nil {
+				models.Log.Error("Failed to start catt", "error", err)
+				continue
+			}
 
 			// Wait a bit for sync (lazy sync as in Python version)
 			time.Sleep(974 * time.Millisecond)
@@ -267,10 +272,10 @@ func CastPlay(ctx context.Context, flags models.GlobalFlags, media []models.Medi
 			localCmd.Stdout = os.Stdout
 			localCmd.Stderr = os.Stderr
 			localCmd.Stdin = os.Stdin
-			localCmd.Run()
+			_ = localCmd.Run()
 
 			// Wait for catt to finish if it hasn't
-			cattCmd.Wait()
+			_ = cattCmd.Wait()
 		} else {
 			cmd := exec.CommandContext(ctx, args[0], args[1:]...)
 			cmd.Stdout = os.Stdout
@@ -291,7 +296,9 @@ func CastPlay(ctx context.Context, flags models.GlobalFlags, media []models.Medi
 				existingPlayhead = int(*m.Playhead)
 			}
 			playhead := utils.GetPlayhead(flags, m.Path, startTime, existingPlayhead, mediaDuration)
-			history.UpdateHistorySimple(ctx, m.DB, []string{m.Path}, playhead, false)
+			if err := history.UpdateHistorySimple(ctx, m.DB, []string{m.Path}, playhead, false); err != nil {
+				models.Log.Warn("Failed to update history", "error", err)
+			}
 		}
 	}
 	os.Remove(utils.GetCattNowPlayingFile())

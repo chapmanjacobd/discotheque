@@ -137,7 +137,7 @@ func (c *ServeCmd) HandleZimView(w http.ResponseWriter, r *http.Request) {
 </html>`, zimName, contentURL)
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Write([]byte(html))
+	_, _ = w.Write([]byte(html))
 }
 
 func (m *KiwixManager) EnsureKiwixServing(zimPath string) (int, error) {
@@ -154,7 +154,8 @@ func (m *KiwixManager) EnsureKiwixServing(zimPath string) (int, error) {
 		return 0, errors.New("no available ports for kiwix-serve")
 	}
 
-	cmd := exec.Command(
+	cmd := exec.CommandContext(
+		context.Background(),
 		KiwixBin,
 		"--nolibrarybutton",
 		"-p", strconv.Itoa(port),
@@ -197,9 +198,11 @@ func (m *KiwixManager) cleanupOldInstances() {
 			if instance.LastUsed.Before(cutoff) {
 				models.Log.Info("Cleaning up unused kiwix-serve instance", "port", instance.Port, "path", path)
 				if instance.Process.Process != nil {
-					instance.Process.Process.Kill()
+					if err := instance.Process.Process.Kill(); err != nil {
+						models.Log.Warn("Failed to kill kiwix-serve process", "port", instance.Port, "error", err)
+					}
 				}
-				instance.Process.Wait()
+				_ = instance.Process.Wait()
 				delete(m.UsedPorts, instance.Port)
 				delete(m.Instances, path)
 			}
@@ -210,7 +213,7 @@ func (m *KiwixManager) cleanupOldInstances() {
 
 func IsPortAvailable(port int) bool {
 	addr := fmt.Sprintf("127.0.0.1:%d", port)
-	listener, err := net.Listen("tcp", addr)
+	listener, err := (&net.ListenConfig{}).Listen(context.Background(), "tcp", addr)
 	if err != nil {
 		return false
 	}

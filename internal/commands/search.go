@@ -47,9 +47,11 @@ func (c *SearchCmd) Run(ctx context.Context) error {
 					Scan(&name)
 				if err == nil {
 					// Verify FTS5 actually works by running a simple query
-					_, testErr := sqlDB.QueryContext(ctx, "SELECT 1 FROM media_fts LIMIT 1")
+					rows, testErr := sqlDB.QueryContext(ctx, "SELECT 1 FROM media_fts LIMIT 1")
 					if testErr == nil {
+						_ = rows.Err() // Check for row errors
 						flags.FTS = true
+						rows.Close()
 					}
 				}
 				sqlDB.Close()

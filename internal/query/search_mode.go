@@ -1,6 +1,7 @@
 package query
 
 import (
+	"context"
 	"database/sql"
 	"sync"
 
@@ -59,7 +60,8 @@ func hasFTS5Table(db *sql.DB) bool {
 	}
 
 	var exists bool
-	err := db.QueryRow(
+	err := db.QueryRowContext(
+		context.Background(),
 		"SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='media_fts')",
 	).Scan(&exists)
 	return err == nil && exists

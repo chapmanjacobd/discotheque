@@ -318,7 +318,7 @@ func (c *ServeCmd) HandleSubtitles(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "text/vtt")
-	w.Write(output)
+	_, _ = w.Write(output)
 }
 
 // generateTextSnippetSVG creates a styled SVG thumbnail with text content preview
@@ -336,7 +336,7 @@ func (c *ServeCmd) generatePDFThumbnail(path string) ([]byte, string, error) {
 		tmpPath := tmpFile.Name()
 		tmpFile.Close()
 		defer os.Remove(tmpPath + ".png")
-		if err = exec.Command("pdftoppm", "-png", "-f", "1", "-singlefile", "-scale-to", "320", path, tmpPath).
+		if err = exec.CommandContext(context.Background(), "pdftoppm", "-png", "-f", "1", "-singlefile", "-scale-to", "320", path, tmpPath).
 			Run(); err == nil {
 			if data, err := os.ReadFile(tmpPath + ".png"); err == nil {
 				return data, "image/png", nil
@@ -520,7 +520,7 @@ func (c *ServeCmd) HandleThumbnail(w http.ResponseWriter, r *http.Request) {
 		if data, ok := c.thumbnailCache.Load(path); ok {
 			w.Header().Set("Content-Type", "image/jpeg")
 			w.Header().Set("Cache-Control", "public, max-age=31536000")
-			w.Write(data.([]byte))
+			_, _ = w.Write(data.([]byte))
 			return
 		}
 	}
@@ -540,7 +540,7 @@ func (c *ServeCmd) HandleThumbnail(w http.ResponseWriter, r *http.Request) {
 				} else {
 					w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
 				}
-				w.Write(data)
+				_, _ = w.Write(data)
 				return
 			}
 		}
@@ -561,7 +561,7 @@ func (c *ServeCmd) HandleThumbnail(w http.ResponseWriter, r *http.Request) {
 		} else {
 			w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
 		}
-		w.Write(thumb)
+		_, _ = w.Write(thumb)
 		return
 
 	case ".epub":
@@ -577,7 +577,7 @@ func (c *ServeCmd) HandleThumbnail(w http.ResponseWriter, r *http.Request) {
 		} else {
 			w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
 		}
-		w.Write(thumb)
+		_, _ = w.Write(thumb)
 		return
 
 	case ".txt", ".md", ".markdown", ".rtf":
@@ -667,7 +667,7 @@ func (c *ServeCmd) HandleThumbnail(w http.ResponseWriter, r *http.Request) {
 	} else {
 		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
 	}
-	w.Write(thumb)
+	_, _ = w.Write(thumb)
 }
 
 func (c *ServeCmd) HandleHLSPlaylist(w http.ResponseWriter, r *http.Request) {
@@ -747,7 +747,7 @@ func (c *ServeCmd) HandleHLSSegment(w http.ResponseWriter, r *http.Request) {
 	var m models.Media
 	found := false
 	for _, dbPath := range c.Databases {
-		c.execDB(r.Context(), dbPath, func(ctx context.Context, sqlDB *sql.DB) error {
+		_ = c.execDB(r.Context(), dbPath, func(ctx context.Context, sqlDB *sql.DB) error {
 			queries := database.New(sqlDB)
 			dbMedia, err := queries.GetMediaByPathExact(ctx, path)
 			if err == nil {

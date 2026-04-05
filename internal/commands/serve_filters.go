@@ -494,7 +494,7 @@ func (c *ServeCmd) computeFilterBinsDataOptimized(
 		wg.Add(1)
 		go func(path string) {
 			defer wg.Done()
-			c.execDB(ctx, path, func(ctx context.Context, sqlDB *sql.DB) error {
+			_ = c.execDB(ctx, path, func(ctx context.Context, sqlDB *sql.DB) error {
 				// OPTIMIZATION: Use SQL aggregation instead of fetching all rows
 				// This is much faster for large datasets
 

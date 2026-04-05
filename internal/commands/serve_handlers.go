@@ -23,7 +23,7 @@ import (
 // handleHealth returns OK if the server is running
 func (c *ServeCmd) HandleHealth(w http.ResponseWriter, _ *http.Request) {
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("OK"))
+	_, _ = w.Write([]byte("OK"))
 }
 
 // HandleQuery handles media searching and filtering.
@@ -238,9 +238,13 @@ func (c *ServeCmd) HandleQuery(w http.ResponseWriter, r *http.Request) {
 				"items":  items,
 				"counts": filterCounts,
 			}
-			json.NewEncoder(w).Encode(response)
+			if err := json.NewEncoder(w).Encode(response); err != nil {
+				models.Log.Warn("Failed to encode response", "error", err)
+			}
 		} else {
-			json.NewEncoder(w).Encode(items)
+			if err := json.NewEncoder(w).Encode(items); err != nil {
+				models.Log.Warn("Failed to encode response", "error", err)
+			}
 		}
 		return
 	}
@@ -354,9 +358,13 @@ func (c *ServeCmd) HandleQuery(w http.ResponseWriter, r *http.Request) {
 			"items":  items,
 			"counts": filterCounts,
 		}
-		json.NewEncoder(w).Encode(response)
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			models.Log.Warn("Failed to encode response", "error", err)
+		}
 	} else {
-		json.NewEncoder(w).Encode(items)
+		if err := json.NewEncoder(w).Encode(items); err != nil {
+			models.Log.Warn("Failed to encode response", "error", err)
+		}
 	}
 }
 
@@ -888,7 +896,9 @@ func (c *ServeCmd) HandleLs(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(results)
+	if err := json.NewEncoder(w).Encode(results); err != nil {
+		models.Log.Warn("Failed to encode results", "error", err)
+	}
 }
 
 func (c *ServeCmd) HandleDU(w http.ResponseWriter, r *http.Request) {
@@ -1098,7 +1108,9 @@ func (c *ServeCmd) HandleDU(w http.ResponseWriter, r *http.Request) {
 	// Set total count header for pagination
 	w.Header().Set("X-Total-Count", strconv.Itoa(totalCount))
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		models.Log.Warn("Failed to encode response", "error", err)
+	}
 }
 
 func (c *ServeCmd) HandleEpisodes(w http.ResponseWriter, r *http.Request) {
@@ -1120,5 +1132,7 @@ func (c *ServeCmd) HandleEpisodes(w http.ResponseWriter, r *http.Request) {
 	// Set total count header for pagination
 	w.Header().Set("X-Total-Count", strconv.Itoa(len(results)))
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(results)
+	if err := json.NewEncoder(w).Encode(results); err != nil {
+		models.Log.Warn("Failed to encode results", "error", err)
+	}
 }

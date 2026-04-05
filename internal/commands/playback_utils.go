@@ -18,7 +18,9 @@ func DispatchPlaybackCommand(
 	cattFile := utils.GetCattNowPlayingFile()
 	if utils.FileExists(cattFile) {
 		args := append([]string{castCmd}, castArgs...)
-		utils.CastCommand(c.CastDevice, args...)
+		if err := utils.CastCommand(c.CastDevice, args...); err != nil {
+			models.Log.Warn("Cast command failed", "error", err)
+		}
 		if castCmd == "stop" {
 			os.Remove(cattFile)
 		}

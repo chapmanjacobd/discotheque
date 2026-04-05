@@ -197,7 +197,7 @@ func serveHTMLWithTOC(w http.ResponseWriter, _ *http.Request, htmlDir, originalP
 	wrapperHTML := createWrapperHTML(initialSrc, htmlFiles, originalPath)
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Write([]byte(wrapperHTML))
+	_, _ = w.Write([]byte(wrapperHTML))
 }
 
 // createWrapperHTML creates HTML with sticky TOC header
@@ -330,5 +330,5 @@ func serveHTMLFolderWithTOC(w http.ResponseWriter, _ *http.Request, htmlDir, ori
 	wrapperHTML := createWrapperHTML(initialSrc, htmlFiles, originalPath)
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Write([]byte(wrapperHTML))
+	_, _ = w.Write([]byte(wrapperHTML))
 }

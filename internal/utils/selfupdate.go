@@ -67,7 +67,7 @@ func shouldCheckProbabilistically() bool {
 
 	data, err := os.ReadFile(statePath)
 	if err == nil {
-		json.Unmarshal(data, &state)
+		_ = json.Unmarshal(data, &state)
 	}
 
 	// Ensure we don't check more than once every 24 hours even if the process restarts.
@@ -84,9 +84,9 @@ func shouldCheckProbabilistically() bool {
 	// Update the last check time before performing the check to ensure we don't
 	// retry immediately on failure and stay within the daily quota.
 	state.LastCheck = time.Now()
-	os.MkdirAll(filepath.Dir(statePath), 0o755)
+	_ = os.MkdirAll(filepath.Dir(statePath), 0o755)
 	if newData, err := json.Marshal(state); err == nil {
-		os.WriteFile(statePath, newData, 0o644)
+		_ = os.WriteFile(statePath, newData, 0o644)
 	}
 
 	return true
@@ -229,7 +229,9 @@ func DoUpdateAt(ctx context.Context, curp, url string) bool {
 	if err := os.Rename(newp, curp); err != nil {
 		fmt.Fprintln(Stderr,
 			"couldn't rename new file:", err)
-		os.Rename(oldp, curp) // Try to rollback
+		if rbErr := os.Rename(oldp, curp); rbErr != nil {
+			fmt.Fprintln(Stderr, "couldn't rollback rename:", rbErr)
+		}
 		return false
 	}
 

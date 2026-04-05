@@ -89,9 +89,9 @@ func Migrate(ctx context.Context, db *sql.DB) error {
 
 func isVersionGreaterOrEqual(v, target string) bool {
 	var v1, v2, v3 int
-	fmt.Sscanf(v, "%d.%d.%d", &v1, &v2, &v3)
+	_, _ = fmt.Sscanf(v, "%d.%d.%d", &v1, &v2, &v3)
 	var t1, t2, t3 int
-	fmt.Sscanf(target, "%d.%d.%d", &t1, &t2, &t3)
+	_, _ = fmt.Sscanf(target, "%d.%d.%d", &t1, &t2, &t3)
 
 	if v1 != t1 {
 		return v1 > t1
@@ -137,7 +137,7 @@ func migrateToStrict(ctx context.Context, db *sql.DB, tableName, createSQL strin
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	// Rename old table
 	oldTable := tableName + "_old_strict"
@@ -243,7 +243,7 @@ func convertHistoryMediaID(ctx context.Context, db *sql.DB) error {
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	// Create temp history table with media_path
 	if _, err := tx.ExecContext(ctx, `CREATE TABLE history_tmp (
@@ -319,7 +319,7 @@ func convertCaptionsMediaID(ctx context.Context, db *sql.DB) error {
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	// Create temp captions table with media_path
 	if _, err := tx.ExecContext(ctx, `CREATE TABLE captions_tmp (
@@ -569,7 +569,7 @@ func cleanupMediaTable(ctx context.Context, db *sql.DB, hasStrict bool) error {
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	strictSQL := ""
 	if hasStrict {
@@ -675,7 +675,7 @@ func populatePathTokenized(ctx context.Context, db *sql.DB) error {
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	stmt, err := tx.PrepareContext(ctx, "UPDATE media SET path_tokenized = ? WHERE path = ?")
 	if err != nil {

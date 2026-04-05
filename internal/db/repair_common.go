@@ -88,7 +88,7 @@ func IsHealthy(ctx context.Context, dbPath string) bool {
 		Log.Debug("Health check: failed to begin transaction", "error", err)
 		return false
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	// Check for media table and perform a REAL write if possible
 	var hasMedia bool

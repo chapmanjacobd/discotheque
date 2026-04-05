@@ -88,7 +88,7 @@ func (c *TuiCmd) Run(ctx context.Context) error {
 		fmt.Printf("Playing: %s\n", choice.Path)
 
 		args := []string{"mpv", choice.Path}
-		cmd := exec.Command(args[0], args[1:]...)
+		cmd := exec.CommandContext(context.Background(), args[0], args[1:]...)
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		cmd.Stdin = os.Stdin

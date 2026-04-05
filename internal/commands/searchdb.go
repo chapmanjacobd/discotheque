@@ -84,6 +84,9 @@ func (c *SearchDBCmd) getTableName(sqlDB *sql.DB) (string, error) {
 		}
 		allTables = append(allTables, name)
 	}
+	if err := rows.Err(); err != nil {
+		return "", err
+	}
 
 	var matches []string
 	for _, t := range allTables {
@@ -121,6 +124,9 @@ func (c *SearchDBCmd) getSearchableColumns(sqlDB *sql.DB, table string) ([]strin
 		if strings.Contains(dtype, "TEXT") || strings.Contains(dtype, "CHAR") || dtype == "" {
 			columns = append(columns, name)
 		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 	return columns, nil
 }

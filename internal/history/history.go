@@ -66,7 +66,7 @@ func UpdateHistoryWithTime(
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	queries := db.New(sqlDB).WithTx(tx)
 	done := int64(0)
@@ -117,7 +117,7 @@ func DeleteHistoryByPaths(ctx context.Context, dbPath string, paths []string) er
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	for _, path := range paths {
 		if _, err := tx.ExecContext(ctx, "DELETE FROM history WHERE media_path = ?", path); err != nil {

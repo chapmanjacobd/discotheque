@@ -30,7 +30,7 @@ func (c *ServeCmd) HandleCategorizeKeywords(w http.ResponseWriter, r *http.Reque
 	data := make(map[string]map[string]bool)
 
 	for _, dbPath := range c.Databases {
-		c.execDB(r.Context(), dbPath, func(ctx context.Context, sqlDB *sql.DB) error {
+		_ = c.execDB(r.Context(), dbPath, func(ctx context.Context, sqlDB *sql.DB) error {
 			rows, err := sqlDB.QueryContext(ctx, "SELECT category, keyword FROM custom_keywords")
 			if err != nil {
 				return nil
@@ -309,7 +309,7 @@ func (c *ServeCmd) HandleCategorizeSuggest(w http.ResponseWriter, r *http.Reques
 	// Fetch existing keywords to filter them out
 	existingKeywords := make(map[string]bool)
 	for _, dbPath := range c.Databases {
-		c.execDB(r.Context(), dbPath, func(ctx context.Context, sqlDB *sql.DB) error {
+		_ = c.execDB(r.Context(), dbPath, func(ctx context.Context, sqlDB *sql.DB) error {
 			rows, err := sqlDB.QueryContext(ctx, "SELECT DISTINCT keyword FROM custom_keywords")
 			if err != nil {
 				return nil
@@ -1127,7 +1127,7 @@ func (c *ServeCmd) HandleRSVP(w http.ResponseWriter, r *http.Request) {
 	// Verify path in database
 	found := false
 	for _, dbPath := range c.Databases {
-		c.execDB(r.Context(), dbPath, func(ctx context.Context, sqlDB *sql.DB) error {
+		_ = c.execDB(r.Context(), dbPath, func(ctx context.Context, sqlDB *sql.DB) error {
 			queries := database.New(sqlDB)
 			_, err := queries.GetMediaByPathExact(ctx, path)
 			if err == nil {

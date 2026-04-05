@@ -115,7 +115,7 @@ func (c *ServeCmd) HandleCategories(w http.ResponseWriter, r *http.Request) {
 
 	// 3. Add Uncategorized count
 	for _, dbPath := range c.Databases {
-		c.execDB(r.Context(), dbPath, func(ctx context.Context, sqlDB *sql.DB) error {
+		_ = c.execDB(r.Context(), dbPath, func(ctx context.Context, sqlDB *sql.DB) error {
 			var count int64
 			err := sqlDB.QueryRowContext(ctx, "SELECT COUNT(*) FROM media WHERE time_deleted = 0 AND (categories IS NULL OR categories = '')").
 				Scan(&count)

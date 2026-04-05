@@ -122,7 +122,7 @@ func InteractiveDecision(ctx context.Context, flags models.GlobalFlags, m models
 
 	var input string
 	fmt.Print("> ")
-	fmt.Scanln(&input)
+	_, _ = fmt.Scanln(&input)
 
 	switch strings.ToLower(input) {
 	case "d":

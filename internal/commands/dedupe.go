@@ -167,7 +167,7 @@ func (c *DedupeCmd) Run(ctx context.Context) error {
 	if !c.NoConfirm {
 		fmt.Print("\nDelete duplicates? [y/N] ")
 		var response string
-		fmt.Scanln(&response)
+		_, _ = fmt.Scanln(&response)
 		if strings.ToLower(response) != "y" {
 			return nil
 		}
@@ -180,9 +180,13 @@ func (c *DedupeCmd) Run(ctx context.Context) error {
 			quotedKeep := shellquote.ShellQuote(d.KeepPath)
 			cmdStr := strings.ReplaceAll(c.DedupeCmd, "{}", quotedDup)
 			// rmlint style is cmd duplicate keep
-			exec.Command("bash", "-c", cmdStr+" "+quotedDup+" "+quotedKeep).Run()
+			if err := exec.CommandContext(context.Background(), "bash", "-c", cmdStr+" "+quotedDup+" "+quotedKeep).Run(); err != nil {
+				models.Log.Warn("Dedupe command failed", "error", err)
+			}
 		} else if flags.Trash {
-			utils.Trash(flags, d.DuplicatePath)
+			if err := utils.Trash(flags, d.DuplicatePath); err != nil {
+				models.Log.Warn("Failed to trash file", "path", d.DuplicatePath, "error", err)
+			}
 		} else {
 			os.Remove(d.DuplicatePath)
 		}

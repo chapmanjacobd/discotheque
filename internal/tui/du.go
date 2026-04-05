@@ -272,7 +272,7 @@ func (d duDelegate) Render(w io.Writer, m list.Model, index int, listItem list.I
 		strings.Repeat("-", barWidth-filled),
 	) + "]"
 
-	fmt.Fprintf(w, "%s %s\n%s", title, bar, desc)
+	_, _ = fmt.Fprintf(w, "%s %s\n%s", title, bar, desc)
 }
 
 func (m DUModel) Init() tea.Cmd {

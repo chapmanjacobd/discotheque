@@ -1254,7 +1254,7 @@ func extractCHMContents(path string) (string, error) {
 
 		// Read extracted HTML files
 		var content strings.Builder
-		filepath.Walk(tmpDir, func(path string, info os.FileInfo, err error) error {
+		_ = filepath.Walk(tmpDir, func(path string, info os.FileInfo, err error) error {
 			if err != nil {
 				return err
 			}
@@ -1515,7 +1515,7 @@ p > .calibre3:not(:only-of-type) {
   display: list-item;
 }
 `
-	os.WriteFile(cssPath, []byte(css), 0o644)
+	_ = os.WriteFile(cssPath, []byte(css), 0o644)
 }
 
 // SanitizeFilename replaces special characters with underscores for calibre compatibility
@@ -1632,7 +1632,7 @@ func GenerateTTS(text, outputPath string, wpm int) error {
 // GetHTMLFiles returns a list of HTML files in the directory sorted by filename
 func GetHTMLFiles(dir string) []string {
 	var files []string
-	filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+	_ = filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return nil
 		}
@@ -1708,7 +1708,7 @@ func FindMainContentFile(oebDir string) string {
 
 	// Fallback: Find HTML files, preferring those that aren't cover/metadata
 	var firstContentHTML string
-	filepath.Walk(oebDir, func(path string, info os.FileInfo, err error) error {
+	_ = filepath.Walk(oebDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return nil
 		}

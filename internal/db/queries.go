@@ -1367,7 +1367,7 @@ func (q *Queries) PopulateMediaType(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	// Get all media with NULL media_type
 	rows, err := tx.QueryContext(ctx, "SELECT path FROM media WHERE media_type IS NULL")

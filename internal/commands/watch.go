@@ -154,7 +154,7 @@ func (c *WatchCmd) Run(ctx context.Context) error {
 		}
 
 		// Execute mpv
-		cmd := exec.Command(args[0], args[1:]...)
+		cmd := exec.CommandContext(context.Background(), args[0], args[1:]...)
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		cmd.Stdin = os.Stdin
@@ -333,7 +333,7 @@ func (c *ListenCmd) Run(ctx context.Context) error {
 			continue
 		}
 
-		cmd := exec.Command(args[0], args[1:]...)
+		cmd := exec.CommandContext(context.Background(), args[0], args[1:]...)
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 
@@ -350,7 +350,9 @@ func (c *ListenCmd) Run(ctx context.Context) error {
 				existingPlayhead = int(*m.Playhead)
 			}
 			playhead := utils.GetPlayhead(flags, m.Path, startTime, existingPlayhead, mediaDuration)
-			history.UpdateHistorySimple(ctx, m.DB, []string{m.Path}, playhead, false)
+			if err := history.UpdateHistorySimple(ctx, m.DB, []string{m.Path}, playhead, false); err != nil {
+				models.Log.Warn("Failed to update history", "error", err)
+			}
 		}
 
 		exitCode := 0

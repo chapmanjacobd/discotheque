@@ -60,7 +60,7 @@ func (c *OptimizeCmd) BulkMarkOptimizedExtensions(ctx context.Context, sqlDB *sq
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	// Logic to mark optimized extensions
 	// This is a placeholder for the actual logic described by the user

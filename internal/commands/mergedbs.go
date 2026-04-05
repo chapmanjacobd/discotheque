@@ -233,7 +233,7 @@ func (c *MergeDBsCmd) mergeTable(ctx context.Context, srcConn, targetConn *sql.D
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	stmt, err := tx.PrepareContext(ctx, insertQuery)
 	if err != nil {

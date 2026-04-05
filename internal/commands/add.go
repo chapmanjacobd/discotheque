@@ -165,10 +165,12 @@ func (c *AddCmd) Run(ctx context.Context) error {
 		// Record or update this scan root
 		// If path already exists as a playlist, this will be a no-op for the insert
 		// The actual scan logic below will process the files
-		queries.InsertPlaylist(runCtx, db.InsertPlaylistParams{
+		if _, err := queries.InsertPlaylist(runCtx, db.InsertPlaylistParams{
 			Path:         sql.NullString{String: absRoot, Valid: true},
 			ExtractorKey: sql.NullString{String: "Local", Valid: true},
-		})
+		}); err != nil {
+			models.Log.Warn("Failed to insert playlist root", "path", absRoot, "error", err)
+		}
 
 		var filter map[string]bool
 		if c.VideoOnly || c.AudioOnly || c.ImageOnly || c.TextOnly {
@@ -446,12 +448,12 @@ func (c *AddCmd) Run(ctx context.Context) error {
 
 						qtx := queries.WithTx(tx)
 						if err := qtx.BulkUpsertMedia(runCtx, mediaBatch); err != nil {
-							tx.Rollback()
+							_ = tx.Rollback()
 							lastErr = fmt.Errorf("bulk upsert media failed: %w", err)
 							continue
 						}
 						if err := qtx.BulkInsertCaptions(runCtx, captionsBatch); err != nil {
-							tx.Rollback()
+							_ = tx.Rollback()
 							lastErr = fmt.Errorf("bulk insert captions failed: %w", err)
 							continue
 						}

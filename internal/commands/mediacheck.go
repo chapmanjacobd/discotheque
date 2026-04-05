@@ -99,10 +99,12 @@ func (c *MediaCheckCmd) Run(ctx context.Context) error {
 						if err == nil {
 							defer sqlDB.Close()
 							queries := db.New(sqlDB)
-							queries.MarkDeleted(ctx, db.MarkDeletedParams{
+							if err := queries.MarkDeleted(ctx, db.MarkDeletedParams{
 								Path:        m.Path,
 								TimeDeleted: utils.ToNullInt64(time.Now().Unix()),
-							})
+							}); err != nil {
+								models.Log.Warn("Failed to mark deleted in DB", "path", m.Path, "error", err)
+							}
 						}
 					}
 				}

@@ -303,7 +303,7 @@ func (c *ServeCmd) execDB(ctx context.Context, dbPath string, fn func(ctx contex
 			if loaded, ok := c.dbCache.LoadOrStore(dbPath, sqlDB); ok {
 				// Another goroutine stored a connection first; use theirs and close ours
 				sqlDB = loaded.(*sql.DB)
-				newDB.Close()
+				_ = newDB.Close()
 			}
 		}
 
@@ -311,7 +311,7 @@ func (c *ServeCmd) execDB(ctx context.Context, dbPath string, fn func(ctx contex
 		if err != nil {
 			if db.IsCorruptionError(err) && i < maxRetries {
 				c.dbCache.Delete(dbPath)
-				sqlDB.Close()
+				_ = sqlDB.Close()
 
 				models.Log.Warn("Database corruption detected on query, attempting repair", "db", dbPath)
 				if repErr := db.Repair(ctx, dbPath); repErr != nil {
@@ -359,7 +359,7 @@ func (c *ServeCmd) Run(ctx context.Context) error {
 	for _, dbPath := range c.Databases {
 		sqlDB, _, err := db.ConnectWithInit(ctx, dbPath)
 		if err == nil {
-			sqlDB.Close()
+			_ = sqlDB.Close()
 		}
 	}
 

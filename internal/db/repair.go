@@ -38,7 +38,7 @@ func Repair(ctx context.Context, dbPath string) error {
 	if err := syscall.Flock(int(lockFile.Fd()), syscall.LOCK_EX); err != nil {
 		return fmt.Errorf("failed to acquire flock: %w", err)
 	}
-	defer syscall.Flock(int(lockFile.Fd()), syscall.LOCK_UN)
+	defer func() { _ = syscall.Flock(int(lockFile.Fd()), syscall.LOCK_UN) }()
 
 	waitDuration := time.Since(start)
 
@@ -69,7 +69,9 @@ func Repair(ctx context.Context, dbPath string) error {
 	for _, suffix := range []string{"-wal", "-shm"} {
 		sidecar := dbPath + suffix
 		if _, err := os.Stat(sidecar); err == nil {
-			os.Rename(sidecar, corruptMain+suffix)
+			if err := os.Rename(sidecar, corruptMain+suffix); err != nil {
+				Log.Warn("Failed to rename sidecar file", "suffix", suffix, "error", err)
+			}
 		}
 	}
 

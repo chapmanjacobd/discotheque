@@ -370,7 +370,7 @@ func MoveFile(src, dst string) error {
 	out.Close()
 
 	// Restore timestamps on destination
-	os.Chtimes(dst, atime, mtime)
+	_ = os.Chtimes(dst, atime, mtime)
 
 	return os.Remove(src)
 }
