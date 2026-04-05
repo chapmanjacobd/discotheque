@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"context"
 	"os"
 
 	"github.com/chapmanjacobd/discoteca/internal/models"
@@ -9,6 +10,7 @@ import (
 
 // DispatchPlaybackCommand handles common logic for sending commands to mpv or Chromecast
 func DispatchPlaybackCommand(
+	ctx context.Context,
 	c models.ControlFlags,
 	mpvCmd string,
 	mpvArgs []any,
@@ -18,7 +20,7 @@ func DispatchPlaybackCommand(
 	cattFile := utils.GetCattNowPlayingFile()
 	if utils.FileExists(cattFile) {
 		args := append([]string{castCmd}, castArgs...)
-		if err := utils.CastCommand(c.CastDevice, args...); err != nil {
+		if err := utils.CastCommand(ctx, c.CastDevice, args...); err != nil {
 			models.Log.Warn("Cast command failed", "error", err)
 		}
 		if castCmd == "stop" {
@@ -29,7 +31,7 @@ func DispatchPlaybackCommand(
 	socketPath := utils.GetMpvSocketPath(c.MpvSocket)
 	if utils.FileExists(socketPath) {
 		args := append([]any{mpvCmd}, mpvArgs...)
-		_, err := utils.MpvCall(socketPath, args...)
+		_, err := utils.MpvCall(ctx, socketPath, args...)
 		return err
 	}
 	return nil

@@ -52,8 +52,8 @@ func TestE2E_AddAndCheck(t *testing.T) {
 	}
 
 	// 3. Delete the physical file
-	if err := os.Remove(dummyPath); err != nil {
-		t.Fatal(err)
+	if err2 := os.Remove(dummyPath); err2 != nil {
+		t.Fatal(err2)
 	}
 
 	// 4. Run Check command
@@ -62,8 +62,8 @@ func TestE2E_AddAndCheck(t *testing.T) {
 		CheckPaths: []string{fixture.TempDir},
 	}
 
-	if err := checkCmd.Run(context.Background()); err != nil {
-		t.Fatalf("CheckCmd failed: %v", err)
+	if err2 := checkCmd.Run(context.Background()); err2 != nil {
+		t.Fatalf("CheckCmd failed: %v", err2)
 	}
 
 	// 5. Verify marked as deleted
@@ -268,14 +268,14 @@ func TestE2E_AddWithVTTCaptions(t *testing.T) {
 		t.Fatalf("failed to open database: %v", err)
 	}
 	defer sqlDBInit.Close()
-	if err := db.InitDB(context.Background(), sqlDBInit); err != nil {
-		t.Fatalf("database initialization failed: %v", err)
+	if err2 := db.InitDB(context.Background(), sqlDBInit); err2 != nil {
+		t.Fatalf("database initialization failed: %v", err2)
 	}
 
 	// 1. Create a dummy video file and a sidecar VTT
 	videoPath := filepath.Join(fixture.TempDir, "movie.mp4")
-	if err := os.WriteFile(videoPath, []byte("\x00\x00\x00\x20ftypisom"), 0o644); err != nil {
-		t.Fatalf("failed to create dummy video: %v", err)
+	if err2 := os.WriteFile(videoPath, []byte("\x00\x00\x00\x20ftypisom"), 0o644); err2 != nil {
+		t.Fatalf("failed to create dummy video: %v", err2)
 	}
 
 	vttPath := filepath.Join(fixture.TempDir, "movie.vtt")
@@ -287,8 +287,8 @@ This is a sample caption.
 00:00:15.000 --> 00:00:18.000
 Another caption here.
 `
-	if err := os.WriteFile(vttPath, []byte(vttContent), 0o644); err != nil {
-		t.Fatalf("failed to create dummy vtt: %v", err)
+	if err2 := os.WriteFile(vttPath, []byte(vttContent), 0o644); err2 != nil {
+		t.Fatalf("failed to create dummy vtt: %v", err2)
 	}
 
 	// 2. Run AddCmd with ScanSubtitles enabled
@@ -302,12 +302,12 @@ Another caption here.
 		Parallel: 1,
 	}
 	// We need to call AfterApply to set up Internal fields correctly
-	if err := addCmd.AfterApply(); err != nil {
-		t.Fatalf("AddCmd.AfterApply failed: %v", err)
+	if err2 := addCmd.AfterApply(); err2 != nil {
+		t.Fatalf("AddCmd.AfterApply failed: %v", err2)
 	}
 
-	if err := addCmd.Run(context.Background()); err != nil {
-		t.Fatalf("AddCmd failed: %v", err)
+	if err2 := addCmd.Run(context.Background()); err2 != nil {
+		t.Fatalf("AddCmd failed: %v", err2)
 	}
 
 	// 3. Verify captions are in DB

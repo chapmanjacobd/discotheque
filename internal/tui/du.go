@@ -210,7 +210,9 @@ func (m *DUModel) updateList() {
 	// Sort using the standard sort function
 	stats := make([]models.FolderStats, len(items))
 	for i, item := range items {
-		stats[i] = item.(DUItem).stats
+		if duItem, ok := item.(DUItem); ok {
+			stats[i] = duItem.stats
+		}
 	}
 	query.SortFolders(stats, m.flags.SortBy, m.flags.Reverse)
 

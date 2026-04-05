@@ -11,7 +11,7 @@ import (
 func RunQuery(
 	ctx context.Context,
 	dbs []string,
-	flags models.GlobalFlags,
+	flags *models.GlobalFlags,
 	process func([]models.MediaWithDB) error,
 ) error {
 	models.SetupLogging(flags.Verbose)

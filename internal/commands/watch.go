@@ -50,13 +50,13 @@ func (c *WatchCmd) Run(ctx context.Context) error {
 	flags.PlaybackFlags = c.PlaybackFlags
 	flags.MpvActionFlags = c.MpvActionFlags
 	flags.PostActionFlags = c.PostActionFlags
-	media, err := query.MediaQuery(ctx, c.Databases, flags)
+	media, err := query.MediaQuery(ctx, c.Databases, &flags)
 	if err != nil {
 		return err
 	}
 
-	media = query.FilterMedia(media, flags)
-	query.SortMedia(media, flags)
+	media = query.FilterMedia(media, &flags)
+	query.SortMedia(media, &flags)
 	if c.ReRank != "" {
 		media = query.ReRankMedia(media, flags)
 	}
@@ -154,7 +154,7 @@ func (c *WatchCmd) Run(ctx context.Context) error {
 		}
 
 		// Execute mpv
-		cmd := exec.CommandContext(context.Background(), args[0], args[1:]...)
+		cmd := exec.CommandContext(ctx, args[0], args[1:]...)
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		cmd.Stdin = os.Stdin
@@ -172,10 +172,10 @@ func (c *WatchCmd) Run(ctx context.Context) error {
 			if m.Playhead != nil {
 				existingPlayhead = int(*m.Playhead)
 			}
-			playhead := utils.GetPlayhead(flags, m.Path, startTime, existingPlayhead, mediaDuration)
+			playhead := utils.GetPlayhead(&flags, m.Path, startTime, existingPlayhead, mediaDuration)
 
-			if err := history.UpdateHistorySimple(ctx, m.DB, []string{m.Path}, playhead, false); err != nil {
-				models.Log.Error("Warning: failed to update history", "path", m.Path, "error", err)
+			if err2 := history.UpdateHistorySimple(ctx, m.DB, []string{m.Path}, playhead, false); err2 != nil {
+				models.Log.Error("Warning: failed to update history", "path", m.Path, "error", err2)
 			}
 		}
 
@@ -194,7 +194,7 @@ func (c *WatchCmd) Run(ctx context.Context) error {
 			return nil
 		}
 
-		if err := RunExitCommand(ctx, flags, exitCode, m.Path); err != nil {
+		if err := RunExitCommand(ctx, &flags, exitCode, m.Path); err != nil {
 			models.Log.Error("Exit command failed", "code", exitCode, "error", err)
 		}
 
@@ -209,7 +209,7 @@ func (c *WatchCmd) Run(ctx context.Context) error {
 		}
 
 		// Execute post action for this item
-		if err := ExecutePostAction(ctx, flags, []models.MediaWithDB{m}); err != nil {
+		if err := ExecutePostAction(ctx, &flags, []models.MediaWithDB{m}); err != nil {
 			models.Log.Error("Post action failed", "path", m.Path, "error", err)
 		}
 
@@ -256,13 +256,13 @@ func (c *ListenCmd) Run(ctx context.Context) error {
 	flags.PlaybackFlags = c.PlaybackFlags
 	flags.MpvActionFlags = c.MpvActionFlags
 	flags.PostActionFlags = c.PostActionFlags
-	media, err := query.MediaQuery(ctx, c.Databases, flags)
+	media, err := query.MediaQuery(ctx, c.Databases, &flags)
 	if err != nil {
 		return err
 	}
 
-	media = query.FilterMedia(media, flags)
-	query.SortMedia(media, flags)
+	media = query.FilterMedia(media, &flags)
+	query.SortMedia(media, &flags)
 	if c.ReRank != "" {
 		media = query.ReRankMedia(media, flags)
 	}
@@ -333,7 +333,7 @@ func (c *ListenCmd) Run(ctx context.Context) error {
 			continue
 		}
 
-		cmd := exec.CommandContext(context.Background(), args[0], args[1:]...)
+		cmd := exec.CommandContext(ctx, args[0], args[1:]...)
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 
@@ -349,9 +349,9 @@ func (c *ListenCmd) Run(ctx context.Context) error {
 			if m.Playhead != nil {
 				existingPlayhead = int(*m.Playhead)
 			}
-			playhead := utils.GetPlayhead(flags, m.Path, startTime, existingPlayhead, mediaDuration)
-			if err := history.UpdateHistorySimple(ctx, m.DB, []string{m.Path}, playhead, false); err != nil {
-				models.Log.Warn("Failed to update history", "error", err)
+			playhead := utils.GetPlayhead(&flags, m.Path, startTime, existingPlayhead, mediaDuration)
+			if err2 := history.UpdateHistorySimple(ctx, m.DB, []string{m.Path}, playhead, false); err2 != nil {
+				models.Log.Warn("Failed to update history", "error", err2)
 			}
 		}
 
@@ -367,7 +367,7 @@ func (c *ListenCmd) Run(ctx context.Context) error {
 			return nil
 		}
 
-		if err := RunExitCommand(ctx, flags, exitCode, m.Path); err != nil {
+		if err := RunExitCommand(ctx, &flags, exitCode, m.Path); err != nil {
 			models.Log.Error("Exit command failed", "code", exitCode, "error", err)
 		}
 
@@ -380,7 +380,7 @@ func (c *ListenCmd) Run(ctx context.Context) error {
 			}
 		}
 
-		if err := ExecutePostAction(ctx, flags, []models.MediaWithDB{m}); err != nil {
+		if err := ExecutePostAction(ctx, &flags, []models.MediaWithDB{m}); err != nil {
 			models.Log.Error("Post action failed", "path", m.Path, "error", err)
 		}
 	}

@@ -49,9 +49,9 @@ func (c *ServeCmd) HandleCategorizeKeywords(w http.ResponseWriter, r *http.Reque
 		})
 	}
 
-	var results []catKeywords
+	results := make([]catKeywords, 0, len(data))
 	for cat, kwSet := range data {
-		var kws []string
+		kws := make([]string, 0, len(kwSet))
 		for kw := range kwSet {
 			kws = append(kws, kw)
 		}
@@ -618,7 +618,7 @@ func (c *ServeCmd) HandleTrash(w http.ResponseWriter, r *http.Request) {
 	flags.SortBy = "time_deleted"
 	flags.Reverse = true
 
-	media, err := query.MediaQuery(r.Context(), c.Databases, flags)
+	media, err := query.MediaQuery(r.Context(), c.Databases, &flags)
 	if err != nil {
 		models.Log.Error("Trash query failed", "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -661,7 +661,7 @@ func (c *ServeCmd) HandleEmptyBin(w http.ResponseWriter, r *http.Request) {
 		flags.All = true
 
 		var err error
-		media, err = query.MediaQuery(r.Context(), c.Databases, flags)
+		media, err = query.MediaQuery(r.Context(), c.Databases, &flags)
 		if err != nil {
 			models.Log.Error("Trash query failed", "error", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -706,7 +706,7 @@ func (c *ServeCmd) HandleOPDS(w http.ResponseWriter, r *http.Request) {
 	flags.TextOnly = true
 	flags.All = true
 
-	media, err := query.MediaQuery(r.Context(), c.Databases, flags)
+	media, err := query.MediaQuery(r.Context(), c.Databases, &flags)
 	if err != nil {
 		models.Log.Error("OPDS query failed", "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -1152,7 +1152,7 @@ func (c *ServeCmd) HandleRSVP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	text, err := utils.ExtractText(path)
+	text, err := utils.ExtractText(r.Context(), path)
 	if err != nil {
 		models.Log.Error("Text extraction failed", "path", path, "error", err)
 		http.Error(w, fmt.Sprintf("Text extraction failed: %v", err), http.StatusInternalServerError)
@@ -1180,7 +1180,7 @@ func (c *ServeCmd) HandleRSVP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	wavPath := filepath.Join(tmpDir, "audio.wav")
-	if err := utils.GenerateTTS(text, wavPath, wpm); err != nil {
+	if err := utils.GenerateTTS(r.Context(), text, wavPath, wpm); err != nil {
 		models.Log.Warn("TTS generation failed", "error", err)
 		wavPath = ""
 	}

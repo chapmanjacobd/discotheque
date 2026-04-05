@@ -38,13 +38,13 @@ func (c *SearchDBCmd) Run(ctx context.Context) error {
 	defer sqlDB.Close()
 
 	// 1. Resolve table name
-	tableName, err := c.getTableName(sqlDB)
+	tableName, err := c.getTableName(ctx, sqlDB)
 	if err != nil {
 		return err
 	}
 
 	// 2. Get searchable columns
-	columns, err := c.getSearchableColumns(sqlDB, tableName)
+	columns, err := c.getSearchableColumns(ctx, sqlDB, tableName)
 	if err != nil {
 		return err
 	}
@@ -54,16 +54,16 @@ func (c *SearchDBCmd) Run(ctx context.Context) error {
 
 	// 4. Handle Actions (Delete/MarkDeleted) or Print
 	if c.DeleteRows {
-		return c.deleteRows(sqlDB, tableName, whereClauses, args)
+		return c.deleteRows(ctx, sqlDB, tableName, whereClauses, args)
 	} else if c.MarkDeleted {
-		return c.markDeletedRows(sqlDB, tableName, whereClauses, args)
+		return c.markDeletedRows(ctx, sqlDB, tableName, whereClauses, args)
 	}
 
 	return c.printRows(ctx, sqlDB, tableName, whereClauses, args)
 }
 
-func (c *SearchDBCmd) getTableName(sqlDB *sql.DB) (string, error) {
-	rows, err := sqlDB.QueryContext(context.Background(), "SELECT name FROM sqlite_master WHERE type='table'")
+func (c *SearchDBCmd) getTableName(ctx context.Context, sqlDB *sql.DB) (string, error) {
+	rows, err := sqlDB.QueryContext(ctx, "SELECT name FROM sqlite_master WHERE type='table'")
 	if err != nil {
 		return "", err
 	}
@@ -104,8 +104,8 @@ func (c *SearchDBCmd) getTableName(sqlDB *sql.DB) (string, error) {
 	return "", fmt.Errorf("table %q not found in %s", c.Table, c.Database)
 }
 
-func (c *SearchDBCmd) getSearchableColumns(sqlDB *sql.DB, table string) ([]string, error) {
-	rows, err := sqlDB.QueryContext(context.Background(), fmt.Sprintf("PRAGMA table_info(%s)", table))
+func (c *SearchDBCmd) getSearchableColumns(ctx context.Context, sqlDB *sql.DB, table string) ([]string, error) {
+	rows, err := sqlDB.QueryContext(ctx, fmt.Sprintf("PRAGMA table_info(%s)", table))
 	if err != nil {
 		return nil, err
 	}
@@ -159,7 +159,7 @@ func (c *SearchDBCmd) buildSearchFilters(columns []string) ([]string, []any) {
 	// Support for GlobalFlags.Include/Exclude
 	if len(c.Include) > 0 {
 		for _, inc := range c.Include {
-			var groupClauses []string
+			groupClauses := make([]string, 0, len(columns))
 			pattern := "%" + inc + "%"
 			for _, col := range columns {
 				groupClauses = append(groupClauses, fmt.Sprintf("%s LIKE ?", col))
@@ -171,7 +171,7 @@ func (c *SearchDBCmd) buildSearchFilters(columns []string) ([]string, []any) {
 
 	if len(c.Exclude) > 0 {
 		for _, exc := range c.Exclude {
-			var groupClauses []string
+			groupClauses := make([]string, 0, len(columns))
 			pattern := "%" + exc + "%"
 			for _, col := range columns {
 				groupClauses = append(groupClauses, fmt.Sprintf("%s NOT LIKE ?", col))
@@ -184,13 +184,13 @@ func (c *SearchDBCmd) buildSearchFilters(columns []string) ([]string, []any) {
 	return whereClauses, args
 }
 
-func (c *SearchDBCmd) deleteRows(sqlDB *sql.DB, table string, where []string, args []any) error {
+func (c *SearchDBCmd) deleteRows(ctx context.Context, sqlDB *sql.DB, table string, where []string, args []any) error {
 	query := fmt.Sprintf("DELETE FROM %s", table)
 	if len(where) > 0 {
 		query += " WHERE " + strings.Join(where, " AND ")
 	}
 
-	res, err := sqlDB.ExecContext(context.Background(), query, args...)
+	res, err := sqlDB.ExecContext(ctx, query, args...)
 	if err != nil {
 		return err
 	}
@@ -199,7 +199,13 @@ func (c *SearchDBCmd) deleteRows(sqlDB *sql.DB, table string, where []string, ar
 	return nil
 }
 
-func (c *SearchDBCmd) markDeletedRows(sqlDB *sql.DB, table string, where []string, args []any) error {
+func (c *SearchDBCmd) markDeletedRows(
+	ctx context.Context,
+	sqlDB *sql.DB,
+	table string,
+	where []string,
+	args []any,
+) error {
 	now := time.Now().Unix()
 	query := fmt.Sprintf("UPDATE %s SET time_deleted = ?", table)
 	actualArgs := append([]any{now}, args...)
@@ -208,7 +214,7 @@ func (c *SearchDBCmd) markDeletedRows(sqlDB *sql.DB, table string, where []strin
 		query += " WHERE " + strings.Join(where, " AND ")
 	}
 
-	res, err := sqlDB.ExecContext(context.Background(), query, actualArgs...)
+	res, err := sqlDB.ExecContext(ctx, query, actualArgs...)
 	if err != nil {
 		return err
 	}
@@ -231,13 +237,13 @@ func (c *SearchDBCmd) printRows(ctx context.Context, sqlDB *sql.DB, table string
 		var name, colType string
 		var notnull, pk int
 		var dfltValue sql.NullString
-		if err := colRows.Scan(&cid, &name, &colType, &notnull, &dfltValue, &pk); err != nil {
-			return err
+		if scanErr := colRows.Scan(&cid, &name, &colType, &notnull, &dfltValue, &pk); scanErr != nil {
+			return scanErr
 		}
 		columns = append(columns, name)
 	}
-	if err := colRows.Err(); err != nil {
-		return err
+	if err2 := colRows.Err(); err2 != nil {
+		return err2
 	}
 
 	query := fmt.Sprintf("SELECT %s FROM %s", strings.Join(columns, ", "), table)

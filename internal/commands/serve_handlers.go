@@ -20,7 +20,7 @@ import (
 	"github.com/chapmanjacobd/discoteca/internal/utils/pathutil"
 )
 
-// handleHealth returns OK if the server is running
+// HandleHealth returns OK if the server is running
 func (c *ServeCmd) HandleHealth(w http.ResponseWriter, _ *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte("OK"))
@@ -43,9 +43,9 @@ func (c *ServeCmd) HandleQuery(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Pre-resolve percentiles so Count matches Query results
-	resolvedFlags, err := query.ResolvePercentileFlags(ctx, dbs, flags)
+	resolvedFlags, err := query.ResolvePercentileFlags(ctx, dbs, &flags)
 	if err == nil {
-		flags = resolvedFlags
+		flags = *resolvedFlags
 	}
 
 	if q.Get("view") == "captions" || q.Get("captions") == "true" {
@@ -63,14 +63,14 @@ func (c *ServeCmd) HandleQuery(w http.ResponseWriter, r *http.Request) {
 		aggregate := q.Get("aggregate") == "true"
 
 		for _, dbPath := range dbs {
-			err := c.execDB(ctx, dbPath, func(ctx context.Context, sqlDB *sql.DB) error {
+			err2 := c.execDB(ctx, dbPath, func(ctx context.Context, sqlDB *sql.DB) error {
 				queries := database.New(sqlDB)
 				var rows []database.SearchCaptionsRow
-				var err error
+				var captionErr error
 
 				if queryStr != "" {
 					// Search with context - get all captions for matched media
-					rows, err = c.getCaptionsWithContext(
+					rows, captionErr = c.getCaptionsWithContext(
 						ctx,
 						queries,
 						queryStr,
@@ -90,9 +90,9 @@ func (c *ServeCmd) HandleQuery(w http.ResponseWriter, r *http.Request) {
 						TextOnly:  utils.BoolToInt64(flags.TextOnly),
 						Limit:     int64(limit),
 					}
-					rawRows, err2 := queries.GetAllCaptionsOrdered(ctx, params)
-					if err2 != nil {
-						return err2
+					rawRows, err3 := queries.GetAllCaptionsOrdered(ctx, params)
+					if err3 != nil {
+						return err3
 					}
 					models.Log.Info(
 						"Fetched captions",
@@ -118,8 +118,8 @@ func (c *ServeCmd) HandleQuery(w http.ResponseWriter, r *http.Request) {
 					}
 				}
 
-				if err != nil {
-					return err
+				if captionErr != nil {
+					return captionErr
 				}
 
 				if aggregate {
@@ -194,8 +194,8 @@ func (c *ServeCmd) HandleQuery(w http.ResponseWriter, r *http.Request) {
 				}
 				return nil
 			})
-			if err != nil {
-				models.Log.Error("Caption fetch failed", "db", dbPath, "error", err)
+			if err2 != nil {
+				models.Log.Error("Caption fetch failed", "db", dbPath, "error", err2)
 			}
 		}
 
@@ -238,18 +238,18 @@ func (c *ServeCmd) HandleQuery(w http.ResponseWriter, r *http.Request) {
 				"items":  items,
 				"counts": filterCounts,
 			}
-			if err := json.NewEncoder(w).Encode(response); err != nil {
-				models.Log.Warn("Failed to encode response", "error", err)
+			if err2 := json.NewEncoder(w).Encode(response); err2 != nil {
+				models.Log.Warn("Failed to encode response", "error", err2)
 			}
 		} else {
-			if err := json.NewEncoder(w).Encode(items); err != nil {
-				models.Log.Warn("Failed to encode response", "error", err)
+			if err2 := json.NewEncoder(w).Encode(items); err2 != nil {
+				models.Log.Warn("Failed to encode response", "error", err2)
 			}
 		}
 		return
 	}
 
-	media, err := query.MediaQuery(ctx, dbs, flags)
+	media, err := query.MediaQuery(ctx, dbs, &flags)
 	if err != nil {
 		models.Log.Error("Query failed", "dbs", dbs, "error", err)
 		sendError(w, http.StatusInternalServerError, "Query failed: "+err.Error())
@@ -270,15 +270,15 @@ func (c *ServeCmd) HandleQuery(w http.ResponseWriter, r *http.Request) {
 	if flags.WithCaptions && len(flags.Search) > 0 {
 		queryStr := strings.Join(flags.Search, " ")
 		for _, dbPath := range dbs {
-			err := c.execDB(ctx, dbPath, func(ctx context.Context, sqlDB *sql.DB) error {
+			err2 := c.execDB(ctx, dbPath, func(ctx context.Context, sqlDB *sql.DB) error {
 				queries := database.New(sqlDB)
 				// Enrich existing results with matching caption segments
-				rows, err := queries.SearchCaptions(ctx, database.SearchCaptionsParams{
+				rows, captionErr := queries.SearchCaptions(ctx, database.SearchCaptionsParams{
 					Query: queryStr,
 					Limit: 5, // Just get a few per DB for enrichment
 				})
-				if err != nil {
-					return err
+				if captionErr != nil {
+					return captionErr
 				}
 
 				// Apply in-memory ranking for better relevance
@@ -299,13 +299,13 @@ func (c *ServeCmd) HandleQuery(w http.ResponseWriter, r *http.Request) {
 				}
 				return nil
 			})
-			if err != nil {
-				models.Log.Error("Caption enrichment failed", "db", dbPath, "error", err)
+			if err2 != nil {
+				models.Log.Error("Caption enrichment failed", "db", dbPath, "error", err2)
 			}
 		}
 	}
 
-	totalCount, err := query.MediaQueryCount(ctx, dbs, flags)
+	totalCount, err := query.MediaQueryCount(ctx, dbs, &flags)
 	if err != nil {
 		models.Log.Error("Count query failed", "dbs", dbs, "error", err)
 		// Don't fail the whole request just for count
@@ -328,17 +328,17 @@ func (c *ServeCmd) HandleQuery(w http.ResponseWriter, r *http.Request) {
 	if strings.Contains(sortConfig, "_related_media") && len(dbs) > 0 {
 		// Use expansion-aware sorting with first database
 		err := c.execDB(ctx, dbs[0], func(ctx context.Context, sqlDB *sql.DB) error {
-			query.SortMediaWithExpansion(ctx, sqlDB, &media, flags)
+			query.SortMediaWithExpansion(ctx, sqlDB, &media, &flags)
 			return nil
 		})
 		if err != nil {
 			models.Log.Warn("SortMediaWithExpansion failed", "error", err)
 			// Fall back to regular sorting
-			query.SortMedia(media, flags)
+			query.SortMedia(media, &flags)
 		}
 	} else if len(dbs) > 1 {
 		// Multi-DB queries need in-memory sorting to merge results from multiple databases
-		query.SortMedia(media, flags)
+		query.SortMedia(media, &flags)
 	}
 	// For single DB queries, SQL already sorted with LIMIT/OFFSET, so skip in-memory sorting
 
@@ -368,7 +368,7 @@ func (c *ServeCmd) HandleQuery(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// handlePlay triggers local playback of a media file via mpv.
+// HandlePlay triggers local playback of a media file via mpv.
 // POST /api/play
 // Body: {"path": "..."}
 func (c *ServeCmd) HandlePlay(w http.ResponseWriter, r *http.Request) {
@@ -426,7 +426,7 @@ func (c *ServeCmd) markDeletedInAllDBs(ctx context.Context, path string, deleted
 	}
 }
 
-// handleDelete marks a file as deleted or restores it in all databases.
+// HandleDelete marks a file as deleted or restores it in all databases.
 // POST /api/delete
 // Body: {"path": "...", "restore": bool}
 func (c *ServeCmd) HandleDelete(w http.ResponseWriter, r *http.Request) {
@@ -449,7 +449,7 @@ func (c *ServeCmd) HandleDelete(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-// handleProgress updates the playback progress for a media file.
+// HandleProgress updates the playback progress for a media file.
 // POST /api/progress
 // Body: {"path": "...", "playhead": int64, "completed": bool}
 func (c *ServeCmd) HandleProgress(w http.ResponseWriter, r *http.Request) {
@@ -498,7 +498,7 @@ func (c *ServeCmd) HandleProgress(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-// handleMarkUnplayed resets play count and progress for a media file.
+// HandleMarkUnplayed resets play count and progress for a media file.
 // POST /api/mark-unplayed
 // Body: {"path": "..."}
 func (c *ServeCmd) HandleMarkUnplayed(w http.ResponseWriter, r *http.Request) {
@@ -540,7 +540,7 @@ func (c *ServeCmd) HandleMarkUnplayed(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-// handleMarkPlayed increments play count and resets progress for a media file.
+// HandleMarkPlayed increments play count and resets progress for a media file.
 // POST /api/mark-played
 // Body: {"path": "..."}
 func (c *ServeCmd) HandleMarkPlayed(w http.ResponseWriter, r *http.Request) {
@@ -584,7 +584,7 @@ func (c *ServeCmd) HandleMarkPlayed(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-// handleRate updates the rating for a media file.
+// HandleRate updates the rating for a media file.
 // POST /api/rate
 // Body: {"path": "...", "score": float64}
 func (c *ServeCmd) HandleRate(w http.ResponseWriter, r *http.Request) {
@@ -940,10 +940,10 @@ func (c *ServeCmd) HandleDU(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Resolve percentile-based filters (e.g., p10-90) to absolute values
-	resolvedFlags, err := query.ResolvePercentileFlags(r.Context(), dbs, flags)
+	resolvedFlags, err := query.ResolvePercentileFlags(r.Context(), dbs, &flags)
 	if err != nil {
 		models.Log.Warn("Failed to resolve percentile filters", "error", err)
-		resolvedFlags = flags
+		resolvedFlags = &flags
 	}
 
 	// Use DU aggregation with filter support
@@ -1120,7 +1120,7 @@ func (c *ServeCmd) HandleEpisodes(w http.ResponseWriter, r *http.Request) {
 		flags.Limit = 1000000
 	}
 
-	allMedia, err := query.MediaQuery(r.Context(), c.Databases, flags)
+	allMedia, err := query.MediaQuery(r.Context(), c.Databases, &flags)
 	if err != nil {
 		models.Log.Error("Failed to fetch media for episodes", "error", err)
 		http.Error(w, "Query failed", http.StatusInternalServerError)

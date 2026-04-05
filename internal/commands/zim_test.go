@@ -26,7 +26,7 @@ func TestKiwixManager_findAvailablePort(t *testing.T) {
 	}
 
 	t.Run("returns first available port starting from commands.KiwixPortStart", func(t *testing.T) {
-		port := manager.FindAvailablePort()
+		port := manager.FindAvailablePort(context.Background())
 		if port != commands.KiwixPortStart {
 			t.Errorf("Expected port %d, got %d", commands.KiwixPortStart, port)
 		}
@@ -34,7 +34,7 @@ func TestKiwixManager_findAvailablePort(t *testing.T) {
 
 	t.Run("skips used ports in UsedPorts map", func(t *testing.T) {
 		manager.UsedPorts[commands.KiwixPortStart] = true
-		port := manager.FindAvailablePort()
+		port := manager.FindAvailablePort(context.Background())
 		if port != commands.KiwixPortStart+1 {
 			t.Errorf("Expected port %d, got %d", commands.KiwixPortStart+1, port)
 		}
@@ -51,7 +51,7 @@ func TestKiwixManager_findAvailablePort(t *testing.T) {
 		for i := range 5 {
 			manager2.UsedPorts[commands.KiwixPortStart+i] = true
 		}
-		port := manager2.FindAvailablePort()
+		port := manager2.FindAvailablePort(context.Background())
 		if port != commands.KiwixPortStart+5 {
 			t.Errorf("Expected port %d, got %d", commands.KiwixPortStart+5, port)
 		}
@@ -66,7 +66,7 @@ func TestKiwixManager_findAvailablePort(t *testing.T) {
 		for i := range 100 {
 			manager3.UsedPorts[commands.KiwixPortStart+i] = true
 		}
-		port := manager3.FindAvailablePort()
+		port := manager3.FindAvailablePort(context.Background())
 		if port != 0 {
 			t.Errorf("Expected port 0 (no available ports), got %d", port)
 		}
@@ -85,7 +85,7 @@ func TestKiwixManager_ensureKiwixServing(t *testing.T) {
 		// That validation happens in handleZimView before calling EnsureKiwixServing
 		// This test verifies the function tries to start kiwix-serve
 		nonExistentPath := "/tmp/nonexistent.zim"
-		port, err := manager.EnsureKiwixServing(nonExistentPath)
+		port, err := manager.EnsureKiwixServing(context.Background(), nonExistentPath)
 		// The function will try to start kiwix-serve, which may fail if not installed
 		// or succeed if kiwix-serve is installed (it doesn't validate the file)
 		if err != nil {
@@ -116,7 +116,7 @@ func TestKiwixManager_ensureKiwixServing(t *testing.T) {
 		}
 
 		// Second call should return cached instance
-		port, err := manager.EnsureKiwixServing(zimPath)
+		port, err := manager.EnsureKiwixServing(context.Background(), zimPath)
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
@@ -139,7 +139,7 @@ func TestKiwixManager_ensureKiwixServing(t *testing.T) {
 			LastUsed: oldTime,
 		}
 
-		_, err := manager.EnsureKiwixServing(zimPath)
+		_, err := manager.EnsureKiwixServing(context.Background(), zimPath)
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
@@ -232,7 +232,7 @@ func TestKiwixManager_concurrentAccess(t *testing.T) {
 	// Simulate concurrent access
 	for range 50 {
 		wg.Go(func() {
-			port, err := manager.EnsureKiwixServing(zimPath)
+			port, err := manager.EnsureKiwixServing(context.Background(), zimPath)
 			if err != nil {
 				errors <- err
 				return
@@ -478,7 +478,7 @@ func TestIsPortAvailable(t *testing.T) {
 	t.Run("returns true for available port", func(t *testing.T) {
 		// Find a truly available port
 		port := commands.KiwixPortStart + 100
-		if !commands.IsPortAvailable(port) {
+		if !commands.IsPortAvailable(context.Background(), port) {
 			t.Errorf("Expected port %d to be available", port)
 		}
 	})
@@ -496,7 +496,7 @@ func TestIsPortAvailable(t *testing.T) {
 		port := 0
 		fmt.Sscanf(parts[1], "%d", &port)
 
-		if commands.IsPortAvailable(port) {
+		if commands.IsPortAvailable(context.Background(), port) {
 			t.Errorf("Expected port %d to be unavailable", port)
 		}
 	})

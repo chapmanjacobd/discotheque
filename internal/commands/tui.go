@@ -51,7 +51,7 @@ func (c *TuiCmd) Run(ctx context.Context) error {
 		c.FTSFlags,
 	)
 
-	media, err := query.MediaQuery(ctx, c.Databases, flags)
+	media, err := query.MediaQuery(ctx, c.Databases, &flags)
 	if err != nil {
 		return err
 	}
@@ -60,14 +60,14 @@ func (c *TuiCmd) Run(ctx context.Context) error {
 		return errors.New("no media found")
 	}
 
-	query.SortMedia(media, flags)
+	query.SortMedia(media, &flags)
 
 	var customCats []string
 	for _, dbPath := range c.Databases {
-		sqlDB, queries, err := db.ConnectWithInit(ctx, dbPath)
-		if err == nil {
-			cats, err := queries.GetCustomCategories(ctx)
-			if err == nil {
+		sqlDB, queries, err2 := db.ConnectWithInit(ctx, dbPath)
+		if err2 == nil {
+			cats, err3 := queries.GetCustomCategories(ctx)
+			if err3 == nil {
 				customCats = append(customCats, cats...)
 			}
 			sqlDB.Close()
@@ -82,18 +82,20 @@ func (c *TuiCmd) Run(ctx context.Context) error {
 		return err
 	}
 
-	choice := finalModel.(*tui.Model).GetChoice()
-	if choice != nil {
-		// Play the chosen media
-		fmt.Printf("Playing: %s\n", choice.Path)
+	if model, ok := finalModel.(*tui.Model); ok {
+		choice := model.GetChoice()
+		if choice != nil {
+			// Play the chosen media
+			fmt.Printf("Playing: %s\n", choice.Path)
 
-		args := []string{"mpv", choice.Path}
-		cmd := exec.CommandContext(context.Background(), args[0], args[1:]...)
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		cmd.Stdin = os.Stdin
+			args := []string{"mpv", choice.Path}
+			cmd := exec.CommandContext(ctx, args[0], args[1:]...)
+			cmd.Stdout = os.Stdout
+			cmd.Stderr = os.Stderr
+			cmd.Stdin = os.Stdin
 
-		return cmd.Run()
+			return cmd.Run()
+		}
 	}
 
 	return nil

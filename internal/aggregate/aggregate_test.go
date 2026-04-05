@@ -37,7 +37,7 @@ func TestIsSameGroup(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := aggregate.IsSameGroup(flags, m0, tt.other); got != tt.expected {
+			if got := aggregate.IsSameGroup(&flags, m0, tt.other); got != tt.expected {
 				t.Errorf("IsSameGroup() = %v, want %v", got, tt.expected)
 			}
 		})
@@ -65,7 +65,7 @@ func TestIsSameFolderGroup(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := aggregate.IsSameFolderGroup(flags, f0, tt.other); got != tt.expected {
+			if got := aggregate.IsSameFolderGroup(&flags, f0, tt.other); got != tt.expected {
 				t.Errorf("IsSameFolderGroup() = %v, want %v", got, tt.expected)
 			}
 		})
@@ -100,7 +100,7 @@ func TestClusterByNumbers(t *testing.T) {
 		{Media: models.Media{Path: "f", Size: &s116, Duration: &d108}},
 	}
 
-	got := aggregate.ClusterByNumbers(flags, media)
+	got := aggregate.ClusterByNumbers(&flags, media)
 	// Python test said: [0, 0, 0, 1, 1, 2]
 	// group 0: a, b, c
 	// group 1: d, e
@@ -128,7 +128,7 @@ func TestClusterFoldersByNumbers(t *testing.T) {
 		{Path: "/dir3", ExistsCount: 110, Count: 1},
 	}
 
-	got := aggregate.ClusterFoldersByNumbers(flags, folders)
+	got := aggregate.ClusterFoldersByNumbers(&flags, folders)
 	if len(got) != 1 {
 		t.Errorf("Expected 1 group, got %d", len(got))
 	}
@@ -205,7 +205,7 @@ func TestClusterFoldersByName(t *testing.T) {
 	}
 
 	got := aggregate.ClusterFoldersByName(
-		models.GlobalFlags{SimilarityFlags: models.SimilarityFlags{Similar: false}},
+		&models.GlobalFlags{SimilarityFlags: models.SimilarityFlags{Similar: false}},
 		folders,
 	)
 	if len(got) != 2 {
@@ -222,7 +222,7 @@ func TestClusterPaths(t *testing.T) {
 		"/other/completely/different/file.txt",
 	}
 
-	got := aggregate.ClusterPaths(models.GlobalFlags{SimilarityFlags: models.SimilarityFlags{Clusters: 2}}, lines)
+	got := aggregate.ClusterPaths(&models.GlobalFlags{SimilarityFlags: models.SimilarityFlags{Clusters: 2}}, lines)
 	if len(got) < 1 {
 		t.Error("ClusterPaths returned no groups")
 	}

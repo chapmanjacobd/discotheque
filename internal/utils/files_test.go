@@ -17,8 +17,8 @@ func TestSampleHashFile(t *testing.T) {
 	defer os.Remove(f.Name())
 
 	content := "hello world"
-	if _, err := f.WriteString(content); err != nil {
-		t.Fatal(err)
+	if _, err2 := f.WriteString(content); err2 != nil {
+		t.Fatal(err2)
 	}
 	f.Close()
 
@@ -40,8 +40,8 @@ func TestFullHashFile(t *testing.T) {
 	defer os.Remove(f.Name())
 
 	content := "hello world full"
-	if _, err := f.WriteString(content); err != nil {
-		t.Fatal(err)
+	if _, err2 := f.WriteString(content); err2 != nil {
+		t.Fatal(err2)
 	}
 	f.Close()
 
@@ -58,15 +58,15 @@ func TestSimulationFunctions(t *testing.T) {
 	flags := models.GlobalFlags{}
 	flags.Simulate = true
 
-	if err := utils.Rename(flags, "src", "dst"); err != nil {
+	if err := utils.Rename(&flags, "src", "dst"); err != nil {
 		t.Errorf("utils.Rename failed in simulation: %v", err)
 	}
 
-	if err := utils.Unlink(flags, "path"); err != nil {
+	if err := utils.Unlink(&flags, "path"); err != nil {
 		t.Errorf("utils.Unlink failed in simulation: %v", err)
 	}
 
-	if err := utils.Rmtree(flags, "path"); err != nil {
+	if err := utils.Rmtree(&flags, "path"); err != nil {
 		t.Errorf("utils.Rmtree failed in simulation: %v", err)
 	}
 }
@@ -197,8 +197,8 @@ func TestGetFileStats(t *testing.T) {
 	defer os.Remove(f.Name())
 
 	content := "hello"
-	if _, err := f.WriteString(content); err != nil {
-		t.Fatal(err)
+	if _, err2 := f.WriteString(content); err2 != nil {
+		t.Fatal(err2)
 	}
 	f.Close()
 

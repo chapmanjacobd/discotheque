@@ -19,17 +19,15 @@ import (
 // instead of LIMIT total.
 func TestMultiDBPagination(t *testing.T) {
 	// Create two test databases
-	dbPath1, err := createTestDB("multidb-test1-*.db")
+	dbPath1, err := createTestDB(t, "multidb-test1-*.db")
 	if err != nil {
 		t.Fatalf("Failed to create test DB 1: %v", err)
 	}
-	defer os.Remove(dbPath1)
 
-	dbPath2, err := createTestDB("multidb-test2-*.db")
+	dbPath2, err := createTestDB(t, "multidb-test2-*.db")
 	if err != nil {
 		t.Fatalf("Failed to create test DB 2: %v", err)
 	}
-	defer os.Remove(dbPath2)
 
 	ctx := context.Background()
 	dbs := []string{dbPath1, dbPath2}
@@ -150,8 +148,8 @@ func TestMultiDBPagination(t *testing.T) {
 }
 
 // createTestDB creates a test database with 5 sample items
-func createTestDB(pattern string) (string, error) {
-	f, err := os.CreateTemp("", pattern)
+func createTestDB(t *testing.T, pattern string) (string, error) {
+	f, err := os.CreateTemp(t.TempDir(), pattern)
 	if err != nil {
 		return "", err
 	}
@@ -160,14 +158,12 @@ func createTestDB(pattern string) (string, error) {
 
 	dbConn, err := sql.Open("sqlite3", dbPath)
 	if err != nil {
-		os.Remove(dbPath)
 		return "", err
 	}
 	defer dbConn.Close()
 
 	// Create schema using central schema (without FTS)
 	if err := testutils.InitTestDBNoFTS(dbConn); err != nil {
-		os.Remove(dbPath)
 		return "", err
 	}
 
@@ -180,7 +176,6 @@ func createTestDB(pattern string) (string, error) {
 			path, "Item "+string(rune('0'+i)), "video", 1000*i, 100*i,
 		)
 		if err != nil {
-			os.Remove(dbPath)
 			return "", err
 		}
 	}

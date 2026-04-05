@@ -280,7 +280,9 @@ func (c *ServeCmd) execDB(ctx context.Context, dbPath string, fn func(ctx contex
 	for i := 0; i <= maxRetries; i++ {
 		var sqlDB *sql.DB
 		if val, ok := c.dbCache.Load(dbPath); ok {
-			sqlDB = val.(*sql.DB)
+			if dbConn, ok := val.(*sql.DB); ok {
+				sqlDB = dbConn
+			}
 		} else {
 			// Create a new connection
 			newDB, err := db.Connect(ctx, dbPath)
@@ -302,7 +304,9 @@ func (c *ServeCmd) execDB(ctx context.Context, dbPath string, fn func(ctx contex
 			sqlDB = newDB
 			if loaded, ok := c.dbCache.LoadOrStore(dbPath, sqlDB); ok {
 				// Another goroutine stored a connection first; use theirs and close ours
-				sqlDB = loaded.(*sql.DB)
+				if dbConn, ok := loaded.(*sql.DB); ok {
+					sqlDB = dbConn
+				}
 				_ = newDB.Close()
 			}
 		}
@@ -385,9 +389,11 @@ func (c *ServeCmd) Run(ctx context.Context) error {
 	go func() {
 		config := db.DefaultMaintenanceConfig()
 		for _, dbPath := range c.Databases {
-			if sqlDB, ok := c.dbCache.Load(dbPath); ok {
-				if err := db.RunMaintenance(ctx, sqlDB.(*sql.DB), config, dbPath); err != nil {
-					models.Log.Error("Maintenance failed", "db", dbPath, "error", err)
+			if val, ok := c.dbCache.Load(dbPath); ok {
+				if sqlDB, ok := val.(*sql.DB); ok {
+					if err := db.RunMaintenance(ctx, sqlDB, config, dbPath); err != nil {
+						models.Log.Error("Maintenance failed", "db", dbPath, "error", err)
+					}
 				}
 			}
 		}
@@ -426,7 +432,9 @@ func (c *ServeCmd) Run(ctx context.Context) error {
 
 			if openCmd != "" {
 				openArgs = append(openArgs, baseURL)
-				cmd := exec.CommandContext(context.Background(), openCmd, openArgs...)
+				browserCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+				defer cancel()
+				cmd := exec.CommandContext(browserCtx, openCmd, openArgs...)
 				if err := cmd.Start(); err != nil {
 					models.Log.Debug("Failed to open browser", "error", err)
 				}
@@ -464,7 +472,7 @@ func (c *ServeCmd) GetGlobalFlags() models.GlobalFlags {
 	}
 }
 
-// parseFlags extracts query parameters into GlobalFlags
+// ParseFlags extracts query parameters into GlobalFlags
 func (c *ServeCmd) ParseFlags(r *http.Request) models.GlobalFlags {
 	flags := c.GetGlobalFlags()
 	q := r.URL.Query()

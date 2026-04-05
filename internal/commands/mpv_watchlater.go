@@ -44,7 +44,7 @@ func (c *MpvWatchlaterCmd) Run(ctx context.Context) error {
 	}
 
 	// 1. Get all media from databases
-	media, err := query.MediaQuery(ctx, c.Databases, flags)
+	media, err := query.MediaQuery(ctx, c.Databases, &flags)
 	if err != nil {
 		return err
 	}

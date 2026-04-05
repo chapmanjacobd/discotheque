@@ -13,7 +13,10 @@ var repairLocks sync.Map
 
 func getLock(path string) *sync.Mutex {
 	v, _ := repairLocks.LoadOrStore(path, &sync.Mutex{})
-	return v.(*sync.Mutex)
+	if mu, ok := v.(*sync.Mutex); ok {
+		return mu
+	}
+	return nil
 }
 
 // IsCorruptionError checks if the error is a database corruption error
@@ -52,8 +55,8 @@ func IsHealthy(ctx context.Context, dbPath string) bool {
 	foundOk := false
 	for rows.Next() {
 		var res string
-		if err := rows.Scan(&res); err != nil {
-			Log.Debug("Health check: failed to scan integrity row", "error", err)
+		if scanErr := rows.Scan(&res); scanErr != nil {
+			Log.Debug("Health check: failed to scan integrity row", "error", scanErr)
 			return false
 		}
 		if res == "ok" {
@@ -63,8 +66,8 @@ func IsHealthy(ctx context.Context, dbPath string) bool {
 			return false
 		}
 	}
-	if err := rows.Err(); err != nil {
-		Log.Debug("Health check: rows iteration error", "error", err)
+	if err2 := rows.Err(); err2 != nil {
+		Log.Debug("Health check: rows iteration error", "error", err2)
 		return false
 	}
 	if !foundOk {
@@ -75,8 +78,8 @@ func IsHealthy(ctx context.Context, dbPath string) bool {
 	// 2. Schema check
 	row := db.QueryRowContext(ctx, "SELECT name FROM sqlite_master LIMIT 1")
 	var name string
-	if err := row.Scan(&name); err != nil && err != sql.ErrNoRows {
-		Log.Debug("Health check: schema check failed", "error", err)
+	if scanErr := row.Scan(&name); scanErr != nil && scanErr != sql.ErrNoRows {
+		Log.Debug("Health check: schema check failed", "error", scanErr)
 		return false
 	}
 

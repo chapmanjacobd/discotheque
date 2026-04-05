@@ -54,7 +54,7 @@ func (c *ClusterSortCmd) Run(ctx context.Context) error {
 		return nil
 	}
 
-	groups := aggregate.ClusterPaths(flags, lines)
+	groups := aggregate.ClusterPaths(&flags, lines)
 
 	if c.Duplicates != nil && *c.Duplicates {
 		groups = aggregate.FilterNearDuplicates(groups)

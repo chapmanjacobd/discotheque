@@ -59,7 +59,7 @@ func (c *DiskUsageCmd) Run(ctx context.Context) error {
 
 	// Handle databases
 	if len(c.Databases) > 0 {
-		dbMedia, err := query.MediaQuery(ctx, c.Databases, flags)
+		dbMedia, err := query.MediaQuery(ctx, c.Databases, &flags)
 		if err != nil {
 			return err
 		}

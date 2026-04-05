@@ -102,14 +102,18 @@ func (c *ServeCmd) HandleZimView(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	port, err := ZimManager.EnsureKiwixServing(localPath)
+	port, err := ZimManager.EnsureKiwixServing(r.Context(), localPath)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	if err := WaitForKiwixReady(r.Context(), port, 10*time.Second); err != nil {
-		http.Error(w, fmt.Sprintf("Kiwix server did not start in time: %s", err.Error()), http.StatusServiceUnavailable)
+	if err2 := WaitForKiwixReady(r.Context(), port, 10*time.Second); err2 != nil {
+		http.Error(
+			w,
+			fmt.Sprintf("Kiwix server did not start in time: %s", err2.Error()),
+			http.StatusServiceUnavailable,
+		)
 		return
 	}
 
@@ -140,7 +144,7 @@ func (c *ServeCmd) HandleZimView(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write([]byte(html))
 }
 
-func (m *KiwixManager) EnsureKiwixServing(zimPath string) (int, error) {
+func (m *KiwixManager) EnsureKiwixServing(ctx context.Context, zimPath string) (int, error) {
 	m.Mutex.Lock()
 	defer m.Mutex.Unlock()
 
@@ -149,13 +153,13 @@ func (m *KiwixManager) EnsureKiwixServing(zimPath string) (int, error) {
 		return instance.Port, nil
 	}
 
-	port := m.FindAvailablePort()
+	port := m.FindAvailablePort(ctx)
 	if port == 0 {
 		return 0, errors.New("no available ports for kiwix-serve")
 	}
 
 	cmd := exec.CommandContext(
-		context.Background(),
+		ctx,
 		KiwixBin,
 		"--nolibrarybutton",
 		"-p", strconv.Itoa(port),
@@ -179,10 +183,10 @@ func (m *KiwixManager) EnsureKiwixServing(zimPath string) (int, error) {
 	return port, nil
 }
 
-func (m *KiwixManager) FindAvailablePort() int {
+func (m *KiwixManager) FindAvailablePort(ctx context.Context) int {
 	for i := range 100 {
 		port := KiwixPortStart + i
-		if !m.UsedPorts[port] && IsPortAvailable(port) {
+		if !m.UsedPorts[port] && IsPortAvailable(ctx, port) {
 			return port
 		}
 	}
@@ -211,9 +215,9 @@ func (m *KiwixManager) cleanupOldInstances() {
 	}
 }
 
-func IsPortAvailable(port int) bool {
+func IsPortAvailable(ctx context.Context, port int) bool {
 	addr := fmt.Sprintf("127.0.0.1:%d", port)
-	listener, err := (&net.ListenConfig{}).Listen(context.Background(), "tcp", addr)
+	listener, err := (&net.ListenConfig{}).Listen(ctx, "tcp", addr)
 	if err != nil {
 		return false
 	}

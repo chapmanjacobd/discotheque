@@ -27,7 +27,9 @@ var getExecutableDir = sync.OnceValue(func() string {
 // Results are cached to avoid repeated syscalls
 func CommandExists(cmd string) bool {
 	if cached, ok := commandExistsCache.Load(cmd); ok {
-		return cached.(bool)
+		if result, ok := cached.(bool); ok {
+			return result
+		}
 	}
 
 	path := GetCommandPath(cmd)

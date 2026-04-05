@@ -194,9 +194,9 @@ func DoUpdateAt(ctx context.Context, curp, url string) bool {
 	}
 
 	// 2. Download checksum if available
-	if err := verifyChecksum(ctx, url, data); err != nil {
+	if err2 := verifyChecksum(ctx, url, data); err2 != nil {
 		fmt.Fprintln(Stderr,
-			"checksum verification failed:", err)
+			"checksum verification failed:", err2)
 		return false
 	}
 

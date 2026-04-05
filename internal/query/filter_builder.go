@@ -21,18 +21,18 @@ import (
 // FilterBuilder constructs SQL queries and in-memory filters from flags
 // This is the single source of truth for all filter logic
 type FilterBuilder struct {
-	Flags models.GlobalFlags
+	Flags *models.GlobalFlags
 }
 
 // NewFilterBuilder creates a new FilterBuilder from global flags
-func NewFilterBuilder(flags models.GlobalFlags) *FilterBuilder {
+func NewFilterBuilder(flags *models.GlobalFlags) *FilterBuilder {
 	return &FilterBuilder{Flags: flags}
 }
 
 // BuildWhereClauses builds WHERE clauses and arguments for SQL queries
 // Order matters for performance: selective indexed filters come before expensive substring searches
 // Based on benchmark: indexed equality (~277μs) << LIKE prefix (~500μs) << LIKE substring (~1ms)
-func (fb *FilterBuilder) BuildWhereClauses() ([]string, []any) {
+func (fb *FilterBuilder) BuildWhereClauses(ctx context.Context) ([]string, []any) {
 	var whereClauses []string
 	var args []any
 
@@ -75,7 +75,7 @@ func (fb *FilterBuilder) BuildWhereClauses() ([]string, []any) {
 
 	// Language filter (equality match)
 	if len(fb.Flags.Language) > 0 {
-		var langClauses []string
+		langClauses := make([]string, 0, len(fb.Flags.Language))
 		for _, lang := range fb.Flags.Language {
 			langClauses = append(langClauses, fmt.Sprintf("%s = ?", fb.col("language")))
 			args = append(args, lang)
@@ -253,7 +253,7 @@ func (fb *FilterBuilder) BuildWhereClauses() ([]string, []any) {
 
 	// Extension filters (EndsWith pattern - surprisingly fast ~660μs per benchmark)
 	if len(fb.Flags.Ext) > 0 {
-		var extClauses []string
+		extClauses := make([]string, 0, len(fb.Flags.Ext))
 		for _, ext := range fb.Flags.Ext {
 			extClauses = append(extClauses, fmt.Sprintf("%s LIKE ?", fb.col("path")))
 			args = append(args, "%"+ext)
@@ -313,7 +313,7 @@ func (fb *FilterBuilder) BuildWhereClauses() ([]string, []any) {
 
 		// Auto-detect if not explicitly set
 		if !useFTS && !noFTS {
-			mode := DetectSearchMode(nil)
+			mode := DetectSearchMode(ctx, nil)
 			useFTS = (mode == SearchModeFTS5)
 		}
 
@@ -464,7 +464,7 @@ func (fb *FilterBuilder) BuildWhereClauses() ([]string, []any) {
 }
 
 // BuildQuery constructs a complete SQL query with the given columns
-func (fb *FilterBuilder) BuildQuery(columns string) (string, []any) {
+func (fb *FilterBuilder) BuildQuery(ctx context.Context, columns string) (string, []any) {
 	// If raw query provided, use it
 	if fb.Flags.Query != "" {
 		if columns == "COUNT(*)" {
@@ -473,7 +473,7 @@ func (fb *FilterBuilder) BuildQuery(columns string) (string, []any) {
 		return fb.Flags.Query, nil
 	}
 
-	whereClauses, args := fb.BuildWhereClauses()
+	whereClauses, args := fb.BuildWhereClauses(ctx)
 
 	// Base table
 	table := "media"
@@ -607,13 +607,13 @@ func (fb *FilterBuilder) OverrideSort(s string) string {
 }
 
 // BuildSelect is an alias for BuildQuery for backward compatibility
-func (fb *FilterBuilder) BuildSelect(columns string) (string, []any) {
-	return fb.BuildQuery(columns)
+func (fb *FilterBuilder) BuildSelect(ctx context.Context, columns string) (string, []any) {
+	return fb.BuildQuery(ctx, columns)
 }
 
 // BuildCount builds a count query
-func (fb *FilterBuilder) BuildCount() (string, []any) {
-	return fb.BuildQuery("COUNT(*)")
+func (fb *FilterBuilder) BuildCount(ctx context.Context) (string, []any) {
+	return fb.BuildQuery(ctx, "COUNT(*)")
 }
 
 // hasSearchTerms checks if there are any search/include terms
@@ -747,10 +747,10 @@ func (fb *FilterBuilder) FilterMedia(media []models.MediaWithDB) []models.MediaW
 
 // SortBuilder handles both SQL and in-memory sorting
 type SortBuilder struct {
-	Flags models.GlobalFlags
+	Flags *models.GlobalFlags
 }
 
-func NewSortBuilder(flags models.GlobalFlags) *SortBuilder {
+func NewSortBuilder(flags *models.GlobalFlags) *SortBuilder {
 	return &SortBuilder{Flags: flags}
 }
 
@@ -1543,7 +1543,7 @@ func ExpandRelatedMedia(
 	ctx context.Context,
 	sqlDB *sql.DB,
 	media *[]models.MediaWithDB,
-	flags models.GlobalFlags,
+	flags *models.GlobalFlags,
 ) error {
 	if len(*media) == 0 {
 		return nil
@@ -1784,7 +1784,7 @@ type QueryExecutor struct {
 }
 
 // NewQueryExecutor creates a new QueryExecutor
-func NewQueryExecutor(flags models.GlobalFlags) *QueryExecutor {
+func NewQueryExecutor(flags *models.GlobalFlags) *QueryExecutor {
 	return &QueryExecutor{
 		filterBuilder: NewFilterBuilder(flags),
 	}
@@ -1967,7 +1967,7 @@ func (qe *QueryExecutor) MediaQuery(ctx context.Context, dbs []string) ([]models
 
 	// Rebuild filter builder with resolved flags
 	fb := NewFilterBuilder(flags)
-	query, args := fb.BuildQuery("*")
+	query, args := fb.BuildQuery(ctx, "*")
 
 	allMedia, errs := qe.executeMultiDB(ctx, dbs, query, args)
 	if len(errs) > 0 {
@@ -2060,7 +2060,7 @@ func (qe *QueryExecutor) MediaQueryCount(ctx context.Context, dbs []string) (int
 		return int64(len(allMedia)), nil
 	}
 
-	query, args := qe.filterBuilder.BuildCount()
+	query, args := qe.filterBuilder.BuildCount(ctx)
 
 	var wg sync.WaitGroup
 	results := make(chan int64, len(dbs))
@@ -2109,7 +2109,7 @@ func (qe *QueryExecutor) MediaQueryCount(ctx context.Context, dbs []string) (int
 	return total, nil
 }
 
-func (qe *QueryExecutor) GroupByParent(allMedia []models.MediaWithDB, flags models.GlobalFlags) []models.MediaWithDB {
+func (qe *QueryExecutor) GroupByParent(allMedia []models.MediaWithDB, flags *models.GlobalFlags) []models.MediaWithDB {
 	type GroupedMedia struct {
 		ParentPath              string  `json:"parent_path"`
 		EpisodeCount            int64   `json:"episode_count"`
@@ -2171,7 +2171,7 @@ func (qe *QueryExecutor) GroupByParent(allMedia []models.MediaWithDB, flags mode
 func (qe *QueryExecutor) FetchSiblings(
 	ctx context.Context,
 	media []models.MediaWithDB,
-	flags models.GlobalFlags,
+	flags *models.GlobalFlags,
 ) ([]models.MediaWithDB, error) {
 	if len(media) == 0 {
 		return media, nil
@@ -2254,8 +2254,8 @@ func (qe *QueryExecutor) FetchSiblings(
 func (qe *QueryExecutor) ResolvePercentileFlags(
 	ctx context.Context,
 	dbs []string,
-	flags models.GlobalFlags,
-) (models.GlobalFlags, error) {
+	flags *models.GlobalFlags,
+) (*models.GlobalFlags, error) {
 	hasPSize := false
 	for _, s := range flags.Size {
 		if _, _, ok := utils.ParsePercentileRange(s); ok {
@@ -2357,9 +2357,9 @@ func (qe *QueryExecutor) ResolvePercentileFlags(
 		var sqlQuery string
 		var args []any
 		if field == "episodes" {
-			sqlQuery, args = fb.BuildSelect("path")
+			sqlQuery, args = fb.BuildSelect(ctx, "path")
 		} else {
-			sqlQuery, args = fb.BuildSelect(field)
+			sqlQuery, args = fb.BuildSelect(ctx, field)
 		}
 
 		var values []int64

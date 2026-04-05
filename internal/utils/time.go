@@ -179,7 +179,6 @@ func TubeDate(v map[string]any) *int64 {
 	return nil
 }
 
-// UtcFromLocalTimestamp converts a local Unix timestamp to a UTC time.Time
 // ParseDateOrRelative parses a date string into a Unix timestamp.
 // It supports absolute dates (YYYY-MM-DD) and relative strings (e.g., "3 days").
 func ParseDateOrRelative(dateStr string) int64 {

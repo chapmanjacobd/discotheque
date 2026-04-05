@@ -47,11 +47,11 @@ func (c *CategorizeCmd) Run(ctx context.Context) error {
 	)
 	flags.PostActionFlags = c.PostActionFlags
 
-	media, err := query.MediaQuery(ctx, c.Databases, flags)
+	media, err := query.MediaQuery(ctx, c.Databases, &flags)
 	if err != nil {
 		return err
 	}
-	media = query.FilterMedia(media, flags)
+	media = query.FilterMedia(media, &flags)
 
 	if len(media) == 0 {
 		return errors.New("no media found")
@@ -147,7 +147,7 @@ func (c *CategorizeCmd) applyCategories(
 			for _, f := range foundCategories {
 				merged[f] = true
 			}
-			combined := []string{}
+			combined := make([]string, 0, len(merged))
 			for k := range merged {
 				combined = append(combined, k)
 			}

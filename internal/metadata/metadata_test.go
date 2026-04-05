@@ -199,7 +199,7 @@ func TestExtractImageTextFromCBZ_Structure(t *testing.T) {
 	createZip(t, cbzPath, []string{img1, img2, img3})
 
 	// Test extraction (will fail without tesseract, but we can check the function runs)
-	captions, err := metadata.ExtractImageTextFromComicArchive(cbzPath, "tesseract")
+	captions, err := metadata.ExtractImageTextFromComicArchive(context.Background(), cbzPath, "tesseract")
 
 	// We expect an error because tesseract won't process mock data
 	// But the function should at least attempt to open the archive
@@ -223,7 +223,7 @@ func TestExtractImageTextFromCBZ_PageOrdering(t *testing.T) {
 	// Create CBZ file
 	cbzPath := filepath.Join(tmpDir, "test.cbz")
 	createZip(t, cbzPath, func() []string {
-		var paths []string
+		paths := make([]string, 0, len(pages))
 		for _, p := range pages {
 			paths = append(paths, filepath.Join(tmpDir, p))
 		}
@@ -307,7 +307,7 @@ func TestExtractImageTextFromCBZ_TIFFConversion(t *testing.T) {
 
 	// Test extraction with OCR enabled
 	// This tests that TIFF files are converted to PNG before OCR
-	captions, err := metadata.ExtractImageTextFromComicArchive(cbzPath, "tesseract")
+	captions, err := metadata.ExtractImageTextFromComicArchive(context.Background(), cbzPath, "tesseract")
 	// The function should handle TIFF files without error
 	// Even if tesseract is not installed or can't read the mock image,
 	// the conversion pipeline should work
@@ -457,7 +457,7 @@ func TestExtractSpeechToText_EngineSelection(t *testing.T) {
 	}
 
 	// Test vosk engine selection (will fail without vosk, but should not panic)
-	_, err := metadata.ExtractSpeechToText(audioPath, "vosk")
+	_, err := metadata.ExtractSpeechToText(context.Background(), audioPath, "vosk")
 	if err == nil {
 		t.Log("Vosk extraction succeeded (vosk installed)")
 	} else {
@@ -465,7 +465,7 @@ func TestExtractSpeechToText_EngineSelection(t *testing.T) {
 	}
 
 	// Test whisper engine selection (will fail without whisper, but should not panic)
-	_, err = metadata.ExtractSpeechToText(audioPath, "whisper")
+	_, err = metadata.ExtractSpeechToText(context.Background(), audioPath, "whisper")
 	if err == nil {
 		t.Log("Whisper extraction succeeded (whisper installed)")
 	} else {
@@ -473,7 +473,7 @@ func TestExtractSpeechToText_EngineSelection(t *testing.T) {
 	}
 
 	// Test default engine (should default to vosk)
-	_, err = metadata.ExtractSpeechToText(audioPath, "")
+	_, err = metadata.ExtractSpeechToText(context.Background(), audioPath, "")
 	if err == nil {
 		t.Log("Default engine extraction succeeded")
 	} else {
@@ -615,7 +615,7 @@ func TestConvertImageForOCR(t *testing.T) {
 	// Test 1: PNG should return original path (no conversion needed)
 	pngPath := filepath.Join(tmpDir, "test.png")
 	os.WriteFile(pngPath, []byte("mock png"), 0o644)
-	converted, err := metadata.ConvertImageForOCR(pngPath)
+	converted, err := metadata.ConvertImageForOCR(context.Background(), pngPath)
 	if err != nil {
 		t.Errorf("PNG conversion failed unexpectedly: %v", err)
 	}
@@ -626,7 +626,7 @@ func TestConvertImageForOCR(t *testing.T) {
 	// Test 2: JPG should return original path (no conversion needed)
 	jpgPath := filepath.Join(tmpDir, "test.jpg")
 	os.WriteFile(jpgPath, []byte("mock jpg"), 0o644)
-	converted, err = metadata.ConvertImageForOCR(jpgPath)
+	converted, err = metadata.ConvertImageForOCR(context.Background(), jpgPath)
 	if err != nil {
 		t.Errorf("JPG conversion failed unexpectedly: %v", err)
 	}
@@ -652,7 +652,7 @@ func TestConvertImageForOCR(t *testing.T) {
 		0xFF,
 	}
 	os.WriteFile(tiffPath, minimalTIFF, 0o644)
-	converted, err = metadata.ConvertImageForOCR(tiffPath)
+	converted, err = metadata.ConvertImageForOCR(context.Background(), tiffPath)
 	if err != nil {
 		t.Errorf("TIFF conversion failed: %v", err)
 	}
@@ -685,7 +685,7 @@ func TestConvertImageForOCR(t *testing.T) {
 		0x00, 0x00, 0x00, 0x00,
 	}
 	os.WriteFile(webpPath, minimalWebP, 0o644)
-	converted, err = metadata.ConvertImageForOCR(webpPath)
+	converted, err = metadata.ConvertImageForOCR(context.Background(), webpPath)
 	if err != nil {
 		t.Errorf("WebP conversion failed: %v", err)
 	}

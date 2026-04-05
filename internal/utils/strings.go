@@ -231,12 +231,12 @@ func Shorten(text string, maxWidth int) string {
 
 	g := uniseg.NewGraphemes(text)
 	for g.Next() {
-		Chunk := g.Str()
-		chunkWidth := runewidth.StringWidth(Chunk)
+		chunk := g.Str()
+		chunkWidth := runewidth.StringWidth(chunk)
 		if currentWidth+chunkWidth > available {
 			break
 		}
-		truncated.WriteString(Chunk)
+		truncated.WriteString(chunk)
 		currentWidth += chunkWidth
 	}
 
@@ -267,12 +267,12 @@ func ShortenMiddle(text string, maxWidth int) string {
 
 	var left strings.Builder
 	currentWidth := 0
-	for _, Chunk := range chunks {
-		w := runewidth.StringWidth(Chunk)
+	for _, chunk := range chunks {
+		w := runewidth.StringWidth(chunk)
 		if currentWidth+w > leftWidth {
 			break
 		}
-		left.WriteString(Chunk)
+		left.WriteString(chunk)
 		currentWidth += w
 	}
 

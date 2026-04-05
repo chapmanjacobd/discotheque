@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
+	"errors"
 	"fmt"
 	"time"
 
@@ -154,13 +155,7 @@ func (c *traceConn) ExecContext(ctx context.Context, query string, args []driver
 		logSlowQuery(query, args, start)
 		return result, err
 	}
-	// Fallback for drivers that don't implement ExecerContext
-	values := namedValuesToValues(args)
-	start := time.Now()
-	//lint:ignore SA1019 Fallback for backward compatibility with older drivers
-	result, err := c.Conn.(driver.Execer).Exec(query, values)
-	logSlowQuery(query, valuesToNamedValues(values), start)
-	return result, err
+	return nil, errors.New("driver does not implement ExecerContext")
 }
 
 func (c *traceConn) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
@@ -170,13 +165,7 @@ func (c *traceConn) QueryContext(ctx context.Context, query string, args []drive
 		logSlowQuery(query, args, start)
 		return rows, err
 	}
-	// Fallback for drivers that don't implement QueryerContext
-	values := namedValuesToValues(args)
-	start := time.Now()
-	//lint:ignore SA1019 Fallback for backward compatibility with older drivers
-	rows, err := c.Conn.(driver.Queryer).Query(query, values)
-	logSlowQuery(query, valuesToNamedValues(values), start)
-	return rows, err
+	return nil, errors.New("driver does not implement QueryerContext")
 }
 
 // traceStmt wraps a driver.Stmt to trace query execution

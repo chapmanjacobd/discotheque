@@ -92,12 +92,12 @@ func TestExpandRelatedMedia_WithSearchTerms(t *testing.T) {
 	}
 
 	for _, td := range testData {
-		_, err := sqlDB.Exec(`
+		_, err2 := sqlDB.Exec(`
 			INSERT INTO media (path, path_tokenized, title, description, media_type)
 			VALUES (?, ?, ?, ?, 'video')
 		`, td.path, td.path, td.title, td.desc)
-		if err != nil {
-			t.Fatalf("Failed to insert test media: %v", err)
+		if err2 != nil {
+			t.Fatalf("Failed to insert test media: %v", err2)
 		}
 	}
 
@@ -241,12 +241,12 @@ func TestExpandRelatedMedia_WithPhrases(t *testing.T) {
 	}
 
 	for _, td := range testData {
-		_, err := sqlDB.Exec(`
+		_, err2 := sqlDB.Exec(`
 			INSERT INTO media (path, path_tokenized, title, description, media_type)
 			VALUES (?, ?, ?, ?, 'video')
 		`, td.path, td.path, td.title, td.desc)
-		if err != nil {
-			t.Fatalf("Failed to insert test media: %v", err)
+		if err2 != nil {
+			t.Fatalf("Failed to insert test media: %v", err2)
 		}
 	}
 

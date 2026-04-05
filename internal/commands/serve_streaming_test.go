@@ -101,8 +101,8 @@ func TestHandleDU(t *testing.T) {
 	defer sqlDB.Close()
 
 	// Initialize database schema
-	if err := db.InitDB(context.Background(), sqlDB); err != nil {
-		t.Fatalf("Failed to initialize DB: %v", err)
+	if err2 := db.InitDB(context.Background(), sqlDB); err2 != nil {
+		t.Fatalf("Failed to initialize DB: %v", err2)
 	}
 
 	// Create test media in different directories

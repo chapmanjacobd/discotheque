@@ -20,7 +20,7 @@ func TestTextProcessor(t *testing.T) {
 				LineSorts: []string{"line"},
 			},
 		}
-		got := utils.TextProcessor(flags, lines)
+		got := utils.TextProcessor(&flags, lines)
 		// apple banana cherry, banana apple apple, cherry cherry cherry
 		if got[0] != "apple banana cherry" {
 			t.Errorf("Expected apple... first, got %s", got[0])
@@ -36,7 +36,7 @@ func TestTextProcessor(t *testing.T) {
 		}
 		// This should sort lines by original string, but word sorting happens internally.
 		// Since we only get original lines back, it's hard to verify word sorting unless it affects line sorting.
-		got := utils.TextProcessor(flags, lines)
+		got := utils.TextProcessor(&flags, lines)
 		if len(got) != 3 {
 			t.Error("Lost lines")
 		}

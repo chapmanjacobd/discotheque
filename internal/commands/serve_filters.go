@@ -79,8 +79,11 @@ func (c *ServeCmd) computeFilterBinsData(
 		tempFlags.DownloadedBefore = ""
 	}
 
-	fb := query.NewFilterBuilder(tempFlags)
-	sqlQuery, args := fb.BuildSelect("path, size, duration, media_type, time_modified, time_created, time_downloaded")
+	fb := query.NewFilterBuilder(&tempFlags)
+	sqlQuery, args := fb.BuildSelect(
+		ctx,
+		"path, size, duration, media_type, time_modified, time_created, time_downloaded",
+	)
 
 	var wg sync.WaitGroup
 	errChan := make(chan error, len(dbs))
@@ -291,8 +294,8 @@ func buildEpisodeBins(parentCounts map[string]int64) (minVal, maxVal int64, perc
 
 // buildTypeBins creates type filter bins from type counts
 func buildTypeBins(typeCounts map[string]int64) []models.FilterBin {
-	var bins []models.FilterBin
-	var keys []string
+	bins := make([]models.FilterBin, 0, len(typeCounts))
+	keys := make([]string, 0, len(typeCounts))
 	for k := range typeCounts {
 		keys = append(keys, k)
 	}
@@ -321,7 +324,7 @@ func buildTimeBins(times []int64) (minVal, maxVal int64, percentiles []int64) {
 	return minVal, maxVal, percentiles
 }
 
-// handleFilterBins handles the /api/filter-bins endpoint
+// HandleFilterBins handles the /api/filter-bins endpoint
 func (c *ServeCmd) HandleFilterBins(w http.ResponseWriter, r *http.Request) {
 	flags := c.ParseFlags(r)
 	q := r.URL.Query()
@@ -517,14 +520,14 @@ func (c *ServeCmd) computeFilterBinsDataOptimized(
 							folderStatsCount++
 							var parent string
 							var cnt int64
-							if err := rows.Scan(&parent, &cnt); err == nil {
+							if scanErr := rows.Scan(&parent, &cnt); scanErr == nil {
 								mu.Lock()
 								allParentCounts[parent] += cnt
 								mu.Unlock()
 							}
 						}
-						if err := rows.Err(); err != nil {
-							models.Log.Debug("Parent count query error", "error", err)
+						if err2 := rows.Err(); err2 != nil {
+							models.Log.Debug("Parent count query error", "error", err2)
 						}
 					}
 
@@ -591,14 +594,14 @@ func (c *ServeCmd) computeFilterBinsDataOptimized(
 					for rows.Next() {
 						var t string
 						var cnt int64
-						if err := rows.Scan(&t, &cnt); err == nil {
+						if scanErr := rows.Scan(&t, &cnt); scanErr == nil {
 							mu.Lock()
 							allTypeCounts[t] += cnt
 							mu.Unlock()
 						}
 					}
-					if err := rows.Err(); err != nil {
-						models.Log.Debug("Type count query error", "error", err)
+					if err2 := rows.Err(); err2 != nil {
+						models.Log.Debug("Type count query error", "error", err2)
 					}
 				}
 

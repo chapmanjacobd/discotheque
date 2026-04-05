@@ -262,7 +262,7 @@ func TestFilterBuilder_Build(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			fb := query.NewFilterBuilder(tt.flags)
-			query, _ := fb.BuildQuery("*")
+			query, _ := fb.BuildQuery(context.Background(), "*")
 			if query != tt.expected {
 				t.Errorf("Build() query = %q, want %q", query, tt.expected)
 			}
@@ -411,9 +411,9 @@ func TestQueryDatabase(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := testutils.InitTestDBNoFTS(dbConn); err != nil {
+	if err2 := testutils.InitTestDBNoFTS(dbConn); err2 != nil {
 		dbConn.Close()
-		t.Fatal(err)
+		t.Fatal(err2)
 	}
 
 	insert := `INSERT INTO media (path, title, duration, size, media_type) VALUES (?, ?, ?, ?, ?)`
@@ -539,7 +539,7 @@ func TestRegexSortMedia(t *testing.T) {
 		{Media: models.Media{Path: "movie_part1.mp4"}},
 	}
 
-	got := query.RegexSortMedia(media, models.GlobalFlags{TextFlags: models.TextFlags{RegexSort: true}})
+	got := query.RegexSortMedia(media, &models.GlobalFlags{TextFlags: models.TextFlags{RegexSort: true}})
 	if len(got) != 2 {
 		t.Errorf("Expected 2 results, got %d", len(got))
 	}

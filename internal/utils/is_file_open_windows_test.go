@@ -12,11 +12,10 @@ import (
 )
 
 func TestIsFileOpen(t *testing.T) {
-	f, err := os.CreateTemp("", "is-open-test")
+	f, err := os.CreateTemp(t.TempDir(), "is-open-test")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(f.Name())
 
 	// Test closed file
 	f.Close()

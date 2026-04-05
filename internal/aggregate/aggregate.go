@@ -42,7 +42,7 @@ func ByFolder(media []models.Media) []FolderStats {
 		f.Files = append(f.Files, m)
 	}
 
-	var result []FolderStats
+	result := make([]FolderStats, 0, len(folders))
 	for _, f := range folders {
 		if f.Count > 0 {
 			f.AvgSize = f.TotalSize / int64(f.Count)

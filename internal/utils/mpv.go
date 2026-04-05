@@ -36,21 +36,21 @@ func GetMpvSocketPath(provided string) string {
 }
 
 // CastCommand builds and executes a catt command with optional device specification
-func CastCommand(castDevice string, args ...string) error {
+func CastCommand(ctx context.Context, castDevice string, args ...string) error {
 	cmdArgs := []string{"catt"}
 	if castDevice != "" {
 		cmdArgs = append(cmdArgs, "-d", castDevice)
 	}
 	cmdArgs = append(cmdArgs, args...)
-	cmd := exec.CommandContext(context.Background(), cmdArgs[0], cmdArgs[1:]...)
+	cmd := exec.CommandContext(ctx, cmdArgs[0], cmdArgs[1:]...)
 	return cmd.Run()
 }
 
 // MpvCall sends a command to mpv via IPC socket and returns the response
-func MpvCall(socketPath string, args ...any) (*MpvResponse, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+func MpvCall(ctx context.Context, socketPath string, args ...any) (*MpvResponse, error) {
+	dialCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
-	conn, err := (&net.Dialer{}).DialContext(ctx, "unix", socketPath)
+	conn, err := (&net.Dialer{}).DialContext(dialCtx, "unix", socketPath)
 	if err != nil {
 		return nil, err
 	}
@@ -88,14 +88,14 @@ func MpvCall(socketPath string, args ...any) (*MpvResponse, error) {
 }
 
 // MpvSetProperty sets a property in mpv
-func MpvSetProperty(socketPath, name string, value any) error {
-	_, err := MpvCall(socketPath, "set_property", name, value)
+func MpvSetProperty(ctx context.Context, socketPath, name string, value any) error {
+	_, err := MpvCall(ctx, socketPath, "set_property", name, value)
 	return err
 }
 
 // MpvGetProperty gets a property from mpv
-func MpvGetProperty(socketPath, name string) (any, error) {
-	resp, err := MpvCall(socketPath, "get_property", name)
+func MpvGetProperty(ctx context.Context, socketPath, name string) (any, error) {
+	resp, err := MpvCall(ctx, socketPath, "get_property", name)
 	if err != nil {
 		return nil, err
 	}
@@ -103,27 +103,27 @@ func MpvGetProperty(socketPath, name string) (any, error) {
 }
 
 // MpvPause pauses or unpauses playback
-func MpvPause(socketPath string, pause bool) error {
-	return MpvSetProperty(socketPath, "pause", pause)
+func MpvPause(ctx context.Context, socketPath string, pause bool) error {
+	return MpvSetProperty(ctx, socketPath, "pause", pause)
 }
 
 // MpvSeek seeks to a specific position
-func MpvSeek(socketPath string, value float64, mode string) error {
+func MpvSeek(ctx context.Context, socketPath string, value float64, mode string) error {
 	// mode can be "relative", "absolute", "absolute-percent", "relative-percent"
 	if mode == "" {
 		mode = "relative"
 	}
-	_, err := MpvCall(socketPath, "seek", value, mode)
+	_, err := MpvCall(ctx, socketPath, "seek", value, mode)
 	return err
 }
 
 // MpvLoadFile loads a file into mpv
-func MpvLoadFile(socketPath, path, mode string) error {
+func MpvLoadFile(ctx context.Context, socketPath, path, mode string) error {
 	// mode can be "replace", "append", "append-play"
 	if mode == "" {
 		mode = "replace"
 	}
-	_, err := MpvCall(socketPath, "loadfile", path, mode)
+	_, err := MpvCall(ctx, socketPath, "loadfile", path, mode)
 	return err
 }
 
@@ -166,7 +166,7 @@ func MpvWatchLaterValue(path, key string) (string, error) {
 }
 
 // GetPlayhead calculates the playhead position based on session duration, existing playhead and mpv watch_later
-func GetPlayhead(flags models.GlobalFlags, path string, startTime time.Time, existingPlayhead, mediaDuration int) int {
+func GetPlayhead(flags *models.GlobalFlags, path string, startTime time.Time, existingPlayhead, mediaDuration int) int {
 	endTime := time.Now()
 	sessionDuration := int(endTime.Sub(startTime).Seconds())
 	pythonPlayhead := sessionDuration

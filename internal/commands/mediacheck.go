@@ -43,7 +43,7 @@ func (c *MediaCheckCmd) Run(ctx context.Context) error {
 	deleteThreshold, _ := utils.FloatFromPercent(c.DeleteCorrupt)
 	fullScanThreshold, _ := utils.FloatFromPercent(c.FullScanIfCorrupt)
 
-	return RunQuery(ctx, c.Databases, flags, func(media []models.MediaWithDB) error {
+	return RunQuery(ctx, c.Databases, &flags, func(media []models.MediaWithDB) error {
 		if len(media) == 0 {
 			return errors.New("no media found")
 		}

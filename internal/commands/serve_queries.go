@@ -102,7 +102,7 @@ type QueryStatsResponse struct {
 	StartTime    int64            `json:"start_time"` // Unix timestamp to avoid JSON marshaling issues
 }
 
-// handleQueries handles the /api/queries endpoint for slow query dashboard
+// HandleQueries handles the /api/queries endpoint for slow query dashboard
 func (c *ServeCmd) HandleQueries(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	action := q.Get("action")

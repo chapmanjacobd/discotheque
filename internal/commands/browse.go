@@ -33,12 +33,12 @@ func (c *OpenCmd) Run(ctx context.Context) error {
 		SortFlags:        c.SortFlags,
 		PostActionFlags:  c.PostActionFlags,
 	}
-	media, err := query.MediaQuery(ctx, c.Databases, flags)
+	media, err := query.MediaQuery(ctx, c.Databases, &flags)
 	if err != nil {
 		return err
 	}
 
-	media = query.FilterMedia(media, flags)
+	media = query.FilterMedia(media, &flags)
 
 	for _, m := range media {
 		if !utils.FileExists(m.Path) {
@@ -60,7 +60,7 @@ func (c *OpenCmd) Run(ctx context.Context) error {
 		}
 	}
 
-	return ExecutePostAction(ctx, flags, media)
+	return ExecutePostAction(ctx, &flags, media)
 }
 
 type BrowseCmd struct {
@@ -83,12 +83,12 @@ func (c *BrowseCmd) Run(ctx context.Context) error {
 		MediaFilterFlags: c.MediaFilterFlags,
 		SortFlags:        c.SortFlags,
 	}
-	media, err := query.MediaQuery(ctx, c.Databases, flags)
+	media, err := query.MediaQuery(ctx, c.Databases, &flags)
 	if err != nil {
 		return err
 	}
 
-	media = query.FilterMedia(media, flags)
+	media = query.FilterMedia(media, &flags)
 
 	browser := c.Browser
 	if browser == "" {

@@ -35,8 +35,8 @@ func Repair(ctx context.Context, dbPath string) error {
 		os.Remove(lockPath)
 	}()
 
-	if err := syscall.Flock(int(lockFile.Fd()), syscall.LOCK_EX); err != nil {
-		return fmt.Errorf("failed to acquire flock: %w", err)
+	if err2 := syscall.Flock(int(lockFile.Fd()), syscall.LOCK_EX); err2 != nil {
+		return fmt.Errorf("failed to acquire flock: %w", err2)
 	}
 	defer func() { _ = syscall.Flock(int(lockFile.Fd()), syscall.LOCK_UN) }()
 
@@ -50,27 +50,27 @@ func Repair(ctx context.Context, dbPath string) error {
 		return nil
 	}
 
-	if _, err := exec.LookPath("sqlite3"); err != nil {
+	if _, err2 := exec.LookPath("sqlite3"); err2 != nil {
 		return errors.New("sqlite3 command line tool is required for auto-repair")
 	}
 
 	// 4. Backup
 	now := time.Now().Unix()
 	backupDir := fmt.Sprintf("%s.corrupt.%d", dbPath, now)
-	if err := os.MkdirAll(backupDir, 0o755); err != nil {
-		return fmt.Errorf("failed to create backup directory: %w", err)
+	if err2 := os.MkdirAll(backupDir, 0o755); err2 != nil {
+		return fmt.Errorf("failed to create backup directory: %w", err2)
 	}
 
 	corruptMain := backupDir + "/main.db"
-	if err := os.Rename(dbPath, corruptMain); err != nil {
-		return fmt.Errorf("failed to move corrupted database: %w", err)
+	if err2 := os.Rename(dbPath, corruptMain); err2 != nil {
+		return fmt.Errorf("failed to move corrupted database: %w", err2)
 	}
 
 	for _, suffix := range []string{"-wal", "-shm"} {
 		sidecar := dbPath + suffix
-		if _, err := os.Stat(sidecar); err == nil {
-			if err := os.Rename(sidecar, corruptMain+suffix); err != nil {
-				Log.Warn("Failed to rename sidecar file", "suffix", suffix, "error", err)
+		if _, err2 := os.Stat(sidecar); err2 == nil {
+			if err3 := os.Rename(sidecar, corruptMain+suffix); err3 != nil {
+				Log.Warn("Failed to rename sidecar file", "suffix", suffix, "error", err3)
 			}
 		}
 	}

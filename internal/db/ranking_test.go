@@ -478,8 +478,8 @@ func TestRankingReorderAmount(t *testing.T) {
 	var dbOrder []db.SearchMediaFTSResult
 	for rows.Next() {
 		var path, title, desc string
-		if err := rows.Scan(&path, &title, &desc); err != nil {
-			t.Fatalf("Scan failed: %v", err)
+		if scanErr := rows.Scan(&path, &title, &desc); scanErr != nil {
+			t.Fatalf("Scan failed: %v", scanErr)
 		}
 		dbOrder = append(dbOrder, db.SearchMediaFTSResult{
 			Media: db.Media{
@@ -489,8 +489,8 @@ func TestRankingReorderAmount(t *testing.T) {
 			},
 		})
 	}
-	if err := rows.Err(); err != nil {
-		t.Fatalf("Rows error: %v", err)
+	if err2 := rows.Err(); err2 != nil {
+		t.Fatalf("Rows error: %v", err2)
 	}
 
 	if len(dbOrder) == 0 {

@@ -36,10 +36,10 @@ var (
 
 // DetectSearchMode detects the best available search backend
 // Priority: FTS5 > Substring
-func DetectSearchMode(db *sql.DB) SearchMode {
+func DetectSearchMode(ctx context.Context, db *sql.DB) SearchMode {
 	detectionOnce.Do(func() {
 		// Check for FTS5
-		if database.FtsEnabled && db != nil && hasFTS5Table(db) {
+		if database.FtsEnabled && db != nil && hasFTS5Table(ctx, db) {
 			detectedSearchMode = SearchModeFTS5
 			return
 		}
@@ -54,14 +54,14 @@ func DetectSearchMode(db *sql.DB) SearchMode {
 }
 
 // hasFTS5Table checks if the media_fts table exists in the database
-func hasFTS5Table(db *sql.DB) bool {
+func hasFTS5Table(ctx context.Context, db *sql.DB) bool {
 	if db == nil {
 		return false
 	}
 
 	var exists bool
 	err := db.QueryRowContext(
-		context.Background(),
+		ctx,
 		"SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='media_fts')",
 	).Scan(&exists)
 	return err == nil && exists
@@ -83,10 +83,10 @@ func ResetSearchModeDetection() {
 }
 
 // IsSearchAvailable checks if a specific search mode is available
-func IsSearchAvailable(mode SearchMode, db *sql.DB) bool {
+func IsSearchAvailable(ctx context.Context, mode SearchMode, db *sql.DB) bool {
 	switch mode {
 	case SearchModeFTS5:
-		return db != nil && hasFTS5Table(db)
+		return db != nil && hasFTS5Table(ctx, db)
 	case SearchModeSubstring:
 		return true // Always available
 	default:

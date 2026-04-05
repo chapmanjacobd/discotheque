@@ -24,9 +24,9 @@ func (c *ExplodeCmd) Run(ctx *kong.Context) error {
 		return err
 	}
 
-	discoPath, err := os.Executable()
-	if err != nil {
-		return err
+	discoPath, err2 := os.Executable()
+	if err2 != nil {
+		return err2
 	}
 
 	for _, cmd := range ctx.Model.Node.Children {

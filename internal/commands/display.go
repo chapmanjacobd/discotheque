@@ -128,7 +128,7 @@ func InteractiveDecision(ctx context.Context, flags models.GlobalFlags, m models
 	case "d":
 		return DeleteMediaItem(m)
 	case "t":
-		return utils.Trash(flags, m.Path)
+		return utils.Trash(ctx, &flags, m.Path)
 	case "m":
 		return MarkDeletedItem(ctx, m)
 	case "q":

@@ -57,7 +57,7 @@ func (c *FilesInfoCmd) Run(ctx context.Context) error {
 
 	// Handle databases
 	if len(c.Databases) > 0 {
-		media, err := query.MediaQuery(ctx, c.Databases, flags)
+		media, err := query.MediaQuery(ctx, c.Databases, &flags)
 		if err != nil {
 			return err
 		}

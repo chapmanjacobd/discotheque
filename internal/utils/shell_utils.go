@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -11,7 +12,7 @@ import (
 )
 
 // RenameMoveFile moves a file from src to dst, creating parent directories if needed
-func RenameMoveFile(flags models.GlobalFlags, src, dst string) error {
+func RenameMoveFile(flags *models.GlobalFlags, src, dst string) error {
 	if flags.Simulate {
 		fmt.Fprintf(Stdout, "mv %s %s\n", shellquote.ShellQuote(src), shellquote.ShellQuote(dst))
 		return nil
@@ -22,8 +23,8 @@ func RenameMoveFile(flags models.GlobalFlags, src, dst string) error {
 		// If dst parent doesn't exist
 		if os.IsNotExist(err) {
 			parent := filepath.Dir(dst)
-			if err := os.MkdirAll(parent, 0o755); err != nil {
-				return err
+			if err2 := os.MkdirAll(parent, 0o755); err2 != nil {
+				return err2
 			}
 			return os.Rename(src, dst)
 		}
@@ -31,9 +32,9 @@ func RenameMoveFile(flags models.GlobalFlags, src, dst string) error {
 		// Cross-device move fallback
 		if strings.Contains(err.Error(), "invalid cross-device link") {
 			// Basic copy and delete
-			input, err := os.ReadFile(src)
-			if err != nil {
-				return err
+			input, err2 := os.ReadFile(src)
+			if err2 != nil {
+				return err2
 			}
 			err = os.WriteFile(dst, input, 0o644)
 			if err != nil {
@@ -54,7 +55,7 @@ func RenameNoReplace(src, dst string) error {
 }
 
 // Trash moves a file to the system trash if available, otherwise deletes it
-func Trash(flags models.GlobalFlags, path string) error {
+func Trash(ctx context.Context, flags *models.GlobalFlags, path string) error {
 	if !FileExists(path) {
 		return nil
 	}
@@ -65,10 +66,10 @@ func Trash(flags models.GlobalFlags, path string) error {
 	}
 
 	trashCmd := "trash-put" // Prefer trash-put from trash-cli
-	err := CmdDetach(trashCmd, path)
+	err := CmdDetach(ctx, trashCmd, path)
 	if err != nil {
 		// Try 'trash' if 'trash-put' fails
-		err = CmdDetach("trash", path)
+		err = CmdDetach(ctx, "trash", path)
 	}
 
 	if err != nil {
@@ -117,7 +118,7 @@ func FlattenWrapperFolder(outputDir string) error {
 			dst := filepath.Join(outputDir, name)
 			if err := os.Rename(src, dst); err != nil {
 				// Try fallback
-				if err := RenameMoveFile(models.GlobalFlags{}, src, dst); err != nil {
+				if err := RenameMoveFile(&models.GlobalFlags{}, src, dst); err != nil {
 					return err
 				}
 			}
@@ -127,7 +128,7 @@ func FlattenWrapperFolder(outputDir string) error {
 			src := filepath.Join(wrapperPath, conflictItem)
 			tempDst := filepath.Join(outputDir, conflictItem+".tmp")
 			if err := os.Rename(src, tempDst); err != nil {
-				if err := RenameMoveFile(models.GlobalFlags{}, src, tempDst); err != nil {
+				if err := RenameMoveFile(&models.GlobalFlags{}, src, tempDst); err != nil {
 					return err
 				}
 			}

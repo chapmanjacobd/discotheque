@@ -141,16 +141,16 @@ func migrateToStrict(ctx context.Context, db *sql.DB, tableName, createSQL strin
 
 	// Rename old table
 	oldTable := tableName + "_old_strict"
-	if _, err := tx.ExecContext(
+	if _, err2 := tx.ExecContext(
 		ctx,
 		fmt.Sprintf("ALTER TABLE %s RENAME TO %s", tableName, oldTable),
-	); err != nil {
-		return fmt.Errorf("failed to rename %s: %w", tableName, err)
+	); err2 != nil {
+		return fmt.Errorf("failed to rename %s: %w", tableName, err2)
 	}
 
 	// Create new STRICT table
-	if _, err := tx.ExecContext(ctx, createSQL); err != nil {
-		return fmt.Errorf("failed to create strict %s: %w", tableName, err)
+	if _, err2 := tx.ExecContext(ctx, createSQL); err2 != nil {
+		return fmt.Errorf("failed to create strict %s: %w", tableName, err2)
 	}
 
 	// Copy data
@@ -222,16 +222,16 @@ func convertHistoryMediaID(ctx context.Context, db *sql.DB) error {
 		var name, dtype string
 		var notnull, pk int
 		var dfltValue any
-		if err := rows.Scan(&cid, &name, &dtype, &notnull, &dfltValue, &pk); err != nil {
-			return err
+		if scanErr := rows.Scan(&cid, &name, &dtype, &notnull, &dfltValue, &pk); scanErr != nil {
+			return scanErr
 		}
 		if strings.EqualFold(name, "media_id") {
 			hasMediaID = true
 			break
 		}
 	}
-	if err := rows.Err(); err != nil {
-		return err
+	if err2 := rows.Err(); err2 != nil {
+		return err2
 	}
 
 	if !hasMediaID {
@@ -297,16 +297,16 @@ func convertCaptionsMediaID(ctx context.Context, db *sql.DB) error {
 		var name, dtype string
 		var notnull, pk int
 		var dfltValue any
-		if err := rows.Scan(&cid, &name, &dtype, &notnull, &dfltValue, &pk); err != nil {
-			return err
+		if scanErr := rows.Scan(&cid, &name, &dtype, &notnull, &dfltValue, &pk); scanErr != nil {
+			return scanErr
 		}
 		if strings.EqualFold(name, "media_id") {
 			hasMediaID = true
 			break
 		}
 	}
-	if err := rows.Err(); err != nil {
-		return err
+	if err2 := rows.Err(); err2 != nil {
+		return err2
 	}
 	rows.Close()
 
@@ -534,16 +534,16 @@ func cleanupMediaTable(ctx context.Context, db *sql.DB, hasStrict bool) error {
 		var name, dtype string
 		var notnull, pk int
 		var dfltValue any
-		if err := rows.Scan(&cid, &name, &dtype, &notnull, &dfltValue, &pk); err != nil {
-			return err
+		if scanErr := rows.Scan(&cid, &name, &dtype, &notnull, &dfltValue, &pk); scanErr != nil {
+			return scanErr
 		}
 		if deadColumns[strings.ToLower(name)] {
 			hasDeadColumns = true
 			break
 		}
 	}
-	if err := rows.Err(); err != nil {
-		return err
+	if err2 := rows.Err(); err2 != nil {
+		return err2
 	}
 
 	strict := isTableStrict(ctx, db, "media")
@@ -654,16 +654,16 @@ func populatePathTokenized(ctx context.Context, db *sql.DB) error {
 	}
 	for rows.Next() {
 		var path string
-		if err := rows.Scan(&path); err != nil {
-			return err
+		if scanErr := rows.Scan(&path); scanErr != nil {
+			return scanErr
 		}
 		updates = append(updates, struct {
 			path      string
 			tokenized string
 		}{path, pathToTokenized(path)})
 	}
-	if err := rows.Err(); err != nil {
-		return err
+	if err2 := rows.Err(); err2 != nil {
+		return err2
 	}
 	rows.Close()
 

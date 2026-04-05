@@ -103,7 +103,7 @@ func ConstructSearchBindings(include, exclude, columns []string, exact bool) (st
 	if len(include) > 0 {
 		var includeClauses []string
 		for i, term := range include {
-			var columnClauses []string
+			columnClauses := make([]string, 0, len(columns))
 			key := fmt.Sprintf("S_include%d", i)
 			pattern := term
 			if !exact {
@@ -126,7 +126,7 @@ func ConstructSearchBindings(include, exclude, columns []string, exact bool) (st
 	if len(exclude) > 0 {
 		var excludeClauses []string
 		for i, term := range exclude {
-			var columnClauses []string
+			columnClauses := make([]string, 0, len(columns))
 			key := fmt.Sprintf("S_exclude%d", i)
 			pattern := term
 			if !exact {

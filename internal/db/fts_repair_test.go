@@ -53,15 +53,15 @@ CREATE TRIGGER media_au AFTER UPDATE ON media BEGIN
     INSERT INTO media_fts(rowid, path, title) VALUES (new.rowid, new.path, new.title);
 END;
 `
-	if _, err := sqlDB.Exec(setupSQL); err != nil {
-		t.Fatal(err)
+	if _, err2 := sqlDB.Exec(setupSQL); err2 != nil {
+		t.Fatal(err2)
 	}
 
 	// Insert data
 	for i := range 100 {
-		if _, err := sqlDB.Exec("INSERT INTO media (path, title) VALUES (?, ?)",
-			fmt.Sprintf("file%d.mp4", i), fmt.Sprintf("Video %d", i)); err != nil {
-			t.Fatal(err)
+		if _, err2 := sqlDB.Exec("INSERT INTO media (path, title) VALUES (?, ?)",
+			fmt.Sprintf("file%d.mp4", i), fmt.Sprintf("Video %d", i)); err2 != nil {
+			t.Fatal(err2)
 		}
 	}
 	sqlDB.Close()
@@ -107,8 +107,8 @@ END;
 
 	// 5. db.Repair
 	t.Log("Running db.Repair...")
-	if err := db.Repair(context.Background(), dbPath); err != nil {
-		t.Fatalf("db.Repair failed: %v", err)
+	if err2 := db.Repair(context.Background(), dbPath); err2 != nil {
+		t.Fatalf("db.Repair failed: %v", err2)
 	}
 
 	// 6. Verify Healthy again

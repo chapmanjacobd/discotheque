@@ -429,42 +429,42 @@ func ParsePercentileRange(s string) (min, max float64, ok bool) {
 	return min, max, true
 }
 
-func CalculateSegments(total, Chunk, gap float64) []float64 {
-	if total <= 0 || Chunk <= 0 {
+func CalculateSegments(total, chunk, gap float64) []float64 {
+	if total <= 0 || chunk <= 0 {
 		return nil
 	}
-	if total <= Chunk*3 {
+	if total <= chunk*3 {
 		return []float64{0}
 	}
 
 	var segments []float64
 	start := 0.0
-	endSegmentStart := total - Chunk
+	endSegmentStart := total - chunk
 
 	g := gap
 	if g < 1 {
 		g = math.Ceil(total * gap)
 	}
 
-	for start+Chunk < endSegmentStart {
+	for start+chunk < endSegmentStart {
 		segments = append(segments, start)
-		start += Chunk + g
+		start += chunk + g
 	}
 
 	return append(segments, endSegmentStart)
 }
 
-func CalculateSegmentsInt(total, Chunk int64, gap float64) []int64 {
-	if total <= 0 || Chunk <= 0 {
+func CalculateSegmentsInt(total, chunk int64, gap float64) []int64 {
+	if total <= 0 || chunk <= 0 {
 		return nil
 	}
-	if total <= Chunk*3 {
+	if total <= chunk*3 {
 		return []int64{0}
 	}
 
 	var segments []int64
 	start := int64(0)
-	endSegmentStart := total - Chunk
+	endSegmentStart := total - chunk
 
 	var g int64
 	if gap < 1 {
@@ -473,9 +473,9 @@ func CalculateSegmentsInt(total, Chunk int64, gap float64) []int64 {
 		g = int64(gap)
 	}
 
-	for start+Chunk < endSegmentStart {
+	for start+chunk < endSegmentStart {
 		segments = append(segments, start)
-		start += Chunk + g
+		start += chunk + g
 	}
 
 	return append(segments, endSegmentStart)

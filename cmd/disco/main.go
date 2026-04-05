@@ -28,6 +28,7 @@ func main() {
 	)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to initialize CLI parser: %v\n", err)
+		cleanup()
 		os.Exit(1)
 	}
 

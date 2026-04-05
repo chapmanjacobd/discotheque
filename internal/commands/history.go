@@ -52,7 +52,7 @@ func (c *HistoryCmd) Run(ctx context.Context) error {
 		flags.Watched = &watched
 	}
 
-	return RunQuery(ctx, c.Databases, flags, func(media []models.MediaWithDB) error {
+	return RunQuery(ctx, c.Databases, &flags, func(media []models.MediaWithDB) error {
 		HideRedundantFirstPlayed(media)
 
 		if flags.JSON {
@@ -88,7 +88,7 @@ func (c *HistoryCmd) Run(ctx context.Context) error {
 		if flags.Partial != "" {
 			query.SortHistory(media, flags.Partial, flags.Reverse)
 		} else {
-			query.SortMedia(media, flags)
+			query.SortMedia(media, &flags)
 		}
 		return PrintMedia(flags.DisplayFlags, flags.Columns, media)
 	})

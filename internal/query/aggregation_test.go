@@ -155,14 +155,14 @@ func TestAggregateMediaAllModes(t *testing.T) {
 	// Extensions
 	got := query.AggregateMedia(
 		media,
-		models.GlobalFlags{AggregateFlags: models.AggregateFlags{GroupByExtensions: true}},
+		&models.GlobalFlags{AggregateFlags: models.AggregateFlags{GroupByExtensions: true}},
 	)
 	if len(got) != 1 || got[0].Path != ".mp4" {
 		t.Errorf("Extensions mode failed: %v", got)
 	}
 
 	// Size
-	got = query.AggregateMedia(media, models.GlobalFlags{AggregateFlags: models.AggregateFlags{GroupBySize: true}})
+	got = query.AggregateMedia(media, &models.GlobalFlags{AggregateFlags: models.AggregateFlags{GroupBySize: true}})
 	if len(got) != 1 {
 		t.Errorf("Size mode failed: %v", got)
 	}
@@ -179,7 +179,7 @@ func TestAggregatePostFilteringExtra(t *testing.T) {
 	// Filter by FileCounts > 1
 	got := query.AggregateMedia(
 		media,
-		models.GlobalFlags{AggregateFlags: models.AggregateFlags{Depth: 1, FileCounts: ">1"}},
+		&models.GlobalFlags{AggregateFlags: models.AggregateFlags{Depth: 1, FileCounts: ">1"}},
 	)
 	if len(got) != 1 || filepath.ToSlash(got[0].Path) != filepath.ToSlash(filepath.FromSlash("/dir1")) {
 		t.Errorf("FileCounts filtering failed: %v", got)
@@ -188,7 +188,7 @@ func TestAggregatePostFilteringExtra(t *testing.T) {
 	// Filter by FoldersOnly
 	got = query.AggregateMedia(
 		media,
-		models.GlobalFlags{AggregateFlags: models.AggregateFlags{Depth: 1, FoldersOnly: true}},
+		&models.GlobalFlags{AggregateFlags: models.AggregateFlags{Depth: 1, FoldersOnly: true}},
 	)
 	if len(got) != 2 {
 		t.Errorf("FoldersOnly failed: %v", got)
@@ -200,7 +200,7 @@ func TestAggregatePostFilteringExtra(t *testing.T) {
 			{Media: models.Media{Path: "C:\\videos\\funny\\dog.mp4", Size: &size100}},
 		}
 		// Aggregate at depth 2 (C:\videos\funny)
-		agg := query.AggregateMedia(winMedia, models.GlobalFlags{AggregateFlags: models.AggregateFlags{Depth: 2}})
+		agg := query.AggregateMedia(winMedia, &models.GlobalFlags{AggregateFlags: models.AggregateFlags{Depth: 2}})
 		if len(agg) != 1 {
 			t.Errorf("Expected 1 aggregated folder, got %d", len(agg))
 		}

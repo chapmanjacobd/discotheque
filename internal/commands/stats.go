@@ -54,21 +54,21 @@ func (c *StatsCmd) Run(ctx context.Context) error {
 		defer sqlDB.Close()
 
 		if c.Frequency != "" {
-			stats, err := query.HistoricalUsage(ctx, dbPath, c.Frequency, timeCol)
-			if err != nil {
-				return err
+			stats, err2 := query.HistoricalUsage(ctx, dbPath, c.Frequency, timeCol)
+			if err2 != nil {
+				return err2
 			}
 
 			if c.JSON {
-				if err := utils.PrintJSON(stats); err != nil {
-					return err
+				if err2 := utils.PrintJSON(stats); err2 != nil {
+					return err2
 				}
 				continue
 			}
 
 			fmt.Printf("%s media (%s) for %s:\n", utils.Title(c.Facet), c.Frequency, dbPath)
-			if err := PrintFrequencyStats(stats); err != nil {
-				return err
+			if err2 := PrintFrequencyStats(stats); err2 != nil {
+				return err2
 			}
 			continue
 		}

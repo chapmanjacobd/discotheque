@@ -43,8 +43,8 @@ func TestHandleSubtitles_SubtitleCountOptimization(t *testing.T) {
 		0x69, 0x73, 0x6F, 0x6D, // 'isom'
 		0x00, 0x00, 0x00, 0x01, 0x69, 0x73, 0x6F, 0x6D, // 'isom'
 	}
-	if err := os.WriteFile(videoPath, videoData, 0o644); err != nil {
-		t.Fatal(err)
+	if err2 := os.WriteFile(videoPath, videoData, 0o644); err2 != nil {
+		t.Fatal(err2)
 	}
 
 	// Insert media with subtitle_count = 0 (no embedded subtitles)
@@ -129,8 +129,8 @@ func TestHandleSubtitles_WithEmbeddedSubtitles(t *testing.T) {
 		0x69, 0x73, 0x6F, 0x6D,
 		0x00, 0x00, 0x00, 0x01, 0x69, 0x73, 0x6F, 0x6D,
 	}
-	if err := os.WriteFile(videoPath, videoData, 0o644); err != nil {
-		t.Fatal(err)
+	if err2 := os.WriteFile(videoPath, videoData, 0o644); err2 != nil {
+		t.Fatal(err2)
 	}
 
 	// Insert media with subtitle_count > 0 (has embedded subtitles)
@@ -254,8 +254,8 @@ func TestHandleSubtitles_ExternalSubtitleFile(t *testing.T) {
 00:00:01,000 --> 00:00:04,000
 Test subtitle line
 `
-	if err := os.WriteFile(subPath, []byte(subContent), 0o644); err != nil {
-		t.Fatal(err)
+	if err2 := os.WriteFile(subPath, []byte(subContent), 0o644); err2 != nil {
+		t.Fatal(err2)
 	}
 
 	// Insert the subtitle file as media
@@ -310,8 +310,8 @@ func TestHandleSubtitles_NoFFmpegCallForZeroCount(t *testing.T) {
 
 	// Create a video file
 	videoPath := filepath.Join(tempDir, "test.mp4")
-	if err := os.WriteFile(videoPath, []byte("dummy"), 0o644); err != nil {
-		t.Fatal(err)
+	if err2 := os.WriteFile(videoPath, []byte("dummy"), 0o644); err2 != nil {
+		t.Fatal(err2)
 	}
 
 	// Insert with subtitle_count = 0

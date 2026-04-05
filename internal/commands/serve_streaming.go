@@ -329,16 +329,16 @@ func (c *ServeCmd) generateTextSnippetSVG(_, _, _ string) []byte {
 }
 
 // generatePDFThumbnail generates a thumbnail for PDF files using pdftoppm or fallback
-func (c *ServeCmd) generatePDFThumbnail(path string) ([]byte, string, error) {
+func (c *ServeCmd) generatePDFThumbnail(ctx context.Context, path string) ([]byte, string, error) {
 	// Try pdftoppm first (fastest, best quality)
 	tmpFile, err := os.CreateTemp("", "disco-thumb-*")
 	if err == nil {
 		tmpPath := tmpFile.Name()
 		tmpFile.Close()
 		defer os.Remove(tmpPath + ".png")
-		if err = exec.CommandContext(context.Background(), "pdftoppm", "-png", "-f", "1", "-singlefile", "-scale-to", "320", path, tmpPath).
+		if err = exec.CommandContext(ctx, "pdftoppm", "-png", "-f", "1", "-singlefile", "-scale-to", "320", path, tmpPath).
 			Run(); err == nil {
-			if data, err := os.ReadFile(tmpPath + ".png"); err == nil {
+			if data, err2 := os.ReadFile(tmpPath + ".png"); err2 == nil {
 				return data, "image/png", nil
 			}
 		}
@@ -520,7 +520,9 @@ func (c *ServeCmd) HandleThumbnail(w http.ResponseWriter, r *http.Request) {
 		if data, ok := c.thumbnailCache.Load(path); ok {
 			w.Header().Set("Content-Type", "image/jpeg")
 			w.Header().Set("Cache-Control", "public, max-age=31536000")
-			_, _ = w.Write(data.([]byte))
+			if bytes, ok := data.([]byte); ok {
+				_, _ = w.Write(bytes)
+			}
 			return
 		}
 	}
@@ -549,7 +551,7 @@ func (c *ServeCmd) HandleThumbnail(w http.ResponseWriter, r *http.Request) {
 	// Handle text-based documents with smart thumbnails
 	switch ext {
 	case ".pdf":
-		thumb, contentType, err := c.generatePDFThumbnail(path)
+		thumb, contentType, err := c.generatePDFThumbnail(r.Context(), path)
 		if err != nil || len(thumb) == 0 {
 			models.Log.Warn("PDF thumbnail generation failed", "path", path, "error", err)
 			http.NotFound(w, r)

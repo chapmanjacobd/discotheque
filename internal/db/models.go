@@ -89,7 +89,7 @@ type Playlists struct {
 	TimeDeleted     sql.NullInt64  `json:"time_deleted"`
 }
 
-// Row types for query results
+// GetAllCaptionsRow represents a row from GetAllCaptions query.
 type GetAllCaptionsRow struct {
 	MediaPath string          `json:"media_path"`
 	Time      sql.NullFloat64 `json:"time"`

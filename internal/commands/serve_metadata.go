@@ -11,7 +11,7 @@ import (
 	"github.com/chapmanjacobd/discoteca/internal/models"
 )
 
-// handleMetadata returns detailed metadata for a specific media file.
+// HandleMetadata returns detailed metadata for a specific media file.
 // GET /api/metadata?db=...&path=...
 func (c *ServeCmd) HandleMetadata(w http.ResponseWriter, r *http.Request) {
 	dbPath := r.URL.Query().Get("db")
@@ -54,7 +54,7 @@ func (c *ServeCmd) HandleMetadata(w http.ResponseWriter, r *http.Request) {
 	sendJSON(w, http.StatusOK, metadata)
 }
 
-// handleDatabases returns server configuration.
+// HandleDatabases returns server configuration.
 // GET /api/databases
 func (c *ServeCmd) HandleDatabases(w http.ResponseWriter, _ *http.Request) {
 	resp := models.DatabaseInfo{
@@ -65,7 +65,7 @@ func (c *ServeCmd) HandleDatabases(w http.ResponseWriter, _ *http.Request) {
 	sendJSON(w, http.StatusOK, resp)
 }
 
-// handleCategories returns a list of categories and their media counts.
+// HandleCategories returns a list of categories and their media counts.
 // GET /api/categories
 func (c *ServeCmd) HandleCategories(w http.ResponseWriter, r *http.Request) {
 	counts := make(map[string]int64)
@@ -126,7 +126,7 @@ func (c *ServeCmd) HandleCategories(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	var res []models.CatStat
+	res := make([]models.CatStat, 0, len(counts))
 	for k, v := range counts {
 		res = append(res, models.CatStat{Category: k, Count: v})
 	}
@@ -147,7 +147,7 @@ func (c *ServeCmd) HandleCategories(w http.ResponseWriter, r *http.Request) {
 	sendJSON(w, http.StatusOK, res)
 }
 
-// handleGenres returns genre statistics.
+// HandleGenres returns genre statistics.
 // GET /api/genres
 func (c *ServeCmd) HandleGenres(w http.ResponseWriter, r *http.Request) {
 	counts := make(map[string]int64)
@@ -172,7 +172,7 @@ func (c *ServeCmd) HandleGenres(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	var res []models.CatStat
+	res := make([]models.CatStat, 0, len(counts))
 	for k, v := range counts {
 		res = append(res, models.CatStat{Category: k, Count: v})
 	}
@@ -187,7 +187,7 @@ func (c *ServeCmd) HandleGenres(w http.ResponseWriter, r *http.Request) {
 	sendJSON(w, http.StatusOK, res)
 }
 
-// handleRatings returns rating statistics.
+// HandleRatings returns rating statistics.
 // GET /api/ratings
 func (c *ServeCmd) HandleRatings(w http.ResponseWriter, r *http.Request) {
 	counts := make(map[int64]int64)
@@ -224,7 +224,7 @@ func (c *ServeCmd) HandleRatings(w http.ResponseWriter, r *http.Request) {
 	sendJSON(w, http.StatusOK, res)
 }
 
-// handleLanguages returns language statistics.
+// HandleLanguages returns language statistics.
 // GET /api/languages
 func (c *ServeCmd) HandleLanguages(w http.ResponseWriter, r *http.Request) {
 	counts := make(map[string]int64)
@@ -249,7 +249,7 @@ func (c *ServeCmd) HandleLanguages(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	var res []models.CatStat
+	res := make([]models.CatStat, 0, len(counts))
 	for k, v := range counts {
 		res = append(res, models.CatStat{Category: k, Count: v})
 	}

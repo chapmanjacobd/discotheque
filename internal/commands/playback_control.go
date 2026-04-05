@@ -30,7 +30,7 @@ func (c *NowCmd) Run(ctx context.Context) error {
 	}
 
 	socketPath := utils.GetMpvSocketPath(c.MpvSocket)
-	pathResp, err := utils.MpvCall(socketPath, "get_property", "path")
+	pathResp, err := utils.MpvCall(ctx, socketPath, "get_property", "path")
 	if err != nil {
 		if !utils.FileExists(cattFile) {
 			return errors.New("no playback detected (mpv or chromecast)")
@@ -41,7 +41,7 @@ func (c *NowCmd) Run(ctx context.Context) error {
 	path := utils.GetString(pathResp.Data)
 	fmt.Printf("Now Playing: %s\n", path)
 
-	posResp, err := utils.MpvCall(socketPath, "get_property", "time-pos")
+	posResp, err := utils.MpvCall(ctx, socketPath, "get_property", "time-pos")
 	if err == nil && posResp.Data != nil {
 		pos := 0.0
 		switch v := posResp.Data.(type) {
@@ -51,7 +51,7 @@ func (c *NowCmd) Run(ctx context.Context) error {
 		fmt.Printf("    Playhead: %s\n", utils.SecondsToHHMMSS(int64(pos)))
 	}
 
-	durResp, err := utils.MpvCall(socketPath, "get_property", "duration")
+	durResp, err := utils.MpvCall(ctx, socketPath, "get_property", "duration")
 	if err == nil && durResp.Data != nil {
 		dur := 0.0
 		switch v := durResp.Data.(type) {
@@ -69,7 +69,7 @@ type StopCmd struct {
 }
 
 func (c *StopCmd) Run(ctx context.Context) error {
-	return DispatchPlaybackCommand(c.ControlFlags, "loadfile", []any{"/dev/null"}, "stop")
+	return DispatchPlaybackCommand(ctx, c.ControlFlags, "loadfile", []any{"/dev/null"}, "stop")
 }
 
 type PauseCmd struct {
@@ -77,7 +77,7 @@ type PauseCmd struct {
 }
 
 func (c *PauseCmd) Run(ctx context.Context) error {
-	return DispatchPlaybackCommand(c.ControlFlags, "cycle", []any{"pause"}, "play_toggle")
+	return DispatchPlaybackCommand(ctx, c.ControlFlags, "cycle", []any{"pause"}, "play_toggle")
 }
 
 type NextCmd struct {
@@ -86,7 +86,7 @@ type NextCmd struct {
 
 func (c *NextCmd) Run(ctx context.Context) error {
 	// Note: We don't remove cattFile for next because CastPlay loop handles it
-	return DispatchPlaybackCommand(c.ControlFlags, "playlist_next", []any{"force"}, "stop")
+	return DispatchPlaybackCommand(ctx, c.ControlFlags, "playlist_next", []any{"force"}, "stop")
 }
 
 type SeekCmd struct {
@@ -141,6 +141,7 @@ func (c *SeekCmd) Run(ctx context.Context) error {
 	}
 
 	return DispatchPlaybackCommand(
+		ctx,
 		c.ControlFlags,
 		"seek",
 		[]any{seconds, mode},

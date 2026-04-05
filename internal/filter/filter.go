@@ -1,4 +1,5 @@
 // Package filter provides legacy in-memory filtering for media.
+//
 // Deprecated: Use query.FilterBuilder instead for unified SQL and in-memory filtering.
 package filter
 

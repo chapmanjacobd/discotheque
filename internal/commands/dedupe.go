@@ -180,11 +180,11 @@ func (c *DedupeCmd) Run(ctx context.Context) error {
 			quotedKeep := shellquote.ShellQuote(d.KeepPath)
 			cmdStr := strings.ReplaceAll(c.DedupeCmd, "{}", quotedDup)
 			// rmlint style is cmd duplicate keep
-			if err := exec.CommandContext(context.Background(), "bash", "-c", cmdStr+" "+quotedDup+" "+quotedKeep).Run(); err != nil {
+			if err := exec.CommandContext(ctx, "bash", "-c", cmdStr+" "+quotedDup+" "+quotedKeep).Run(); err != nil {
 				models.Log.Warn("Dedupe command failed", "error", err)
 			}
 		} else if flags.Trash {
-			if err := utils.Trash(flags, d.DuplicatePath); err != nil {
+			if err := utils.Trash(ctx, &flags, d.DuplicatePath); err != nil {
 				models.Log.Warn("Failed to trash file", "path", d.DuplicatePath, "error", err)
 			}
 		} else {
@@ -217,8 +217,8 @@ func (c *DedupeCmd) Run(ctx context.Context) error {
 
 				// Update hash if not already set
 				if d.DuplicateSize > 0 {
-					h, err := utils.SampleHashFile(d.KeepPath, flags.HashThreads, flags.HashGap, flags.HashChunkSize)
-					if err == nil && h != "" {
+					h, err2 := utils.SampleHashFile(d.KeepPath, flags.HashThreads, flags.HashGap, flags.HashChunkSize)
+					if err2 == nil && h != "" {
 						if _, err := sqlDB.ExecContext(
 							ctx,
 							"UPDATE media SET fasthash = ? WHERE path = ?",
@@ -228,8 +228,8 @@ func (c *DedupeCmd) Run(ctx context.Context) error {
 							dbErrs = append(dbErrs, fmt.Sprintf("failed to update fasthash: %v", err))
 						}
 					}
-					h, err = utils.FullHashFile(d.KeepPath)
-					if err == nil && h != "" {
+					h, err2 = utils.FullHashFile(d.KeepPath)
+					if err2 == nil && h != "" {
 						if _, err := sqlDB.ExecContext(
 							ctx,
 							"UPDATE media SET sha256 = ? WHERE path = ?",
@@ -306,7 +306,9 @@ func (c *DedupeCmd) getDuplicatesBy(
 		args := make([]any, len(cols))
 		for i, col := range cols {
 			whereParts[i] = strings.TrimSpace(col) + " = ?"
-			args[i] = *(values[i].(*any))
+			if val, ok := values[i].(*any); ok {
+				args[i] = *val
+			}
 		}
 
 		groupQuery := fmt.Sprintf(`

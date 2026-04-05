@@ -70,12 +70,12 @@ func (c *RegexSortCmd) Run(ctx context.Context) error {
 			mapping[sentence] = line
 		}
 
-		sortedSentences := utils.TextProcessor(flags, sentenceStrings)
+		sortedSentences := utils.TextProcessor(&flags, sentenceStrings)
 		for _, s := range sortedSentences {
 			processedLines = append(processedLines, mapping[s])
 		}
 	} else {
-		processedLines = utils.TextProcessor(flags, lines)
+		processedLines = utils.TextProcessor(&flags, lines)
 	}
 
 	var writer *bufio.Writer

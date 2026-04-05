@@ -34,7 +34,7 @@ func GroupByParent(media []models.MediaWithDB) []models.FolderStats {
 		}
 	}
 
-	var result []models.FolderStats
+	result := make([]models.FolderStats, 0, len(groups))
 	for _, stats := range groups {
 		if stats.Count > 0 {
 			stats.AvgSize = stats.TotalSize / int64(stats.Count)

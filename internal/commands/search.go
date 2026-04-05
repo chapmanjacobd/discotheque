@@ -59,8 +59,8 @@ func (c *SearchCmd) Run(ctx context.Context) error {
 		}
 	}
 
-	return RunQuery(ctx, c.Databases, flags, func(media []models.MediaWithDB) error {
-		query.SortMedia(media, flags)
+	return RunQuery(ctx, c.Databases, &flags, func(media []models.MediaWithDB) error {
+		query.SortMedia(media, &flags)
 
 		if flags.JSON {
 			return utils.PrintJSON(media)

@@ -32,7 +32,7 @@ var htmlTagRe = regexp.MustCompile(`<[^>]*>`)
 // Returns word count and error.
 // For files with very low word counts (<300), falls back to size-based estimation
 // to avoid false positives from sparse or image-heavy files.
-func QuickWordCount(path string, size int64) (int, error) {
+func QuickWordCount(ctx context.Context, path string, size int64) (int, error) {
 	ext := strings.ToLower(filepath.Ext(path))
 
 	switch ext {
@@ -159,7 +159,7 @@ func QuickWordCount(path string, size int64) (int, error) {
 
 	case ".pdf":
 		// Use pdftotext if available (much faster than calibre)
-		cmd := exec.CommandContext(context.Background(), "pdftotext", "-raw", "-eol", "unix", path, "-")
+		cmd := exec.CommandContext(ctx, "pdftotext", "-raw", "-eol", "unix", path, "-")
 		output, err := cmd.Output()
 		if err == nil && len(output) > 0 {
 			count := CountWordsFast(output)
@@ -260,7 +260,7 @@ func readAllLimited(r io.Reader) ([]byte, error) {
 }
 
 // ExtractText extracts plain text from a given file path.
-func ExtractText(path string) (string, error) {
+func ExtractText(ctx context.Context, path string) (string, error) {
 	stat, err := os.Stat(path)
 	if err != nil {
 		return "", err
@@ -363,7 +363,7 @@ func ExtractText(path string) (string, error) {
 	// ===== RTF - use unrtf if available =====
 	case ".rtf":
 		// Try unrtf first for clean text extraction
-		if text, err := extractTextFromRTF(path); err == nil {
+		if text, err := extractTextFromRTF(ctx, path); err == nil {
 			return text, nil
 		}
 		// Fallback: read raw (will include RTF control codes)
@@ -376,20 +376,20 @@ func ExtractText(path string) (string, error) {
 	// ===== PDF - use pdftotext =====
 	case ".pdf":
 		// Try pdftotext first (fast, lightweight)
-		if text, err := extractTextFromPDF(path); err == nil {
+		if text, err := extractTextFromPDF(ctx, path); err == nil {
 			return text, nil
 		}
 		// Fallback to calibre
-		return extractTextWithCalibre(path)
+		return extractTextWithCalibre(ctx, path)
 
 	// ===== PostScript - use ps2ascii/pstotext =====
 	case ".ps", ".eps":
 		// Try ps2ascii (comes with ghostscript)
-		if text, err := extractTextFromPS(path); err == nil {
+		if text, err := extractTextFromPS(ctx, path); err == nil {
 			return text, nil
 		}
 		// Fallback to calibre
-		return extractTextWithCalibre(path)
+		return extractTextWithCalibre(ctx, path)
 
 	// ===== EPUB formats - native zip extraction =====
 	case ".epub", ".epub3":
@@ -398,7 +398,7 @@ func ExtractText(path string) (string, error) {
 			return text, nil
 		}
 		// Fallback to calibre
-		return extractTextWithCalibre(path)
+		return extractTextWithCalibre(ctx, path)
 
 	// ===== OpenDocument formats - native zip =====
 	case ".odt", ".ods", ".odp", ".odg", ".odf", ".odm", ".ott", ".ots", ".otp":
@@ -407,7 +407,7 @@ func ExtractText(path string) (string, error) {
 			return text, nil
 		}
 		// Fallback to calibre
-		return extractTextWithCalibre(path)
+		return extractTextWithCalibre(ctx, path)
 
 	// ===== Microsoft Office formats - native zip =====
 	case ".docx", ".docm", ".dotx", ".dotm":
@@ -416,7 +416,7 @@ func ExtractText(path string) (string, error) {
 			return text, nil
 		}
 		// Fallback to calibre
-		return extractTextWithCalibre(path)
+		return extractTextWithCalibre(ctx, path)
 
 	case ".xlsx", ".xlsm", ".xltx", ".xltm", ".xlsb":
 		// Excel spreadsheets and templates - extract cell values
@@ -424,7 +424,7 @@ func ExtractText(path string) (string, error) {
 			return text, nil
 		}
 		// Fallback to calibre
-		return extractTextWithCalibre(path)
+		return extractTextWithCalibre(ctx, path)
 
 	case ".pptx", ".pptm", ".potx", ".potm", ".ppsx", ".ppsm":
 		// PowerPoint presentations and templates
@@ -432,7 +432,7 @@ func ExtractText(path string) (string, error) {
 			return text, nil
 		}
 		// Fallback to calibre
-		return extractTextWithCalibre(path)
+		return extractTextWithCalibre(ctx, path)
 
 	// ===== iWork formats (Apple) - native zip =====
 	case ".pages", ".numbers", ".key":
@@ -441,32 +441,32 @@ func ExtractText(path string) (string, error) {
 			return text, nil
 		}
 		// Fallback to calibre
-		return extractTextWithCalibre(path)
+		return extractTextWithCalibre(ctx, path)
 
 	// ===== Old Office formats - use external tools =====
 	case ".doc":
 		// Old Word format - try catdoc
-		if text, err := extractTextFromDOC(path); err == nil && text != "" {
+		if text, err := extractTextFromDOC(ctx, path); err == nil && text != "" {
 			return text, nil
 		}
 		// Fallback to calibre
-		return extractTextWithCalibre(path)
+		return extractTextWithCalibre(ctx, path)
 
 	case ".xls":
 		// Old Excel format - try xls2csv or catdoc
-		if text, err := extractTextFromXLS(path); err == nil && text != "" {
+		if text, err := extractTextFromXLS(ctx, path); err == nil && text != "" {
 			return text, nil
 		}
 		// Fallback to calibre
-		return extractTextWithCalibre(path)
+		return extractTextWithCalibre(ctx, path)
 
 	case ".ppt":
 		// Old PowerPoint - try catdoc
-		if text, err := extractTextFromPPT(path); err == nil && text != "" {
+		if text, err := extractTextFromPPT(ctx, path); err == nil && text != "" {
 			return text, nil
 		}
 		// Fallback to calibre
-		return extractTextWithCalibre(path)
+		return extractTextWithCalibre(ctx, path)
 
 	// ===== Archive formats - list contents =====
 	case ".zip", ".jar", ".apk", ".aar", ".ipa":
@@ -475,31 +475,31 @@ func ExtractText(path string) (string, error) {
 
 	case ".tar":
 		// TAR archive - list file names
-		return listTarContents(path)
+		return listTarContents(ctx, path)
 
 	case ".tar.gz", ".tgz":
 		// Gzipped TAR - list file names
-		return listTarContents(path)
+		return listTarContents(ctx, path)
 
 	case ".tar.bz2", ".tbz2":
 		// Bzip2 TAR - list file names
-		return listTarContents(path)
+		return listTarContents(ctx, path)
 
 	case ".tar.xz", ".txz":
 		// XZ TAR - list file names
-		return listTarContents(path)
+		return listTarContents(ctx, path)
 
 	case ".tar.zst", ".tzst", ".zst", ".zstd":
 		// Zstd TAR - list file names (requires zstd or tar with zstd support)
-		return listTarContents(path)
+		return listTarContents(ctx, path)
 
 	case ".7z":
 		// 7-Zip archive - list file names (requires 7z)
-		return list7zContents(path)
+		return list7zContents(ctx, path)
 
 	case ".rar":
 		// RAR archive - list file names (requires unrar)
-		return listRarContents(path)
+		return listRarContents(ctx, path)
 
 	// ===== Torrent metadata =====
 	case ".torrent":
@@ -518,11 +518,11 @@ func ExtractText(path string) (string, error) {
 	// ===== CHM (Microsoft Compiled HTML) =====
 	case ".chm":
 		// CHM files - try extract_chm or list contents
-		if text, err := extractCHMContents(path); err == nil && text != "" {
+		if text, err := extractCHMContents(ctx, path); err == nil && text != "" {
 			return text, nil
 		}
 		// Fallback to calibre
-		return extractTextWithCalibre(path)
+		return extractTextWithCalibre(ctx, path)
 
 	// ===== Other ebook formats - calibre only =====
 	case ".mobi", ".azw", ".azw3", ".fb2", ".djvu", ".cbz", ".cbr":
@@ -530,11 +530,11 @@ func ExtractText(path string) (string, error) {
 	}
 
 	// Fallback: try calibre for all remaining ebook formats
-	return extractTextWithCalibre(path)
+	return extractTextWithCalibre(ctx, path)
 }
 
 // extractTextFromPDF extracts text from PDF using pdftotext
-func extractTextFromPDF(path string) (string, error) {
+func extractTextFromPDF(ctx context.Context, path string) (string, error) {
 	// Check for pdftotext (poppler-utils)
 	pdftotextBin := "pdftotext"
 	if _, err := exec.LookPath(pdftotextBin); err != nil {
@@ -542,7 +542,7 @@ func extractTextFromPDF(path string) (string, error) {
 	}
 
 	// Run pdftotext with layout preservation
-	cmd := exec.CommandContext(context.Background(), pdftotextBin, "-layout", "-q", path, "-")
+	cmd := exec.CommandContext(ctx, pdftotextBin, "-layout", "-q", path, "-")
 	output, err := cmd.Output()
 	if err != nil {
 		return "", err
@@ -551,11 +551,11 @@ func extractTextFromPDF(path string) (string, error) {
 }
 
 // extractTextFromPS extracts text from PostScript using ps2ascii
-func extractTextFromPS(path string) (string, error) {
+func extractTextFromPS(ctx context.Context, path string) (string, error) {
 	// Try ps2ascii first (comes with ghostscript)
 	ps2asciiBin := "ps2ascii"
 	if _, err := exec.LookPath(ps2asciiBin); err == nil {
-		cmd := exec.CommandContext(context.Background(), ps2asciiBin, path)
+		cmd := exec.CommandContext(ctx, ps2asciiBin, path)
 		output, err := cmd.Output()
 		if err == nil {
 			return string(output), nil
@@ -565,7 +565,7 @@ func extractTextFromPS(path string) (string, error) {
 	// Try pstotext as alternative
 	pstotextBin := "pstotext"
 	if _, err := exec.LookPath(pstotextBin); err == nil {
-		cmd := exec.CommandContext(context.Background(), pstotextBin, path)
+		cmd := exec.CommandContext(ctx, pstotextBin, path)
 		output, err := cmd.Output()
 		if err == nil {
 			return string(output), nil
@@ -576,7 +576,7 @@ func extractTextFromPS(path string) (string, error) {
 }
 
 // extractTextFromRTF extracts text from RTF using unrtf
-func extractTextFromRTF(path string) (string, error) {
+func extractTextFromRTF(ctx context.Context, path string) (string, error) {
 	// Check for unrtf
 	unrtfBin := "unrtf"
 	if _, err := exec.LookPath(unrtfBin); err != nil {
@@ -584,7 +584,7 @@ func extractTextFromRTF(path string) (string, error) {
 	}
 
 	// Run unrtf with text output
-	cmd := exec.CommandContext(context.Background(), unrtfBin, "--text", path)
+	cmd := exec.CommandContext(ctx, unrtfBin, "--text", path)
 	output, err := cmd.Output()
 	if err != nil {
 		return "", err
@@ -910,11 +910,11 @@ func extractTextFromIWork(path string) (string, error) {
 }
 
 // extractTextFromDOC extracts text from old .doc files using catdoc
-func extractTextFromDOC(path string) (string, error) {
+func extractTextFromDOC(ctx context.Context, path string) (string, error) {
 	// Try catdoc first
 	catdocBin := "catdoc"
 	if _, err := exec.LookPath(catdocBin); err == nil {
-		cmd := exec.CommandContext(context.Background(), catdocBin, path)
+		cmd := exec.CommandContext(ctx, catdocBin, path)
 		output, err := cmd.Output()
 		if err == nil {
 			return string(output), nil
@@ -924,7 +924,7 @@ func extractTextFromDOC(path string) (string, error) {
 	// Try docx2txt as alternative (some versions support .doc)
 	docx2txtBin := "docx2txt"
 	if _, err := exec.LookPath(docx2txtBin); err == nil {
-		cmd := exec.CommandContext(context.Background(), docx2txtBin, path)
+		cmd := exec.CommandContext(ctx, docx2txtBin, path)
 		output, err := cmd.Output()
 		if err == nil {
 			return string(output), nil
@@ -935,11 +935,11 @@ func extractTextFromDOC(path string) (string, error) {
 }
 
 // extractTextFromXLS extracts text from old .xls files
-func extractTextFromXLS(path string) (string, error) {
+func extractTextFromXLS(ctx context.Context, path string) (string, error) {
 	// Try xls2csv first
 	xls2csvBin := "xls2csv"
 	if _, err := exec.LookPath(xls2csvBin); err == nil {
-		cmd := exec.CommandContext(context.Background(), xls2csvBin, path)
+		cmd := exec.CommandContext(ctx, xls2csvBin, path)
 		output, err := cmd.Output()
 		if err == nil {
 			return string(output), nil
@@ -949,7 +949,7 @@ func extractTextFromXLS(path string) (string, error) {
 	// Try catdoc (also handles XLS)
 	catdocBin := "catdoc"
 	if _, err := exec.LookPath(catdocBin); err == nil {
-		cmd := exec.CommandContext(context.Background(), catdocBin, path)
+		cmd := exec.CommandContext(ctx, catdocBin, path)
 		output, err := cmd.Output()
 		if err == nil {
 			return string(output), nil
@@ -960,11 +960,11 @@ func extractTextFromXLS(path string) (string, error) {
 }
 
 // extractTextFromPPT extracts text from old .ppt files
-func extractTextFromPPT(path string) (string, error) {
+func extractTextFromPPT(ctx context.Context, path string) (string, error) {
 	// Try catdoc (supports PPT)
 	catdocBin := "catdoc"
 	if _, err := exec.LookPath(catdocBin); err == nil {
-		cmd := exec.CommandContext(context.Background(), catdocBin, path)
+		cmd := exec.CommandContext(ctx, catdocBin, path)
 		output, err := cmd.Output()
 		if err == nil {
 			return string(output), nil
@@ -993,11 +993,11 @@ func listArchiveContents(path string) (string, error) {
 }
 
 // listTarContents lists file names in a TAR archive
-func listTarContents(path string) (string, error) {
+func listTarContents(ctx context.Context, path string) (string, error) {
 	// Try tar command first
 	tarBin := "tar"
 	if _, err := exec.LookPath(tarBin); err == nil {
-		cmd := exec.CommandContext(context.Background(), tarBin, "-tf", path)
+		cmd := exec.CommandContext(ctx, tarBin, "-tf", path)
 		output, err := cmd.Output()
 		if err == nil {
 			return string(output), nil
@@ -1010,7 +1010,12 @@ func listTarContents(path string) (string, error) {
 		zstdBin := "zstd"
 		if _, err := exec.LookPath(zstdBin); err == nil {
 			// zstd -d -c file | tar -tf -
-			cmd := exec.CommandContext(context.Background(), "sh", "-c", "zstd -d -c "+strings.ReplaceAll(path, "'", "'\\''")+" | tar -tf -")
+			cmd := exec.CommandContext(
+				ctx,
+				"sh",
+				"-c",
+				"zstd -d -c "+strings.ReplaceAll(path, "'", "'\\''")+" | tar -tf -",
+			)
 			output, err := cmd.Output()
 			if err == nil {
 				return string(output), nil
@@ -1040,7 +1045,7 @@ func listTarContents(path string) (string, error) {
 		// Zstd compression - use external zstd command
 		zstdBin := "zstd"
 		if _, err := exec.LookPath(zstdBin); err == nil {
-			cmd := exec.CommandContext(context.Background(), zstdBin, "-d", "-c", path)
+			cmd := exec.CommandContext(ctx, zstdBin, "-d", "-c", path)
 			output, err := cmd.Output()
 			if err != nil {
 				return "", err
@@ -1070,11 +1075,11 @@ func listTarContents(path string) (string, error) {
 }
 
 // list7zContents lists file names in a 7-Zip archive
-func list7zContents(path string) (string, error) {
+func list7zContents(ctx context.Context, path string) (string, error) {
 	// Try 7z first
 	sevenzBin := "7z"
 	if _, err := exec.LookPath(sevenzBin); err == nil {
-		cmd := exec.CommandContext(context.Background(), sevenzBin, "l", "-ba", path)
+		cmd := exec.CommandContext(ctx, sevenzBin, "l", "-ba", path)
 		output, err := cmd.Output()
 		if err == nil {
 			return parse7zOutput(string(output)), nil
@@ -1084,7 +1089,7 @@ func list7zContents(path string) (string, error) {
 	// Try unar (The Unarchiver) as alternative
 	unarBin := "unar"
 	if _, err := exec.LookPath(unarBin); err == nil {
-		cmd := exec.CommandContext(context.Background(), unarBin, "-t", path)
+		cmd := exec.CommandContext(ctx, unarBin, "-t", path)
 		output, err := cmd.Output()
 		if err == nil {
 			return parseUnarOutput(string(output)), nil
@@ -1133,11 +1138,11 @@ func parseUnarOutput(output string) string {
 }
 
 // listRarContents lists file names in a RAR archive
-func listRarContents(path string) (string, error) {
+func listRarContents(ctx context.Context, path string) (string, error) {
 	// Try unrar first
 	unrarBin := "unrar"
 	if _, err := exec.LookPath(unrarBin); err == nil {
-		cmd := exec.CommandContext(context.Background(), unrarBin, "l", "-c-", path)
+		cmd := exec.CommandContext(ctx, unrarBin, "l", "-c-", path)
 		output, err := cmd.Output()
 		if err == nil {
 			// Parse output to extract file names
@@ -1157,7 +1162,7 @@ func listRarContents(path string) (string, error) {
 	// Try 7z as alternative
 	sevenzBin := "7z"
 	if _, err := exec.LookPath(sevenzBin); err == nil {
-		cmd := exec.CommandContext(context.Background(), sevenzBin, "l", "-ba", path)
+		cmd := exec.CommandContext(ctx, sevenzBin, "l", "-ba", path)
 		output, err := cmd.Output()
 		if err == nil {
 			return parse7zOutput(string(output)), nil
@@ -1167,7 +1172,7 @@ func listRarContents(path string) (string, error) {
 	// Try unar (The Unarchiver) as alternative
 	unarBin := "unar"
 	if _, err := exec.LookPath(unarBin); err == nil {
-		cmd := exec.CommandContext(context.Background(), unarBin, "-t", path)
+		cmd := exec.CommandContext(ctx, unarBin, "-t", path)
 		output, err := cmd.Output()
 		if err == nil {
 			return parseUnarOutput(string(output)), nil
@@ -1236,7 +1241,7 @@ func extractTorrentMetadata(path string) (string, error) {
 }
 
 // extractCHMContents extracts text from CHM (Microsoft Compiled HTML) files
-func extractCHMContents(path string) (string, error) {
+func extractCHMContents(ctx context.Context, path string) (string, error) {
 	// Try extract_chm if available
 	extractChmBin := "extract_chm"
 	if _, err := exec.LookPath(extractChmBin); err == nil {
@@ -1247,7 +1252,7 @@ func extractCHMContents(path string) (string, error) {
 		}
 		defer os.RemoveAll(tmpDir)
 
-		cmd := exec.CommandContext(context.Background(), extractChmBin, "-l", tmpDir, path)
+		cmd := exec.CommandContext(ctx, extractChmBin, "-l", tmpDir, path)
 		if err := cmd.Run(); err != nil {
 			return "", err
 		}
@@ -1276,7 +1281,7 @@ func extractCHMContents(path string) (string, error) {
 	// Try chmcmd (from libmspack)
 	chmcmdBin := "chmcmd"
 	if _, err := exec.LookPath(chmcmdBin); err == nil {
-		cmd := exec.CommandContext(context.Background(), chmcmdBin, "t", path)
+		cmd := exec.CommandContext(ctx, chmcmdBin, "t", path)
 		output, err := cmd.Output()
 		if err == nil {
 			return string(output), nil
@@ -1287,8 +1292,8 @@ func extractCHMContents(path string) (string, error) {
 }
 
 // extractTextWithCalibre uses calibre's ebook-convert as fallback
-func extractTextWithCalibre(path string) (string, error) {
-	htmlDir, err := ConvertEpubToOEB(path)
+func extractTextWithCalibre(ctx context.Context, path string) (string, error) {
+	htmlDir, err := ConvertEpubToOEB(ctx, path)
 	if err != nil {
 		return "", fmt.Errorf("calibre conversion failed: %w", err)
 	}
@@ -1386,7 +1391,7 @@ func extractTextFromHTMLFile(path string) (string, error) {
 // ConvertEpubToOEB converts EPUB/text documents to HTML format using calibre's ebook-convert.
 // The converted files are stored in ~/.cache/disco with automatic cleanup of files older than 3 days.
 // Returns the path to the converted HTML directory.
-func ConvertEpubToOEB(inputPath string) (string, error) {
+func ConvertEpubToOEB(ctx context.Context, inputPath string) (string, error) {
 	// Check for ebook-convert
 	ebookConvertBin := "ebook-convert"
 	if _, err := exec.LookPath(ebookConvertBin); err != nil {
@@ -1432,7 +1437,7 @@ func ConvertEpubToOEB(inputPath string) (string, error) {
 	// Run ebook-convert with HTML output
 	// Output to a directory (no extension) creates an exploded HTML directory
 	cmd := exec.CommandContext(
-		context.Background(),
+		ctx,
 		ebookConvertBin,
 		inputPath,
 		outputDir,
@@ -1611,7 +1616,7 @@ func formatAssTime(seconds float64) string {
 }
 
 // GenerateTTS generates a WAV file from text using espeak-ng.
-func GenerateTTS(text, outputPath string, wpm int) error {
+func GenerateTTS(ctx context.Context, text, outputPath string, wpm int) error {
 	// Check for espeak-ng
 	espeakBin := "espeak-ng"
 	if _, err := exec.LookPath(espeakBin); err != nil {
@@ -1620,7 +1625,7 @@ func GenerateTTS(text, outputPath string, wpm int) error {
 
 	// Boost espeak speed slightly as it tends to drift slower than the calculated word timing
 	espeakWpm := int(float64(wpm) * 1.1)
-	cmd := exec.CommandContext(context.Background(), espeakBin, "-w", outputPath, "-s", strconv.Itoa(espeakWpm))
+	cmd := exec.CommandContext(ctx, espeakBin, "-w", outputPath, "-s", strconv.Itoa(espeakWpm))
 	cmd.Stdin = strings.NewReader(text)
 	output, err := cmd.CombinedOutput()
 	if err != nil {

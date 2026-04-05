@@ -22,8 +22,8 @@ func setupDB(t *testing.T) (*sql.DB, *db.Queries) {
 
 	// Check for STRICT support
 	var version string
-	if err := sqlDB.QueryRow("SELECT sqlite_version()").Scan(&version); err != nil {
-		t.Fatal(err)
+	if err2 := sqlDB.QueryRow("SELECT sqlite_version()").Scan(&version); err2 != nil {
+		t.Fatal(err2)
 	}
 	var v1, v2, v3 int
 	fmt.Sscanf(version, "%d.%d.%d", &v1, &v2, &v3)

@@ -67,7 +67,7 @@ func (c *SearchCaptionsCmd) Run(ctx context.Context) error {
 	merged := c.mergeCaptions(rows)
 
 	if c.Open {
-		c.playCaptions(merged)
+		c.playCaptions(ctx, merged)
 		return nil
 	}
 
@@ -166,7 +166,7 @@ func (c *SearchCaptionsCmd) printCaptions(captions []MergedCaption) {
 	}
 }
 
-func (c *SearchCaptionsCmd) playCaptions(captions []MergedCaption) {
+func (c *SearchCaptionsCmd) playCaptions(ctx context.Context, captions []MergedCaption) {
 	for _, cap := range captions {
 		fmt.Printf("Playing: %s at %s\n", cap.Path, utils.FormatDuration(int(cap.Time)))
 		fmt.Printf("Text: %s\n", cap.Text)
@@ -178,7 +178,7 @@ func (c *SearchCaptionsCmd) playCaptions(captions []MergedCaption) {
 			fmt.Sprintf("--end=%f", cap.End+1.5),
 		}
 
-		cmd := exec.CommandContext(context.Background(), args[0], args[1:]...)
+		cmd := exec.CommandContext(ctx, args[0], args[1:]...)
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		cmd.Stdin = os.Stdin

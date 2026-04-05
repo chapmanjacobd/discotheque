@@ -12,7 +12,7 @@ import (
 	"github.com/chapmanjacobd/discoteca/internal/utils"
 )
 
-// handleEpubConvert serves converted EPUB/text documents as HTML format
+// HandleEpubConvert serves converted EPUB/text documents as HTML format
 // URL format: /api/epub/{path} serves index.html with custom TOC header
 // URL format: /api/epub/{path}/{asset} serves CSS/images from the HTML directory
 func (c *ServeCmd) HandleEpubConvert(w http.ResponseWriter, r *http.Request) {
@@ -118,8 +118,8 @@ func (c *ServeCmd) HandleEpubConvert(w http.ResponseWriter, r *http.Request) {
 	// If it's a folder, check if it has index.html (HTML folder)
 	if fileInfo.IsDir() {
 		indexHTMLPath := filepath.Join(docPath, "index.html")
-		if _, err := os.Stat(indexHTMLPath); err != nil {
-			models.Log.Error("Folder does not contain index.html", "path", docPath, "error", err)
+		if _, err2 := os.Stat(indexHTMLPath); err2 != nil {
+			models.Log.Error("Folder does not contain index.html", "path", docPath, "error", err2)
 			http.Error(w, "Folder does not contain index.html", http.StatusNotFound)
 			return
 		}
@@ -150,7 +150,7 @@ func (c *ServeCmd) HandleEpubConvert(w http.ResponseWriter, r *http.Request) {
 
 	// Convert EPUB/text to HTML
 	models.Log.Info("Converting document to HTML", "path", docPath)
-	htmlDir, err := utils.ConvertEpubToOEB(docPath)
+	htmlDir, err := utils.ConvertEpubToOEB(r.Context(), docPath)
 	if err != nil {
 		models.Log.Error("EPUB conversion failed", "path", docPath, "error", err)
 		http.Error(w, fmt.Sprintf("Conversion failed: %v", err), http.StatusInternalServerError)

@@ -2,6 +2,7 @@ package utils_test
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"net"
 	"os"
@@ -23,8 +24,8 @@ func TestMpvCall(t *testing.T) {
 
 	go func() {
 		for {
-			conn, err := ln.Accept()
-			if err != nil {
+			conn, err2 := ln.Accept()
+			if err2 != nil {
 				return
 			}
 			go func(c net.Conn) {
@@ -49,7 +50,7 @@ func TestMpvCall(t *testing.T) {
 		}
 	}()
 
-	resp, err := utils.MpvCall(socketPath, "ping")
+	resp, err := utils.MpvCall(context.Background(), socketPath, "ping")
 	if err != nil {
 		t.Fatalf("utils.MpvCall failed: %v", err)
 	}
@@ -57,7 +58,7 @@ func TestMpvCall(t *testing.T) {
 		t.Errorf("Expected pong, got %v", resp.Data)
 	}
 
-	val, err := utils.MpvGetProperty(socketPath, "volume")
+	val, err := utils.MpvGetProperty(context.Background(), socketPath, "volume")
 	if err != nil {
 		t.Fatalf("utils.MpvGetProperty failed: %v", err)
 	}
@@ -65,27 +66,27 @@ func TestMpvCall(t *testing.T) {
 		t.Errorf("Expected 50, got %v", val)
 	}
 
-	err = utils.MpvSetProperty(socketPath, "volume", 60)
+	err = utils.MpvSetProperty(context.Background(), socketPath, "volume", 60)
 	if err != nil {
 		t.Fatalf("utils.MpvSetProperty failed: %v", err)
 	}
 
-	err = utils.MpvPause(socketPath, true)
+	err = utils.MpvPause(context.Background(), socketPath, true)
 	if err != nil {
 		t.Fatalf("utils.MpvPause failed: %v", err)
 	}
 
-	err = utils.MpvSeek(socketPath, 10, "relative")
+	err = utils.MpvSeek(context.Background(), socketPath, 10, "relative")
 	if err != nil {
 		t.Fatalf("utils.MpvSeek failed: %v", err)
 	}
 
-	err = utils.MpvLoadFile(socketPath, "file.mp4", "replace")
+	err = utils.MpvLoadFile(context.Background(), socketPath, "file.mp4", "replace")
 	if err != nil {
 		t.Fatalf("utils.MpvLoadFile failed: %v", err)
 	}
 
-	_, err = utils.MpvCall(socketPath, "error")
+	_, err = utils.MpvCall(context.Background(), socketPath, "error")
 	if err == nil {
 		t.Error("Expected error for 'error' command, got nil")
 	}
@@ -138,7 +139,7 @@ func TestGetPlayhead(t *testing.T) {
 	// Use MPV time
 	startTime := time.Now().Add(-2 * time.Second)
 	os.WriteFile(metadataPath, []byte("start=5.000000\n"), 0o644)
-	if ph := utils.GetPlayhead(flags, path, startTime, 0, 0); ph != 5 {
+	if ph := utils.GetPlayhead(&flags, path, startTime, 0, 0); ph != 5 {
 		t.Errorf("utils.GetPlayhead (mpv time) = %d; want 5", ph)
 	}
 
@@ -157,19 +158,19 @@ func TestGetPlayhead(t *testing.T) {
 
 	// So if mpv_playhead is 13 and media_duration is 12, it skips 13 and tries python_playhead (2).
 
-	if ph := utils.GetPlayhead(flags, path, startTime, 0, 12); ph != 2 {
+	if ph := utils.GetPlayhead(&flags, path, startTime, 0, 12); ph != 2 {
 		t.Errorf("utils.GetPlayhead (invalid mpv time) = %d; want 2", ph)
 	}
 
 	// Use session time only if MPV does not exist
 	os.Remove(metadataPath)
-	if ph := utils.GetPlayhead(flags, path, startTime, 0, 0); ph != 2 {
+	if ph := utils.GetPlayhead(&flags, path, startTime, 0, 0); ph != 2 {
 		t.Errorf("utils.GetPlayhead (session time) = %d; want 2", ph)
 	}
 
 	// Append existing time
 	startTime = time.Now().Add(-3 * time.Second)
-	if ph := utils.GetPlayhead(flags, path, startTime, 4, 12); ph != 7 {
+	if ph := utils.GetPlayhead(&flags, path, startTime, 4, 12); ph != 7 {
 		t.Errorf("utils.GetPlayhead (existing time) = %d; want 7", ph)
 	}
 }
