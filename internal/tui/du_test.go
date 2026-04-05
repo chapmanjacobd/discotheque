@@ -33,26 +33,26 @@ func TestDUModel(t *testing.T) {
 
 	// Mock window size
 	m2, _ := m.Update(tea.WindowSizeMsg{Width: 100, Height: 40})
-	m = m2.(DUModel)
+	m = m2.(*DUModel)
 
 	// Verify we can navigate - select first item and press Enter
 	if len(items) > 0 {
 		// Select first item
 		m2, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
-		m = m2.(DUModel)
+		m = m2.(*DUModel)
 
 		// Try to enter (if it's a directory)
 		m2, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
-		m = m2.(DUModel)
+		m = m2.(*DUModel)
 	}
 
 	// Mock Backspace to go back
 	m2, _ = m.Update(tea.KeyMsg{Type: tea.KeyBackspace})
-	m = m2.(DUModel)
+	m = m2.(*DUModel)
 
 	// Mock Quit
 	m2, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("q")})
-	m = m2.(DUModel)
+	m = m2.(*DUModel)
 	if !m.quitting {
 		t.Error("Expected quitting to be true after 'q'")
 	}

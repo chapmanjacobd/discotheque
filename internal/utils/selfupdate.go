@@ -263,7 +263,7 @@ func checkUpdate(ctx context.Context) string {
 	var found struct {
 		TagName string `json:"tag_name"`
 		Assets  []struct {
-			Name               string
+			Name               string `json:"name"`
 			BrowserDownloadURL string `json:"browser_download_url"`
 		}
 	}

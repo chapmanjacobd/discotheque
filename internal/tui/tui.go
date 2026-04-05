@@ -371,7 +371,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case PaneMediaList:
 				m.activePane = PaneSearch
 				return m, m.searchInput.Focus()
-			default:
+			case PaneSearch:
 				m.activePane = PaneSidebar
 				m.searchInput.Blur()
 			}
@@ -402,6 +402,11 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case PaneSidebar:
 				m.updateMediaList()
 				m.activePane = PaneMediaList
+				return m, nil
+			case PaneSearch:
+				// Enter in search pane exits search and returns to media list
+				m.activePane = PaneMediaList
+				m.searchInput.Blur()
 				return m, nil
 			}
 		}
@@ -470,7 +475,7 @@ func (m *Model) View() string {
 	case PaneMediaList:
 		sidebarView = StyleInactivePane.Render(sidebarView)
 		mediaListView = StyleActivePane.Render(mediaListView)
-	default:
+	case PaneSearch:
 		sidebarView = StyleInactivePane.Render(sidebarView)
 		mediaListView = StyleInactivePane.Render(mediaListView)
 	}

@@ -19,13 +19,14 @@ const (
 
 func (s SearchMode) String() string {
 	switch s {
+	case SearchModeUnknown:
+		return "Unknown"
 	case SearchModeSubstring:
 		return "Substring"
 	case SearchModeFTS5:
 		return "FTS5"
-	default:
-		return "Unknown"
 	}
+	return "Unknown"
 }
 
 var (
@@ -85,11 +86,12 @@ func ResetSearchModeDetection() {
 // IsSearchAvailable checks if a specific search mode is available
 func IsSearchAvailable(ctx context.Context, mode SearchMode, db *sql.DB) bool {
 	switch mode {
+	case SearchModeUnknown:
+		return false
 	case SearchModeFTS5:
 		return db != nil && hasFTS5Table(ctx, db)
 	case SearchModeSubstring:
 		return true // Always available
-	default:
-		return false
 	}
+	return false
 }

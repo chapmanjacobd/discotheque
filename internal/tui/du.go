@@ -174,8 +174,8 @@ type DUModel struct {
 	flags       models.GlobalFlags
 }
 
-func NewDUModel(media []models.MediaWithDB, flags models.GlobalFlags) DUModel {
-	m := DUModel{
+func NewDUModel(media []models.MediaWithDB, flags models.GlobalFlags) *DUModel {
+	m := &DUModel{
 		flags: flags,
 		// Build tree once at startup for O(1) navigation
 		tree: buildDUTree(media),
@@ -277,11 +277,11 @@ func (d duDelegate) Render(w io.Writer, m list.Model, index int, listItem list.I
 	_, _ = fmt.Fprintf(w, "%s %s\n%s", title, bar, desc)
 }
 
-func (m DUModel) Init() tea.Cmd {
+func (m *DUModel) Init() tea.Cmd {
 	return nil
 }
 
-func (m DUModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *DUModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		if m.list.FilterState() == list.Filtering {
@@ -318,7 +318,7 @@ func (m DUModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m DUModel) View() string {
+func (m *DUModel) View() string {
 	if m.quitting {
 		return ""
 	}

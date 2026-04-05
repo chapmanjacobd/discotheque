@@ -116,7 +116,6 @@ func (c *AddCmd) Run(ctx context.Context) error {
 				deleted: m.TimeDeleted.Int64 > 0,
 			}
 		}
-		existingMedia = nil // Allow GC
 		models.Log.Info("Loaded metadata cache from database", "count", len(metaCache))
 	} else {
 		metaCache = make(map[string]meta)

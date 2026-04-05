@@ -18,6 +18,7 @@ var (
 	Deps []*debug.Module
 )
 
+//nolint:gochecknoinits // Populate version info from build metadata embedded at compile time
 func init() {
 	bi, ok := debug.ReadBuildInfo()
 	if !ok {
