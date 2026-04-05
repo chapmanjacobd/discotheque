@@ -26,15 +26,14 @@ func ParseDatabaseAndScanPaths(
 	args []string,
 	coreFlags *models.CoreFlags,
 	mediaFlags *models.MediaFilterFlags,
-) ([]string, []string, error) {
-	if err := coreFlags.AfterApply(); err != nil {
+) (databases, scanPaths []string, err error) {
+	if err = coreFlags.AfterApply(); err != nil {
 		return nil, nil, err
 	}
-	if err := mediaFlags.AfterApply(); err != nil {
+	if err = mediaFlags.AfterApply(); err != nil {
 		return nil, nil, err
 	}
 
-	var databases, scanPaths []string
 	for _, arg := range args {
 		if strings.HasSuffix(arg, ".db") {
 			if utils.IsSQLite(arg) {

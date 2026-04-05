@@ -86,6 +86,7 @@ func wrapWithTracing(baseDB *sql.DB, dsn string) (*sql.DB, error) {
 	return sql.OpenDB(tracedConnector), nil
 }
 
+// driverConnector creates a [driver.Connector] from a driver and DSN.
 func driverConnector(drv driver.Driver, dsn string) (driver.Connector, error) {
 	// Check if driver implements DriverContext
 	if driverCtx, ok := drv.(driver.DriverContext); ok {

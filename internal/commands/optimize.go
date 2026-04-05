@@ -131,9 +131,7 @@ type SampleHashCmd struct {
 func (c *SampleHashCmd) Run(ctx context.Context) error {
 	models.SetupLogging(c.Verbose)
 	flags := models.GlobalFlags{
-		CoreFlags:    c.CoreFlags,
 		HashingFlags: c.HashingFlags,
-		DisplayFlags: c.DisplayFlags,
 	}
 
 	type result struct {

@@ -122,8 +122,8 @@ func Extract(ctx context.Context, path string, opts ExtractOptions) (*MediaMetad
 		if opts.ScanSubtitles || opts.ExtractText {
 			if params.Duration.Int64 == 0 {
 				// Fast word count for duration estimation on ingest
-				wordCount, err := utils.QuickWordCount(ctx, path, stat.Size())
-				if err != nil || wordCount <= 0 {
+				wordCount, err2 := utils.QuickWordCount(ctx, path, stat.Size())
+				if err2 != nil || wordCount <= 0 {
 					// Fallback to size-based estimate if word count fails
 					d := int64(float64(stat.Size())/4.2/220*60) + 10
 					params.Duration = utils.ToNullInt64(d)
@@ -136,17 +136,17 @@ func Extract(ctx context.Context, path string, opts ExtractOptions) (*MediaMetad
 
 			// Extract text from comic archives (CBZ/CBR) using OCR if requested
 			if utils.ComicExtensionMap[ext] && opts.OCR {
-				captions, err := ExtractImageTextFromComicArchive(ctx, path, opts.OCREngine)
-				if err != nil {
-					models.Log.Warn("Comic archive OCR extraction failed", "path", path, "error", err)
+				captions, err2 := ExtractImageTextFromComicArchive(ctx, path, opts.OCREngine)
+				if err2 != nil {
+					models.Log.Warn("Comic archive OCR extraction failed", "path", path, "error", err2)
 				} else {
 					result.Captions = captions
 				}
 			} else if opts.ExtractText && !utils.ComicExtensionMap[ext] {
 				// Extract full text from document if requested (non-comic documents)
-				captions, err := extractDocumentText(ctx, path)
-				if err != nil {
-					models.Log.Warn("Document text extraction failed", "path", path, "error", err)
+				captions, err2 := extractDocumentText(ctx, path)
+				if err2 != nil {
+					models.Log.Warn("Document text extraction failed", "path", path, "error", err2)
 				} else {
 					result.Captions = captions
 				}
@@ -158,9 +158,9 @@ func Extract(ctx context.Context, path string, opts ExtractOptions) (*MediaMetad
 
 	// Extract text from images using OCR if requested
 	if mediaType == "image" && opts.OCR {
-		captions, err := extractImageText(ctx, path, opts.OCREngine)
-		if err != nil {
-			models.Log.Warn("Image OCR extraction failed", "path", path, "error", err)
+		captions, err2 := extractImageText(ctx, path, opts.OCREngine)
+		if err2 != nil {
+			models.Log.Warn("Image OCR extraction failed", "path", path, "error", err2)
 		} else {
 			result.Captions = captions
 		}
@@ -168,9 +168,9 @@ func Extract(ctx context.Context, path string, opts ExtractOptions) (*MediaMetad
 
 	// Extract speech from audio/video files if requested
 	if opts.SpeechRecognition && (mediaType == "audio" || mediaType == "video") {
-		captions, err := ExtractSpeechToText(ctx, path, opts.SpeechRecEngine)
-		if err != nil {
-			models.Log.Warn("Speech recognition failed", "path", path, "error", err)
+		captions, err2 := ExtractSpeechToText(ctx, path, opts.SpeechRecEngine)
+		if err2 != nil {
+			models.Log.Warn("Speech recognition failed", "path", path, "error", err2)
 		} else {
 			result.Captions = append(result.Captions, captions...)
 		}

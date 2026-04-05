@@ -25,15 +25,7 @@ type StatsCmd struct {
 
 func (c *StatsCmd) Run(ctx context.Context) error {
 	models.SetupLogging(c.Verbose)
-	flags := models.GlobalFlags{
-		CoreFlags:        c.CoreFlags,
-		PathFilterFlags:  c.PathFilterFlags,
-		FilterFlags:      c.FilterFlags,
-		MediaFilterFlags: c.MediaFilterFlags,
-		TimeFilterFlags:  c.TimeFilterFlags,
-		DeletedFlags:     c.DeletedFlags,
-		DisplayFlags:     c.DisplayFlags,
-	}
+	flags := models.GlobalFlags{}
 
 	timeCol := "time_last_played"
 	switch c.Facet {

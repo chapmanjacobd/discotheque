@@ -265,7 +265,7 @@ func checkUpdate(ctx context.Context) string {
 		Assets  []struct {
 			Name               string `json:"name"`
 			BrowserDownloadURL string `json:"browser_download_url"`
-		}
+		} `json:"assets"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&found); err != nil {
 		return ""
