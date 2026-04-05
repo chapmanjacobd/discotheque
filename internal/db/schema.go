@@ -34,9 +34,3 @@ func GetSchemaFTS() string {
 	return string(data)
 }
 
-// GetSchema returns the full schema (for backward compatibility if needed, but InitDB logic changed)
-//
-// Deprecated: Use GetSchemaTables, GetSchemaTriggers, GetSchemaFTS instead
-func GetSchema() string {
-	return GetSchemaTables() + "\n" + GetSchemaTriggers() + "\n" + GetSchemaFTS()
-}

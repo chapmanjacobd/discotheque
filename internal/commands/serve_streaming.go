@@ -321,14 +321,6 @@ func (c *ServeCmd) HandleSubtitles(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(output)
 }
 
-// generateTextSnippetSVG creates a styled SVG thumbnail with text content preview
-//
-// Deprecated: SVG thumbnails disabled, returning placeholder
-func (c *ServeCmd) generateTextSnippetSVG(_, _, _ string) []byte {
-	// Return a simple placeholder instead of SVG
-	return []byte{}
-}
-
 // generatePDFThumbnail generates a thumbnail for PDF files using pdftoppm or fallback
 func (c *ServeCmd) generatePDFThumbnail(ctx context.Context, path string) ([]byte, string, error) {
 	// Try pdftoppm first (fastest, best quality)
@@ -368,7 +360,8 @@ func (c *ServeCmd) generatePDFThumbnail(ctx context.Context, path string) ([]byt
 		}
 	}
 
-	return c.generateTextSnippetSVG("PDF", firstLine, path), "image/svg+xml", nil
+	// SVG thumbnails disabled, returning placeholder
+	return []byte{}, "image/svg+xml", nil
 }
 
 // extractEpubCover extracts the cover image from an EPUB file
@@ -447,7 +440,8 @@ func (c *ServeCmd) generateEpubThumbnail(path string) ([]byte, string, error) {
 	// Fallback: extract title/author from metadata and render as SVG
 	r, err := zip.OpenReader(path)
 	if err != nil {
-		return c.generateTextSnippetSVG("EPUB", "", path), "image/svg+xml", nil
+		// SVG thumbnails disabled, returning placeholder
+		return []byte{}, "image/svg+xml", nil
 	}
 	defer r.Close()
 
@@ -478,7 +472,8 @@ func (c *ServeCmd) generateEpubThumbnail(path string) ([]byte, string, error) {
 		}
 	}
 
-	return c.generateTextSnippetSVG("EPUB", title, path), "image/svg+xml", nil
+	// SVG thumbnails disabled, returning placeholder
+	return []byte{}, "image/svg+xml", nil
 }
 
 func (c *ServeCmd) HandleThumbnail(w http.ResponseWriter, r *http.Request) {

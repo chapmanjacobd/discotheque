@@ -80,12 +80,12 @@ func (f *TestFixture) GetDB() *sql.DB {
 
 // GetSchema returns the canonical database schema
 func GetSchema() string {
-	return db.GetSchema()
+	return db.GetSchemaTables() + "\n" + db.GetSchemaTriggers() + "\n" + db.GetSchemaFTS()
 }
 
 // InitTestDB initializes a test database with the canonical schema
 func InitTestDB(_ testing.TB, sqlDB *sql.DB) error {
-	schema := db.GetSchema()
+	schema := db.GetSchemaTables() + "\n" + db.GetSchemaTriggers() + "\n" + db.GetSchemaFTS()
 	_, err := sqlDB.ExecContext(context.Background(), schema)
 	return err
 }
@@ -119,14 +119,14 @@ func StripFTSFromSchema(schema string) string {
 
 // InitTestDBNoFTS initializes a test database with the schema minus FTS5 features
 func InitTestDBNoFTS(sqlDB *sql.DB) error {
-	schema := StripFTSFromSchema(db.GetSchema())
+	schema := StripFTSFromSchema(db.GetSchemaTables() + "\n" + db.GetSchemaTriggers() + "\n" + db.GetSchemaFTS())
 	_, err := sqlDB.ExecContext(context.Background(), schema)
 	return err
 }
 
 // InitTestDBWithDB initializes a test database with the canonical schema using provided DB connection
 func InitTestDBWithDB(_ testing.TB, sqlDB *sql.DB) error {
-	schema := db.GetSchema()
+	schema := db.GetSchemaTables() + "\n" + db.GetSchemaTriggers() + "\n" + db.GetSchemaFTS()
 	_, err := sqlDB.ExecContext(context.Background(), schema)
 	return err
 }

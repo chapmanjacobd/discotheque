@@ -17,7 +17,7 @@ func SchemaFS() embed.FS {
 
 // GetSchema returns the database schema SQL
 func GetSchema() string {
-	return db.GetSchema()
+	return db.GetSchemaTables() + "\n" + db.GetSchemaTriggers() + "\n" + db.GetSchemaFTS()
 }
 
 // ParseDatabaseAndScanPaths separates .db files from scan paths

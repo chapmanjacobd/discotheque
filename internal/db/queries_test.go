@@ -18,7 +18,7 @@ func setupDB(t *testing.T) (*sql.DB, *db.Queries) {
 		t.Fatal(err)
 	}
 
-	schema := db.GetSchema()
+	schema := db.GetSchemaTables() + "\n" + db.GetSchemaTriggers() + "\n" + db.GetSchemaFTS()
 
 	// Check for STRICT support
 	var version string
