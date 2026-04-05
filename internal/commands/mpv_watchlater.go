@@ -96,9 +96,11 @@ func (c *MpvWatchlaterCmd) Run(ctx context.Context) error {
 				ctx,
 				m.DB,
 				[]string{m.Path},
-				playhead,
-				timePlayed,
-				false,
+				history.HistoryEntry{
+					Playhead:   playhead,
+					TimePlayed: timePlayed,
+					MarkDone:   false,
+				},
 			); err != nil {
 				models.Log.Error("Failed to import watchlater", "path", m.Path, "error", err)
 			} else {

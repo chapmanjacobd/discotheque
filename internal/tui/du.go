@@ -108,13 +108,13 @@ func getNodesAtDepth(node *duTreeNode, targetDepth, currentDepth int, pathPrefix
 		// Return children of this node
 		for _, child := range node.Children {
 			results = append(results, DUItem{
-				stats: models.FolderStats{
+				Stats: models.FolderStats{
 					Path:          child.Path,
 					Count:         child.Count,
 					TotalSize:     child.TotalSize,
 					TotalDuration: child.TotalDuration,
 				},
-				isDir: true,
+				IsDir: true,
 			})
 		}
 		return results
@@ -143,42 +143,42 @@ func getNodesAtDepth(node *duTreeNode, targetDepth, currentDepth int, pathPrefix
 }
 
 type DUItem struct {
-	stats models.FolderStats
-	isDir bool
+	Stats models.FolderStats
+	IsDir bool
 }
 
 func (i DUItem) Title() string {
-	if i.isDir {
-		return "📁 " + filepath.Base(i.stats.Path)
+	if i.IsDir {
+		return "📁 " + filepath.Base(i.Stats.Path)
 	}
-	return "📄 " + filepath.Base(i.stats.Path)
+	return "📄 " + filepath.Base(i.Stats.Path)
 }
 
 func (i DUItem) Description() string {
 	return fmt.Sprintf("%s • %d files • %s",
-		utils.FormatSize(i.stats.TotalSize),
-		i.stats.Count,
-		utils.FormatDuration(int(i.stats.TotalDuration)))
+		utils.FormatSize(i.Stats.TotalSize),
+		i.Stats.Count,
+		utils.FormatDuration(int(i.Stats.TotalDuration)))
 }
 
 func (i DUItem) FilterValue() string {
-	return i.stats.Path
+	return i.Stats.Path
 }
 
 type DUModel struct {
-	list        list.Model
-	tree        *duTreeNode
-	currentPath string
-	history     []string
-	quitting    bool
-	flags       models.GlobalFlags
+	List        list.Model
+	Tree        *duTreeNode
+	CurrentPath string
+	History     []string
+	Quitting    bool
+	Flags       models.GlobalFlags
 }
 
 func NewDUModel(media []models.MediaWithDB, flags models.GlobalFlags) *DUModel {
 	m := &DUModel{
-		flags: flags,
+		Flags: flags,
 		// Build tree once at startup for O(1) navigation
-		tree: buildDUTree(media),
+		Tree: buildDUTree(media),
 	}
 	m.updateList()
 	return m
@@ -187,8 +187,8 @@ func NewDUModel(media []models.MediaWithDB, flags models.GlobalFlags) *DUModel {
 func (m *DUModel) updateList() {
 	// Determine target depth (children of current path)
 	targetDepth := 1
-	if m.currentPath != "" {
-		cleanPath := filepath.Clean(m.currentPath)
+	if m.CurrentPath != "" {
+		cleanPath := filepath.Clean(m.CurrentPath)
 		targetDepth = strings.Count(cleanPath, "/") + strings.Count(cleanPath, "\\") + 1
 	}
 
@@ -196,13 +196,13 @@ func (m *DUModel) updateList() {
 	var items []list.Item
 	var maxSize int64
 
-	if m.tree != nil {
-		nodes := getNodesAtDepth(m.tree, targetDepth, 0, m.currentPath)
+	if m.Tree != nil {
+		nodes := getNodesAtDepth(m.Tree, targetDepth, 0, m.CurrentPath)
 		items = make([]list.Item, len(nodes))
 		for i, node := range nodes {
 			items[i] = node
-			if node.stats.TotalSize > maxSize {
-				maxSize = node.stats.TotalSize
+			if node.Stats.TotalSize > maxSize {
+				maxSize = node.Stats.TotalSize
 			}
 		}
 	}
@@ -211,14 +211,14 @@ func (m *DUModel) updateList() {
 	stats := make([]models.FolderStats, len(items))
 	for i, item := range items {
 		if duItem, ok := item.(DUItem); ok {
-			stats[i] = duItem.stats
+			stats[i] = duItem.Stats
 		}
 	}
-	query.SortFolders(stats, m.flags.SortBy, m.flags.Reverse)
+	query.SortFolders(stats, m.Flags.SortBy, m.Flags.Reverse)
 
 	// Rebuild items with sorted stats
 	for i, s := range stats {
-		items[i] = DUItem{stats: s, isDir: true}
+		items[i] = DUItem{Stats: s, IsDir: true}
 		if s.TotalSize > maxSize {
 			maxSize = s.TotalSize
 		}
@@ -229,14 +229,14 @@ func (m *DUModel) updateList() {
 		"Disco",
 	) + StyleLogoSuffix.Render(
 		"theque",
-	) + " Disk Usage: " + m.currentPath
-	if m.currentPath == "" {
+	) + " Disk Usage: " + m.CurrentPath
+	if m.CurrentPath == "" {
 		l.Title = "🪩  " + StyleLogoPrefix.Render("Disco") + StyleLogoSuffix.Render("theque") + " Disk Usage: Root"
 	}
 	l.SetShowStatusBar(true)
 	l.SetFilteringEnabled(true)
 	l.Styles.Title = StyleTitle
-	m.list = l
+	m.List = l
 }
 
 type duDelegate struct {
@@ -266,7 +266,7 @@ func (d duDelegate) Render(w io.Writer, m list.Model, index int, listItem list.I
 	barWidth := 20
 	filled := 0
 	if d.maxSize > 0 {
-		filled = int(float64(i.stats.TotalSize) / float64(d.maxSize) * float64(barWidth))
+		filled = int(float64(i.Stats.TotalSize) / float64(d.maxSize) * float64(barWidth))
 	}
 	bar := "[" + barFullStyle.Render(
 		strings.Repeat("#", filled),
@@ -284,43 +284,43 @@ func (m *DUModel) Init() tea.Cmd {
 func (m *DUModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		if m.list.FilterState() == list.Filtering {
+		if m.List.FilterState() == list.Filtering {
 			break
 		}
 
 		switch msg.String() {
 		case "ctrl+c", "q":
-			m.quitting = true
+			m.Quitting = true
 			return m, tea.Quit
 		case "enter", "right":
-			i, ok := m.list.SelectedItem().(DUItem)
-			if ok && i.isDir {
-				m.history = append(m.history, m.currentPath)
-				m.currentPath = i.stats.Path
+			i, ok := m.List.SelectedItem().(DUItem)
+			if ok && i.IsDir {
+				m.History = append(m.History, m.CurrentPath)
+				m.CurrentPath = i.Stats.Path
 				m.updateList()
 				return m, nil
 			}
 		case "backspace", "left":
-			if len(m.history) > 0 {
-				m.currentPath = m.history[len(m.history)-1]
-				m.history = m.history[:len(m.history)-1]
+			if len(m.History) > 0 {
+				m.CurrentPath = m.History[len(m.History)-1]
+				m.History = m.History[:len(m.History)-1]
 				m.updateList()
 				return m, nil
 			}
 		}
 	case tea.WindowSizeMsg:
 		h, v := StyleDoc.GetFrameSize()
-		m.list.SetSize(msg.Width-h, msg.Height-v)
+		m.List.SetSize(msg.Width-h, msg.Height-v)
 	}
 
 	var cmd tea.Cmd
-	m.list, cmd = m.list.Update(msg)
+	m.List, cmd = m.List.Update(msg)
 	return m, cmd
 }
 
 func (m *DUModel) View() string {
-	if m.quitting {
+	if m.Quitting {
 		return ""
 	}
-	return StyleDoc.Render(m.list.View())
+	return StyleDoc.Render(m.List.View())
 }

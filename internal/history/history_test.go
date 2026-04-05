@@ -172,9 +172,11 @@ func TestUpdateHistoryWithTime(t *testing.T) {
 		context.Background(),
 		dbPath,
 		[]string{path},
-		10,
-		customTime,
-		false,
+		history.HistoryEntry{
+			Playhead:   10,
+			TimePlayed: customTime,
+			MarkDone:   false,
+		},
 	); err2 != nil {
 		t.Fatal(err2)
 	}

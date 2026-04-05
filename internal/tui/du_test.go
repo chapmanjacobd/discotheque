@@ -1,4 +1,4 @@
-package tui
+package tui_test
 
 import (
 	"path/filepath"
@@ -7,6 +7,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/chapmanjacobd/discoteca/internal/models"
+	"github.com/chapmanjacobd/discoteca/internal/tui"
 )
 
 func TestDUModel(t *testing.T) {
@@ -18,42 +19,42 @@ func TestDUModel(t *testing.T) {
 		{Media: models.Media{Path: filepath.FromSlash("/home/user/music/m1.mp3"), Size: &v2Size}},
 	}
 
-	m := NewDUModel(media, models.GlobalFlags{})
-	if m.list.Title == "" {
+	m := tui.NewDUModel(media, models.GlobalFlags{})
+	if m.List.Title == "" {
 		t.Error("Expected list title to be set")
 	}
 
 	// Test navigation
 	// Initial state: root, showing /home
 	// Check that we have items at root level
-	items := m.list.Items()
+	items := m.List.Items()
 	if len(items) == 0 {
 		t.Fatal("Expected items at root level, got none")
 	}
 
 	// Mock window size
 	m2, _ := m.Update(tea.WindowSizeMsg{Width: 100, Height: 40})
-	m = m2.(*DUModel)
+	m = m2.(*tui.DUModel)
 
 	// Verify we can navigate - select first item and press Enter
 	if len(items) > 0 {
 		// Select first item
 		m2, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
-		m = m2.(*DUModel)
+		m = m2.(*tui.DUModel)
 
 		// Try to enter (if it's a directory)
 		m2, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
-		m = m2.(*DUModel)
+		m = m2.(*tui.DUModel)
 	}
 
 	// Mock Backspace to go back
 	m2, _ = m.Update(tea.KeyMsg{Type: tea.KeyBackspace})
-	m = m2.(*DUModel)
+	m = m2.(*tui.DUModel)
 
 	// Mock Quit
 	m2, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("q")})
-	m = m2.(*DUModel)
-	if !m.quitting {
+	m = m2.(*tui.DUModel)
+	if !m.Quitting {
 		t.Error("Expected quitting to be true after 'q'")
 	}
 
@@ -70,7 +71,7 @@ func TestDUItem(t *testing.T) {
 		TotalSize:     5000,
 		TotalDuration: 120,
 	}
-	item := DUItem{stats: stats, isDir: true}
+	item := tui.DUItem{Stats: stats, IsDir: true}
 	if item.Title() != "📁 path" {
 		t.Errorf("Unexpected title: %s", item.Title())
 	}

@@ -183,11 +183,10 @@ func (c *WatchCmd) Run(ctx context.Context) error {
 		exitCode := 0
 		if err != nil {
 			exitError := &exec.ExitError{}
-			if errors.As(err, &exitError) {
-				exitCode = exitError.ExitCode()
-			} else {
+			if !errors.As(err, &exitError) {
 				return err
 			}
+			exitCode = exitError.ExitCode()
 		}
 
 		if exitCode == 4 {

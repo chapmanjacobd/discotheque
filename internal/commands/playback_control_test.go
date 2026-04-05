@@ -45,7 +45,7 @@ func startMockMpvServer(t *testing.T) string {
 
 					jsonData, err := json.Marshal(resp)
 					if err != nil {
-						t.Fatalf("json.Marshal failed: %v", err)
+						return
 					}
 					c.Write(append(jsonData, '\n'))
 				}
