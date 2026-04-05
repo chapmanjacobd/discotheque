@@ -19,7 +19,7 @@ import (
 )
 
 // ExecutePostAction executes actions after a command
-func ExecutePostAction(ctx context.Context, flags *models.GlobalFlags, media []models.MediaWithDB) error {
+func ExecutePostAction(ctx context.Context, flags models.GlobalFlags, media []models.MediaWithDB) error {
 	action := flags.PostAction
 
 	if flags.DeleteFiles {
@@ -92,7 +92,7 @@ func ExecutePostAction(ctx context.Context, flags *models.GlobalFlags, media []m
 	return nil
 }
 
-func RunExitCommand(ctx context.Context, flags *models.GlobalFlags, exitCode int, path string) error {
+func RunExitCommand(ctx context.Context, flags models.GlobalFlags, exitCode int, path string) error {
 	var cmdStr string
 	switch exitCode {
 	case 0:
@@ -295,7 +295,7 @@ func CastPlay(ctx context.Context, flags models.GlobalFlags, media []models.Medi
 			if m.Playhead != nil {
 				existingPlayhead = int(*m.Playhead)
 			}
-			playhead := utils.GetPlayhead(&flags, m.Path, startTime, existingPlayhead, mediaDuration)
+			playhead := utils.GetPlayhead(flags, m.Path, startTime, existingPlayhead, mediaDuration)
 			if err := history.UpdateHistorySimple(ctx, m.DB, []string{m.Path}, playhead, false); err != nil {
 				models.Log.Warn("Failed to update history", "error", err)
 			}

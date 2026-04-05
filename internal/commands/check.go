@@ -20,7 +20,7 @@ type CheckCmd struct {
 	models.PathFilterFlags  `embed:""`
 	models.MediaFilterFlags `embed:""`
 
-	Args   []string `help:"Database file followed by optional paths to check" required:"" arg:""`
+	Args   []string `help:"Database file followed by optional paths to check" required:"true" arg:""`
 	DryRun bool     `help:"Don't actually mark files as deleted"`
 
 	CheckPaths []string `kong:"-"`

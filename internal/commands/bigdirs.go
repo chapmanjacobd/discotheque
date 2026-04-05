@@ -17,7 +17,7 @@ type BigDirsCmd struct {
 	models.SortFlags        `embed:""`
 	models.DisplayFlags     `embed:""`
 
-	Databases []string `help:"SQLite database files" required:"" arg:"" type:"existingfile"`
+	Databases []string `help:"SQLite database files" required:"true" arg:"" type:"existingfile"`
 }
 
 func (c *BigDirsCmd) Run(ctx context.Context) error {

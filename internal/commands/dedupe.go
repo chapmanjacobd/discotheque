@@ -31,7 +31,7 @@ type DedupeCmd struct {
 	models.PostActionFlags  `embed:""`
 	models.HashingFlags     `embed:""`
 
-	Databases []string `help:"SQLite database files" required:"" arg:"" type:"existingfile"`
+	Databases []string `help:"SQLite database files" required:"true" arg:"" type:"existingfile"`
 }
 
 type DedupeDuplicate struct {
@@ -184,7 +184,7 @@ func (c *DedupeCmd) Run(ctx context.Context) error {
 				models.Log.Warn("Dedupe command failed", "error", err)
 			}
 		} else if flags.Trash {
-			if err := utils.Trash(ctx, &flags, d.DuplicatePath); err != nil {
+			if err := utils.Trash(ctx, flags, d.DuplicatePath); err != nil {
 				models.Log.Warn("Failed to trash file", "path", d.DuplicatePath, "error", err)
 			}
 		} else {

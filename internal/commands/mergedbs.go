@@ -16,8 +16,8 @@ type MergeDBsCmd struct {
 	models.FilterFlags `embed:""`
 	models.MergeFlags  `embed:""`
 
-	TargetDB  string   `help:"Target SQLite database file"  required:"" arg:""`
-	SourceDBs []string `help:"Source SQLite database files" required:"" arg:"" type:"existingfile"`
+	TargetDB  string   `help:"Target SQLite database file"  required:"true" arg:""`
+	SourceDBs []string `help:"Source SQLite database files" required:"true" arg:"" type:"existingfile"`
 }
 
 func (c *MergeDBsCmd) Run(ctx context.Context) error {

@@ -148,7 +148,7 @@ func TestExecutePostAction(t *testing.T) {
 	dbConn.Exec("INSERT INTO media (path) VALUES (?)", f1)
 	dbConn.Close()
 
-	if err := commands.ExecutePostAction(context.Background(), &flags, []models.MediaWithDB{m}); err != nil {
+	if err := commands.ExecutePostAction(context.Background(), flags, []models.MediaWithDB{m}); err != nil {
 		t.Fatalf("commands.ExecutePostAction mark-deleted failed: %v", err)
 	}
 

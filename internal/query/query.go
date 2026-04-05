@@ -15,31 +15,31 @@ import (
 )
 
 // MediaQuery executes a query against multiple databases concurrently
-func MediaQuery(ctx context.Context, dbs []string, flags *models.GlobalFlags) ([]models.MediaWithDB, error) {
+func MediaQuery(ctx context.Context, dbs []string, flags models.GlobalFlags) ([]models.MediaWithDB, error) {
 	executor := NewQueryExecutor(flags)
 	return executor.MediaQuery(ctx, dbs)
 }
 
 // MediaQueryCount executes a count query against multiple databases concurrently
-func MediaQueryCount(ctx context.Context, dbs []string, flags *models.GlobalFlags) (int64, error) {
+func MediaQueryCount(ctx context.Context, dbs []string, flags models.GlobalFlags) (int64, error) {
 	executor := NewQueryExecutor(flags)
 	return executor.MediaQueryCount(ctx, dbs)
 }
 
 // FilterMedia applies all filters to media list in memory
-func FilterMedia(media []models.MediaWithDB, flags *models.GlobalFlags) []models.MediaWithDB {
+func FilterMedia(media []models.MediaWithDB, flags models.GlobalFlags) []models.MediaWithDB {
 	fb := NewFilterBuilder(flags)
 	return fb.FilterMedia(media)
 }
 
 // SortMedia sorts media using the unified SortBuilder
-func SortMedia(media []models.MediaWithDB, flags *models.GlobalFlags) {
+func SortMedia(media []models.MediaWithDB, flags models.GlobalFlags) {
 	NewSortBuilder(flags).Sort(media)
 }
 
 // SortMediaWithExpansion sorts media with optional result expansion (siblings, related)
 // This should be used when sort config includes expansion markers
-func SortMediaWithExpansion(ctx context.Context, sqlDB *sql.DB, media *[]models.MediaWithDB, flags *models.GlobalFlags) {
+func SortMediaWithExpansion(ctx context.Context, sqlDB *sql.DB, media *[]models.MediaWithDB, flags models.GlobalFlags) {
 	// Check if sort config contains expansion markers
 	sortConfig := flags.PlayInOrder
 	if sortConfig == "" && flags.SortBy != "" {
@@ -61,14 +61,14 @@ func SortMediaWithExpansion(ctx context.Context, sqlDB *sql.DB, media *[]models.
 func FetchSiblings(
 	ctx context.Context,
 	media []models.MediaWithDB,
-	flags *models.GlobalFlags,
+	flags models.GlobalFlags,
 ) ([]models.MediaWithDB, error) {
 	executor := NewQueryExecutor(flags)
 	return executor.FetchSiblings(ctx, media, flags)
 }
 
 // ResolvePercentileFlags resolves percentile-based filters (Re-exported for tests)
-func ResolvePercentileFlags(ctx context.Context, dbs []string, flags *models.GlobalFlags) (*models.GlobalFlags, error) {
+func ResolvePercentileFlags(ctx context.Context, dbs []string, flags models.GlobalFlags) (models.GlobalFlags, error) {
 	executor := NewQueryExecutor(flags)
 	return executor.ResolvePercentileFlags(ctx, dbs, flags)
 }
@@ -224,7 +224,7 @@ func SortHistory(media []models.MediaWithDB, partial string, reverse bool) {
 }
 
 // RegexSortMedia sorts media using the text processor
-func RegexSortMedia(media []models.MediaWithDB, flags *models.GlobalFlags) []models.MediaWithDB {
+func RegexSortMedia(media []models.MediaWithDB, flags models.GlobalFlags) []models.MediaWithDB {
 	if len(media) == 0 {
 		return media
 	}

@@ -23,7 +23,7 @@ type PrintCmd struct {
 	models.TextFlags        `embed:""`
 	models.FTSFlags         `embed:""`
 
-	Args []string `help:"Database file(s) or files/directories to scan" required:"" arg:""`
+	Args []string `help:"Database file(s) or files/directories to scan" required:"true" arg:""`
 
 	Databases []string `kong:"-"`
 	ScanPaths []string `kong:"-"`
@@ -51,7 +51,7 @@ func (c *PrintCmd) Run(ctx context.Context) error {
 	flags.AggregateFlags = c.AggregateFlags
 	flags.TextFlags = c.TextFlags
 
-	return RunQuery(ctx, c.Databases, &flags, func(media []models.MediaWithDB) error {
+	return RunQuery(ctx, c.Databases, flags, func(media []models.MediaWithDB) error {
 		// Handle scan paths (omitted for brevity, assume they would be handled if implemented)
 
 		HideRedundantFirstPlayed(media)
@@ -64,7 +64,7 @@ func (c *PrintCmd) Run(ctx context.Context) error {
 
 		if flags.JSON {
 			if isAggregated {
-				folders := query.AggregateMedia(media, &flags)
+				folders := query.AggregateMedia(media, flags)
 				query.SortFolders(folders, flags.SortBy, flags.Reverse)
 				return PrintFolders(flags.DisplayFlags, flags.Columns, folders)
 			}
@@ -87,15 +87,15 @@ func (c *PrintCmd) Run(ctx context.Context) error {
 		}
 
 		if isAggregated {
-			folders := query.AggregateMedia(media, &flags)
+			folders := query.AggregateMedia(media, flags)
 			query.SortFolders(folders, flags.SortBy, flags.Reverse)
 			return PrintFolders(flags.DisplayFlags, flags.Columns, folders)
 		}
 
 		if flags.RegexSort {
-			media = query.RegexSortMedia(media, &flags)
+			media = query.RegexSortMedia(media, flags)
 		} else {
-			query.SortMedia(media, &flags)
+			query.SortMedia(media, flags)
 		}
 
 		return PrintMedia(flags.DisplayFlags, flags.Columns, media)

@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	// Register SQLite driver for database/sql
 	_ "github.com/mattn/go-sqlite3"
 
 	"github.com/chapmanjacobd/discoteca/internal/shellquote"

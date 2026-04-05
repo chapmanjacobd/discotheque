@@ -66,17 +66,17 @@ type ServeCmd struct {
 	models.PostActionFlags  `embed:""`
 	models.FTSFlags         `embed:""`
 
-	Databases            []string `help:"SQLite database files"                                                           required:"" arg:"" type:"existingfile"`
-	Port                 int      `help:"Port to listen on"                                                                                                      default:"5555" short:"p"`
+	Databases            []string `help:"SQLite database files"                                                           required:"true" arg:"" type:"existingfile"`
+	Port                 int      `help:"Port to listen on"                                                                                                          default:"5555" short:"p"`
 	PublicDir            string   `help:"Override embedded web assets with local directory"`
 	Dev                  bool     `help:"Enable development mode (auto-reload)"`
 	ReadOnly             bool     `help:"Disable write operations (progress tracking, playlist modifications, deletions)"`
 	NoBrowser            bool     `help:"Don't open browser on startup"`
-	ApplicationStartTime int64    `                                                                                                                                                       kong:"-"`
-	APIToken             string   `                                                                                                                                                       kong:"-"`
-	thumbnailCache       sync.Map `                                                                                                                                                       kong:"-"`
-	dbCache              sync.Map `                                                                                                                                                       kong:"-"`
-	hasFfmpeg            bool     `                                                                                                                                                       kong:"-"`
+	ApplicationStartTime int64    `                                                                                                                                                           kong:"-"`
+	APIToken             string   `                                                                                                                                                           kong:"-"`
+	thumbnailCache       sync.Map
+	dbCache              sync.Map
+	hasFfmpeg            bool
 }
 
 // authMiddleware validates API token for authenticated endpoints

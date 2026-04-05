@@ -25,7 +25,7 @@ type CategorizeCmd struct {
 	models.DeletedFlags     `embed:""`
 	models.PostActionFlags  `embed:""`
 
-	Databases []string `help:"SQLite database files" required:"" arg:"" type:"existingfile"`
+	Databases []string `help:"SQLite database files" required:"true" arg:"" type:"existingfile"`
 
 	Other    bool `help:"Analyze 'other' category to find potential new categories"`
 	FullPath bool `help:"Use full path for categorization suggestions instead of just filename"`
@@ -47,11 +47,11 @@ func (c *CategorizeCmd) Run(ctx context.Context) error {
 	)
 	flags.PostActionFlags = c.PostActionFlags
 
-	media, err := query.MediaQuery(ctx, c.Databases, &flags)
+	media, err := query.MediaQuery(ctx, c.Databases, flags)
 	if err != nil {
 		return err
 	}
-	media = query.FilterMedia(media, &flags)
+	media = query.FilterMedia(media, flags)
 
 	if len(media) == 0 {
 		return errors.New("no media found")

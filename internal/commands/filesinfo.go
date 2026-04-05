@@ -20,7 +20,7 @@ type FilesInfoCmd struct {
 	models.MediaFilterFlags `embed:""`
 	models.DisplayFlags     `embed:""`
 
-	Args []string `help:"Database file(s) or files/directories to scan" required:"" arg:""`
+	Args []string `help:"Database file(s) or files/directories to scan" required:"true" arg:""`
 
 	Databases []string `kong:"-"`
 	ScanPaths []string `kong:"-"`
@@ -57,7 +57,7 @@ func (c *FilesInfoCmd) Run(ctx context.Context) error {
 
 	// Handle databases
 	if len(c.Databases) > 0 {
-		media, err := query.MediaQuery(ctx, c.Databases, &flags)
+		media, err := query.MediaQuery(ctx, c.Databases, flags)
 		if err != nil {
 			return err
 		}

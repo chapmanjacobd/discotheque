@@ -139,7 +139,7 @@ func TestGetPlayhead(t *testing.T) {
 	// Use MPV time
 	startTime := time.Now().Add(-2 * time.Second)
 	os.WriteFile(metadataPath, []byte("start=5.000000\n"), 0o644)
-	if ph := utils.GetPlayhead(&flags, path, startTime, 0, 0); ph != 5 {
+	if ph := utils.GetPlayhead(flags, path, startTime, 0, 0); ph != 5 {
 		t.Errorf("utils.GetPlayhead (mpv time) = %d; want 5", ph)
 	}
 
@@ -158,19 +158,19 @@ func TestGetPlayhead(t *testing.T) {
 
 	// So if mpv_playhead is 13 and media_duration is 12, it skips 13 and tries python_playhead (2).
 
-	if ph := utils.GetPlayhead(&flags, path, startTime, 0, 12); ph != 2 {
+	if ph := utils.GetPlayhead(flags, path, startTime, 0, 12); ph != 2 {
 		t.Errorf("utils.GetPlayhead (invalid mpv time) = %d; want 2", ph)
 	}
 
 	// Use session time only if MPV does not exist
 	os.Remove(metadataPath)
-	if ph := utils.GetPlayhead(&flags, path, startTime, 0, 0); ph != 2 {
+	if ph := utils.GetPlayhead(flags, path, startTime, 0, 0); ph != 2 {
 		t.Errorf("utils.GetPlayhead (session time) = %d; want 2", ph)
 	}
 
 	// Append existing time
 	startTime = time.Now().Add(-3 * time.Second)
-	if ph := utils.GetPlayhead(&flags, path, startTime, 4, 12); ph != 7 {
+	if ph := utils.GetPlayhead(flags, path, startTime, 4, 12); ph != 7 {
 		t.Errorf("utils.GetPlayhead (existing time) = %d; want 7", ph)
 	}
 }

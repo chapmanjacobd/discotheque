@@ -58,15 +58,15 @@ func TestSimulationFunctions(t *testing.T) {
 	flags := models.GlobalFlags{}
 	flags.Simulate = true
 
-	if err := utils.Rename(&flags, "src", "dst"); err != nil {
+	if err := utils.Rename(flags, "src", "dst"); err != nil {
 		t.Errorf("utils.Rename failed in simulation: %v", err)
 	}
 
-	if err := utils.Unlink(&flags, "path"); err != nil {
+	if err := utils.Unlink(flags, "path"); err != nil {
 		t.Errorf("utils.Unlink failed in simulation: %v", err)
 	}
 
-	if err := utils.Rmtree(&flags, "path"); err != nil {
+	if err := utils.Rmtree(flags, "path"); err != nil {
 		t.Errorf("utils.Rmtree failed in simulation: %v", err)
 	}
 }

@@ -43,9 +43,9 @@ func (c *ServeCmd) HandleQuery(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Pre-resolve percentiles so Count matches Query results
-	resolvedFlags, err := query.ResolvePercentileFlags(ctx, dbs, &flags)
+	resolvedFlags, err := query.ResolvePercentileFlags(ctx, dbs, flags)
 	if err == nil {
-		flags = *resolvedFlags
+		flags = resolvedFlags
 	}
 
 	if q.Get("view") == "captions" || q.Get("captions") == "true" {
@@ -249,7 +249,7 @@ func (c *ServeCmd) HandleQuery(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	media, err := query.MediaQuery(ctx, dbs, &flags)
+	media, err := query.MediaQuery(ctx, dbs, flags)
 	if err != nil {
 		models.Log.Error("Query failed", "dbs", dbs, "error", err)
 		sendError(w, http.StatusInternalServerError, "Query failed: "+err.Error())
@@ -305,7 +305,7 @@ func (c *ServeCmd) HandleQuery(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	totalCount, err := query.MediaQueryCount(ctx, dbs, &flags)
+	totalCount, err := query.MediaQueryCount(ctx, dbs, flags)
 	if err != nil {
 		models.Log.Error("Count query failed", "dbs", dbs, "error", err)
 		// Don't fail the whole request just for count
@@ -328,17 +328,17 @@ func (c *ServeCmd) HandleQuery(w http.ResponseWriter, r *http.Request) {
 	if strings.Contains(sortConfig, "_related_media") && len(dbs) > 0 {
 		// Use expansion-aware sorting with first database
 		err := c.execDB(ctx, dbs[0], func(ctx context.Context, sqlDB *sql.DB) error {
-			query.SortMediaWithExpansion(ctx, sqlDB, &media, &flags)
+			query.SortMediaWithExpansion(ctx, sqlDB, &media, flags)
 			return nil
 		})
 		if err != nil {
 			models.Log.Warn("SortMediaWithExpansion failed", "error", err)
 			// Fall back to regular sorting
-			query.SortMedia(media, &flags)
+			query.SortMedia(media, flags)
 		}
 	} else if len(dbs) > 1 {
 		// Multi-DB queries need in-memory sorting to merge results from multiple databases
-		query.SortMedia(media, &flags)
+		query.SortMedia(media, flags)
 	}
 	// For single DB queries, SQL already sorted with LIMIT/OFFSET, so skip in-memory sorting
 
@@ -940,10 +940,10 @@ func (c *ServeCmd) HandleDU(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Resolve percentile-based filters (e.g., p10-90) to absolute values
-	resolvedFlags, err := query.ResolvePercentileFlags(r.Context(), dbs, &flags)
+	resolvedFlags, err := query.ResolvePercentileFlags(r.Context(), dbs, flags)
 	if err != nil {
 		models.Log.Warn("Failed to resolve percentile filters", "error", err)
-		resolvedFlags = &flags
+		resolvedFlags = flags
 	}
 
 	// Use DU aggregation with filter support
@@ -1120,7 +1120,7 @@ func (c *ServeCmd) HandleEpisodes(w http.ResponseWriter, r *http.Request) {
 		flags.Limit = 1000000
 	}
 
-	allMedia, err := query.MediaQuery(r.Context(), c.Databases, &flags)
+	allMedia, err := query.MediaQuery(r.Context(), c.Databases, flags)
 	if err != nil {
 		models.Log.Error("Failed to fetch media for episodes", "error", err)
 		http.Error(w, "Query failed", http.StatusInternalServerError)

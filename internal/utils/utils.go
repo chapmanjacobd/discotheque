@@ -142,9 +142,13 @@ func DictFilterBool(d map[string]any) map[string]any {
 	}
 	res := make(map[string]any)
 	for k, v := range d {
-		if v != nil && v != "" && v != 0 && v != false {
-			res[k] = v
+		if v == nil || v == "" || v == 0 {
+			continue
 		}
+		if b, ok := v.(bool); ok && !b {
+			continue
+		}
+		res[k] = v
 	}
 	if len(res) == 0 {
 		return nil

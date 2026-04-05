@@ -306,11 +306,8 @@ func GetMountPoint(path string) (string, error) {
 			return "", err
 		}
 
-		if parentDev, ok := GetDeviceID(parentInfo); ok {
-			if parentDev != dev {
-				return dir, nil
-			}
-		} else {
+		parentDev, ok := GetDeviceID(parentInfo)
+		if !ok || parentDev != dev {
 			return dir, nil
 		}
 
@@ -376,7 +373,7 @@ func MoveFile(src, dst string) error {
 }
 
 // Rename renames a file, respecting simulation mode
-func Rename(flags *models.GlobalFlags, src, dst string) error {
+func Rename(flags models.GlobalFlags, src, dst string) error {
 	if flags.Simulate {
 		fmt.Fprintf(Stdout, "rename %s %s\n", src, dst)
 		return nil
@@ -386,7 +383,7 @@ func Rename(flags *models.GlobalFlags, src, dst string) error {
 }
 
 // Unlink deletes a file, respecting simulation mode
-func Unlink(flags *models.GlobalFlags, path string) error {
+func Unlink(flags models.GlobalFlags, path string) error {
 	if flags.Simulate {
 		fmt.Fprintf(Stdout, "unlink %s\n", path)
 		return nil
@@ -396,7 +393,7 @@ func Unlink(flags *models.GlobalFlags, path string) error {
 }
 
 // Rmtree deletes a directory tree, respecting simulation mode
-func Rmtree(flags *models.GlobalFlags, path string) error {
+func Rmtree(flags models.GlobalFlags, path string) error {
 	if flags.Simulate {
 		fmt.Fprintf(Stdout, "rmtree %s\n", path)
 		return nil

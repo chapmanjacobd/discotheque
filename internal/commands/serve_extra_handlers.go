@@ -618,7 +618,7 @@ func (c *ServeCmd) HandleTrash(w http.ResponseWriter, r *http.Request) {
 	flags.SortBy = "time_deleted"
 	flags.Reverse = true
 
-	media, err := query.MediaQuery(r.Context(), c.Databases, &flags)
+	media, err := query.MediaQuery(r.Context(), c.Databases, flags)
 	if err != nil {
 		models.Log.Error("Trash query failed", "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -661,7 +661,7 @@ func (c *ServeCmd) HandleEmptyBin(w http.ResponseWriter, r *http.Request) {
 		flags.All = true
 
 		var err error
-		media, err = query.MediaQuery(r.Context(), c.Databases, &flags)
+		media, err = query.MediaQuery(r.Context(), c.Databases, flags)
 		if err != nil {
 			models.Log.Error("Trash query failed", "error", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -706,7 +706,7 @@ func (c *ServeCmd) HandleOPDS(w http.ResponseWriter, r *http.Request) {
 	flags.TextOnly = true
 	flags.All = true
 
-	media, err := query.MediaQuery(r.Context(), c.Databases, &flags)
+	media, err := query.MediaQuery(r.Context(), c.Databases, flags)
 	if err != nil {
 		models.Log.Error("OPDS query failed", "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)

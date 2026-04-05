@@ -27,13 +27,13 @@ type AddCmd struct {
 	models.FilterFlags      `embed:""`
 	models.MediaFilterFlags `embed:""`
 
-	Args                    []string `help:"Database file followed by paths to scan"                                  required:"" name:"args" arg:""`
-	Parallel                int      `help:"Number of parallel extractors (default: CPU count * 4)"                                                  short:"p"`
+	Args                    []string `help:"Database file followed by paths to scan"                                  required:"true" name:"args" arg:""`
+	Parallel                int      `help:"Number of parallel extractors (default: CPU count * 4)"                                                      short:"p"`
 	ExtractText             bool     `help:"Extract full text from documents (PDF, EPUB, TXT, MD) for caption search"`
 	OCR                     bool     `help:"Extract text from images using OCR (tesseract) for caption search"`
-	OCREngine               string   `help:"OCR engine to use"                                                                                                 default:"tesseract" enum:"tesseract,paddle"`
+	OCREngine               string   `help:"OCR engine to use"                                                                                                     default:"tesseract" enum:"tesseract,paddle"`
 	SpeechRecognition       bool     `help:"Extract speech-to-text from audio/video files for caption search"`
-	SpeechRecognitionEngine string   `help:"Speech recognition engine to use"                                                                                  default:"vosk"      enum:"vosk,whisper"`
+	SpeechRecognitionEngine string   `help:"Speech recognition engine to use"                                                                                      default:"vosk"      enum:"vosk,whisper"`
 
 	ScanPaths []string `kong:"-"`
 	Database  string   `kong:"-"`

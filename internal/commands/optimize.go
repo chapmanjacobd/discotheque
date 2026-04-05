@@ -16,7 +16,7 @@ import (
 type OptimizeCmd struct {
 	models.CoreFlags `embed:""`
 
-	Databases []string `help:"SQLite database files" required:"" arg:"" type:"existingfile"`
+	Databases []string `help:"SQLite database files" required:"true" arg:"" type:"existingfile"`
 }
 
 func (c *OptimizeCmd) Run(ctx context.Context) error {
@@ -125,7 +125,7 @@ type SampleHashCmd struct {
 	models.HashingFlags `embed:""`
 	models.DisplayFlags `embed:""`
 
-	Paths []string `help:"Files to hash" required:"" arg:"" type:"existingfile"`
+	Paths []string `help:"Files to hash" required:"true" arg:"" type:"existingfile"`
 }
 
 func (c *SampleHashCmd) Run(ctx context.Context) error {

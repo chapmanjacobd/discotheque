@@ -20,7 +20,7 @@ type SimilarFilesCmd struct {
 	models.DisplayFlags     `embed:""`
 	models.SimilarityFlags  `embed:""`
 
-	Databases []string `help:"SQLite database files" required:"" arg:"" type:"existingfile"`
+	Databases []string `help:"SQLite database files" required:"true" arg:"" type:"existingfile"`
 }
 
 type SimilarFoldersCmd struct {
@@ -33,7 +33,7 @@ type SimilarFoldersCmd struct {
 	models.DisplayFlags     `embed:""`
 	models.SimilarityFlags  `embed:""`
 
-	Databases []string `help:"SQLite database files" required:"" arg:"" type:"existingfile"`
+	Databases []string `help:"SQLite database files" required:"true" arg:"" type:"existingfile"`
 }
 
 func (c *SimilarFilesCmd) Run(ctx context.Context) error {
@@ -67,12 +67,12 @@ func (c *SimilarFoldersCmd) Run(ctx context.Context) error {
 func runSimilar(ctx context.Context, flags models.GlobalFlags, dbs []string, folderMode bool) error {
 	models.SetupLogging(flags.Verbose)
 
-	media, err := query.MediaQuery(ctx, dbs, &flags)
+	media, err := query.MediaQuery(ctx, dbs, flags)
 	if err != nil {
 		return err
 	}
 
-	media = query.FilterMedia(media, &flags)
+	media = query.FilterMedia(media, flags)
 
 	if folderMode {
 		// Defaults for similar folders
@@ -81,12 +81,12 @@ func runSimilar(ctx context.Context, flags models.GlobalFlags, dbs []string, fol
 			flags.FilterSizes = true
 		}
 
-		folders := query.AggregateMedia(media, &flags)
+		folders := query.AggregateMedia(media, flags)
 
 		var groups []models.FolderStats
 		if flags.FilterNames {
 			// First pass: group by name
-			groups = aggregate.ClusterFoldersByName(&flags, folders)
+			groups = aggregate.ClusterFoldersByName(flags, folders)
 
 			if flags.FilterSizes || flags.FilterCounts || flags.FilterDurations {
 				// Second pass: filter each group by numerical similarity
@@ -96,15 +96,15 @@ func runSimilar(ctx context.Context, flags models.GlobalFlags, dbs []string, fol
 						continue
 					}
 					// Break this merged group back into individual folders
-					subFolders := query.AggregateMedia(group.Files, &flags)
+					subFolders := query.AggregateMedia(group.Files, flags)
 					// Apply numerical clustering within this group
-					subGroups := aggregate.ClusterFoldersByNumbers(&flags, subFolders)
+					subGroups := aggregate.ClusterFoldersByNumbers(flags, subFolders)
 					refinedGroups = append(refinedGroups, subGroups...)
 				}
 				groups = refinedGroups
 			}
 		} else {
-			groups = aggregate.ClusterFoldersByNumbers(&flags, folders)
+			groups = aggregate.ClusterFoldersByNumbers(flags, folders)
 		}
 
 		return PrintFolders(flags.DisplayFlags, flags.Columns, groups)
@@ -117,7 +117,7 @@ func runSimilar(ctx context.Context, flags models.GlobalFlags, dbs []string, fol
 		flags.FilterDurations = true
 	}
 
-	groups := aggregate.ClusterByNumbers(&flags, media)
+	groups := aggregate.ClusterByNumbers(flags, media)
 
 	if flags.OnlyOriginals || flags.OnlyDuplicates {
 		for i, g := range groups {

@@ -539,7 +539,7 @@ func TestRegexSortMedia(t *testing.T) {
 		{Media: models.Media{Path: "movie_part1.mp4"}},
 	}
 
-	got := query.RegexSortMedia(media, &models.GlobalFlags{TextFlags: models.TextFlags{RegexSort: true}})
+	got := query.RegexSortMedia(media, models.GlobalFlags{TextFlags: models.TextFlags{RegexSort: true}})
 	if len(got) != 2 {
 		t.Errorf("Expected 2 results, got %d", len(got))
 	}

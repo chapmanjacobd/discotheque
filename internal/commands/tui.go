@@ -27,7 +27,7 @@ type TuiCmd struct {
 	models.DisplayFlags     `embed:""`
 	models.FTSFlags         `embed:""`
 
-	Databases []string `help:"SQLite database files" required:"" arg:"" type:"existingfile"`
+	Databases []string `help:"SQLite database files" required:"true" arg:"" type:"existingfile"`
 }
 
 func (c *TuiCmd) Run(ctx context.Context) error {
@@ -51,7 +51,7 @@ func (c *TuiCmd) Run(ctx context.Context) error {
 		c.FTSFlags,
 	)
 
-	media, err := query.MediaQuery(ctx, c.Databases, &flags)
+	media, err := query.MediaQuery(ctx, c.Databases, flags)
 	if err != nil {
 		return err
 	}
@@ -60,7 +60,7 @@ func (c *TuiCmd) Run(ctx context.Context) error {
 		return errors.New("no media found")
 	}
 
-	query.SortMedia(media, &flags)
+	query.SortMedia(media, flags)
 
 	var customCats []string
 	for _, dbPath := range c.Databases {

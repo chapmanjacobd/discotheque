@@ -20,8 +20,8 @@ type SearchCaptionsCmd struct {
 	models.MediaFilterFlags `embed:""`
 	models.PlaybackFlags    `embed:""`
 
-	Database string   `help:"SQLite database file" required:"" arg:"" type:"existingfile"`
-	Search   []string `help:"Search terms"         required:"" arg:""`
+	Database string   `help:"SQLite database file" required:"true" arg:"" type:"existingfile"`
+	Search   []string `help:"Search terms"         required:"true" arg:""`
 
 	Open    bool `help:"Open results in media player"`
 	Overlap int  `help:"Overlap in seconds for merging captions" default:"8"`

@@ -26,7 +26,7 @@ type DUQueryResult struct {
 
 // hasActiveFilters checks if any filters are active that require slow-path processing
 // Returns true if FileCounts (episodes) filter is active, which requires folder backfiltering
-func hasActiveFilters(flags *models.GlobalFlags) bool {
+func hasActiveFilters(flags models.GlobalFlags) bool {
 	// FileCounts requires folder-level aggregation before filtering
 	if flags.FileCounts != "" {
 		return true
@@ -44,7 +44,7 @@ func hasActiveFilters(flags *models.GlobalFlags) bool {
 
 // hasBasicFilters checks if only basic SQL-level filters are active (size, duration, media_type, etc.)
 // These can be applied directly in SQL without folder backfiltering
-func hasBasicFilters(flags *models.GlobalFlags) bool {
+func hasBasicFilters(flags models.GlobalFlags) bool {
 	if flags.VideoOnly || flags.AudioOnly || flags.ImageOnly || flags.TextOnly {
 		return true
 	}
@@ -327,13 +327,13 @@ func FetchDUDirectFiles(
 }
 
 // AggregateMedia media using the specified aggregation mode
-func AggregateMedia(media []models.MediaWithDB, flags *models.GlobalFlags) []models.FolderStats {
+func AggregateMedia(media []models.MediaWithDB, flags models.GlobalFlags) []models.FolderStats {
 	return AggregateMediaWithMode(media, flags, false)
 }
 
 // AggregateMediaWithMode aggregates media with optional fast mode
 // fastMode: skip expensive calculations (median, file storage) for faster navigation
-func AggregateMediaWithMode(media []models.MediaWithDB, flags *models.GlobalFlags, fastMode bool) []models.FolderStats {
+func AggregateMediaWithMode(media []models.MediaWithDB, flags models.GlobalFlags, fastMode bool) []models.FolderStats {
 	var stats []models.FolderStats
 	if flags.GroupByExtensions {
 		stats = AggregateExtensions(media, fastMode)
@@ -471,7 +471,7 @@ func AggregateSizeBuckets(media []models.MediaWithDB, fastMode ...bool) []models
 	return finalizeStatsWithOptions(groups, !fast, !fast)
 }
 
-func AggregateByDepth(media []models.MediaWithDB, flags *models.GlobalFlags, fastMode ...bool) []models.FolderStats {
+func AggregateByDepth(media []models.MediaWithDB, flags models.GlobalFlags, fastMode ...bool) []models.FolderStats {
 	fast := len(fastMode) > 0 && fastMode[0]
 	groups := make(map[string]*models.FolderStats)
 
@@ -630,7 +630,7 @@ func AggregateDUByPathMultiDBWithFilters(
 	dbPaths []string,
 	pathPrefix string,
 	targetDepth int,
-	flags *models.GlobalFlags,
+	flags models.GlobalFlags,
 ) ([]DUQueryResult, error) {
 	allResults := make([]DUQueryResult, 0)
 
@@ -668,7 +668,7 @@ func getMatchingParentDirs(
 	ctx context.Context,
 	dbPath, pathPrefix string,
 	targetDepth int,
-	flags *models.GlobalFlags,
+	flags models.GlobalFlags,
 ) (map[string]int64, error) {
 	sqlDB, err := db.Connect(ctx, dbPath)
 	if err != nil {
@@ -742,12 +742,12 @@ func getMatchingParentDirs(
 	}
 
 	// Add basic filters (size, duration, media_type, etc.) - but NOT FileCounts/FolderCounts
-	basicFlags := *flags
+	basicFlags := flags
 	basicFlags.FileCounts = ""
 	basicFlags.FolderCounts = ""
 	basicFlags.FolderSizes = nil
 
-	fb := NewFilterBuilder(&basicFlags)
+	fb := NewFilterBuilder(basicFlags)
 	filterClauses, filterArgs := fb.BuildWhereClauses(ctx)
 
 	if len(filterClauses) > 0 {
@@ -778,7 +778,7 @@ func getMatchingParentDirs(
 }
 
 // filterParentsByCounts filters parent directories based on FileCounts/FolderCounts/FolderSizes
-func filterParentsByCounts(parentCounts map[string]int64, flags *models.GlobalFlags) map[string]struct{} {
+func filterParentsByCounts(parentCounts map[string]int64, flags models.GlobalFlags) map[string]struct{} {
 	matchingParents := make(map[string]struct{})
 
 	for parent, count := range parentCounts {
@@ -817,7 +817,7 @@ func AggregateDUByPathWithFilters(
 	ctx context.Context,
 	dbPath, pathPrefix string,
 	targetDepth int,
-	flags *models.GlobalFlags,
+	flags models.GlobalFlags,
 ) ([]DUQueryResult, error) {
 	sqlDB, err := db.Connect(ctx, dbPath)
 	if err != nil {
@@ -858,7 +858,7 @@ func aggregateDUWithBasicFilters(
 	sqlDB *sql.DB,
 	pathPrefix string,
 	targetDepth int,
-	flags *models.GlobalFlags,
+	flags models.GlobalFlags,
 ) ([]DUQueryResult, error) {
 	var query string
 	var args []any
@@ -928,13 +928,13 @@ func aggregateDUWithBasicFilters(
 	}
 
 	// Add only basic filters (skip FileCounts, FolderCounts, FolderSizes which require post-aggregation)
-	basicFlags := *flags
+	basicFlags := flags
 	basicFlags.FileCounts = ""
 	basicFlags.FolderCounts = ""
 	basicFlags.FolderSizes = nil
 
-	if hasBasicFilters(&basicFlags) {
-		fb := NewFilterBuilder(&basicFlags)
+	if hasBasicFilters(basicFlags) {
+		fb := NewFilterBuilder(basicFlags)
 		filterClauses, filterArgs := fb.BuildWhereClauses(ctx)
 		if len(filterClauses) > 0 {
 			query += " AND " + strings.Join(filterClauses, " AND ")
@@ -972,7 +972,7 @@ func aggregateDUWithParentFilter(
 	sqlDB *sql.DB,
 	pathPrefix string,
 	targetDepth int,
-	flags *models.GlobalFlags,
+	flags models.GlobalFlags,
 	matchingParents map[string]struct{},
 ) ([]DUQueryResult, error) {
 	var query string
@@ -1085,13 +1085,13 @@ func aggregateDUWithParentFilter(
 	}
 
 	// Add basic filters
-	basicFlags := *flags
+	basicFlags := flags
 	basicFlags.FileCounts = ""
 	basicFlags.FolderCounts = ""
 	basicFlags.FolderSizes = nil
 
-	if hasBasicFilters(&basicFlags) {
-		fb := NewFilterBuilder(&basicFlags)
+	if hasBasicFilters(basicFlags) {
+		fb := NewFilterBuilder(basicFlags)
 		filterClauses, filterArgs := fb.BuildWhereClauses(ctx)
 		if len(filterClauses) > 0 {
 			query += " AND " + strings.Join(filterClauses, " AND ")
@@ -1124,7 +1124,7 @@ func aggregateDUWithParentFilter(
 }
 
 // applyPostAggregationFilters applies filters that require aggregated data (FolderCounts, FolderSizes)
-func applyPostAggregationFilters(results []DUQueryResult, flags *models.GlobalFlags) []DUQueryResult {
+func applyPostAggregationFilters(results []DUQueryResult, flags models.GlobalFlags) []DUQueryResult {
 	if flags.FolderCounts == "" && len(flags.FolderSizes) == 0 {
 		return results
 	}
@@ -1173,7 +1173,7 @@ func FetchDUDirectFilesWithFilters(
 	dbPaths []string,
 	pathPrefix string,
 	targetDepth int,
-	flags *models.GlobalFlags,
+	flags models.GlobalFlags,
 ) ([]models.MediaWithDB, error) {
 	allFiles := make([]models.MediaWithDB, 0)
 

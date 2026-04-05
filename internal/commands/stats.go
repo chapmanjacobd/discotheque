@@ -19,8 +19,8 @@ type StatsCmd struct {
 	models.DeletedFlags     `embed:""`
 	models.DisplayFlags     `embed:""`
 
-	Facet     string   `help:"One of: watched, deleted, created, modified" required:"" arg:""`
-	Databases []string `help:"SQLite database files"                       required:"" arg:"" type:"existingfile"`
+	Facet     string   `help:"One of: watched, deleted, created, modified" required:"true" arg:""`
+	Databases []string `help:"SQLite database files"                       required:"true" arg:"" type:"existingfile"`
 }
 
 func (c *StatsCmd) Run(ctx context.Context) error {

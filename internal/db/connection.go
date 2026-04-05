@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"time"
 
+	// Register SQLite driver for database/sql
 	_ "github.com/mattn/go-sqlite3"
 )
 

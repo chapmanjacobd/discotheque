@@ -115,10 +115,14 @@ func ListDictFilterBool(data []map[string]any) []map[string]any {
 		}
 		keep := false
 		for _, v := range d {
-			if v != nil && v != "" && v != 0 && v != false {
-				keep = true
-				break
+			if v == nil || v == "" || v == 0 {
+				continue
 			}
+			if b, ok := v.(bool); ok && !b {
+				continue
+			}
+			keep = true
+			break
 		}
 		if keep {
 			res = append(res, d)

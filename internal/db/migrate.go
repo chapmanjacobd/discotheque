@@ -80,11 +80,7 @@ func Migrate(ctx context.Context, db *sql.DB) error {
 	}
 
 	// 4. Index migrations
-	if err := migrateIndexes(ctx, db); err != nil {
-		return err
-	}
-
-	return nil
+	return migrateIndexes(ctx, db)
 }
 
 func isVersionGreaterOrEqual(v, target string) bool {

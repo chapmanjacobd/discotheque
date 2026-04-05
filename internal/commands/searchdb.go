@@ -23,9 +23,9 @@ type SearchDBCmd struct {
 	models.DisplayFlags     `embed:""`
 	models.PostActionFlags  `embed:""`
 
-	Database string   `help:"SQLite database file"                  required:"" arg:"" type:"existingfile"`
-	Table    string   `help:"Table name (fuzzy matching supported)" required:"" arg:""`
-	Search   []string `help:"Search terms"                          required:"" arg:""`
+	Database string   `help:"SQLite database file"                  required:"true" arg:"" type:"existingfile"`
+	Table    string   `help:"Table name (fuzzy matching supported)" required:"true" arg:""`
+	Search   []string `help:"Search terms"                          required:"true" arg:""`
 }
 
 func (c *SearchDBCmd) Run(ctx context.Context) error {

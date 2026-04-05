@@ -305,11 +305,11 @@ func (m *Model) performSearch(queryStr string) tea.Cmd {
 			flags.Search = []string{queryStr}
 		}
 
-		media, err := query.MediaQuery(context.Background(), m.databases, &flags)
+		media, err := query.MediaQuery(context.Background(), m.databases, flags)
 		if err != nil {
 			return errMsg(err)
 		}
-		query.SortMedia(media, &flags)
+		query.SortMedia(media, flags)
 		return searchMsg(media)
 	}
 }

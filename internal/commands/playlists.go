@@ -13,7 +13,7 @@ type PlaylistsCmd struct {
 	models.CoreFlags    `embed:""`
 	models.DisplayFlags `embed:""`
 
-	Databases []string `help:"SQLite database files" required:"" arg:"" type:"existingfile"`
+	Databases []string `help:"SQLite database files" required:"true" arg:"" type:"existingfile"`
 }
 
 func (c *PlaylistsCmd) Run(ctx context.Context) error {

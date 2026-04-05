@@ -10,7 +10,7 @@ import (
 type RepairCmd struct {
 	models.CoreFlags `embed:""`
 
-	Database string `help:"Database file to repair" required:"" arg:"" type:"existingfile"`
+	Database string `help:"Database file to repair" required:"true" arg:"" type:"existingfile"`
 }
 
 func (c *RepairCmd) Run(ctx context.Context) error {

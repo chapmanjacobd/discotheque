@@ -20,7 +20,7 @@ type MediaCheckCmd struct {
 	models.MediaFilterFlags `embed:""`
 	models.DeletedFlags     `embed:""`
 
-	Databases []string `help:"SQLite database files" required:"" arg:"" type:"existingfile"`
+	Databases []string `help:"SQLite database files" required:"true" arg:"" type:"existingfile"`
 
 	ChunkSize         float64 `help:"Chunk size in seconds. If set, recommended to use >0.1 seconds"                                                                                     default:"0.5"`
 	Gap               string  `help:"Width between chunks to skip. Values greater than 1 are treated as number of seconds"                                                               default:"5%"`
@@ -43,7 +43,7 @@ func (c *MediaCheckCmd) Run(ctx context.Context) error {
 	deleteThreshold, _ := utils.FloatFromPercent(c.DeleteCorrupt)
 	fullScanThreshold, _ := utils.FloatFromPercent(c.FullScanIfCorrupt)
 
-	return RunQuery(ctx, c.Databases, &flags, func(media []models.MediaWithDB) error {
+	return RunQuery(ctx, c.Databases, flags, func(media []models.MediaWithDB) error {
 		if len(media) == 0 {
 			return errors.New("no media found")
 		}

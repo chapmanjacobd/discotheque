@@ -59,12 +59,11 @@ func IsHealthy(ctx context.Context, dbPath string) bool {
 			Log.Debug("Health check: failed to scan integrity row", "error", scanErr)
 			return false
 		}
-		if res == "ok" {
-			foundOk = true
-		} else {
+		if res != "ok" {
 			Log.Warn("Health check: integrity error found", "msg", res)
 			return false
 		}
+		foundOk = true
 	}
 	if err2 := rows.Err(); err2 != nil {
 		Log.Debug("Health check: rows iteration error", "error", err2)

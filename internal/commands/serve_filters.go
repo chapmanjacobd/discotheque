@@ -79,7 +79,7 @@ func (c *ServeCmd) computeFilterBinsData(
 		tempFlags.DownloadedBefore = ""
 	}
 
-	fb := query.NewFilterBuilder(&tempFlags)
+	fb := query.NewFilterBuilder(tempFlags)
 	sqlQuery, args := fb.BuildSelect(
 		ctx,
 		"path, size, duration, media_type, time_modified, time_created, time_downloaded",

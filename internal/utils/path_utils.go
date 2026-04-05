@@ -179,6 +179,8 @@ func FolderSize(path string) int64 {
 }
 
 // PathTupleFromURL returns (parentDir, filename) from a URL
+//
+//nolint:revive // Confusing results are documented in the function name
 func PathTupleFromURL(rawURL string) (string, string) {
 	u, err := url.Parse(rawURL)
 	if err != nil {

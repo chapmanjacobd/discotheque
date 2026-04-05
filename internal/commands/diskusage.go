@@ -27,7 +27,7 @@ type DiskUsageCmd struct {
 	models.AggregateFlags   `embed:""`
 	models.FTSFlags         `embed:""`
 
-	Args []string `help:"Database file(s) or files/directories to scan" required:"" arg:""`
+	Args []string `help:"Database file(s) or files/directories to scan" required:"true" arg:""`
 
 	Databases []string `kong:"-"`
 	ScanPaths []string `kong:"-"`
@@ -59,7 +59,7 @@ func (c *DiskUsageCmd) Run(ctx context.Context) error {
 
 	// Handle databases
 	if len(c.Databases) > 0 {
-		dbMedia, err := query.MediaQuery(ctx, c.Databases, &flags)
+		dbMedia, err := query.MediaQuery(ctx, c.Databases, flags)
 		if err != nil {
 			return err
 		}

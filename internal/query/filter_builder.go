@@ -21,11 +21,11 @@ import (
 // FilterBuilder constructs SQL queries and in-memory filters from flags
 // This is the single source of truth for all filter logic
 type FilterBuilder struct {
-	Flags *models.GlobalFlags
+	Flags models.GlobalFlags
 }
 
 // NewFilterBuilder creates a new FilterBuilder from global flags
-func NewFilterBuilder(flags *models.GlobalFlags) *FilterBuilder {
+func NewFilterBuilder(flags models.GlobalFlags) *FilterBuilder {
 	return &FilterBuilder{Flags: flags}
 }
 
@@ -747,10 +747,10 @@ func (fb *FilterBuilder) FilterMedia(media []models.MediaWithDB) []models.MediaW
 
 // SortBuilder handles both SQL and in-memory sorting
 type SortBuilder struct {
-	Flags *models.GlobalFlags
+	Flags models.GlobalFlags
 }
 
-func NewSortBuilder(flags *models.GlobalFlags) *SortBuilder {
+func NewSortBuilder(flags models.GlobalFlags) *SortBuilder {
 	return &SortBuilder{Flags: flags}
 }
 
@@ -1543,7 +1543,7 @@ func ExpandRelatedMedia(
 	ctx context.Context,
 	sqlDB *sql.DB,
 	media *[]models.MediaWithDB,
-	flags *models.GlobalFlags,
+	flags models.GlobalFlags,
 ) error {
 	if len(*media) == 0 {
 		return nil
@@ -1784,7 +1784,7 @@ type QueryExecutor struct {
 }
 
 // NewQueryExecutor creates a new QueryExecutor
-func NewQueryExecutor(flags *models.GlobalFlags) *QueryExecutor {
+func NewQueryExecutor(flags models.GlobalFlags) *QueryExecutor {
 	return &QueryExecutor{
 		filterBuilder: NewFilterBuilder(flags),
 	}
@@ -2109,7 +2109,7 @@ func (qe *QueryExecutor) MediaQueryCount(ctx context.Context, dbs []string) (int
 	return total, nil
 }
 
-func (qe *QueryExecutor) GroupByParent(allMedia []models.MediaWithDB, flags *models.GlobalFlags) []models.MediaWithDB {
+func (qe *QueryExecutor) GroupByParent(allMedia []models.MediaWithDB, flags models.GlobalFlags) []models.MediaWithDB {
 	type GroupedMedia struct {
 		ParentPath              string  `json:"parent_path"`
 		EpisodeCount            int64   `json:"episode_count"`
@@ -2171,7 +2171,7 @@ func (qe *QueryExecutor) GroupByParent(allMedia []models.MediaWithDB, flags *mod
 func (qe *QueryExecutor) FetchSiblings(
 	ctx context.Context,
 	media []models.MediaWithDB,
-	flags *models.GlobalFlags,
+	flags models.GlobalFlags,
 ) ([]models.MediaWithDB, error) {
 	if len(media) == 0 {
 		return media, nil
@@ -2254,8 +2254,8 @@ func (qe *QueryExecutor) FetchSiblings(
 func (qe *QueryExecutor) ResolvePercentileFlags(
 	ctx context.Context,
 	dbs []string,
-	flags *models.GlobalFlags,
-) (*models.GlobalFlags, error) {
+	flags models.GlobalFlags,
+) (models.GlobalFlags, error) {
 	hasPSize := false
 	for _, s := range flags.Size {
 		if _, _, ok := utils.ParsePercentileRange(s); ok {
@@ -2425,9 +2425,9 @@ func (qe *QueryExecutor) ResolvePercentileFlags(
 			mapping := utils.CalculatePercentiles(values)
 			var newSize []string
 			for _, s := range flags.Size {
-				if min, max, ok := utils.ParsePercentileRange(s); ok {
-					minVal := mapping[int(min)]
-					maxVal := mapping[int(max)]
+				if pmin, pmax, ok := utils.ParsePercentileRange(s); ok {
+					minVal := mapping[int(pmin)]
+					maxVal := mapping[int(pmax)]
 					newSize = append(newSize, fmt.Sprintf("+%d", minVal))
 					newSize = append(newSize, fmt.Sprintf("-%d", maxVal))
 				} else {
@@ -2444,9 +2444,9 @@ func (qe *QueryExecutor) ResolvePercentileFlags(
 			mapping := utils.CalculatePercentiles(values)
 			var newDuration []string
 			for _, d := range flags.Duration {
-				if min, max, ok := utils.ParsePercentileRange(d); ok {
-					minVal := mapping[int(min)]
-					maxVal := mapping[int(max)]
+				if pmin, pmax, ok := utils.ParsePercentileRange(d); ok {
+					minVal := mapping[int(pmin)]
+					maxVal := mapping[int(pmax)]
 					newDuration = append(newDuration, fmt.Sprintf("+%d", minVal))
 					newDuration = append(newDuration, fmt.Sprintf("-%d", maxVal))
 				} else {
@@ -2462,9 +2462,9 @@ func (qe *QueryExecutor) ResolvePercentileFlags(
 		if len(values) > 0 {
 			mapping := utils.CalculatePercentiles(values)
 			for _, m := range flags.Modified {
-				if min, max, ok := utils.ParsePercentileRange(m); ok {
-					minVal := mapping[int(min)]
-					maxVal := mapping[int(max)]
+				if pmin, pmax, ok := utils.ParsePercentileRange(m); ok {
+					minVal := mapping[int(pmin)]
+					maxVal := mapping[int(pmax)]
 					flags.ModifiedAfter = strconv.FormatInt(minVal, 10)
 					flags.ModifiedBefore = strconv.FormatInt(maxVal, 10)
 				}
@@ -2477,9 +2477,9 @@ func (qe *QueryExecutor) ResolvePercentileFlags(
 		if len(values) > 0 {
 			mapping := utils.CalculatePercentiles(values)
 			for _, c := range flags.Created {
-				if min, max, ok := utils.ParsePercentileRange(c); ok {
-					minVal := mapping[int(min)]
-					maxVal := mapping[int(max)]
+				if pmin, pmax, ok := utils.ParsePercentileRange(c); ok {
+					minVal := mapping[int(pmin)]
+					maxVal := mapping[int(pmax)]
 					flags.CreatedAfter = strconv.FormatInt(minVal, 10)
 					flags.CreatedBefore = strconv.FormatInt(maxVal, 10)
 				}
@@ -2492,9 +2492,9 @@ func (qe *QueryExecutor) ResolvePercentileFlags(
 		if len(values) > 0 {
 			mapping := utils.CalculatePercentiles(values)
 			for _, d := range flags.Downloaded {
-				if min, max, ok := utils.ParsePercentileRange(d); ok {
-					minVal := mapping[int(min)]
-					maxVal := mapping[int(max)]
+				if pmin, pmax, ok := utils.ParsePercentileRange(d); ok {
+					minVal := mapping[int(pmin)]
+					maxVal := mapping[int(pmax)]
 					flags.DownloadedAfter = strconv.FormatInt(minVal, 10)
 					flags.DownloadedBefore = strconv.FormatInt(maxVal, 10)
 				}
@@ -2506,9 +2506,9 @@ func (qe *QueryExecutor) ResolvePercentileFlags(
 		values := getValues("episodes")
 		if len(values) > 0 {
 			mapping := utils.CalculatePercentiles(values)
-			if min, max, ok := utils.ParsePercentileRange(flags.FileCounts); ok {
-				minVal := mapping[int(min)]
-				maxVal := mapping[int(max)]
+			if pmin, pmax, ok := utils.ParsePercentileRange(flags.FileCounts); ok {
+				minVal := mapping[int(pmin)]
+				maxVal := mapping[int(pmax)]
 				flags.FileCounts = fmt.Sprintf("+%d,-%d", minVal, maxVal)
 			}
 		}

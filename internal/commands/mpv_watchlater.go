@@ -20,7 +20,7 @@ type MpvWatchlaterCmd struct {
 	models.DeletedFlags     `embed:""`
 	models.PlaybackFlags    `embed:""`
 
-	Databases []string `help:"SQLite database files" required:"" arg:"" type:"existingfile"`
+	Databases []string `help:"SQLite database files" required:"true" arg:"" type:"existingfile"`
 }
 
 func (c *MpvWatchlaterCmd) Run(ctx context.Context) error {
@@ -44,7 +44,7 @@ func (c *MpvWatchlaterCmd) Run(ctx context.Context) error {
 	}
 
 	// 1. Get all media from databases
-	media, err := query.MediaQuery(ctx, c.Databases, &flags)
+	media, err := query.MediaQuery(ctx, c.Databases, flags)
 	if err != nil {
 		return err
 	}

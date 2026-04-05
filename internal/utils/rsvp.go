@@ -1044,16 +1044,15 @@ func listTarContents(ctx context.Context, path string) (string, error) {
 	case ".zst", ".tzst":
 		// Zstd compression - use external zstd command
 		zstdBin := "zstd"
-		if _, err := exec.LookPath(zstdBin); err == nil {
-			cmd := exec.CommandContext(ctx, zstdBin, "-d", "-c", path)
-			output, err := cmd.Output()
-			if err != nil {
-				return "", err
-			}
-			reader = bytes.NewReader(output)
-		} else {
+		if _, err := exec.LookPath(zstdBin); err != nil {
 			return "", errors.New("zstd not found")
 		}
+		cmd := exec.CommandContext(ctx, zstdBin, "-d", "-c", path)
+		output, err := cmd.Output()
+		if err != nil {
+			return "", err
+		}
+		reader = bytes.NewReader(output)
 	}
 
 	tr := tar.NewReader(reader)

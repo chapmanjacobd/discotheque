@@ -36,7 +36,7 @@ func CorpusStats(corpus [][]string) map[string]int {
 }
 
 // WordSorter sorts words within a line based on various criteria
-func WordSorter(flags *models.GlobalFlags, corpusStats map[string]int, lineWords []string) []string {
+func WordSorter(flags models.GlobalFlags, corpusStats map[string]int, lineWords []string) []string {
 	if len(flags.WordSorts) == 0 {
 		return lineWords
 	}
@@ -104,7 +104,7 @@ func WordSorter(flags *models.GlobalFlags, corpusStats map[string]int, lineWords
 
 // LineSorter sorts original lines based on their processed words
 func LineSorter(
-	flags *models.GlobalFlags,
+	flags models.GlobalFlags,
 	corpusStats map[string]int,
 	originalLines []string,
 	corpus [][]string,
@@ -188,7 +188,7 @@ func LineSorter(
 }
 
 // TextProcessor orchestrates the splitting and sorting of text lines
-func TextProcessor(flags *models.GlobalFlags, lines []string) []string {
+func TextProcessor(flags models.GlobalFlags, lines []string) []string {
 	if len(lines) == 0 {
 		return lines
 	}
