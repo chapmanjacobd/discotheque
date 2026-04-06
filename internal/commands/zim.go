@@ -58,7 +58,6 @@ var ZimManager = &KiwixManager{
 	UsedPorts: make(map[int]bool),
 }
 
-//nolint:gochecknoinits // Start background cleanup goroutine for unused Kiwix instances
 func init() {
 	go ZimManager.cleanupOldInstances()
 }

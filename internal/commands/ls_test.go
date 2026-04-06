@@ -86,7 +86,7 @@ func TestServeCmd_HandleLs(t *testing.T) {
 			return
 		}
 		entry := resp[0].(map[string]any)
-		if entry["name"] != "home" || entry["is_dir"] != true {
+		if entry["name"] != "home" || !entry["is_dir"].(bool) {
 			t.Errorf("Unexpected root entry: %+v", entry)
 		}
 	})

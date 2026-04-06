@@ -1593,6 +1593,7 @@ func ApplyWeightedRerank(media []models.MediaWithDB, fields []SortField) {
 
 // ExpandRelatedMedia expands the result set with media related to the first item
 // based on shared search terms (title, path words) using FTS rank
+//
 func ExpandRelatedMedia(
 	ctx context.Context,
 	sqlDB *sql.DB,
@@ -2525,7 +2526,6 @@ func (qe *QueryExecutor) applyPercentileToRange(ranges []string, mapping []int64
 }
 
 type TimePercentileOptions struct {
-	ctx           context.Context
 	dbs           []string
 	flags         *models.GlobalFlags
 	field         string
@@ -2533,8 +2533,11 @@ type TimePercentileOptions struct {
 	after, before *string
 }
 
-func (qe *QueryExecutor) resolveTimePercentiles(opts TimePercentileOptions) {
-	values := qe.getPercentileValues(opts.ctx, opts.dbs, *opts.flags, opts.field)
+func (qe *QueryExecutor) resolveTimePercentiles(
+	ctx context.Context,
+	opts TimePercentileOptions,
+) {
+	values := qe.getPercentileValues(ctx, opts.dbs, *opts.flags, opts.field)
 	if len(values) > 0 {
 		mapping := utils.CalculatePercentiles(values)
 		for _, r := range opts.ranges {
@@ -2601,16 +2604,16 @@ func (qe *QueryExecutor) resolveAllPercentiles(ctx context.Context, dbs []string
 	qe.resolveSizePercentiles(ctx, dbs, flags)
 	qe.resolveDurationPercentiles(ctx, dbs, flags)
 
-	qe.resolveTimePercentiles(TimePercentileOptions{
-		ctx: ctx, dbs: dbs, flags: flags, field: "time_modified",
+	qe.resolveTimePercentiles(ctx, TimePercentileOptions{
+		dbs: dbs, flags: flags, field: "time_modified",
 		ranges: flags.Modified, after: &flags.ModifiedAfter, before: &flags.ModifiedBefore,
 	})
-	qe.resolveTimePercentiles(TimePercentileOptions{
-		ctx: ctx, dbs: dbs, flags: flags, field: "time_created",
+	qe.resolveTimePercentiles(ctx, TimePercentileOptions{
+		dbs: dbs, flags: flags, field: "time_created",
 		ranges: flags.Created, after: &flags.CreatedAfter, before: &flags.CreatedBefore,
 	})
-	qe.resolveTimePercentiles(TimePercentileOptions{
-		ctx: ctx, dbs: dbs, flags: flags, field: "time_downloaded",
+	qe.resolveTimePercentiles(ctx, TimePercentileOptions{
+		dbs: dbs, flags: flags, field: "time_downloaded",
 		ranges: flags.Downloaded, after: &flags.DownloadedAfter, before: &flags.DownloadedBefore,
 	})
 

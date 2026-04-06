@@ -7,7 +7,6 @@ import "sync/atomic"
 // This is separate from the compile-time FtsEnabled constant
 var ftsEnabledConfig atomic.Bool
 
-//nolint:gochecknoinits // Initialize runtime FTS configuration to default disabled state
 func init() {
 	ftsEnabledConfig.Store(false)
 }

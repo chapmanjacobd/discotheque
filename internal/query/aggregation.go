@@ -911,8 +911,7 @@ func AggregateDUByPathWithFilters(
 	}
 
 	// Phase 3: Aggregate only matching parent directories
-	return aggregateDUWithParentFilter(DUAggregationOptions{
-		ctx:             ctx,
+	return aggregateDUWithParentFilter(ctx, DUAggregationOptions{
 		sqlDB:           sqlDB,
 		pathPrefix:      pathPrefix,
 		targetDepth:     targetDepth,
@@ -1036,7 +1035,6 @@ func aggregateDUWithBasicFilters(
 }
 
 type DUAggregationOptions struct {
-	ctx             context.Context
 	sqlDB           *sql.DB
 	pathPrefix      string
 	targetDepth     int
@@ -1045,16 +1043,16 @@ type DUAggregationOptions struct {
 }
 
 // aggregateDUWithParentFilter performs SQL aggregation filtered by matching parent directories (slow path)
-func aggregateDUWithParentFilter(opts DUAggregationOptions) ([]DUQueryResult, error) {
+func aggregateDUWithParentFilter(ctx context.Context, opts DUAggregationOptions) ([]DUQueryResult, error) {
 	query, args := buildDUWithParentFilterQuery(
-		opts.ctx,
+		ctx,
 		opts.pathPrefix,
 		opts.targetDepth,
 		opts.flags,
 		opts.matchingParents,
 	)
 
-	rows, err := opts.sqlDB.QueryContext(opts.ctx, query, args...)
+	rows, err := opts.sqlDB.QueryContext(ctx, query, args...)
 	if err != nil {
 		models.Log.Error("DU aggregation with parent filter failed", "error", err)
 		return nil, err

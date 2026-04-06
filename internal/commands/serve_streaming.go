@@ -225,42 +225,7 @@ func (c *ServeCmd) HandleSubtitles(w http.ResponseWriter, r *http.Request) {
 	if streamIndex == "" && (ext == ".mkv" || ext == ".mp4" || ext == ".m4v" || ext == ".mov" || ext == ".webm") {
 		// Try to find a sibling subtitle file
 		sidecars := utils.GetExternalSubtitles(path)
-		if len(sidecars) > 0 {
-			// If a specific extension was requested, try to find a matching one
-			if requestedExt != "" {
-				for _, sub := range sidecars {
-					if strings.ToLower(filepath.Ext(sub)) == "."+requestedExt {
-						path = sub
-						ext = strings.ToLower(filepath.Ext(path))
-						models.Log.Debug(
-							"Found matching sidecar for media file",
-							"media",
-							r.URL.Query().Get("path"),
-							"sidecar",
-							path,
-						)
-						break
-					}
-				}
-				// If no matching extension found, use the first one anyway
-				if ext != "."+requestedExt && len(sidecars) > 0 {
-					path = sidecars[0]
-					ext = strings.ToLower(filepath.Ext(path))
-					models.Log.Debug(
-						"Requested extension not found, using first sidecar",
-						"media",
-						r.URL.Query().Get("path"),
-						"sidecar",
-						path,
-					)
-				}
-			} else {
-				// Serve the first found sidecar
-				path = sidecars[0]
-				ext = strings.ToLower(filepath.Ext(path))
-				models.Log.Debug("Found sidecar for media file", "media", r.URL.Query().Get("path"), "sidecar", path)
-			}
-		} else {
+		if len(sidecars) == 0 {
 			// Optimization: If no external sidecars found and DB says no embedded subtitles, return early
 			if !hasSubtitles {
 				models.Log.Debug("No subtitles found (DB check)", "path", path)
@@ -269,6 +234,40 @@ func (c *ServeCmd) HandleSubtitles(w http.ResponseWriter, r *http.Request) {
 			}
 			http.Error(w, "No index specified and no sidecar found", http.StatusNotFound)
 			return
+		}
+		// If a specific extension was requested, try to find a matching one
+		if requestedExt != "" {
+			for _, sub := range sidecars {
+				if strings.ToLower(filepath.Ext(sub)) == "."+requestedExt {
+					path = sub
+					ext = strings.ToLower(filepath.Ext(path))
+					models.Log.Debug(
+						"Found matching sidecar for media file",
+						"media",
+						r.URL.Query().Get("path"),
+						"sidecar",
+						path,
+					)
+					break
+				}
+			}
+			// If no matching extension found, use the first one anyway
+			if ext != "."+requestedExt && len(sidecars) > 0 {
+				path = sidecars[0]
+				ext = strings.ToLower(filepath.Ext(path))
+				models.Log.Debug(
+					"Requested extension not found, using first sidecar",
+					"media",
+					r.URL.Query().Get("path"),
+					"sidecar",
+					path,
+				)
+			}
+		} else {
+			// Serve the first found sidecar
+			path = sidecars[0]
+			ext = strings.ToLower(filepath.Ext(path))
+			models.Log.Debug("Found sidecar for media file", "media", r.URL.Query().Get("path"), "sidecar", path)
 		}
 	}
 

@@ -532,12 +532,11 @@ func (c *DedupeCmd) groupByFastHash(
 	for _, p := range paths {
 		if p.fasthash == "" {
 			h, err := utils.SampleHashFile(p.path, flags.HashThreads, flags.HashGap, flags.HashChunkSize)
-			if err == nil && h != "" {
-				p.fasthash = h
-				_, _ = sqlDB.ExecContext(ctx, "UPDATE media SET fasthash = ? WHERE path = ?", h, p.path)
-			} else {
+			if err != nil || h == "" {
 				continue
 			}
+			p.fasthash = h
+			_, _ = sqlDB.ExecContext(ctx, "UPDATE media SET fasthash = ? WHERE path = ?", h, p.path)
 		}
 		fastHashGroups[p.fasthash] = append(fastHashGroups[p.fasthash], p)
 	}
@@ -553,12 +552,11 @@ func (c *DedupeCmd) groupBySHA256(
 	for _, p := range fhPaths {
 		if p.sha256 == "" {
 			h, err := utils.FullHashFile(p.path)
-			if err == nil && h != "" {
-				p.sha256 = h
-				_, _ = sqlDB.ExecContext(ctx, "UPDATE media SET sha256 = ? WHERE path = ?", h, p.path)
-			} else {
+			if err != nil || h == "" {
 				continue
 			}
+			p.sha256 = h
+			_, _ = sqlDB.ExecContext(ctx, "UPDATE media SET sha256 = ? WHERE path = ?", h, p.path)
 		}
 		sha256Groups[p.sha256] = append(sha256Groups[p.sha256], p)
 	}
@@ -571,7 +569,7 @@ func (c *DedupeCmd) collectDuplicatesFromGroup(
 	sPaths []pathInfo,
 	size int64,
 ) []DedupeDuplicate {
-	var dups []DedupeDuplicate
+	dups := make([]DedupeDuplicate, 0, max(1, len(sPaths)-1))
 	// Priority sorting for "keep" candidate
 	sort.Slice(sPaths, func(i, j int) bool {
 		if sPaths[i].isDeduped != sPaths[j].isDeduped {

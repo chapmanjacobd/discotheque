@@ -266,6 +266,7 @@ func (c *ServeCmd) HandleLanguages(w http.ResponseWriter, r *http.Request) {
 }
 
 // getCaptionsWithContext fetches captions matching a query along with 2 captions before and after each match
+//
 func (c *ServeCmd) getCaptionsWithContext(
 	ctx context.Context,
 	queries *database.Queries,

@@ -2,13 +2,12 @@
 
 package utils_test
 
-import "github.com/chapmanjacobd/discoteca/internal/utils"
-
-
 import (
 	"os"
 	"syscall"
 	"testing"
+
+	"github.com/chapmanjacobd/discoteca/internal/utils"
 )
 
 func TestIsFileOpen(t *testing.T) {

@@ -35,7 +35,6 @@ func sendError(w http.ResponseWriter, status int, message string) {
 	sendJSON(w, status, models.ErrorResponse{Error: message})
 }
 
-//nolint:gochecknoinits // Register MIME types for embedded web assets before HTTP server starts
 func init() {
 	_ = mime.AddExtensionType(".js", "text/javascript")
 	_ = mime.AddExtensionType(".mjs", "text/javascript")

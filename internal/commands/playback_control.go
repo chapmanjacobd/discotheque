@@ -111,11 +111,11 @@ func (c *SeekCmd) Run(ctx context.Context) error {
 	if strings.Contains(s, ":") {
 		seconds = utils.FromTimestampSeconds(s)
 	} else {
-		if f := utils.SafeFloat(s); f != nil {
-			seconds = *f
-		} else {
+		f := utils.SafeFloat(s)
+		if f == nil {
 			return fmt.Errorf("invalid time format: %s", c.Time)
 		}
+		seconds = *f
 	}
 
 	if isNegative {
