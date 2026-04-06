@@ -324,14 +324,14 @@ func ExtractText(ctx context.Context, path string) (string, error) {
 
 func extractTextFromDocuments(ctx context.Context, path string) (string, error) {
 	ext := strings.ToLower(filepath.Ext(path))
-	if text, ok := extractTextFromBasicDocs(ctx, path, ext); ok {
-		return text, nil
+	if text, ok, err := extractTextFromBasicDocs(ctx, path, ext); ok {
+		return text, err
 	}
-	if text, ok := extractTextFromEbooksAndODF(ctx, path, ext); ok {
-		return text, nil
+	if text, ok, err := extractTextFromEbooksAndODF(ctx, path, ext); ok {
+		return text, err
 	}
-	if text, ok := extractTextFromOfficeDocs(ctx, path, ext); ok {
-		return text, nil
+	if text, ok, err := extractTextFromOfficeDocs(ctx, path, ext); ok {
+		return text, err
 	}
 
 	switch ext {
@@ -341,58 +341,61 @@ func extractTextFromDocuments(ctx context.Context, path string) (string, error) 
 	return "", errors.New("not a document format")
 }
 
-func extractTextFromBasicDocs(ctx context.Context, path, ext string) (string, bool) {
+func extractTextFromBasicDocs(ctx context.Context, path, ext string) (string, bool, error) {
 	switch ext {
 	case ".rtf":
 		if text, err := extractTextFromRTF(ctx, path); err == nil {
-			return text, true
+			return text, true, nil
 		}
 		if content, err := os.ReadFile(path); err == nil {
-			return string(content), true
+			return string(content), true, nil
 		}
+		return "", true, fmt.Errorf("failed to extract text from RTF: %s", path)
 	case ".pdf":
 		if text, err := extractTextFromPDF(ctx, path); err == nil {
-			return text, true
+			return text, true, nil
 		}
 		if text, err := extractTextWithCalibre(ctx, path); err == nil {
-			return text, true
+			return text, true, nil
 		}
+		return "", true, fmt.Errorf("failed to extract text from PDF: %s", path)
 	case ".ps", ".eps":
 		if text, err := extractTextFromPS(ctx, path); err == nil {
-			return text, true
+			return text, true, nil
 		}
 		if text, err := extractTextWithCalibre(ctx, path); err == nil {
-			return text, true
+			return text, true, nil
 		}
+		return "", true, fmt.Errorf("failed to extract text from PS/EPS: %s", path)
 	default:
-		return "", false
+		return "", false, nil
 	}
-	return "", true
 }
 
-func extractTextFromEbooksAndODF(ctx context.Context, path, ext string) (string, bool) {
+func extractTextFromEbooksAndODF(ctx context.Context, path, ext string) (string, bool, error) {
 	switch ext {
 	case ".epub", ".epub3":
 		if text, err := extractTextFromEPUB(path); err == nil && text != "" {
-			return text, true
+			return text, true, nil
 		}
 		if text, err := extractTextWithCalibre(ctx, path); err == nil {
-			return text, true
+			return text, true, nil
 		}
+		return "", true, fmt.Errorf("failed to extract text from EPUB: %s", path)
 	case ".odt", ".ods", ".odp", ".odg", ".odf", ".odm", ".ott", ".ots", ".otp":
 		if text, err := extractTextFromOpenDocument(path); err == nil && text != "" {
-			return text, true
+			return text, true, nil
 		}
 		if text, err := extractTextWithCalibre(ctx, path); err == nil {
-			return text, true
+			return text, true, nil
 		}
+		return "", true, fmt.Errorf("failed to extract text from ODT/ODF: %s", path)
 	default:
-		return "", false
+		return "", false, nil
 	}
-	return "", true
 }
 
-func extractTextFromOfficeDocs(ctx context.Context, path, ext string) (string, bool) {
+func extractTextFromOfficeDocs(ctx context.Context, path, ext string) (string, bool, error) {
 	var err error
 	var text string
 	switch ext {
@@ -413,16 +416,16 @@ func extractTextFromOfficeDocs(ctx context.Context, path, ext string) (string, b
 	case ".chm":
 		text, err = extractCHMContents(ctx, path)
 	default:
-		return "", false
+		return "", false, nil
 	}
 
 	if err == nil && text != "" {
-		return text, true
+		return text, true, nil
 	}
 	if text, err := extractTextWithCalibre(ctx, path); err == nil {
-		return text, true
+		return text, true, nil
 	}
-	return "", true
+	return "", true, fmt.Errorf("failed to extract text from office document: %s", path)
 }
 
 func extractTextFromCode(path string, readSize int64) (string, error) {
