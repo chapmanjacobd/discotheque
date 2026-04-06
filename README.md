@@ -16,7 +16,7 @@ disco serve library.db
 
 ### Grid View
 
-![Search Results](docs/screenshots/search-results.png)
+![Grid View](docs/screenshots/search-results.png)
 
 ### Group View
 
@@ -439,8 +439,6 @@ Flags:
         Print aggregate statistics
   -f, --frequency
         Group statistics by time frequency (daily, weekly, monthly, yearly)
-  --tui
-        Interactive TUI mode
   -B, --big-dirs
         Aggregate by parent directory
   --file-counts
@@ -650,8 +648,6 @@ Flags:
         Print aggregate statistics
   -f, --frequency
         Group statistics by time frequency (daily, weekly, monthly, yearly)
-  --tui
-        Interactive TUI mode
   --fts
         Use FTS5 full-text search
   --fts-table
@@ -800,8 +796,6 @@ Flags:
         Print aggregate statistics
   -f, --frequency
         Group statistics by time frequency (daily, weekly, monthly, yearly)
-  --tui
-        Interactive TUI mode
 ```
 
 </details>
@@ -942,8 +936,6 @@ Flags:
         Print aggregate statistics
   -f, --frequency
         Group statistics by time frequency (daily, weekly, monthly, yearly)
-  --tui
-        Interactive TUI mode
   --trash
         Trash files after action
   --post-action
@@ -1198,8 +1190,6 @@ Flags:
         Print aggregate statistics
   -f, --frequency
         Group statistics by time frequency (daily, weekly, monthly, yearly)
-  --tui
-        Interactive TUI mode
 ```
 
 </details>
@@ -1349,8 +1339,6 @@ Flags:
         Print aggregate statistics
   -f, --frequency
         Group statistics by time frequency (daily, weekly, monthly, yearly)
-  --tui
-        Interactive TUI mode
   -B, --big-dirs
         Aggregate by parent directory
   --file-counts
@@ -1723,8 +1711,6 @@ Flags:
         Print aggregate statistics
   -f, --frequency
         Group statistics by time frequency (daily, weekly, monthly, yearly)
-  --tui
-        Interactive TUI mode
 ```
 
 </details>
@@ -2019,8 +2005,6 @@ Flags:
         Print aggregate statistics
   -f, --frequency
         Group statistics by time frequency (daily, weekly, monthly, yearly)
-  --tui
-        Interactive TUI mode
   --similar
         Find similar files or folders
   --sizes-delta
@@ -2193,8 +2177,6 @@ Flags:
         Print aggregate statistics
   -f, --frequency
         Group statistics by time frequency (daily, weekly, monthly, yearly)
-  --tui
-        Interactive TUI mode
   --similar
         Find similar files or folders
   --sizes-delta
@@ -2387,8 +2369,6 @@ Flags:
         Print aggregate statistics
   -f, --frequency
         Group statistics by time frequency (daily, weekly, monthly, yearly)
-  --tui
-        Interactive TUI mode
   --fts
         Use FTS5 full-text search
   --fts-table
@@ -2654,8 +2634,6 @@ Flags:
         Print aggregate statistics
   -f, --frequency
         Group statistics by time frequency (daily, weekly, monthly, yearly)
-  --tui
-        Interactive TUI mode
   --fts
         Use FTS5 full-text search
   --fts-table
@@ -2896,8 +2874,6 @@ Flags:
         Print aggregate statistics
   -f, --frequency
         Group statistics by time frequency (daily, weekly, monthly, yearly)
-  --tui
-        Interactive TUI mode
 ```
 
 </details>
@@ -3047,8 +3023,6 @@ Flags:
         Print aggregate statistics
   -f, --frequency
         Group statistics by time frequency (daily, weekly, monthly, yearly)
-  --tui
-        Interactive TUI mode
   --trash
         Trash files after action
   --post-action
@@ -3374,8 +3348,6 @@ Flags:
         Print aggregate statistics
   -f, --frequency
         Group statistics by time frequency (daily, weekly, monthly, yearly)
-  --tui
-        Interactive TUI mode
   -B, --big-dirs
         Aggregate by parent directory
   --file-counts
@@ -3536,166 +3508,6 @@ Flags:
 
 </details>
 
-### tui
-
-Interactive TUI media picker
-
-<details><summary>All Options</summary>
-
-```bash
-$ disco tui --help
-
-Flags:
-  -v, --verbose
-        Enable verbose logging (-v for info, -vv for debug)
-  --simulate
-        Dry run; don't actually do anything
-  -y, --no-confirm
-        Don't ask for confirmation
-  -T, --timeout
-        Quit after N minutes/seconds
-  -q, --query
-        Raw SQL query (overrides all query building)
-  -L, --limit
-        Limit results per database
-  -a, --all
-        Return all results (no limit)
-  --offset
-        Skip N results
-  -s, --include
-        Include paths matching pattern
-  -E, --exclude
-        Exclude paths matching pattern
-  --regex
-        Filter paths by regex pattern
-  --path-contains
-        Path must contain all these strings
-  --paths
-        Exact paths to include
-  --search
-        Search terms (space-separated for AND, | for OR)
-  -S, --size
-        Size range (e.g., >100MB, 1GB%10)
-  -d, --duration
-        Duration range (e.g., >1hour, 30min%10)
-  --modified
-        Filter by modification time
-  --created
-        Filter by creation time
-  --downloaded
-        Filter by download time
-  --duration-from-size
-        Constrain media to duration of videos which match any size constraints
-  --watched
-        Filter by watched status (true/false)
-  --unfinished
-        Has playhead but not finished
-  -P, --partial
-        Filter by partial playback status
-  --play-count-min
-        Minimum play count
-  --play-count-max
-        Maximum play count
-  --completed
-        Show only completed items
-  --in-progress
-        Show only items in progress
-  --with-captions
-        Show only items with captions
-  --flexible-search
-        Flexible search (fuzzy)
-  --exact
-        Exact match for search
-  -w, --where
-        SQL where clause(s)
-  --exists
-        Filter out non-existent files
-  -o, --fetch-siblings
-        Fetch siblings of matched files (each, all, if-audiobook)
-  --fetch-siblings-max
-        Maximum number of siblings to fetch
-  --category
-        Filter by category
-  --genre
-        Filter by genre
-  --language
-        Filter by language
-  -e, --ext
-        Filter by extensions (e.g., .mp4,.mkv)
-  --video-only
-        Only video files
-  --audio-only
-        Only audio files
-  --image-only
-        Only image files
-  --text-only
-        Only text/ebook files
-  --portrait
-        Only portrait orientation files
-  --scan-subtitles
-        Scan for external subtitles during import
-  --online-media-only
-        Exclude local media
-  --local-media-only
-        Exclude online media
-  --probe-images
-        Run ffprobe on image files (default: skip)
-  --created-after
-        Created after date (YYYY-MM-DD)
-  --created-before
-        Created before date (YYYY-MM-DD)
-  --modified-after
-        Modified after date (YYYY-MM-DD)
-  --modified-before
-        Modified before date (YYYY-MM-DD)
-  --downloaded-after
-        Downloaded after date (YYYY-MM-DD)
-  --downloaded-before
-        Downloaded before date (YYYY-MM-DD)
-  --deleted-after
-        Deleted after date (YYYY-MM-DD)
-  --deleted-before
-        Deleted before date (YYYY-MM-DD)
-  --played-after
-        Last played after date (YYYY-MM-DD)
-  --played-before
-        Last played before date (YYYY-MM-DD)
-  --hide-deleted
-        Exclude deleted files from results
-  --only-deleted
-        Include only deleted files in results
-  -u, --sort-by
-        Sort by field
-  -V, --reverse
-        Reverse sort order
-  -n, --nat-sort
-        Use natural sorting
-  -r, --random
-        Random order
-  -k, --re-rank
-        Add key/value pairs re-rank sorting by multiple attributes (COLUMN=WEIGHT)
-  -c, --columns
-        Columns to display
-  -j, --json
-        Output results as JSON
-  --summarize
-        Print aggregate statistics
-  -f, --frequency
-        Group statistics by time frequency (daily, weekly, monthly, yearly)
-  --tui
-        Interactive TUI mode
-  --fts
-        Use FTS5 full-text search
-  --fts-table
-        FTS table name
-  --no-fts
-        Disable full-text search, use substring search only
-  -R, --related
-        Find media related to the first result
-```
-
-</details>
-
 ### readme
 
 Generate README.md content
@@ -3842,8 +3654,6 @@ Flags:
         Print aggregate statistics
   -f, --frequency
         Group statistics by time frequency (daily, weekly, monthly, yearly)
-  --tui
-        Interactive TUI mode
   -B, --big-dirs
         Aggregate by parent directory
   --file-counts
@@ -4236,8 +4046,6 @@ Flags:
         Print aggregate statistics
   -f, --frequency
         Group statistics by time frequency (daily, weekly, monthly, yearly)
-  --tui
-        Interactive TUI mode
 ```
 
 </details>
