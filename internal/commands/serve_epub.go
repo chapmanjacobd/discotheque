@@ -21,58 +21,101 @@ func (c *ServeCmd) HandleEpubConvert(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Extract path from URL using path value (captures {path...} from mux)
+	pathParts := c.extractEpubPath(w, r)
+	if pathParts == "" {
+		return // error already written
+	}
+	models.Log.Info("handleEpubConvert request", "pathParts", pathParts)
+
+	docPath, assetPath := c.resolveDocAndAssetPath(pathParts)
+	models.Log.Info("Final resolved paths", "docPath", docPath, "assetPath", assetPath)
+
+	if c.isPathBlocklisted(docPath) {
+		http.Error(w, "Access denied: sensitive path", http.StatusForbidden)
+		return
+	}
+
+	fileInfo, err := os.Stat(docPath)
+	if err != nil {
+		folderPath := c.normalizeFolderPath(docPath)
+		if folderPath == "" {
+			models.Log.Error("EPUB file not found on disk", "path", docPath, "error", err)
+			http.Error(w, "File not found", http.StatusNotFound)
+			return
+		}
+		docPath = folderPath
+		indexHTMLPath := filepath.Join(docPath, "index.html")
+		if _, err2 := os.Stat(indexHTMLPath); err2 != nil {
+			models.Log.Error("Folder does not contain index.html", "path", docPath, "error", err2)
+			http.Error(w, "Folder does not contain index.html", http.StatusNotFound)
+			return
+		}
+		models.Log.Info("Serving HTML folder", "path", docPath)
+		c.serveHTMLFolder(w, r, docPath, assetPath)
+		return
+	}
+
+	if fileInfo.IsDir() {
+		indexHTMLPath := filepath.Join(docPath, "index.html")
+		if _, err2 := os.Stat(indexHTMLPath); err2 != nil {
+			models.Log.Error("Folder does not contain index.html", "path", docPath, "error", err2)
+			http.Error(w, "Folder does not contain index.html", http.StatusNotFound)
+			return
+		}
+		models.Log.Info("Serving HTML folder", "path", docPath)
+		c.serveHTMLFolder(w, r, docPath, assetPath)
+		return
+	}
+
+	ext := strings.ToLower(filepath.Ext(docPath))
+	if ext == ".pdf" {
+		models.Log.Debug("Serving PDF directly", "path", docPath)
+		http.ServeFile(w, r, docPath)
+		return
+	}
+
+	c.serveConvertedDocument(w, r, docPath, assetPath)
+}
+
+// extractEpubPath extracts and validates the path from the request URL.
+// Returns empty string if path is missing (error already written to response).
+func (c *ServeCmd) extractEpubPath(w http.ResponseWriter, r *http.Request) string {
 	pathParts := r.PathValue("path")
 	if pathParts == "" {
-		// Fallback for older Go versions or if path value is not set
 		pathParts = strings.TrimPrefix(r.URL.Path, "/api/epub/")
 	}
 
-	// We ONLY unescape if it contains %, otherwise we might mess up valid paths
 	if strings.Contains(pathParts, "%") {
 		unescaped, err := unescapePath(pathParts)
 		if err == nil {
 			pathParts = unescaped
 		}
 	}
-	models.Log.Info("handleEpubConvert request", "pathParts", pathParts)
 
 	if pathParts == "" || pathParts == "/" {
 		http.Error(w, "Path required", http.StatusBadRequest)
-		return
+		return ""
 	}
 
-	// Split into document path and optional asset path
-	// Find the part of the path that ends with a known ebook extension
-	docPath := pathParts
-	assetPath := ""
+	return pathParts
+}
+
+// resolveDocAndAssetPath splits the URL path into document path and optional asset path
+// based on known ebook file extensions.
+func (c *ServeCmd) resolveDocAndAssetPath(pathParts string) (docPath, assetPath string) {
+	docPath = pathParts
 
 	ebookExts := []string{
-		".epub",
-		".mobi",
-		".azw",
-		".azw3",
-		".fb2",
-		".djvu",
-		".cbz",
-		".cbr",
-		".docx",
-		".odt",
-		".rtf",
-		".txt",
-		".md",
-		".html",
-		".htm",
-		".pdf",
+		".epub", ".mobi", ".azw", ".azw3", ".fb2", ".djvu",
+		".cbz", ".cbr", ".docx", ".odt", ".rtf", ".txt",
+		".md", ".html", ".htm", ".pdf",
 	}
 
 	for _, ext := range ebookExts {
 		lowerParts := strings.ToLower(pathParts)
 		extIdx := strings.Index(lowerParts, ext)
 		if extIdx != -1 {
-			// Found the extension. The document path ends here.
 			endIdx := extIdx + len(ext)
-			// Ensure it's either the end of the string or followed by a slash
 			if endIdx == len(pathParts) || pathParts[endIdx] == '/' {
 				docPath = pathParts[:endIdx]
 				if endIdx < len(pathParts) {
@@ -83,72 +126,40 @@ func (c *ServeCmd) HandleEpubConvert(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Ensure docPath starts with / for absolute paths
 	if !strings.HasPrefix(docPath, "/") && !strings.HasPrefix(docPath, "C:") {
 		docPath = "/" + docPath
 	}
 
-	models.Log.Info("Final resolved paths", "docPath", docPath, "assetPath", assetPath)
+	return docPath, assetPath
+}
 
-	// Verify file access
-	if c.isPathBlocklisted(docPath) {
-		http.Error(w, "Access denied: sensitive path", http.StatusForbidden)
-		return
+// normalizeFolderPath removes a trailing slash from docPath if it exists and the path is a valid directory.
+// Returns the folder path if valid, empty string otherwise.
+func (c *ServeCmd) normalizeFolderPath(docPath string) string {
+	folderPath, _ := strings.CutSuffix(docPath, "/")
+	folderInfo, err := os.Stat(folderPath)
+	if err != nil || !folderInfo.IsDir() {
+		return ""
 	}
+	return folderPath
+}
 
-	// Check if file exists
-	fileInfo, err := os.Stat(docPath)
-	if err != nil {
-		// Check if it's a folder (might have trailing slash or not)
-		folderPath := docPath
-		if before, ok := strings.CutSuffix(folderPath, "/"); ok {
-			folderPath = before
-		}
-		folderInfo, folderErr := os.Stat(folderPath)
-		if folderErr != nil || !folderInfo.IsDir() {
-			models.Log.Error("EPUB file not found on disk", "path", docPath, "error", err)
-			http.Error(w, "File not found", http.StatusNotFound)
+// serveHTMLFolder serves an HTML folder directly, with optional asset or TOC wrapper.
+func (c *ServeCmd) serveHTMLFolder(w http.ResponseWriter, r *http.Request, docPath, assetPath string) {
+	if assetPath != "" {
+		assetFile := filepath.Join(docPath, assetPath)
+		if !strings.HasPrefix(assetFile, docPath) {
+			http.Error(w, "Invalid asset path", http.StatusBadRequest)
 			return
 		}
-		// It's a folder, check if it has index.html
-		docPath = folderPath
-		fileInfo = folderInfo
-	}
-
-	// If it's a folder, check if it has index.html (HTML folder)
-	if fileInfo.IsDir() {
-		indexHTMLPath := filepath.Join(docPath, "index.html")
-		if _, err2 := os.Stat(indexHTMLPath); err2 != nil {
-			models.Log.Error("Folder does not contain index.html", "path", docPath, "error", err2)
-			http.Error(w, "Folder does not contain index.html", http.StatusNotFound)
-			return
-		}
-		// Serve HTML folder directly without calibre conversion
-		models.Log.Info("Serving HTML folder", "path", docPath)
-		if assetPath != "" {
-			// Serve asset from HTML folder
-			assetFile := filepath.Join(docPath, assetPath)
-			if !strings.HasPrefix(assetFile, docPath) {
-				http.Error(w, "Invalid asset path", http.StatusBadRequest)
-				return
-			}
-			serveFileWithMimeType(w, r, assetFile)
-			return
-		}
-		// Serve wrapper HTML for the folder
-		serveHTMLFolderWithTOC(w, r, docPath, docPath)
+		serveFileWithMimeType(w, r, assetFile)
 		return
 	}
+	serveHTMLFolderWithTOC(w, r, docPath, docPath)
+}
 
-	// Skip calibre conversion for PDFs
-	ext := strings.ToLower(filepath.Ext(docPath))
-	if ext == ".pdf" {
-		models.Log.Debug("Serving PDF directly", "path", docPath)
-		http.ServeFile(w, r, docPath)
-		return
-	}
-
-	// Convert EPUB/text to HTML
+// serveConvertedDocument converts the document via calibre and serves the result.
+func (c *ServeCmd) serveConvertedDocument(w http.ResponseWriter, r *http.Request, docPath, assetPath string) {
 	models.Log.Info("Converting document to HTML", "path", docPath)
 	htmlDir, err := utils.ConvertEpubToOEB(r.Context(), docPath)
 	if err != nil {
@@ -156,10 +167,8 @@ func (c *ServeCmd) HandleEpubConvert(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("Conversion failed: %v", err), http.StatusInternalServerError)
 		return
 	}
-
 	models.Log.Debug("Conversion successful", "htmlDir", htmlDir)
 
-	// If asset path specified, serve that file from HTML directory
 	if assetPath != "" {
 		assetFile := filepath.Join(htmlDir, assetPath)
 		if !strings.HasPrefix(assetFile, htmlDir) {
@@ -171,7 +180,6 @@ func (c *ServeCmd) HandleEpubConvert(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Serve wrapper HTML with TOC header
 	models.Log.Info("Serving converted HTML with TOC", "htmlDir", htmlDir)
 	serveHTMLWithTOC(w, r, htmlDir, docPath)
 }

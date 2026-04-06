@@ -77,8 +77,8 @@ func TestHandleSubtitles_SubtitleCountOptimization(t *testing.T) {
 		}
 
 		body := w.Body.String()
-		if !strings.Contains(body, "No subtitles") {
-			t.Errorf("Expected 'No subtitles' in response, got: %s", body)
+		if !strings.Contains(strings.ToLower(body), "no subtitles") {
+			t.Errorf("Expected 'no subtitles' in response, got: %s", body)
 		}
 	})
 
@@ -164,7 +164,9 @@ func TestHandleSubtitles_WithEmbeddedSubtitles(t *testing.T) {
 		// - 200 OK (if somehow it worked)
 		// But NOT 404 "No subtitles available" (which is the optimization path)
 
-		if w.Code == http.StatusNotFound && strings.Contains(w.Body.String(), "No subtitles available") {
+		if w.Code == http.StatusNotFound &&
+			strings.Contains(strings.ToLower(w.Body.String()), "no subtitles available") {
+
 			t.Errorf("Should attempt ffmpeg conversion for subtitle_count>0, but got optimization path")
 		}
 	})
@@ -283,7 +285,9 @@ Test subtitle line
 		// For .srt files, ffmpeg will be called to convert to VTT
 		// Since our file is valid, it should succeed or at least attempt conversion
 		// (not return "No subtitles available" 404)
-		if w.Code == http.StatusNotFound && strings.Contains(w.Body.String(), "No subtitles available") {
+		if w.Code == http.StatusNotFound &&
+			strings.Contains(strings.ToLower(w.Body.String()), "no subtitles available") {
+
 			t.Errorf("Should not return 'No subtitles' for external subtitle file")
 		}
 	})
@@ -340,7 +344,7 @@ func TestHandleSubtitles_NoFFmpegCallForZeroCount(t *testing.T) {
 		t.Errorf("Expected 404 for subtitle_count=0, got %d", w.Code)
 	}
 
-	if !strings.Contains(w.Body.String(), "No subtitles") {
-		t.Errorf("Expected 'No subtitles' message, got: %s", w.Body.String())
+	if !strings.Contains(strings.ToLower(w.Body.String()), "no subtitles") {
+		t.Errorf("Expected 'no subtitles' message, got: %s", w.Body.String())
 	}
 }

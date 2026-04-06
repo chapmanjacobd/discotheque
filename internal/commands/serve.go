@@ -845,10 +845,6 @@ func (c *ServeCmd) ParseFlags(r *http.Request) models.GlobalFlags {
 	c.parseStatusFlags(&flags, q)
 	c.parseDatabaseFlags(&flags, q)
 
-	if episodes := q.Get("episodes"); episodes != "" {
-		flags.FileCounts = episodes
-	}
-
 	return flags
 }
 

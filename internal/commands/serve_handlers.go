@@ -62,6 +62,81 @@ type queryViewParams struct {
 	DBs   []string
 }
 
+type fetchCaptionsParams struct {
+	dbPath    string
+	queryStr  string
+	flags     models.GlobalFlags
+	limit     int
+	aggregate bool
+	media     *[]models.MediaWithDB
+}
+
+func (c *ServeCmd) fetchCaptionsFromDB(ctx context.Context, params fetchCaptionsParams) error {
+	return c.execDB(ctx, params.dbPath, func(ctx context.Context, sqlDB *sql.DB) error {
+		queries := database.New(sqlDB)
+		var rows []database.SearchCaptionsRow
+		var captionErr error
+
+		if params.queryStr != "" {
+			rows, captionErr = c.getCaptionsWithContext(
+				ctx,
+				queries,
+				CaptionsQueryParams{
+					QueryStr:  params.queryStr,
+					Limit:     int64(params.limit),
+					VideoOnly: params.flags.VideoOnly,
+					AudioOnly: params.flags.AudioOnly,
+					ImageOnly: params.flags.ImageOnly,
+					TextOnly:  params.flags.TextOnly,
+				},
+			)
+		} else {
+			captionsParams := database.GetAllCaptionsOrderedParams{
+				VideoOnly: utils.BoolToInt64(params.flags.VideoOnly),
+				AudioOnly: utils.BoolToInt64(params.flags.AudioOnly),
+				ImageOnly: utils.BoolToInt64(params.flags.ImageOnly),
+				TextOnly:  utils.BoolToInt64(params.flags.TextOnly),
+				Limit:     int64(params.limit),
+			}
+			rawRows, err := queries.GetAllCaptionsOrdered(ctx, captionsParams)
+			if err != nil {
+				return err
+			}
+			for _, row := range rawRows {
+				rows = append(rows, database.SearchCaptionsRow{
+					MediaPath: row.MediaPath,
+					Time:      row.Time,
+					Text:      row.Text,
+					Title:     row.Title,
+					MediaType: row.MediaType,
+					Size:      row.Size,
+					Duration:  row.Duration,
+					Rank:      0,
+				})
+			}
+		}
+
+		if captionErr != nil {
+			return captionErr
+		}
+
+		c.appendCaptionRows(params.media, rows, params.dbPath, params.aggregate)
+		return nil
+	})
+}
+
+func (c *ServeCmd) applyPagination(media []models.MediaWithDB, flags models.GlobalFlags) []models.MediaWithDB {
+	if !flags.All && flags.Limit > 0 {
+		start := flags.Offset
+		if start > len(media) {
+			return []models.MediaWithDB{}
+		}
+		end := min(start+flags.Limit, len(media))
+		return media[start:end]
+	}
+	return media
+}
+
 // handleQueryCaptionsView handles the captions view mode of HandleQuery
 func (c *ServeCmd) handleQueryCaptionsView(
 	ctx context.Context,
@@ -85,82 +160,21 @@ func (c *ServeCmd) handleQueryCaptionsView(
 	aggregate := q.Get("aggregate") == "true"
 
 	for _, dbPath := range dbs {
-		err2 := c.execDB(ctx, dbPath, func(ctx context.Context, sqlDB *sql.DB) error {
-			queries := database.New(sqlDB)
-			var rows []database.SearchCaptionsRow
-			var captionErr error
-
-			if queryStr != "" {
-				rows, captionErr = c.getCaptionsWithContext(
-					ctx,
-					queries,
-					CaptionsQueryParams{
-						QueryStr:  queryStr,
-						Limit:     int64(limit),
-						VideoOnly: flags.VideoOnly,
-						AudioOnly: flags.AudioOnly,
-						ImageOnly: flags.ImageOnly,
-						TextOnly:  flags.TextOnly,
-					},
-				)
-			} else {
-				captionsParams := database.GetAllCaptionsOrderedParams{
-					VideoOnly: utils.BoolToInt64(flags.VideoOnly),
-					AudioOnly: utils.BoolToInt64(flags.AudioOnly),
-					ImageOnly: utils.BoolToInt64(flags.ImageOnly),
-					TextOnly:  utils.BoolToInt64(flags.TextOnly),
-					Limit:     int64(limit),
-				}
-				rawRows, err3 := queries.GetAllCaptionsOrdered(ctx, captionsParams)
-				if err3 != nil {
-					return err3
-				}
-				models.Log.Info(
-					"Fetched captions",
-					"count",
-					len(rawRows),
-					"video_only",
-					captionsParams.VideoOnly,
-					"audio_only",
-					captionsParams.AudioOnly,
-				)
-				for _, row := range rawRows {
-					rows = append(rows, database.SearchCaptionsRow{
-						MediaPath: row.MediaPath,
-						Time:      row.Time,
-						Text:      row.Text,
-						Title:     row.Title,
-						MediaType: row.MediaType,
-						Size:      row.Size,
-						Duration:  row.Duration,
-						Rank:      0,
-					})
-				}
-			}
-
-			if captionErr != nil {
-				return captionErr
-			}
-
-			c.appendCaptionRows(&media, rows, dbPath, aggregate)
-			return nil
-		})
-		if err2 != nil {
-			models.Log.Error("Caption fetch failed", "db", dbPath, "error", err2)
+		params := fetchCaptionsParams{
+			dbPath:    dbPath,
+			queryStr:  queryStr,
+			flags:     flags,
+			limit:     limit,
+			aggregate: aggregate,
+			media:     &media,
+		}
+		if err := c.fetchCaptionsFromDB(ctx, params); err != nil {
+			models.Log.Error("Caption fetch failed", "db", dbPath, "error", err)
 		}
 	}
 
 	totalCount := len(media)
-
-	if !flags.All && flags.Limit > 0 {
-		start := flags.Offset
-		if start > len(media) {
-			media = []models.MediaWithDB{}
-		} else {
-			end := min(start+flags.Limit, len(media))
-			media = media[start:end]
-		}
-	}
+	media = c.applyPagination(media, flags)
 
 	if media == nil {
 		media = []models.MediaWithDB{}

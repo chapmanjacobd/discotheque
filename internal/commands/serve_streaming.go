@@ -165,6 +165,146 @@ func (c *ServeCmd) runTranscodeCommand(ctx context.Context, w http.ResponseWrite
 	}
 }
 
+// checkPathInDB verifies the path exists in any database and checks for embedded subtitles
+func (c *ServeCmd) checkFuzzyPathMatch(
+	ctx context.Context,
+	queries *database.Queries,
+	path string,
+) (found, hasSubtitles bool) {
+	// Check if any media in the database shares the same directory and base name
+	dir := filepath.Dir(path)
+	filename := filepath.Base(path)
+	base := strings.TrimSuffix(filename, filepath.Ext(filename))
+	if secondExt := filepath.Ext(base); secondExt != "" {
+		base = strings.TrimSuffix(base, secondExt)
+	}
+
+	mediaInDir, _ := queries.GetMedia(ctx, 1000)
+	for _, m := range mediaInDir {
+		if filepath.Dir(m.Path) == dir {
+			mBase := strings.TrimSuffix(filepath.Base(m.Path), filepath.Ext(m.Path))
+			if mBase == base {
+				found = true
+				if m.SubtitleCount.Valid && m.SubtitleCount.Int64 > 0 {
+					hasSubtitles = true
+				}
+				break
+			}
+		}
+	}
+	return found, hasSubtitles
+}
+
+func (c *ServeCmd) checkPathInDB(ctx context.Context, path string) (found, hasSubtitles bool) {
+	for _, dbPath := range c.Databases {
+		err := c.execDB(ctx, dbPath, func(ctx context.Context, sqlDB *sql.DB) error {
+			queries := database.New(sqlDB)
+			media, err := queries.GetMediaByPathExact(ctx, path)
+			if err == nil {
+				found = true
+				if media.SubtitleCount.Valid && media.SubtitleCount.Int64 > 0 {
+					hasSubtitles = true
+				}
+				return nil
+			}
+
+			found, hasSubtitles = c.checkFuzzyPathMatch(ctx, queries, path)
+			return nil
+		})
+		if found {
+			break
+		}
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			models.Log.Error("Database error in handleSubtitles", "db", dbPath, "error", err)
+		}
+	}
+	return found, hasSubtitles
+}
+
+// resolveSidecarSubtitle finds an external subtitle file for a media container
+func (c *ServeCmd) resolveSidecarSubtitle(
+	path, requestedExt string,
+	hasSubtitles bool,
+) (subPath, subType string, err error) {
+	sidecars := utils.GetExternalSubtitles(path)
+	if len(sidecars) == 0 {
+		if !hasSubtitles {
+			models.Log.Debug("No subtitles found (DB check)", "path", path)
+			return "", "", errors.New("no subtitles available")
+		}
+		return "", "", errors.New("no index specified and no sidecar found")
+	}
+
+	if requestedExt != "" {
+		for _, sub := range sidecars {
+			if strings.ToLower(filepath.Ext(sub)) == "."+requestedExt {
+				models.Log.Debug(
+					"Found matching sidecar for media file",
+					"media",
+					path,
+					"sidecar",
+					sub,
+				)
+				return sub, strings.ToLower(filepath.Ext(sub)), nil
+			}
+		}
+		// No matching extension found, use the first one
+		models.Log.Debug(
+			"Requested extension not found, using first sidecar",
+			"media",
+			path,
+			"sidecar",
+			sidecars[0],
+		)
+		return sidecars[0], strings.ToLower(filepath.Ext(sidecars[0])), nil
+	}
+
+	models.Log.Debug("Found sidecar for media file", "media", path, "sidecar", sidecars[0])
+	return sidecars[0], strings.ToLower(filepath.Ext(sidecars[0])), nil
+}
+
+// validateVobSubFiles checks that both .idx and .sub files exist for VobSub subtitles
+func (c *ServeCmd) validateVobSubFiles(path string) (string, error) {
+	subPath := strings.TrimSuffix(path, ".idx") + ".sub"
+	if !utils.FileExists(subPath) {
+		models.Log.Warn("VobSub conversion requested but .sub file is missing", "idx", path)
+		return "", errors.New("corresponding .sub file not found")
+	}
+	return subPath, nil
+}
+
+// convertSubtitleToVTT converts a subtitle file to WebVTT format using ffmpeg
+func (c *ServeCmd) convertSubtitleToVTT(ctx context.Context, path, streamIndex string) ([]byte, error) {
+	var args []string
+	isImageSub := func() bool {
+		ext := strings.ToLower(filepath.Ext(path))
+		return ext == ".idx" || ext == ".sub" || ext == ".sup"
+	}()
+
+	if streamIndex != "" {
+		args = append(args, "-i", path, "-map", "0:s:"+streamIndex, "-f", "webvtt", "pipe:1")
+	} else {
+		args = append(args, "-i", path, "-f", "webvtt", "pipe:1")
+	}
+
+	ffmpegArgs := append([]string{"-hide_banner", "-loglevel", "error"}, args...)
+	models.Log.Debug("subtitle ffmpeg command", "args", strings.Join(ffmpegArgs, " "))
+
+	cmd := exec.CommandContext(ctx, "ffmpeg", ffmpegArgs...)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		if ctx.Err() == nil {
+			msg := "Failed to convert subtitles"
+			if isImageSub || streamIndex != "" {
+				msg = "Failed to convert subtitles (image-based formats require OCR which is not yet supported for direct VTT streaming)"
+			}
+			models.Log.Error(msg, "path", path, "error", err, "output", string(output))
+		}
+		return nil, err
+	}
+	return output, nil
+}
+
 func (c *ServeCmd) HandleSubtitles(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Query().Get("path")
 	if path == "" {
@@ -175,56 +315,7 @@ func (c *ServeCmd) HandleSubtitles(w http.ResponseWriter, r *http.Request) {
 	models.Log.Debug("handleSubtitles request", "path", path, "index", r.URL.Query().Get("index"))
 
 	// Verify path or siblings and check subtitle_count for optimization
-	found := false
-	hasSubtitles := false
-	for _, dbPath := range c.Databases {
-		err := c.execDB(r.Context(), dbPath, func(ctx context.Context, sqlDB *sql.DB) error {
-			queries := database.New(sqlDB)
-			media, err := queries.GetMediaByPathExact(ctx, path)
-			if err == nil {
-				found = true
-				// Check if media has embedded subtitles
-				if media.SubtitleCount.Valid && media.SubtitleCount.Int64 > 0 {
-					hasSubtitles = true
-				}
-				return nil
-			}
-
-			// If path doesn't exist, it might be an external subtitle file next to a media file
-			// We'll check if any media in the database shares the same directory and base name
-			dir := filepath.Dir(path)
-			filename := filepath.Base(path)
-			base := strings.TrimSuffix(filename, filepath.Ext(filename))
-			// Handle cases like movie.en.srt by stripping one more extension if it exists
-			if secondExt := filepath.Ext(base); secondExt != "" {
-				base = strings.TrimSuffix(base, secondExt)
-			}
-
-			// Simple check: does this directory contain ANY media we know with the same base name?
-			mediaInDir, _ := queries.GetMedia(ctx, 1000)
-			for _, m := range mediaInDir {
-				if filepath.Dir(m.Path) == dir {
-					mBase := strings.TrimSuffix(filepath.Base(m.Path), filepath.Ext(m.Path))
-					if mBase == base {
-						found = true
-						// Check if media has embedded subtitles
-						if m.SubtitleCount.Valid && m.SubtitleCount.Int64 > 0 {
-							hasSubtitles = true
-						}
-						break
-					}
-				}
-			}
-			return nil
-		})
-		if found {
-			break
-		}
-		if err != nil && !errors.Is(err, sql.ErrNoRows) {
-			models.Log.Error("Database error in handleSubtitles", "db", dbPath, "error", err)
-		}
-	}
-
+	found, hasSubtitles := c.checkPathInDB(r.Context(), path)
 	if !found {
 		http.Error(w, "Access denied", http.StatusForbidden)
 		return
@@ -241,61 +332,20 @@ func (c *ServeCmd) HandleSubtitles(w http.ResponseWriter, r *http.Request) {
 	streamIndex := r.URL.Query().Get("index")
 	requestedExt := r.URL.Query().Get("ext")
 
-	// If it's a media container but no index is specified, we should try to find an external sidecar
+	// If it's a media container but no index is specified, try to find an external sidecar
 	if streamIndex == "" && (ext == ".mkv" || ext == ".mp4" || ext == ".m4v" || ext == ".mov" || ext == ".webm") {
-		// Try to find a sibling subtitle file
-		sidecars := utils.GetExternalSubtitles(path)
-		if len(sidecars) == 0 {
-			// Optimization: If no external sidecars found and DB says no embedded subtitles, return early
-			if !hasSubtitles {
-				models.Log.Debug("No subtitles found (DB check)", "path", path)
-				http.Error(w, "No subtitles available", http.StatusNotFound)
-				return
-			}
-			http.Error(w, "No index specified and no sidecar found", http.StatusNotFound)
+		resolvedPath, resolvedExt, err := c.resolveSidecarSubtitle(path, requestedExt, hasSubtitles)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusNotFound)
 			return
 		}
-		// If a specific extension was requested, try to find a matching one
-		if requestedExt != "" {
-			for _, sub := range sidecars {
-				if strings.ToLower(filepath.Ext(sub)) == "."+requestedExt {
-					path = sub
-					ext = strings.ToLower(filepath.Ext(path))
-					models.Log.Debug(
-						"Found matching sidecar for media file",
-						"media",
-						r.URL.Query().Get("path"),
-						"sidecar",
-						path,
-					)
-					break
-				}
-			}
-			// If no matching extension found, use the first one anyway
-			if ext != "."+requestedExt && len(sidecars) > 0 {
-				path = sidecars[0]
-				ext = strings.ToLower(filepath.Ext(path))
-				models.Log.Debug(
-					"Requested extension not found, using first sidecar",
-					"media",
-					r.URL.Query().Get("path"),
-					"sidecar",
-					path,
-				)
-			}
-		} else {
-			// Serve the first found sidecar
-			path = sidecars[0]
-			ext = strings.ToLower(filepath.Ext(path))
-			models.Log.Debug("Found sidecar for media file", "media", r.URL.Query().Get("path"), "sidecar", path)
-		}
+		path = resolvedPath
+		ext = resolvedExt
 	}
 
 	if ext == ".idx" {
-		subPath := strings.TrimSuffix(path, ".idx") + ".sub"
-		if !utils.FileExists(subPath) {
-			models.Log.Warn("VobSub conversion requested but .sub file is missing", "idx", path)
-			http.Error(w, "Corresponding .sub file not found", http.StatusNotFound)
+		if _, err := c.validateVobSubFiles(path); err != nil {
+			http.Error(w, err.Error(), http.StatusNotFound)
 			return
 		}
 	}
@@ -306,33 +356,9 @@ func (c *ServeCmd) HandleSubtitles(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var args []string
-	isImageSub := ext == ".idx" || ext == ".sub" || ext == ".sup"
-
-	if streamIndex != "" {
-		// Embedded tracks
-		args = append(args, "-i", path, "-map", "0:s:"+streamIndex, "-f", "webvtt", "pipe:1")
-	} else {
-		// Standalone file (srt, lrc, ass, etc.)
-		args = append(args, "-i", path, "-f", "webvtt", "pipe:1")
-	}
-
-	ffmpegArgs := append([]string{"-hide_banner", "-loglevel", "error"}, args...)
-	models.Log.Debug("subtitle ffmpeg command", "args", strings.Join(ffmpegArgs, " "))
-
-	cmd := exec.CommandContext(r.Context(), "ffmpeg", ffmpegArgs...)
-
-	// We don't set Content-Type yet to allow http.Error if ffmpeg fails immediately
-	output, err := cmd.CombinedOutput()
+	output, err := c.convertSubtitleToVTT(r.Context(), path, streamIndex)
 	if err != nil {
-		if r.Context().Err() == nil {
-			msg := "Failed to convert subtitles"
-			if isImageSub || streamIndex != "" {
-				msg = "Failed to convert subtitles (image-based formats require OCR which is not yet supported for direct VTT streaming)"
-			}
-			models.Log.Error(msg, "path", path, "error", err, "output", string(output))
-			http.Error(w, "Unplayable: subtitle conversion failed", http.StatusUnsupportedMediaType)
-		}
+		http.Error(w, "Unplayable: subtitle conversion failed", http.StatusUnsupportedMediaType)
 		return
 	}
 
@@ -495,18 +521,10 @@ func (c *ServeCmd) generateEpubThumbnail(path string) ([]byte, string, error) {
 	return []byte{}, "image/svg+xml", nil
 }
 
-func (c *ServeCmd) HandleThumbnail(w http.ResponseWriter, r *http.Request) {
-	path := r.URL.Query().Get("path")
-	if path == "" {
-		http.Error(w, "Path required", http.StatusBadRequest)
-		return
-	}
-
-	// Verify path exists in database to prevent arbitrary file access
-	found := false
-	var mediaType string
+// getMediaTypeFromDB looks up the media type for a given path across all databases
+func (c *ServeCmd) getMediaTypeFromDB(ctx context.Context, path string) (found bool, mediaType string) {
 	for _, dbPath := range c.Databases {
-		err := c.execDB(r.Context(), dbPath, func(ctx context.Context, sqlDB *sql.DB) error {
+		err := c.execDB(ctx, dbPath, func(ctx context.Context, sqlDB *sql.DB) error {
 			queries := database.New(sqlDB)
 			dbMedia, err := queries.GetMediaByPathExact(ctx, path)
 			if err == nil {
@@ -524,7 +542,80 @@ func (c *ServeCmd) HandleThumbnail(w http.ResponseWriter, r *http.Request) {
 			models.Log.Error("Database error in handleThumbnail", "db", dbPath, "error", err)
 		}
 	}
+	return found, mediaType
+}
 
+// writeThumbnailResponse writes the thumbnail bytes with appropriate headers
+func (c *ServeCmd) writeThumbnailResponse(w http.ResponseWriter, data []byte, contentType string) {
+	w.Header().Set("Content-Type", contentType)
+	if !c.Dev {
+		w.Header().Set("Cache-Control", "public, max-age=31536000")
+	} else {
+		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+	}
+	_, _ = w.Write(data)
+}
+
+// tryServeSmallImage serves the original file if it is small enough to be used directly as a thumbnail
+func (c *ServeCmd) tryServeSmallImage(w http.ResponseWriter, path string) bool {
+	if info, err := os.Stat(path); err == nil && info.Size() < 500*1024 {
+		if data, err := os.ReadFile(path); err == nil {
+			ext := strings.ToLower(filepath.Ext(path))
+			contentType := utils.GetContentTypeFromExt(ext)
+			c.writeThumbnailResponse(w, data, contentType)
+			return true
+		}
+	}
+	return false
+}
+
+// generateFallbackThumbnail creates a thumbnail for video or audio files using ffmpeg.
+// For video, it seeks to 25s, retries at 85s if the frame is too dark.
+// For audio, it tries to extract embedded album art.
+func (c *ServeCmd) generateFallbackThumbnail(ctx context.Context, path, mediaType string) ([]byte, error) {
+	var args []string
+	switch mediaType {
+	case "video":
+		args = []string{
+			"-ss", "25", "-i", path, "-frames:v", "1", "-q:v", "4",
+			"-vf", "scale=320:-1", "-f", "image2", "pipe:1",
+		}
+	case "audio":
+		args = []string{"-i", path, "-an", "-vcodec", "copy", "-f", "image2", "pipe:1"}
+	default:
+		return nil, errors.New("unsupported media type for thumbnail")
+	}
+
+	ffmpegArgs := append([]string{"-hide_banner", "-loglevel", "error"}, args...)
+	cmd := exec.CommandContext(ctx, "ffmpeg", ffmpegArgs...)
+	thumb, err := cmd.Output()
+
+	// If video thumbnail is too dark, try seeking further (e.g. 60 seconds later)
+	if err == nil && mediaType == "video" && utils.IsImageTooDark(thumb, 0.05) {
+		models.Log.Debug("Thumbnail too dark, retrying further in the video", "path", path)
+		retryArgs := []string{
+			"-ss", "85", "-i", path, "-frames:v", "1", "-q:v", "4",
+			"-vf", "scale=320:-1", "-f", "image2", "pipe:1",
+		}
+		retryFfmpegArgs := append([]string{"-hide_banner", "-loglevel", "error"}, retryArgs...)
+		cmdRetry := exec.CommandContext(ctx, "ffmpeg", retryFfmpegArgs...)
+		if retryThumb, retryErr := cmdRetry.Output(); retryErr == nil {
+			thumb = retryThumb
+		}
+	}
+
+	return thumb, err
+}
+
+func (c *ServeCmd) HandleThumbnail(w http.ResponseWriter, r *http.Request) {
+	path := r.URL.Query().Get("path")
+	if path == "" {
+		http.Error(w, "Path required", http.StatusBadRequest)
+		return
+	}
+
+	// Verify path exists in database to prevent arbitrary file access
+	found, mediaType := c.getMediaTypeFromDB(r.Context(), path)
 	if !found {
 		http.Error(w, "Access denied", http.StatusForbidden)
 		return
@@ -532,38 +623,21 @@ func (c *ServeCmd) HandleThumbnail(w http.ResponseWriter, r *http.Request) {
 
 	// Check cache (skip cache in dev mode)
 	if !c.Dev {
-		if data, ok := c.thumbnailCache.Load(path); ok {
-			w.Header().Set("Content-Type", "image/jpeg")
-			w.Header().Set("Cache-Control", "public, max-age=31536000")
-			if bytes, ok := data.([]byte); ok {
-				_, _ = w.Write(bytes)
-			}
-			return
-		}
-	}
-
-	// Generate thumbnail using media_type from database
-	ext := strings.ToLower(filepath.Ext(path))
-
-	// Handle image files
-	if mediaType == "image" {
-		if info, err := os.Stat(path); err == nil && info.Size() < 500*1024 {
-			data, err := os.ReadFile(path)
-			if err == nil {
-				contentType := utils.GetContentTypeFromExt(ext)
-				w.Header().Set("Content-Type", contentType)
-				if !c.Dev {
-					w.Header().Set("Cache-Control", "public, max-age=31536000")
-				} else {
-					w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
-				}
-				_, _ = w.Write(data)
+		if val, ok := c.thumbnailCache.Load(path); ok {
+			if data, ok := val.([]byte); ok {
+				c.writeThumbnailResponse(w, data, "image/jpeg")
 				return
 			}
 		}
 	}
 
-	// Handle text-based documents with smart thumbnails
+	// Handle image files
+	if mediaType == "image" && c.tryServeSmallImage(w, path) {
+		return
+	}
+
+	// Handle document types with smart thumbnails
+	ext := strings.ToLower(filepath.Ext(path))
 	switch ext {
 	case ".pdf":
 		thumb, contentType, err := c.generatePDFThumbnail(r.Context(), path)
@@ -572,13 +646,7 @@ func (c *ServeCmd) HandleThumbnail(w http.ResponseWriter, r *http.Request) {
 			http.NotFound(w, r)
 			return
 		}
-		w.Header().Set("Content-Type", contentType)
-		if !c.Dev {
-			w.Header().Set("Cache-Control", "public, max-age=31536000")
-		} else {
-			w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
-		}
-		_, _ = w.Write(thumb)
+		c.writeThumbnailResponse(w, thumb, contentType)
 		return
 
 	case ".epub":
@@ -588,86 +656,17 @@ func (c *ServeCmd) HandleThumbnail(w http.ResponseWriter, r *http.Request) {
 			http.NotFound(w, r)
 			return
 		}
-		w.Header().Set("Content-Type", contentType)
-		if !c.Dev {
-			w.Header().Set("Cache-Control", "public, max-age=31536000")
-		} else {
-			w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
-		}
-		_, _ = w.Write(thumb)
+		c.writeThumbnailResponse(w, thumb, contentType)
 		return
 
 	case ".txt", ".md", ".markdown", ".rtf":
-		// SVG thumbnails disabled for text files
 		http.NotFound(w, r)
 		return
 	}
 
 	// Default: handle video/audio with ffmpeg
-	var args []string
-	isVideo := mediaType == "video"
-	if isVideo {
-		args = []string{
-			"-ss",
-			"25",
-			"-i",
-			path,
-			"-frames:v",
-			"1",
-			"-q:v",
-			"4",
-			"-vf",
-			"scale=320:-1",
-			"-f",
-			"image2",
-			"pipe:1",
-		}
-	} else if mediaType == "audio" {
-		// For audio files, try to extract embedded album art first
-		// If no album art exists, ffmpeg will fail, so we return a placeholder
-		args = []string{"-i", path, "-an", "-vcodec", "copy", "-f", "image2", "pipe:1"}
-	} else {
-		// SVG thumbnails disabled for documents and unsupported types
-		http.NotFound(w, r)
-		return
-	}
-
-	cmd := exec.CommandContext(
-		r.Context(),
-		"ffmpeg",
-		append([]string{"-hide_banner", "-loglevel", "error"}, args...)...)
-	thumb, err := cmd.Output()
-
-	// If video thumbnail is too dark, try seeking further (e.g. 60 seconds later)
-	if err == nil && isVideo && utils.IsImageTooDark(thumb, 0.05) {
-		models.Log.Debug("Thumbnail too dark, retrying further in the video", "path", path)
-		retryArgs := []string{
-			"-ss",
-			"85",
-			"-i",
-			path,
-			"-frames:v",
-			"1",
-			"-q:v",
-			"4",
-			"-vf",
-			"scale=320:-1",
-			"-f",
-			"image2",
-			"pipe:1",
-		}
-		cmdRetry := exec.CommandContext(
-			r.Context(),
-			"ffmpeg",
-			append([]string{"-hide_banner", "-loglevel", "error"}, retryArgs...)...)
-		if retryThumb, retryErr := cmdRetry.Output(); retryErr == nil {
-			thumb = retryThumb
-		}
-	}
-
+	thumb, err := c.generateFallbackThumbnail(r.Context(), path, mediaType)
 	if err != nil {
-		// For audio files without embedded art, or video files that fail, return 404
-		// Frontend will fall back to client-generated thumbnails
 		models.Log.Debug("Thumbnail generation failed", "path", path, "error", err)
 		http.NotFound(w, r)
 		return
@@ -678,13 +677,7 @@ func (c *ServeCmd) HandleThumbnail(w http.ResponseWriter, r *http.Request) {
 		c.thumbnailCache.Store(path, thumb)
 	}
 
-	w.Header().Set("Content-Type", "image/jpeg")
-	if !c.Dev {
-		w.Header().Set("Cache-Control", "public, max-age=31536000")
-	} else {
-		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
-	}
-	_, _ = w.Write(thumb)
+	c.writeThumbnailResponse(w, thumb, "image/jpeg")
 }
 
 func (c *ServeCmd) HandleHLSPlaylist(w http.ResponseWriter, r *http.Request) {

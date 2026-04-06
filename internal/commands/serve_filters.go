@@ -27,30 +27,7 @@ type filterBinsData struct {
 	typeCounts   map[string]int64
 }
 
-// computeFilterBinsData queries specified databases and collects size, duration, and parent count data
-// This is the single source of truth for filter bins data collection
-func (c *ServeCmd) computeFilterBinsData(
-	ctx context.Context,
-	flags models.GlobalFlags,
-	filterToIgnore string,
-	dbs []string,
-) filterBinsData {
-	var mu sync.Mutex
-	// Track sizes and durations with their parent paths for filtering
-	type itemWithParent struct {
-		size       int64
-		duration   int64
-		modified   int64
-		created    int64
-		downloaded int64
-		parentDir  string
-		mediaType  string
-	}
-	var allItems []itemWithParent
-	allParentCounts := make(map[string]int64)
-	allTypeCounts := make(map[string]int64)
-
-	// Build flags for this query, ignoring the specified filter
+func (c *ServeCmd) prepareFilterFlags(flags models.GlobalFlags, filterToIgnore string) models.GlobalFlags {
 	tempFlags := flags
 	tempFlags.Where = append([]string{}, flags.Where...)
 	tempFlags.All = true
@@ -78,21 +55,75 @@ func (c *ServeCmd) computeFilterBinsData(
 		tempFlags.DownloadedAfter = ""
 		tempFlags.DownloadedBefore = ""
 	}
+	return tempFlags
+}
 
-	fb := query.NewFilterBuilder(tempFlags)
-	sqlQuery, args := fb.BuildSelect(
-		ctx,
-		"path, size, duration, media_type, time_modified, time_created, time_downloaded",
-	)
+type itemWithParent struct {
+	size       int64
+	duration   int64
+	modified   int64
+	created    int64
+	downloaded int64
+	parentDir  string
+	mediaType  string
+}
 
+func (c *ServeCmd) scanFilterRow(rows *sql.Rows) (itemWithParent, error) {
+	var p string
+	var s, d, tm, tc, td sql.NullInt64
+	var t sql.NullString
+	if err := rows.Scan(&p, &s, &d, &t, &tm, &tc, &td); err != nil {
+		return itemWithParent{}, err
+	}
+	parent := filepath.Dir(p)
+	mediaType := "unknown"
+	if t.Valid && t.String != "" {
+		mediaType = t.String
+	}
+
+	var sizeVal, durVal, modVal, creVal, dlVal int64
+	if s.Valid && s.Int64 > 0 && s.Int64 < 100*1024*1024*1024*1024 {
+		sizeVal = s.Int64
+	}
+	if d.Valid && d.Int64 > 0 && d.Int64 < 2678400 {
+		durVal = d.Int64
+	}
+	if tm.Valid {
+		modVal = tm.Int64
+	}
+	if tc.Valid {
+		creVal = tc.Int64
+	}
+	if td.Valid {
+		dlVal = td.Int64
+	}
+	return itemWithParent{
+		size:       sizeVal,
+		duration:   durVal,
+		modified:   modVal,
+		created:    creVal,
+		downloaded: dlVal,
+		parentDir:  parent,
+		mediaType:  mediaType,
+	}, nil
+}
+
+func (c *ServeCmd) collectRawItems(
+	ctx context.Context,
+	sqlQuery string,
+	args []any,
+	dbs []string,
+) (allItems []itemWithParent, allParentCounts, allTypeCounts map[string]int64) {
+	var mu sync.Mutex
+	allParentCounts = make(map[string]int64)
+	allTypeCounts = make(map[string]int64)
 	var wg sync.WaitGroup
-	errChan := make(chan error, len(dbs))
 
 	for _, dbPath := range dbs {
 		wg.Add(1)
 		go func(path string) {
 			defer wg.Done()
-			err := c.execDB(ctx, path, func(ctx context.Context, sqlDB *sql.DB) error {
+			_ = c.execDB(ctx, path, func(ctx context.Context, sqlDB *sql.DB) error {
 				rows, err := sqlDB.QueryContext(ctx, sqlQuery, args...)
 				if err != nil {
 					return err
@@ -104,49 +135,11 @@ func (c *ServeCmd) computeFilterBinsData(
 				localTypeCounts := make(map[string]int64)
 
 				for rows.Next() {
-					var p string
-					var s, d, tm, tc, td sql.NullInt64
-					var t sql.NullString
-					if err := rows.Scan(&p, &s, &d, &t, &tm, &tc, &td); err == nil {
-						parent := filepath.Dir(p)
-						localParentCounts[parent]++
-
-						mediaType := "unknown"
-						if t.Valid && t.String != "" {
-							mediaType = t.String
-						}
-						localTypeCounts[mediaType]++
-
-						var sizeVal, durVal, modVal, creVal, dlVal int64
-						if s.Valid && s.Int64 > 0 && s.Int64 < 100*1024*1024*1024*1024 {
-							sizeVal = s.Int64
-						}
-						if d.Valid && d.Int64 > 0 && d.Int64 < 2678400 {
-							durVal = d.Int64
-						}
-						if tm.Valid {
-							modVal = tm.Int64
-						}
-						if tc.Valid {
-							creVal = tc.Int64
-						}
-						if td.Valid {
-							dlVal = td.Int64
-						}
-						localItems = append(localItems, itemWithParent{
-							size:       sizeVal,
-							duration:   durVal,
-							modified:   modVal,
-							created:    creVal,
-							downloaded: dlVal,
-							parentDir:  parent,
-							mediaType:  mediaType,
-						})
+					if item, err := c.scanFilterRow(rows); err == nil {
+						localParentCounts[item.parentDir]++
+						localTypeCounts[item.mediaType]++
+						localItems = append(localItems, item)
 					}
-				}
-
-				if err := rows.Err(); err != nil {
-					return err
 				}
 
 				mu.Lock()
@@ -158,91 +151,85 @@ func (c *ServeCmd) computeFilterBinsData(
 					allTypeCounts[k] += v
 				}
 				mu.Unlock()
-				return nil
+				return rows.Err()
 			})
-			if err != nil {
-				errChan <- fmt.Errorf("db %s: %w", path, err)
-			}
 		}(dbPath)
 	}
 	wg.Wait()
-	close(errChan)
+	return allItems, allParentCounts, allTypeCounts
+}
 
-	// Collect and log any errors from database queries
-	var queryErrors []error
-	for err := range errChan {
-		queryErrors = append(queryErrors, err)
+func (c *ServeCmd) applyFileCountsFilter(
+	flags models.GlobalFlags,
+	allItemsIn []itemWithParent,
+	allParentCountsIn map[string]int64,
+) (allItems []itemWithParent, allParentCounts, allTypeCounts map[string]int64) {
+	r, err := utils.ParseRange(flags.FileCounts, func(s string) (int64, error) {
+		return strconv.ParseInt(s, 10, 64)
+	})
+	if err != nil {
+		return allItemsIn, allParentCountsIn, nil
 	}
-	if len(queryErrors) > 0 {
-		for _, qErr := range queryErrors {
-			models.Log.Warn("Database query failed in filter bins", "error", qErr)
+
+	allParentCounts = make(map[string]int64)
+	for parent, count := range allParentCountsIn {
+		if r.Matches(count) {
+			allParentCounts[parent] = count
 		}
 	}
 
-	// Apply FileCounts (episodes) filter in post-processing if not being ignored
-	// This matches the logic in MediaQuery for consistent filtering
+	allItems = make([]itemWithParent, 0, len(allItemsIn))
+	allTypeCounts = make(map[string]int64)
+	for _, item := range allItemsIn {
+		if _, ok := allParentCounts[item.parentDir]; ok {
+			allItems = append(allItems, item)
+			allTypeCounts[item.mediaType]++
+		}
+	}
+	return allItems, allParentCounts, allTypeCounts
+}
+
+func (c *ServeCmd) computeFilterBinsData(
+	ctx context.Context,
+	flags models.GlobalFlags,
+	filterToIgnore string,
+	dbs []string,
+) filterBinsData {
+	tempFlags := c.prepareFilterFlags(flags, filterToIgnore)
+	fb := query.NewFilterBuilder(tempFlags)
+	sqlQuery, args := fb.BuildSelect(
+		ctx,
+		"path, size, duration, media_type, time_modified, time_created, time_downloaded",
+	)
+
+	allItems, allParentCounts, allTypeCounts := c.collectRawItems(ctx, sqlQuery, args, dbs)
+
 	if filterToIgnore != "episodes" && flags.FileCounts != "" {
-		r, err := utils.ParseRange(flags.FileCounts, func(s string) (int64, error) {
-			return strconv.ParseInt(s, 10, 64)
-		})
-		if err == nil {
-			// Filter parent counts to only those matching the file count range
-			filteredParentCounts := make(map[string]int64)
-			for parent, count := range allParentCounts {
-				if r.Matches(count) {
-					filteredParentCounts[parent] = count
-				}
-			}
-			allParentCounts = filteredParentCounts
-
-			// Filter items to only those from matching parents
-			filteredItems := make([]itemWithParent, 0, len(allItems))
-			newTypeCounts := make(map[string]int64)
-			for _, item := range allItems {
-				if _, ok := allParentCounts[item.parentDir]; ok {
-					filteredItems = append(filteredItems, item)
-					newTypeCounts[item.mediaType]++
-				}
-			}
-			allItems = filteredItems
-			allTypeCounts = newTypeCounts
-		}
+		allItems, allParentCounts, allTypeCounts = c.applyFileCountsFilter(flags, allItems, allParentCounts)
 	}
 
-	// Extract sizes and durations from filtered items
-	allSizes := make([]int64, 0, len(allItems))
-	allDurations := make([]int64, 0, len(allItems))
-	allModified := make([]int64, 0, len(allItems))
-	allCreated := make([]int64, 0, len(allItems))
-	allDownloaded := make([]int64, 0, len(allItems))
-
-	for _, item := range allItems {
-		if item.size > 0 {
-			allSizes = append(allSizes, item.size)
-		}
-		if item.duration > 0 {
-			allDurations = append(allDurations, item.duration)
-		}
-		if item.modified > 0 {
-			allModified = append(allModified, item.modified)
-		}
-		if item.created > 0 {
-			allCreated = append(allCreated, item.created)
-		}
-		if item.downloaded > 0 {
-			allDownloaded = append(allDownloaded, item.downloaded)
-		}
-	}
-
-	return filterBinsData{
-		sizes:        allSizes,
-		durations:    allDurations,
-		modified:     allModified,
-		created:      allCreated,
-		downloaded:   allDownloaded,
+	res := filterBinsData{
 		parentCounts: allParentCounts,
 		typeCounts:   allTypeCounts,
 	}
+	for _, item := range allItems {
+		if item.size > 0 {
+			res.sizes = append(res.sizes, item.size)
+		}
+		if item.duration > 0 {
+			res.durations = append(res.durations, item.duration)
+		}
+		if item.modified > 0 {
+			res.modified = append(res.modified, item.modified)
+		}
+		if item.created > 0 {
+			res.created = append(res.created, item.created)
+		}
+		if item.downloaded > 0 {
+			res.downloaded = append(res.downloaded, item.downloaded)
+		}
+	}
+	return res
 }
 
 // buildSizeBins creates size filter bins from raw size data
@@ -441,8 +428,160 @@ func (c *ServeCmd) calculateFilterCountsOptimized(
 	return resp
 }
 
-// computeFilterBinsDataOptimized is an optimized version that uses SQL aggregation
-// instead of fetching all rows. This is MUCH faster for large libraries.
+func (c *ServeCmd) fetchParentCounts(
+	ctx context.Context,
+	sqlDB *sql.DB,
+	allParentCounts map[string]int64,
+	mu *sync.Mutex,
+) {
+	parentCountQuery := `
+		SELECT parent, file_count
+		FROM folder_stats
+	`
+	rows, err := sqlDB.QueryContext(ctx, parentCountQuery)
+	hasData := false
+	if err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			hasData = true
+			var parent string
+			var cnt int64
+			if scanErr := rows.Scan(&parent, &cnt); scanErr == nil {
+				mu.Lock()
+				allParentCounts[parent] += cnt
+				mu.Unlock()
+			}
+		}
+		if err := rows.Err(); err != nil {
+			models.Log.Debug("Parent count query error", "error", err)
+		}
+	}
+
+	if !hasData {
+		c.fetchParentCountsFallback(ctx, sqlDB, allParentCounts, mu)
+	}
+}
+
+func (c *ServeCmd) fetchParentCountsFallback(
+	ctx context.Context,
+	sqlDB *sql.DB,
+	allParentCounts map[string]int64,
+	mu *sync.Mutex,
+) {
+	parentCountQuery := `
+		SELECT path
+		FROM media
+		WHERE COALESCE(time_deleted, 0) = 0
+	`
+	rows, err := sqlDB.QueryContext(ctx, parentCountQuery)
+	if err == nil {
+		defer rows.Close()
+		localParentCounts := make(map[string]int64)
+		for rows.Next() {
+			var path string
+			if err := rows.Scan(&path); err == nil {
+				parent := filepath.Dir(path)
+				localParentCounts[parent]++
+			}
+		}
+		if err := rows.Err(); err != nil {
+			models.Log.Debug("Fallback parent count query error", "error", err)
+		}
+		mu.Lock()
+		for p, cnt := range localParentCounts {
+			allParentCounts[p] += cnt
+		}
+		mu.Unlock()
+	}
+}
+
+func (c *ServeCmd) fetchTypeCounts(ctx context.Context, sqlDB *sql.DB, allTypeCounts map[string]int64, mu *sync.Mutex) {
+	typeCountQuery := `
+		SELECT COALESCE(NULLIF(media_type, ''), 'unknown') as t, COUNT(*) as cnt
+		FROM media
+		WHERE COALESCE(time_deleted, 0) = 0
+		GROUP BY media_type
+	`
+	rows, err := sqlDB.QueryContext(ctx, typeCountQuery)
+	if err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var t string
+			var cnt int64
+			if scanErr := rows.Scan(&t, &cnt); scanErr == nil {
+				mu.Lock()
+				allTypeCounts[t] += cnt
+				mu.Unlock()
+			}
+		}
+		if err := rows.Err(); err != nil {
+			models.Log.Debug("Type count query error", "error", err)
+		}
+	}
+}
+
+type histogramData struct {
+	sizes      []int64
+	durations  []int64
+	modified   []int64
+	created    []int64
+	downloaded []int64
+}
+
+func (c *ServeCmd) scanHistogramRow(rows *sql.Rows, h *histogramData) {
+	var s, d, tm, tc, td sql.NullInt64
+	if err := rows.Scan(&s, &d, &tm, &tc, &td); err == nil {
+		if s.Valid && s.Int64 > 0 && s.Int64 < 100*1024*1024*1024*1024 {
+			h.sizes = append(h.sizes, s.Int64)
+		}
+		if d.Valid && d.Int64 > 0 && d.Int64 < 2678400 {
+			h.durations = append(h.durations, d.Int64)
+		}
+		if tm.Valid && tm.Int64 > 0 {
+			h.modified = append(h.modified, tm.Int64)
+		}
+		if tc.Valid && tc.Int64 > 0 {
+			h.created = append(h.created, tc.Int64)
+		}
+		if td.Valid && td.Int64 > 0 {
+			h.downloaded = append(h.downloaded, td.Int64)
+		}
+	}
+}
+
+func (c *ServeCmd) fetchSampleHistogram(
+	ctx context.Context,
+	sqlDB *sql.DB,
+	allHistogram *histogramData,
+	mu *sync.Mutex,
+) {
+	sampleQuery := `
+		SELECT size, duration, time_modified, time_created, time_downloaded
+		FROM media
+		WHERE COALESCE(time_deleted, 0) = 0
+		ORDER BY random()
+		LIMIT 1000
+	`
+	rows, err := sqlDB.QueryContext(ctx, sampleQuery)
+	if err == nil {
+		defer rows.Close()
+		var local histogramData
+		for rows.Next() {
+			c.scanHistogramRow(rows, &local)
+		}
+		if err := rows.Err(); err != nil {
+			models.Log.Debug("Sample query error", "error", err)
+		}
+		mu.Lock()
+		allHistogram.sizes = append(allHistogram.sizes, local.sizes...)
+		allHistogram.durations = append(allHistogram.durations, local.durations...)
+		allHistogram.modified = append(allHistogram.modified, local.modified...)
+		allHistogram.created = append(allHistogram.created, local.created...)
+		allHistogram.downloaded = append(allHistogram.downloaded, local.downloaded...)
+		mu.Unlock()
+	}
+}
+
 func (c *ServeCmd) computeFilterBinsDataOptimized(
 	ctx context.Context,
 	flags models.GlobalFlags,
@@ -452,45 +591,7 @@ func (c *ServeCmd) computeFilterBinsDataOptimized(
 	var mu sync.Mutex
 	allParentCounts := make(map[string]int64)
 	allTypeCounts := make(map[string]int64)
-
-	// Collect histogram data for efficient percentile calculation
-	type histogramData struct {
-		sizes      []int64
-		durations  []int64
-		modified   []int64
-		created    []int64
-		downloaded []int64
-	}
 	var allHistogram histogramData
-
-	// Build flags for this query, ignoring the specified filter
-	tempFlags := flags
-	tempFlags.Where = append([]string{}, flags.Where...)
-	tempFlags.All = true
-	tempFlags.Limit = 0
-
-	switch filterToIgnore {
-	case "size":
-		tempFlags.Size = nil
-	case "duration":
-		tempFlags.Duration = nil
-	case "episodes":
-		tempFlags.FileCounts = ""
-	case "media_type":
-		tempFlags.VideoOnly = false
-		tempFlags.AudioOnly = false
-		tempFlags.ImageOnly = false
-		tempFlags.TextOnly = false
-	case "modified":
-		tempFlags.ModifiedAfter = ""
-		tempFlags.ModifiedBefore = ""
-	case "created":
-		tempFlags.CreatedAfter = ""
-		tempFlags.CreatedBefore = ""
-	case "downloaded":
-		tempFlags.DownloadedAfter = ""
-		tempFlags.DownloadedBefore = ""
-	}
 
 	var wg sync.WaitGroup
 	for _, dbPath := range dbs {
@@ -498,171 +599,21 @@ func (c *ServeCmd) computeFilterBinsDataOptimized(
 		go func(path string) {
 			defer wg.Done()
 			_ = c.execDB(ctx, path, func(ctx context.Context, sqlDB *sql.DB) error {
-				// OPTIMIZATION: Use SQL aggregation instead of fetching all rows
-				// This is much faster for large datasets
-
-				// 1. Get parent counts from folder_stats materialized view (for episode filtering)
-				// Fetch parent counts when computing episodes filter (filterToIgnore == "episodes")
 				if filterToIgnore == "episodes" {
-					parentCountQuery := `
-						SELECT parent, file_count
-						FROM folder_stats
-					`
-					rows, err := sqlDB.QueryContext(ctx, parentCountQuery)
-					hasData := false
-					folderStatsCount := 0
-					if err != nil {
-						models.Log.Debug("Parent count query failed (folder_stats may not exist)", "error", err)
-					} else {
-						defer rows.Close()
-						for rows.Next() {
-							hasData = true
-							folderStatsCount++
-							var parent string
-							var cnt int64
-							if scanErr := rows.Scan(&parent, &cnt); scanErr == nil {
-								mu.Lock()
-								allParentCounts[parent] += cnt
-								mu.Unlock()
-							}
-						}
-						if err2 := rows.Err(); err2 != nil {
-							models.Log.Debug("Parent count query error", "error", err2)
-						}
-					}
-
-					// If folder_stats was empty or had errors, fall back to counting from media table
-					if !hasData {
-						models.Log.Debug("folder_stats empty, using fallback to media table")
-						parentCountQuery = `
-							SELECT path
-							FROM media
-							WHERE COALESCE(time_deleted, 0) = 0
-						`
-						rows, err = sqlDB.QueryContext(ctx, parentCountQuery)
-						if err != nil {
-							models.Log.Debug("Fallback parent count query failed", "error", err)
-						} else {
-							defer rows.Close()
-							localParentCounts := make(map[string]int64)
-							fallbackCount := 0
-							for rows.Next() {
-								fallbackCount++
-								var path string
-								if err := rows.Scan(&path); err == nil {
-									parent := filepath.Dir(path)
-									localParentCounts[parent]++
-								}
-							}
-							if err := rows.Err(); err != nil {
-								models.Log.Debug("Fallback parent count query error", "error", err)
-							}
-							models.Log.Debug(
-								"Fallback parent count",
-								"paths_scanned",
-								fallbackCount,
-								"unique_parents",
-								len(localParentCounts),
-							)
-							mu.Lock()
-							for p, cnt := range localParentCounts {
-								allParentCounts[p] += cnt
-							}
-							mu.Unlock()
-						}
-					} else {
-						models.Log.Debug(
-							"folder_stats data",
-							"rows",
-							folderStatsCount,
-							"unique_parents",
-							len(allParentCounts),
-						)
-					}
+					c.fetchParentCounts(ctx, sqlDB, allParentCounts, &mu)
 				}
-
-				// 2. Get type counts
-				typeCountQuery := `
-					SELECT COALESCE(NULLIF(media_type, ''), 'unknown') as t, COUNT(*) as cnt
-					FROM media
-					WHERE COALESCE(time_deleted, 0) = 0
-					GROUP BY media_type
-				`
-				rows, err := sqlDB.QueryContext(ctx, typeCountQuery)
-				if err == nil {
-					defer rows.Close()
-					for rows.Next() {
-						var t string
-						var cnt int64
-						if scanErr := rows.Scan(&t, &cnt); scanErr == nil {
-							mu.Lock()
-							allTypeCounts[t] += cnt
-							mu.Unlock()
-						}
-					}
-					if err2 := rows.Err(); err2 != nil {
-						models.Log.Debug("Type count query error", "error", err2)
-					}
-				}
-
-				// 3. For percentile calculation, fetch a SAMPLE of actual values
-				// This is MUCH faster than fetching all rows while still providing
-				// accurate percentile estimates
-				sampleQuery := `
-					SELECT size, duration, time_modified, time_created, time_downloaded
-					FROM media
-					WHERE COALESCE(time_deleted, 0) = 0
-					ORDER BY random()
-					LIMIT 1000
-				`
-				rows, err = sqlDB.QueryContext(ctx, sampleQuery)
-				if err == nil {
-					defer rows.Close()
-					var localSizes, localDurs, localMods, localCres, localDls []int64
-					for rows.Next() {
-						var s, d, tm, tc, td sql.NullInt64
-						if err := rows.Scan(&s, &d, &tm, &tc, &td); err == nil {
-							if s.Valid && s.Int64 > 0 && s.Int64 < 100*1024*1024*1024*1024 {
-								localSizes = append(localSizes, s.Int64)
-							}
-							if d.Valid && d.Int64 > 0 && d.Int64 < 2678400 {
-								localDurs = append(localDurs, d.Int64)
-							}
-							if tm.Valid && tm.Int64 > 0 {
-								localMods = append(localMods, tm.Int64)
-							}
-							if tc.Valid && tc.Int64 > 0 {
-								localCres = append(localCres, tc.Int64)
-							}
-							if td.Valid && td.Int64 > 0 {
-								localDls = append(localDls, td.Int64)
-							}
-						}
-					}
-					if err := rows.Err(); err != nil {
-						models.Log.Debug("Sample query error", "error", err)
-					}
-					mu.Lock()
-					allHistogram.sizes = append(allHistogram.sizes, localSizes...)
-					allHistogram.durations = append(allHistogram.durations, localDurs...)
-					allHistogram.modified = append(allHistogram.modified, localMods...)
-					allHistogram.created = append(allHistogram.created, localCres...)
-					allHistogram.downloaded = append(allHistogram.downloaded, localDls...)
-					mu.Unlock()
-				}
-
+				c.fetchTypeCounts(ctx, sqlDB, allTypeCounts, &mu)
+				c.fetchSampleHistogram(ctx, sqlDB, &allHistogram, &mu)
 				return nil
 			})
 		}(dbPath)
 	}
 	wg.Wait()
 
-	// Apply FileCounts (episodes) filter in post-processing if not being ignored
 	if filterToIgnore != "episodes" && flags.FileCounts != "" {
-		r, err := utils.ParseRange(flags.FileCounts, func(s string) (int64, error) {
+		if r, err := utils.ParseRange(flags.FileCounts, func(s string) (int64, error) {
 			return strconv.ParseInt(s, 10, 64)
-		})
-		if err == nil {
+		}); err == nil {
 			filteredParentCounts := make(map[string]int64)
 			for parent, count := range allParentCounts {
 				if r.Matches(count) {

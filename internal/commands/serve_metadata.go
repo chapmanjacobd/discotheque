@@ -67,64 +67,89 @@ func (c *ServeCmd) HandleDatabases(w http.ResponseWriter, _ *http.Request) {
 
 // HandleCategories returns a list of categories and their media counts.
 // GET /api/categories
-func (c *ServeCmd) HandleCategories(w http.ResponseWriter, r *http.Request) {
-	counts := make(map[string]int64)
-	isCustom := make(map[string]bool)
+func (c *ServeCmd) processUsedCategories(
+	ctx context.Context,
+	queries *database.Queries,
+	counts map[string]int64,
+) error {
+	rows, err := queries.GetUsedCategories(ctx)
+	if err != nil {
+		return err
+	}
+	for _, row := range rows {
+		if row.Categories.Valid {
+			trimmed := strings.Trim(row.Categories.String, ";")
+			if trimmed == "" {
+				continue
+			}
+			cats := strings.SplitSeq(trimmed, ";")
+			for cat := range cats {
+				if cat != "" {
+					counts[cat] += row.Count
+				}
+			}
+		}
+	}
+	return nil
+}
 
+func (c *ServeCmd) processCustomCategories(
+	ctx context.Context,
+	queries *database.Queries,
+	counts map[string]int64,
+	isCustom map[string]bool,
+) {
+	customCats, err := queries.GetCustomCategories(ctx)
+	if err == nil {
+		for _, cat := range customCats {
+			isCustom[cat] = true
+			if _, ok := counts[cat]; !ok {
+				counts[cat] = 0
+			}
+		}
+	}
+}
+
+func (c *ServeCmd) fetchCategoryCounts(ctx context.Context, counts map[string]int64, isCustom map[string]bool) {
 	for _, dbPath := range c.Databases {
-		err := c.execDB(r.Context(), dbPath, func(ctx context.Context, sqlDB *sql.DB) error {
+		err := c.execDB(ctx, dbPath, func(ctx context.Context, sqlDB *sql.DB) error {
 			queries := database.New(sqlDB)
 
-			// 1. Get categories already assigned to media
-			rows, err := queries.GetUsedCategories(ctx)
-			if err != nil {
+			if err := c.processUsedCategories(ctx, queries, counts); err != nil {
 				return err
 			}
-			for _, row := range rows {
-				if row.Categories.Valid {
-					trimmed := strings.Trim(row.Categories.String, ";")
-					if trimmed == "" {
-						continue
-					}
-					cats := strings.SplitSeq(trimmed, ";")
-					for cat := range cats {
-						if cat != "" {
-							counts[cat] += row.Count
-						}
-					}
-				}
-			}
 
-			// 2. Get categories from custom keywords
-			customCats, err := queries.GetCustomCategories(ctx)
-			if err == nil {
-				for _, cat := range customCats {
-					isCustom[cat] = true
-					if _, ok := counts[cat]; !ok {
-						counts[cat] = 0
-					}
-				}
-			}
-
+			c.processCustomCategories(ctx, queries, counts, isCustom)
 			return nil
 		})
 		if err != nil {
 			models.Log.Error("Failed to fetch categories", "db", dbPath, "error", err)
 		}
 	}
+}
 
-	// 3. Add Uncategorized count
+func (c *ServeCmd) fetchUncategorizedCount(ctx context.Context) int64 {
+	var totalCount int64
 	for _, dbPath := range c.Databases {
-		_ = c.execDB(r.Context(), dbPath, func(ctx context.Context, sqlDB *sql.DB) error {
+		_ = c.execDB(ctx, dbPath, func(ctx context.Context, sqlDB *sql.DB) error {
 			var count int64
 			err := sqlDB.QueryRowContext(ctx, "SELECT COUNT(*) FROM media WHERE time_deleted = 0 AND (categories IS NULL OR categories = '')").
 				Scan(&count)
 			if err == nil {
-				counts["Uncategorized"] += count
+				totalCount += count
 			}
 			return nil
 		})
 	}
+	return totalCount
+}
+
+func (c *ServeCmd) HandleCategories(w http.ResponseWriter, r *http.Request) {
+	counts := make(map[string]int64)
+	isCustom := make(map[string]bool)
+
+	c.fetchCategoryCounts(r.Context(), counts, isCustom)
+	counts["Uncategorized"] = c.fetchUncategorizedCount(r.Context())
 
 	res := make([]models.CatStat, 0, len(counts))
 	for k, v := range counts {
@@ -275,6 +300,66 @@ type CaptionsQueryParams struct {
 	TextOnly  bool
 }
 
+func (c *ServeCmd) fetchAllCaptionsForPaths(
+	ctx context.Context,
+	queries *database.Queries,
+	matches []database.SearchCaptionsRow,
+) []database.Captions {
+	pathSet := make(map[string]bool)
+	for _, m := range matches {
+		pathSet[m.MediaPath] = true
+	}
+	var allCaptions []database.Captions
+	for path := range pathSet {
+		captions, err := queries.GetCaptionsForMedia(ctx, path)
+		if err != nil {
+			models.Log.Warn("Failed to get captions for media", "path", path, "error", err)
+			continue
+		}
+		allCaptions = append(allCaptions, captions...)
+	}
+	return allCaptions
+}
+
+type nearbyCaptionsParams struct {
+	path        string
+	matchTime   float64
+	allCaptions []database.Captions
+	matchTimes  map[string]map[float64]bool
+	added       map[string]map[float64]bool
+	isBefore    bool
+}
+
+func (c *ServeCmd) findNearbyCaptions(params nearbyCaptionsParams) []database.SearchCaptionsRow {
+	var nearby []database.SearchCaptionsRow
+	count := 0
+	for _, cap := range params.allCaptions {
+		if cap.MediaPath != params.path || !cap.Time.Valid {
+			continue
+		}
+		capTime := cap.Time.Float64
+		var matchesCondition bool
+		if params.isBefore {
+			matchesCondition = capTime < params.matchTime
+		} else {
+			matchesCondition = capTime > params.matchTime
+		}
+
+		if matchesCondition && !params.matchTimes[params.path][capTime] {
+			if count < 2 && !params.added[params.path][capTime] {
+				nearby = append(nearby, database.SearchCaptionsRow{
+					MediaPath: cap.MediaPath,
+					Time:      cap.Time,
+					Text:      cap.Text,
+				})
+				params.added[params.path][capTime] = true
+				count++
+			}
+		}
+	}
+	return nearby
+}
+
 // getCaptionsWithContext fetches captions matching a query along with 2 captions before and after each match
 func (c *ServeCmd) getCaptionsWithContext(
 	ctx context.Context,
@@ -301,26 +386,7 @@ func (c *ServeCmd) getCaptionsWithContext(
 		return matches, nil
 	}
 
-	// Get unique media paths that have matches
-	pathSet := make(map[string]bool)
-	for _, m := range matches {
-		pathSet[m.MediaPath] = true
-	}
-	var paths []string
-	for path := range pathSet {
-		paths = append(paths, path)
-	}
-
-	// Get all captions for those media paths
-	var allCaptions []database.Captions
-	for _, path := range paths {
-		captions, err := queries.GetCaptionsForMedia(ctx, path)
-		if err != nil {
-			models.Log.Warn("Failed to get captions for media", "path", path, "error", err)
-			continue
-		}
-		allCaptions = append(allCaptions, captions...)
-	}
+	allCaptions := c.fetchAllCaptionsForPaths(ctx, queries, matches)
 
 	// Create a set of match times for each path
 	matchTimes := make(map[string]map[float64]bool)
@@ -333,7 +399,6 @@ func (c *ServeCmd) getCaptionsWithContext(
 		}
 	}
 
-	// For each match, find 2 captions before and after
 	var result []database.SearchCaptionsRow
 	added := make(map[string]map[float64]bool)
 
@@ -344,62 +409,34 @@ func (c *ServeCmd) getCaptionsWithContext(
 		matchTime := m.Time.Float64
 		path := m.MediaPath
 
-		// Add the match itself
 		if added[path] == nil {
 			added[path] = make(map[float64]bool)
 		}
+
+		// Add the match itself
 		if !added[path][matchTime] {
 			result = append(result, m)
 			added[path][matchTime] = true
 		}
 
 		// Find 2 captions before
-		beforeCount := 0
-		for _, c := range allCaptions {
-			if c.MediaPath != path || !c.Time.Valid {
-				continue
-			}
-			captionTime := c.Time.Float64
-			if captionTime < matchTime && !matchTimes[path][captionTime] {
-				if beforeCount < 2 && !added[path][captionTime] {
-					result = append(result, database.SearchCaptionsRow{
-						MediaPath: c.MediaPath,
-						Time:      c.Time,
-						Text:      c.Text,
-						Title:     sql.NullString{},
-						MediaType: sql.NullString{},
-						Size:      sql.NullInt64{},
-						Duration:  sql.NullInt64{},
-					})
-					added[path][captionTime] = true
-					beforeCount++
-				}
-			}
-		}
-
+		result = append(result, c.findNearbyCaptions(nearbyCaptionsParams{
+			path:        path,
+			matchTime:   matchTime,
+			allCaptions: allCaptions,
+			matchTimes:  matchTimes,
+			added:       added,
+			isBefore:    true,
+		})...)
 		// Find 2 captions after
-		afterCount := 0
-		for _, c := range allCaptions {
-			if c.MediaPath != path || !c.Time.Valid {
-				continue
-			}
-			captionTime := c.Time.Float64
-			if captionTime > matchTime && !matchTimes[path][captionTime] {
-				if afterCount < 2 && !added[path][captionTime] {
-					result = append(result, database.SearchCaptionsRow{
-						MediaPath: c.MediaPath,
-						Time:      c.Time,
-						Text:      c.Text,
-						Title:     sql.NullString{},
-						MediaType: sql.NullString{},
-						Size:      sql.NullInt64{},
-						Duration:  sql.NullInt64{},
-					})
-					added[path][captionTime] = true
-					afterCount++
-				}
-			}
-		}
+		result = append(result, c.findNearbyCaptions(nearbyCaptionsParams{
+			path:        path,
+			matchTime:   matchTime,
+			allCaptions: allCaptions,
+			matchTimes:  matchTimes,
+			added:       added,
+			isBefore:    false,
+		})...)
 	}
 
 	// Sort by media_path and time
