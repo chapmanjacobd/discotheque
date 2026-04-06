@@ -189,7 +189,7 @@ test.describe('Debug Media Loading', () => {
     }
   });
 
-  test('handles 404 media gracefully', async ({ mediaPage, viewerPage, server }) => {
+  test('handles 404 media gracefully', async ({ mediaPage, server }) => {
     await mediaPage.goto(server.getBaseUrl());
 
     // Mock a 404 response for media files

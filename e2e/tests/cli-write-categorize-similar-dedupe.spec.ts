@@ -45,7 +45,7 @@ test.describe('CLI: Similar-Files Command', () => {
 });
 
 test.describe('CLI: Similar-Folders Command', () => {
-  test('finds similar folders', async ({ cli, tempDir, testDbPath, createValidVideo }) => {
+  test('finds similar folders', async ({ cli, tempDir, testDbPath }) => {
     const dir1 = path.join(tempDir, 'movies_action');
     const dir2 = path.join(tempDir, 'movies_comedy');
     fs.mkdirSync(dir1);
@@ -69,7 +69,7 @@ test.describe('CLI: Similar-Folders Command', () => {
 });
 
 test.describe('CLI: Dedupe Command', () => {
-  test('deduplicates similar media (simulate)', async ({ cli, tempDir, testDbPath, createValidVideo }) => {
+  test('deduplicates similar media (simulate)', async ({ cli, tempDir, testDbPath }) => {
     const dir1 = path.join(tempDir, 'dir1');
     const dir2 = path.join(tempDir, 'dir2');
     fs.mkdirSync(dir1);
@@ -99,7 +99,7 @@ test.describe('CLI: Big-Dirs Command', () => {
     expect(result.stdout).toContain('big_dir');
   });
 
-  test('shows big directories sorted by size', async ({ cli, tempDir, testDbPath, createValidVideo }) => {
+  test('shows big directories sorted by size', async ({ cli, tempDir, testDbPath }) => {
     const smallDir = path.join(tempDir, 'small');
     const largeDir = path.join(tempDir, 'large');
     fs.mkdirSync(smallDir);

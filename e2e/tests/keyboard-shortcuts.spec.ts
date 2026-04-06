@@ -7,9 +7,6 @@ test.describe('Keyboard Shortcuts', () => {
     test('n key plays next sibling without player open', async ({ mediaPage, viewerPage, server }) => {
       await mediaPage.goto(server.getBaseUrl());
 
-      // Get initial media count using POM
-      const initialCount = await mediaPage.getMediaCount();
-
       // Press 'n' to play next (no player needs to be open)
       await mediaPage.page.keyboard.press('n');
       await mediaPage.page.waitForTimeout(1000);

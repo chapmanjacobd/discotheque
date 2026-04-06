@@ -9,7 +9,7 @@ export default async function globalSetup() {
   // We don't pre-start servers here because Playwright runs workers in separate processes
   // Instead, each worker will start its own server on first test
   return () => {
-    globalServers.forEach(async (server, key) => {
+    globalServers.forEach(async (server) => {
       await server.stop();
     });
     globalServers.clear();

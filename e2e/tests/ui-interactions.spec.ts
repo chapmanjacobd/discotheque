@@ -108,7 +108,6 @@ test.describe('Metadata Modal', () => {
 
     // Get the path from the first media card using POM
     const firstCard = mediaPage.getFirstMediaCardByType('video');
-    const cardPath = await firstCard.getAttribute('data-path');
 
     await firstCard.click();
     await viewerPage.waitForPlayer();

@@ -110,12 +110,6 @@ test.describe('Large Result Sets Scrolling', () => {
     });
     await mediaPage.page.waitForTimeout(500);
 
-    // Get scroll position using POM
-    const scrollPosBefore = await mediaPage.page.evaluate(() => {
-      const content = document.querySelector('#content');
-      return content ? content.scrollTop : 0;
-    });
-
     // Perform search using POM
     await mediaPage.search('test');
     await mediaPage.page.waitForTimeout(1000);
@@ -200,9 +194,6 @@ test.describe('Large Result Sets Scrolling', () => {
   test('no duplicate cards load during scrolling', async ({ mediaPage, server }) => {
     await mediaPage.goto(server.getBaseUrl());
 
-    // Get initial card paths using POM
-    const initialPaths = await mediaPage.getAllMediaCardPaths();
-
     // Scroll down using POM
     await mediaPage.page.evaluate(() => {
       const content = document.querySelector('#content');
@@ -266,7 +257,7 @@ test.describe('Error Handling and Recovery', () => {
     expect(count).toBeGreaterThanOrEqual(0);
   });
 
-  test('shows error toast for failed media playback', async ({ mediaPage, viewerPage, server }) => {
+  test('shows error toast for failed media playback', async ({ mediaPage, server }) => {
     await mediaPage.goto(server.getBaseUrl());
 
     // Mock media file to return 404

@@ -194,7 +194,7 @@ test.describe('README Screenshots', () => {
     console.log('✓ Captured: disk-usage-view.png');
   });
 
-  test('capture group view', async ({ mediaPage, sidebarPage, server }) => {
+  test('capture group view', async ({ mediaPage, server }) => {
     await mediaPage.goto(server.getBaseUrl());
 
     // Switch to group view

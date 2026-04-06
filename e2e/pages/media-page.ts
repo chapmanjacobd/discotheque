@@ -82,7 +82,7 @@ export class MediaPage extends BasePage {
    * Wait for page state to be populated
    */
   async waitForPageState(timeout: number = 10000): Promise<void> {
-    await this.page.waitForFunction((timeout) => {
+    await this.page.waitForFunction(() => {
       const disco = (window as any).disco;
       if (!disco) return false;
       const isDUMode = window.location.hash.includes('mode=du') || disco.state?.page === 'du';
@@ -610,8 +610,6 @@ export class MediaPage extends BasePage {
    */
   async navigateToDUFolderWithFallback(
     folderName: string | RegExp,
-    minFiles: number = 2,
-    maxDepth: number = 5,
     folderTimeout: number = 1500
   ): Promise<{
     fileCards: Locator;

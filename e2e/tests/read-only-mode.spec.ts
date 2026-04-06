@@ -56,7 +56,7 @@ test.describe('Read-Only Mode', () => {
     expect(isVisible).toBe(false);
   });
 
-  test('sidebar trash button not visible in read-only mode', async ({ sidebarPage, server }) => {
+  test('sidebar trash button not visible in read-only mode', async ({ sidebarPage }) => {
     await sidebarPage.open();
 
     // Sidebar trash button should NOT be visible in read-only mode

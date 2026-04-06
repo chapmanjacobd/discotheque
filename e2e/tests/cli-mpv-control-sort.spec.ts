@@ -1,8 +1,6 @@
 import { test, expect } from '../fixtures-cli';
-import * as fs from 'fs';
-import * as path from 'path';
 
-test.describe('CLI: Sort Commands', () => {
+test.describe('CLI: MPV Control and Sorting', () => {
   test('regex-sort sorts media', async ({ cli, tempDir, testDbPath, createValidVideo }) => {
     createValidVideo('movie_2023.mp4');
     createValidVideo('movie_2022.mp4');

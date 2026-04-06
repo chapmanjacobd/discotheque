@@ -6,14 +6,14 @@ import { test, expect } from '../fixtures';
  */
 test.describe('History Pages - In Progress / Unplayed / Completed', () => {
 
-  test.beforeEach(async ({ mediaPage, server }) => {
+  test.beforeEach(async ({ mediaPage }) => {
     // Enable local resume by setting localStorage before page load using POM
     await mediaPage.page.context().addInitScript(() => {
       localStorage.setItem('disco-local-resume', 'true');
     });
   });
 
-  test('In Progress page shows media with local progress', async ({ mediaPage, viewerPage, page, server }) => {
+  test('In Progress page shows media with local progress', async ({ mediaPage, viewerPage, server }) => {
     await mediaPage.goto(server.getBaseUrl(), 20000);
 
     // Play a video to create local progress using POM
@@ -253,7 +253,6 @@ test.describe('History Pages - In Progress / Unplayed / Completed', () => {
     await mediaPage.goto(server.getBaseUrl(), 20000);
 
     const inProgressBtn = sidebarPage.historyInProgressButton;
-    const allMediaBtn = sidebarPage.allMediaButton;
 
     // Initial state should be All Media using POM
     const allMediaActive = await sidebarPage.isAllMediaActive();

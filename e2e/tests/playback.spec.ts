@@ -137,7 +137,7 @@ test.describe('Media Playback', () => {
     }
   });
 
-  test('handles rapid clicks on the same item', async ({ mediaPage, viewerPage, server }) => {
+  test('handles rapid clicks on the same item', async ({ mediaPage, server }) => {
     await mediaPage.goto(server.getBaseUrl());
 
     const mediaCard = mediaPage.getFirstMediaCardByType('video');

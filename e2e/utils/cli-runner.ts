@@ -1,4 +1,4 @@
-import { spawn, ChildProcess } from 'child_process';
+import { spawn } from 'child_process';
 import * as path from 'path';
 import * as fs from 'fs';
 
@@ -173,7 +173,6 @@ export async function createTestDatabase(
 
   // Copy schema if provided
   if (schema) {
-    const fs = await import('fs');
     const { exec } = await import('child_process');
 
     return new Promise((resolve, reject) => {

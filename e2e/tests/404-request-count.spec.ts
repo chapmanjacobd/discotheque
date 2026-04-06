@@ -2,7 +2,7 @@ import { test, expect } from '../fixtures';
 
 test.use({ readOnly: true });
 
-test('counts requests for 404 media', async ({ mediaPage, viewerPage, server }) => {
+test('counts requests for 404 media', async ({ mediaPage, server }) => {
   const requests: string[] = [];
   const targetPath = 'non-existent-media.mp3';
 

@@ -239,9 +239,8 @@ test.describe('Filter Consistency Across Modes', () => {
 
       // Get initial size slider max
       const initialSizeMaxSlider = mediaPage.page.locator('#size-max-slider');
-      let initialSizeMax = '0';
       if (await initialSizeMaxSlider.count() > 0) {
-        initialSizeMax = await initialSizeMaxSlider.getAttribute('max') || '0';
+        await initialSizeMaxSlider.getAttribute('max');
       }
 
       // Perform search
@@ -266,9 +265,8 @@ test.describe('Filter Consistency Across Modes', () => {
 
       // Get initial size slider max
       const initialSizeMaxSlider = mediaPage.page.locator('#size-max-slider');
-      let initialSizeMax = '0';
       if (await initialSizeMaxSlider.count() > 0) {
-        initialSizeMax = await initialSizeMaxSlider.getAttribute('max') || '0';
+        await initialSizeMaxSlider.getAttribute('max');
       }
 
       // Perform search
@@ -293,9 +291,8 @@ test.describe('Filter Consistency Across Modes', () => {
 
       // Get initial size slider max
       const initialSizeMaxSlider = mediaPage.page.locator('#size-max-slider');
-      let initialSizeMax = '0';
       if (await initialSizeMaxSlider.count() > 0) {
-        initialSizeMax = await initialSizeMaxSlider.getAttribute('max') || '0';
+        await initialSizeMaxSlider.getAttribute('max');
       }
 
       // Perform search

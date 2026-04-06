@@ -106,7 +106,7 @@ test.describe('Progress Synchronization', () => {
     expect(typeof progress[videoPath].last).toBe('number');
   });
 
-  test('progress persists across page reload', async ({ mediaPage, viewerPage, server, page }) => {
+  test('progress persists across page reload', async ({ mediaPage, server, page }) => {
     console.log('=== Testing progress persistence across reload ===');
 
     await mediaPage.goto(server.getBaseUrl());

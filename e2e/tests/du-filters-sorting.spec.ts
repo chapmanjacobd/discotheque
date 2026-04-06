@@ -278,8 +278,6 @@ test.describe('DU Mode Filters and Sorting', () => {
       await mediaPage.page.waitForTimeout(1000);
 
       // Get initial folder count and file count
-      const folderCards = mediaPage.page.locator('.media-card.is-folder');
-      const initialFolderCount = await folderCards.count();
       
       const getFolderFileCount = async (): Promise<number> => {
         const countElement = mediaPage.page.locator('.media-card.is-folder .media-meta span:has-text("files")').first();
@@ -498,9 +496,8 @@ test.describe('DU Mode Filters and Sorting', () => {
 
       // Get initial size slider max
       const initialSizeMaxSlider = mediaPage.page.locator('#size-max-slider');
-      let initialSizeMax = '0';
       if (await initialSizeMaxSlider.count() > 0) {
-        initialSizeMax = await initialSizeMaxSlider.getAttribute('max') || '0';
+        await initialSizeMaxSlider.getAttribute('max');
       }
 
       // Apply video filter
@@ -527,9 +524,8 @@ test.describe('DU Mode Filters and Sorting', () => {
 
       // Get initial size slider max
       const initialSizeMaxSlider = mediaPage.page.locator('#size-max-slider');
-      let initialSizeMax = '0';
       if (await initialSizeMaxSlider.count() > 0) {
-        initialSizeMax = await initialSizeMaxSlider.getAttribute('max') || '0';
+        await initialSizeMaxSlider.getAttribute('max');
       }
 
       // Search for specific term
@@ -555,9 +551,8 @@ test.describe('DU Mode Filters and Sorting', () => {
 
       // Get initial size slider max
       const initialSizeMaxSlider = mediaPage.page.locator('#size-max-slider');
-      let initialSizeMax = '0';
       if (await initialSizeMaxSlider.count() > 0) {
-        initialSizeMax = await initialSizeMaxSlider.getAttribute('max') || '0';
+        await initialSizeMaxSlider.getAttribute('max');
       }
 
       // Search

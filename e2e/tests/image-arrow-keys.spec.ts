@@ -85,7 +85,6 @@ test.describe('Image Arrow Key Navigation', () => {
     // Get initial src using POM
     const imageElement = viewerPage.getImageElement();
     await imageElement.waitFor({ state: 'visible', timeout: 5000 });
-    const initialSrc = await imageElement.getAttribute('src');
 
     // Press ArrowRight multiple times using POM (cycle through fewer images to avoid closing player)
     const cycles = Math.min(imageCount - 1, 2);

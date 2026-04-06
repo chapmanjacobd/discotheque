@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 test.describe('CLI: Check Command', () => {
-  test('marks missing files as deleted', async ({ cli, tempDir, testDbPath, createValidVideo }) => {
+  test('marks missing files as deleted', async ({ cli, testDbPath, createValidVideo }) => {
     const videoPath = createValidVideo('to_delete.mp4');
     await cli.runAndVerify(['add', testDbPath, videoPath]);
 
@@ -15,7 +15,7 @@ test.describe('CLI: Check Command', () => {
     expect(queryResult[0].time_deleted).toBeGreaterThan(0);
   });
 
-  test('dry run does not mark files', async ({ cli, tempDir, testDbPath, createValidVideo }) => {
+  test('dry run does not mark files', async ({ cli, testDbPath, createValidVideo }) => {
     const videoPath = createValidVideo('dry_run_check.mp4');
     await cli.runAndVerify(['add', testDbPath, videoPath]);
 
@@ -39,7 +39,7 @@ test.describe('CLI: Print Command', () => {
     expect(result.stdout).toContain('v2.mp4');
   });
 
-  test('prints media sorted by size', async ({ cli, tempDir, testDbPath, createValidVideo }) => {
+  test('prints media sorted by size', async ({ cli, tempDir, testDbPath }) => {
     const small = path.join(tempDir, 'small.mp4');
     const large = path.join(tempDir, 'large.mp4');
     
@@ -59,7 +59,7 @@ test.describe('CLI: Print Command', () => {
 
   test('prints only existing files', async ({ cli, tempDir, testDbPath, createValidVideo }) => {
     const v1 = createValidVideo('v1.mp4');
-    const v2 = createValidVideo('v2.mp4');
+    createValidVideo('v2.mp4');
     await cli.runAndVerify(['add', testDbPath, tempDir]);
 
     fs.unlinkSync(v1);

@@ -160,8 +160,8 @@ test.describe('Filter To Ignore Functionality', () => {
       const durationMaxSlider = mediaPage.page.locator('#duration-max-slider');
       const sizeMaxSlider = mediaPage.page.locator('#size-max-slider');
 
-      const initialDurationMax = await durationMaxSlider.getAttribute('max');
-      const initialSizeMax = await sizeMaxSlider.getAttribute('max');
+      await durationMaxSlider.getAttribute('max');
+      await sizeMaxSlider.getAttribute('max');
 
       // Apply video filter
       await sidebarPage.getMediaTypeButton('video').click();
@@ -231,8 +231,8 @@ test.describe('Filter To Ignore Functionality', () => {
       const durationMaxSlider = mediaPage.page.locator('#duration-max-slider');
       const episodesMaxSlider = mediaPage.page.locator('#episodes-max-slider');
 
-      const initialSizeMax = await sizeMaxSlider.getAttribute('max');
-      const initialDurationMax = await durationMaxSlider.getAttribute('max');
+      await sizeMaxSlider.getAttribute('max');
+      await durationMaxSlider.getAttribute('max');
 
       // Apply episodes filter if slider exists
       if (await episodesMaxSlider.count() > 0) {
@@ -416,8 +416,8 @@ test.describe('Filter To Ignore Functionality', () => {
       const sizeMaxSlider = mediaPage.page.locator('#size-max-slider');
       const durationMaxSlider = mediaPage.page.locator('#duration-max-slider');
 
-      const initialSizeMax = await sizeMaxSlider.getAttribute('max');
-      const initialDurationMax = await durationMaxSlider.getAttribute('max');
+      await sizeMaxSlider.getAttribute('max');
+      await durationMaxSlider.getAttribute('max');
 
       // Perform search
       await mediaPage.search('test');

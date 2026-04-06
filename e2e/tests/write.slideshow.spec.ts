@@ -137,7 +137,6 @@ test.describe('Image Slideshow', () => {
 
     // Get initial src using POM
     const imageElement = viewerPage.getImageElement();
-    const initialSrc = await imageElement.getAttribute('src');
 
     // Start slideshow using POM
     await viewerPage.toggleSlideshow();

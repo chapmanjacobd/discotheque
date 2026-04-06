@@ -82,7 +82,6 @@ test.describe('Combined Filters and Views', () => {
       // Special check for captions + group using POM
       if (mode.name === 'Captions') {
         await mediaPage.page.waitForTimeout(1000);
-        const resultsContainer = mediaPage.resultsContainer;
         // Captions render differently based on view mode
         const isGroupView = await mediaPage.page.evaluate(() => window.disco.state.view === 'group');
         let isCaptionCard;

@@ -110,7 +110,7 @@ test.describe('CLI: Add Command', () => {
     expect(queryResult[0].path).toContain('important');
   });
 
-  test('adds files with size filter', async ({ cli, tempDir, testDbPath, createValidVideo }) => {
+  test('adds files with size filter', async ({ cli, tempDir, testDbPath }) => {
     // Create files of different sizes using real fixtures
     const small = path.join(tempDir, 'small.mp4');
     const large = path.join(tempDir, 'large.mp4');
@@ -161,7 +161,7 @@ test.describe('CLI: Add Command', () => {
     expect(queryResult[0].path).toContain('2023');
   });
 
-  test('adds files with path-contains filter', async ({ cli, tempDir, testDbPath, createValidVideo }) => {
+  test('adds files with path-contains filter', async ({ cli, tempDir, testDbPath }) => {
     const subDir = path.join(tempDir, 'movies');
     fs.mkdirSync(subDir);
     const videoPath = path.join(subDir, 'video.mp4');

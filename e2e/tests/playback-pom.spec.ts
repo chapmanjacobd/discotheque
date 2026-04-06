@@ -162,7 +162,7 @@ test.describe('Media Playback with POM', () => {
     }
   });
 
-  test('handles rapid clicks on the same item', async ({ mediaPage, viewerPage, server }) => {
+  test('handles rapid clicks on the same item', async ({ mediaPage, server }) => {
     await mediaPage.goto(server.getBaseUrl());
 
     // Get first video card
@@ -202,9 +202,6 @@ test.describe('Media Playback with POM', () => {
   test('media title displays correctly', async ({ mediaPage, viewerPage, server }) => {
     await mediaPage.goto(server.getBaseUrl());
 
-    // Get first media card title
-    const cardTitle = await mediaPage.getMediaCardTitle(0);
-    
     // Open media
     await mediaPage.openFirstMediaByType('video');
     await viewerPage.waitForPlayer();

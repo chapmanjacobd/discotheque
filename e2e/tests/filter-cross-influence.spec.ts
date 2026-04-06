@@ -15,16 +15,13 @@ test.describe('Cross-Filter Influence', () => {
 
       // Get initial size range labels (footer labels showing min-max) using POM
       const sizeMinLabel = mediaPage.page.locator('#size-min-label');
-      const sizeMaxLabel = mediaPage.page.locator('#size-max-label');
 
       // Wait for labels to be populated
       await mediaPage.page.waitForTimeout(500);
 
       const initialSizeMin = await sizeMinLabel.textContent();
-      const initialSizeMax = await sizeMaxLabel.textContent();
 
       // Get episodes sliders using POM
-      const episodesMinSlider = sidebarPage.getEpisodesSlider();
       const episodesMaxSlider = mediaPage.page.locator('#episodes-max-slider');
 
       // Adjust episodes filter to a narrower range using POM
@@ -40,7 +37,6 @@ test.describe('Cross-Filter Influence', () => {
 
         // Get updated size range labels using POM
         const newSizeMin = await sizeMinLabel.textContent();
-        const newSizeMax = await sizeMaxLabel.textContent();
 
         // The size range should potentially change when filtering by episodes
         const resultsCount = await mediaPage.getMediaCount();
@@ -66,13 +62,11 @@ test.describe('Cross-Filter Influence', () => {
 
       // Get initial duration range labels using POM
       const durationMinLabel = mediaPage.page.locator('#duration-min-label');
-      const durationMaxLabel = mediaPage.page.locator('#duration-max-label');
 
       // Wait for labels to be populated
       await mediaPage.page.waitForTimeout(500);
 
       const initialDurationMin = await durationMinLabel.textContent();
-      const initialDurationMax = await durationMaxLabel.textContent();
 
       // Get episodes sliders using POM
       const episodesMaxSlider = mediaPage.page.locator('#episodes-max-slider');
@@ -90,7 +84,6 @@ test.describe('Cross-Filter Influence', () => {
 
         // Get updated duration range labels using POM
         const newDurationMin = await durationMinLabel.textContent();
-        const newDurationMax = await durationMaxLabel.textContent();
 
         // Duration range may change when filtering by episodes
         const resultsCount = await mediaPage.getMediaCount();
@@ -192,15 +185,12 @@ test.describe('Cross-Filter Influence', () => {
       const initialSizeMaxSlider = mediaPage.page.locator('#size-max-slider');
       const initialDurationMaxSlider = mediaPage.page.locator('#duration-max-slider');
 
-      let initialSizeMax = '0';
-      let initialDurationMax = '0';
-
       if (await initialSizeMaxSlider.count() > 0) {
-        initialSizeMax = await initialSizeMaxSlider.getAttribute('max') || '0';
+        await initialSizeMaxSlider.getAttribute('max');
       }
 
       if (await initialDurationMaxSlider.count() > 0) {
-        initialDurationMax = await initialDurationMaxSlider.getAttribute('max') || '0';
+        await initialDurationMaxSlider.getAttribute('max');
       }
 
       // Search for specific term using POM
@@ -236,9 +226,8 @@ test.describe('Cross-Filter Influence', () => {
 
       // Get initial size slider max using POM (use specific selector)
       const initialSizeMaxSlider = mediaPage.page.locator('#size-max-slider');
-      let initialSizeMax = '0';
       if (await initialSizeMaxSlider.count() > 0) {
-        initialSizeMax = await initialSizeMaxSlider.getAttribute('max') || '0';
+        await initialSizeMaxSlider.getAttribute('max');
       }
 
       // Search using POM

@@ -1,8 +1,6 @@
 import { test, expect } from '../fixtures-cli';
-import * as fs from 'fs';
-import * as path from 'path';
 
-test.describe('CLI: Watch Command', () => {
+test.describe('CLI: Watch, Listen, Serve Commands', () => {
   test('watches video file with mock player', async ({ cli, testDbPath, createValidVideo }) => {
     const videoPath = createValidVideo('watch_test.mp4');
     await cli.runAndVerify(['add', testDbPath, videoPath]);

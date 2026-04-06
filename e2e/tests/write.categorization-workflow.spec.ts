@@ -294,7 +294,6 @@ test.describe('Categorization Workflow - Full Process', () => {
     const categoryCards = mediaPage.page.locator('.curation-cat-card');
     if (await categoryCards.count() > 0) {
       const firstCategory = categoryCards.first();
-      const categoryName = await firstCategory.getAttribute('data-category');
 
       await firstCategory.click();
       await mediaPage.page.waitForTimeout(1000);

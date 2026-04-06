@@ -11,7 +11,7 @@ test.describe('CLI: Media Check and Info Commands', () => {
     expect(result.stdout).toContain('info_test.mp4');
   });
 
-  test('disk-usage shows aggregation', async ({ cli, tempDir, testDbPath, createValidVideo }) => {
+  test('disk-usage shows aggregation', async ({ cli, tempDir, testDbPath }) => {
     const subDir = path.join(tempDir, 'du_dir');
     fs.mkdirSync(subDir);
     const videoPath = path.join(subDir, 'v1.mp4');
@@ -36,7 +36,7 @@ test.describe('CLI: Media Check and Info Commands', () => {
 });
 
 test.describe('CLI: Disk Usage Deep Dive', () => {
-  test('shows disk usage by depth', async ({ cli, tempDir, testDbPath, createValidVideo }) => {
+  test('shows disk usage by depth', async ({ cli, tempDir, testDbPath }) => {
     const d1 = path.join(tempDir, 'depth1');
     const d2 = path.join(d1, 'depth2');
     fs.mkdirSync(d1);

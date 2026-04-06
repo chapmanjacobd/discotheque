@@ -32,6 +32,7 @@ func run() int {
 		kong.Name("disco"),
 		kong.Description("discoteca management tool"),
 		kong.UsageOnError(),
+		kong.BindTo(context.Background(), (*context.Context)(nil)),
 	)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to initialize CLI parser: %v\n", err)
@@ -62,7 +63,7 @@ func run() int {
 	// Configure default logger (Warn level by default)
 	models.SetupLogging(0)
 
-	err = ctx.Run(context.Background())
+	err = ctx.Run()
 	if err != nil {
 		models.Log.Error("Command failed", "error", err)
 		return 1

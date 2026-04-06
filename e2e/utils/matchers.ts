@@ -152,8 +152,7 @@ export async function toHaveToast(
  * Assert no error toast appears
  */
 export async function toHaveNoErrorToast(
-  page: Page,
-  timeout: number = 2000
+  page: Page
 ): Promise<{ pass: boolean; message: () => string }> {
   const toast = page.locator('#toast');
   if (await toast.isVisible()) {

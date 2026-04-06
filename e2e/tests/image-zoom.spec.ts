@@ -18,9 +18,6 @@ test.describe('Image Zoom and Pan', () => {
     await img.dblclick();
     await mediaPage.page.waitForTimeout(800);
 
-    // Get initial transform
-    const initialTransform = await img.evaluate(el => el.style.transform);
-
     // Simulate mouse wheel (zoom in) - only works in fullscreen
     await img.evaluate(el => {
         const event = new WheelEvent('wheel', {
